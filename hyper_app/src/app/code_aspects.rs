@@ -22,7 +22,6 @@ pub(crate) fn show_aspects_views_menu(
     let title = "Aspects Views";
     // WARN Wtf ?
     let wanted = (&*aspects).into();
-    let id = ui.make_persistent_id(title);
     let add_body = |ui: &mut egui::Ui| {
         show_repo_menu(ui, &mut aspects.commit.repo);
         ui.push_id(ui.id().with("commit"), |ui| {
@@ -151,7 +150,7 @@ pub(crate) fn show_aspects_views_menu(
         // ui.text_edit_singleline(&mut "github.com/INRIA/spoon");
     };
 
-    radio_collapsing(ui, id, title, selected, &wanted, add_body);
+    radio_collapsing(ui, title, selected, &wanted, add_body);
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]

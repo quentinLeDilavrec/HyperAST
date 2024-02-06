@@ -314,6 +314,10 @@ function getImports() {
         const ret = getObject(arg0);
         return addHeapObject(ret);
     };
+    imports.wbg.__wbindgen_object_clone_ref = function(arg0) {
+        const ret = getObject(arg0);
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_prompt_0815ec2ed77b0b6f = function(arg0, arg1, arg2, arg3, arg4) {
         const ret = prompt(getStringFromWasm0(arg1, arg2), getStringFromWasm0(arg3, arg4));
         const ptr0 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);

@@ -123,7 +123,6 @@ pub(super) fn show_menu(
 ) {
     let title = "Long Tracking";
     let wanted = types::SelectedConfig::LongTracking;
-    let id = ui.make_persistent_id(title);
 
     let add_body = |ui: &mut egui::Ui| {
         show_commit_menu(ui, &mut tracking.origins[0].file.commit);
@@ -186,7 +185,7 @@ pub(super) fn show_menu(
         });
     };
 
-    radio_collapsing(ui, id, title, selected, &wanted, add_body);
+    radio_collapsing(ui, title, selected, &wanted, add_body);
 }
 
 #[derive(Clone, Copy, Debug)]

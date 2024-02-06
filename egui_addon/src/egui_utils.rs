@@ -51,12 +51,12 @@ pub fn show_wip(ui: &mut egui::Ui, short: Option<&str>) {
 
 pub fn radio_collapsing<R, S: PartialEq + Clone>(
     ui: &mut egui::Ui,
-    id: Id,
     title: &str,
     selected: &mut S,
     wanted: &S,
     add_body: impl FnOnce(&mut egui::Ui) -> R,
 ) -> CollapsingResponse<R> {
+    let id = ui.id().with(title);
     let mut state =
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
     let title = egui::RichText::new(title).heading();

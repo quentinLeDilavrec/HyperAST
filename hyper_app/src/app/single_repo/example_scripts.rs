@@ -163,7 +163,7 @@ Made to work on Cpp source code."#,
             id: "7f2eb10e93879bc569c7ddf6fb51d6f812cc477c",
         },
         config: Config::MakeCpp,
-        commits: 10,
+        commits: 1,
         scripts: Scripts {
             description: r#"Naively computes the number of files and ast elements.
 This particular implementation goes all the way down in the ast,

@@ -891,11 +891,11 @@ impl Resource<Result<ComputeResults, ScriptingError>> {
         if response.status != 200 {
             let Some(text) = response.text() else {
                 wasm_rs_dbg::dbg!();
-                return Err("".to_string())
+                return Err("".to_string());
             };
             let Ok(json) = serde_json::from_str::<ScriptingError>(text) else {
                 wasm_rs_dbg::dbg!();
-                return Err("".to_string())
+                return Err("".to_string());
             };
             return Ok(Self {
                 response,
@@ -927,17 +927,27 @@ pub(super) fn show_single_repo_menu(
 ) {
     let title = "Single Repository";
     let wanted = SelectedConfig::Single;
-    let id = ui.make_persistent_id(title);
     let add_body = |ui: &mut egui::Ui| {
-        show_repo_menu(ui, &mut single.commit.repo);
-        ui.push_id(ui.id().with("commit"), |ui| {
-            egui::TextEdit::singleline(&mut single.commit.id)
-                .clip_text(true)
-                .desired_width(150.0)
-                .desired_rows(1)
-                .hint_text("commit")
-                .interactive(true)
-                .show(ui)
+        egui::ScrollArea::horizontal().show(ui, |ui| {
+            ui.allocate_ui_with_layout(
+                ui.min_size(),
+                egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    show_repo_menu(ui, &mut single.commit.repo);
+                    ui.label("/");
+                    egui::TextEdit::singleline(&mut single.commit.id)
+                        .id(ui.id().with("commit"))
+                        .clip_text(false)
+                        .margin(egui::Vec2::new(0.0, 0.0))
+                        // .clip_text(true)
+                        // .desired_width(f32::INFINITY)
+                        // .desired_rows(1)
+                        .hint_text("commit")
+                        .interactive(true)
+                        .show(ui);
+                },
+            );
         });
 
         ui.add_enabled_ui(true, |ui| {
@@ -960,7 +970,7 @@ pub(super) fn show_single_repo_menu(
             });
     };
 
-    radio_collapsing(ui, id, title, selected, &wanted, add_body);
+    radio_collapsing(ui, title, selected, &wanted, add_body);
 }
 
 pub(super) fn show_short_result(promise: &Option<RemoteResult>, ui: &mut egui::Ui) {
@@ -1125,11 +1135,10 @@ fn show_long_result_list(content: &ComputeResults, ui: &mut egui::Ui) {
 fn show_long_result_table(content: &ComputeResults, ui: &mut egui::Ui) {
     // header
     let header = content.results.iter().find(|x| x.is_ok());
-    let Some(header) = header
-        .as_ref() else {
-            wasm_rs_dbg::dbg!("issue with header");
-            return;
-        };
+    let Some(header) = header.as_ref() else {
+        wasm_rs_dbg::dbg!("issue with header");
+        return;
+    };
     let header = header.as_ref().unwrap();
     use egui_extras::{Column, TableBuilder};
     TableBuilder::new(ui)

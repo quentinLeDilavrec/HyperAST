@@ -276,7 +276,6 @@ pub(super) fn show_code_tracking_menu(
 ) {
     let title = "Code Tracking";
     let wanted = types::SelectedConfig::Tracking;
-    let id = ui.make_persistent_id(title);
 
     let add_body = |ui: &mut egui::Ui| {
         let repo_changed = show_repo_menu(ui, &mut tracking.target.file.commit.repo);
@@ -309,7 +308,7 @@ pub(super) fn show_code_tracking_menu(
         });
     };
 
-    radio_collapsing(ui, id, title, selected, &wanted, add_body);
+    radio_collapsing(ui, title, selected, &wanted, add_body);
 }
 
 pub(super) fn show_code_tracking_results(

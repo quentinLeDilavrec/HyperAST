@@ -243,19 +243,39 @@ impl<'store, 'cache, TS: CppEnabledTypeStore<HashedNodeRef<'store, TIdN<NodeIden
         //     return None
         // };
         let kind = node.obtain_type(type_store);
-        if kind == Type::StringLiteral || kind == Type::NumberLiteral || kind == Type::CharLiteral {
-            *skip = true;
-        }
-        // TODO make a test to carcterize behavior and avoid future regressions,
-        // see also related TODO: opt out of using end_byte other than on leafs 
         if kind == Type::TS0 {
-            *skip = true;
+            // TODO make a test to carcterize behavior and avoid future regressions,
+            // see also related TODO: opt out of using end_byte other than on leafs
+            let parent_indentation = &stack.parent().unwrap().indentation();
+            let kind = Type::Spaces;
+            let indent = (*parent_indentation).clone();
+            Some(Acc {
+                labeled: node.has_label(),
+                start_byte: node.start_byte(),
+                end_byte: node.end_byte(),
+                metrics: Default::default(),
+                ana: self.build_ana(&kind),
+                padding_start: global.sum_byte_length(),
+                indentation: indent,
+                simple: BasicAccumulator {
+                    kind,
+                    children: vec![],
+                },
+                no_space: vec![],
+            })
+        } else {
+            if kind == Type::StringLiteral || kind == Type::NumberLiteral || kind == Type::CharLiteral {
+                *skip = true;
+            }
+            let mut acc = self.pre(text, node, stack, global);
+            if kind == Type::StringLiteral
+                || kind == Type::NumberLiteral
+                || kind == Type::CharLiteral
+            {
+                acc.labeled = true;
+            }
+            Some(acc)
         }
-        let mut acc = self.pre(text, node, stack, global);
-        if kind == Type::StringLiteral || kind == Type::NumberLiteral || kind == Type::CharLiteral {
-            acc.labeled = true;
-        }
-        Some(acc)
     }
     fn pre(
         &mut self,
@@ -302,6 +322,13 @@ impl<'store, 'cache, TS: CppEnabledTypeStore<HashedNodeRef<'store, TIdN<NodeIden
         text: &[u8],
         acc: <Self as TreeGen>::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+        if acc.simple.kind == Type::Spaces {
+            let spacing = &text[acc.start_byte..acc.end_byte];
+            return FullNode {
+                global: global.into(),
+                local: self.make_spacing(spacing.to_vec()),
+            }
+        }
         let spacing = get_spacing(
             acc.padding_start,
             acc.start_byte,

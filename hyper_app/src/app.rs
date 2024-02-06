@@ -858,12 +858,11 @@ fn show_multi_repo(
 ) {
     let title = "Multi Repo";
     let wanted = types::SelectedConfig::Multi;
-    let id = ui.make_persistent_id(title);
     let add_body = |ui: &mut egui::Ui| {
         ui.text_edit_singleline(&mut "github.com/INRIA/spoon");
     };
 
-    radio_collapsing(ui, id, title, selected, &wanted, add_body);
+    radio_collapsing(ui, title, selected, &wanted, add_body);
 }
 
 fn show_diff(
@@ -873,12 +872,11 @@ fn show_diff(
 ) {
     let title = "Semantic Diff";
     let wanted = types::SelectedConfig::Diff;
-    let id = ui.make_persistent_id(title);
     let add_body = |ui: &mut egui::Ui| {
         ui.text_edit_singleline(&mut "github.com/INRIA/spoon");
     };
 
-    radio_collapsing(ui, id, title, selected, &wanted, add_body);
+    radio_collapsing(ui, title, selected, &wanted, add_body);
 }
 
 mod code_aspects;
@@ -1144,65 +1142,56 @@ pub(crate) fn show_repo_menu(ui: &mut egui::Ui, repo: &mut Repo) -> bool {
     let mut changed = false;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
-        let user_id = ui.next_auto_id().with("user");
-        let name_id = ui.next_auto_id().with("name");
-        ui.push_id("user", |ui| {
-            ui.label("github.com/"); // efwserfwefwe/fewefwse
-            let events = ui.input(|i| i.events.clone()); // avoid dead-lock by cloning. TODO(emilk): optimize
-            for event in &events {
-                match event {
-                    egui::Event::Paste(text_to_insert) => {
-                        if !text_to_insert.is_empty() {
-                            // let mut ccursor = delete_selected(text, &cursor_range);
-                            // insert_text(&mut ccursor, text, text_to_insert);
-                            // Some(CCursorRange::one(ccursor))
-                        }
-                    }
-                    _ => (),
-                };
+        ui.label("github.com/");
+        let user_id = ui.id().with("user");
+        let name_id = ui.id().with("name");
+
+        // let ui_u = &mut ui.child_ui(r, ui.layout().clone());
+        if egui::TextEdit::singleline(&mut repo.user)
+            .margin(egui::Vec2::new(0.0, 0.0))
+            // .id(user_id)
+            // .desired_width(ui.available_rect_before_wrap().width()/2.0)
+            .desired_width(0.0)
+            .id(user_id)
+            .clip_text(false)
+            .show(ui)
+            .response
+            .changed()
+        {
+            let mut user = None;
+            let mut name = None;
+            match repo.user.split_once("/") {
+                Some((a, "")) => {
+                    user = Some(a.to_string());
+                }
+                Some((a, b)) => {
+                    user = Some(a.to_string());
+                    name = Some(b.to_string());
+                }
+                None => (),
             }
-            if egui::TextEdit::singleline(&mut repo.user)
-                .margin(egui::Vec2::new(0.0, 0.0))
-                .desired_width(40.0)
-                .id(user_id)
-                .show(ui)
-                .response
-                .changed()
-            {
-                let mut user = None;
-                let mut name = None;
-                match repo.user.split_once("/") {
-                    Some((a, "")) => {
-                        user = Some(a.to_string());
-                    }
-                    Some((a, b)) => {
-                        user = Some(a.to_string());
-                        name = Some(b.to_string());
-                    }
-                    None => (),
-                }
-                if let Some(user) = user {
-                    changed |= repo.user != user;
-                    repo.user = user;
-                    ui.memory_mut(|mem| {
-                        mem.surrender_focus(user_id);
-                        mem.request_focus(name_id)
-                    });
-                }
-                if let Some(name) = name {
-                    changed |= repo.name != name;
-                    repo.name = name;
-                }
+            if let Some(user) = user {
+                changed |= repo.user != user;
+                repo.user = user;
+                ui.memory_mut(|mem| {
+                    mem.surrender_focus(user_id);
+                    mem.request_focus(name_id)
+                });
             }
-        });
+            if let Some(name) = name {
+                changed |= repo.name != name;
+                repo.name = name;
+            }
+        }
         // 62a2b556c26f0f42a2ae791a86dc39dd36d35392
         if ui
             .push_id("name", |ui| {
                 ui.label("/");
                 egui::TextEdit::singleline(&mut repo.name)
-                    .clip_text(true)
-                    .desired_width(40.0)
-                    .desired_rows(1)
+                    .margin(egui::Vec2::new(0.0, 0.0))
+                    .desired_width(0.0)
+                    .clip_text(false)
+                    // .desired_width(ui.available_width())
                     .hint_text("name")
                     .id(name_id)
                     .interactive(true)

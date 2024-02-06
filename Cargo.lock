@@ -775,10 +775,12 @@ dependencies = [
  "hyper",
  "hyper_ast",
  "hyper_ast_cvs_git",
+ "hyper_ast_gen_ts_cpp",
  "hyper_ast_gen_ts_java",
  "hyper_diff",
  "log",
  "nohash-hasher",
+ "nom",
  "num",
  "once_cell",
  "reqwest",
@@ -796,6 +798,8 @@ dependencies = [
  "tracing-subscriber",
  "tree-sitter",
  "tree-sitter-cli",
+ "tree-sitter-cpp 0.20.0 (git+https://github.com/quentinLeDilavrec/tree-sitter-cpp?branch=master)",
+ "tree-sitter-java 0.20.9 (git+https://github.com/quentinLeDilavrec/tree-sitter-java?branch=master)",
 ]
 
 [[package]]
@@ -2435,7 +2439,7 @@ dependencies = [
  "serde",
  "string-interner",
  "tree-sitter",
- "tree-sitter-cpp",
+ "tree-sitter-cpp 0.20.0 (git+https://github.com/quentinLeDilavrec/tree-sitter-cpp?rev=a4d9e6a32d3607bae6f35c4b4862406a8d9ced7d)",
  "tuples",
  "zerocopy 0.6.6",
 ]
@@ -2462,7 +2466,7 @@ dependencies = [
  "serde",
  "string-interner",
  "tree-sitter",
- "tree-sitter-java",
+ "tree-sitter-java 0.20.9 (git+https://github.com/quentinLeDilavrec/tree-sitter-java?rev=5817a59d64bab74007acf7ea3355e06e83628f96)",
  "tuples",
  "zerocopy 0.6.6",
 ]
@@ -2490,6 +2494,31 @@ dependencies = [
  "tree-sitter-typescript",
  "tuples",
  "zerocopy 0.6.6",
+]
+
+[[package]]
+name = "hyper_ast_gen_ts_tsquery"
+version = "0.1.0"
+dependencies = [
+ "atomic-counter",
+ "bitvec",
+ "cfg-if",
+ "controlled-option",
+ "enumset",
+ "env_logger",
+ "hashbrown 0.13.2",
+ "hyper_ast",
+ "hyper_ast_gen_ts_cpp",
+ "legion",
+ "libc",
+ "log",
+ "num",
+ "pretty_assertions",
+ "serde",
+ "string-interner",
+ "tree-sitter",
+ "tree-sitter-query",
+ "tuples",
 ]
 
 [[package]]
@@ -5434,6 +5463,15 @@ dependencies = [
 [[package]]
 name = "tree-sitter-cpp"
 version = "0.20.0"
+source = "git+https://github.com/quentinLeDilavrec/tree-sitter-cpp?branch=master#a4d9e6a32d3607bae6f35c4b4862406a8d9ced7d"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-cpp"
+version = "0.20.0"
 source = "git+https://github.com/quentinLeDilavrec/tree-sitter-cpp?rev=a4d9e6a32d3607bae6f35c4b4862406a8d9ced7d#a4d9e6a32d3607bae6f35c4b4862406a8d9ced7d"
 dependencies = [
  "cc",
@@ -5461,6 +5499,15 @@ checksum = "042342584c5a7a0b833d9fc4e2bdab3f9868ddc6c4b339a1e01451c6720868bc"
 dependencies = [
  "regex",
  "thiserror",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-java"
+version = "0.20.9"
+source = "git+https://github.com/quentinLeDilavrec/tree-sitter-java?branch=master#5817a59d64bab74007acf7ea3355e06e83628f96"
+dependencies = [
+ "cc",
  "tree-sitter",
 ]
 
@@ -5500,6 +5547,16 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-highlight",
  "tree-sitter-tags",
+]
+
+[[package]]
+name = "tree-sitter-query"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d4374ba146382b2c9a50290e79283b5035544912c0e1387e3ff08e6137f4cb4"
+dependencies = [
+ "cc",
+ "tree-sitter",
 ]
 
 [[package]]

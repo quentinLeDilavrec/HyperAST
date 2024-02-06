@@ -21,6 +21,7 @@ default-members = [
     "gen/tree-sitter/cpp",
     "gen/tree-sitter/xml",
     "gen/tree-sitter/ts",
+    "gen/tree-sitter/query",
     "cvs/git",
     "benchmark",
     "hyperast_wasm",

@@ -3,6 +3,8 @@
 #![feature(build_hasher_simple_hash_one)]
 #![feature(map_many_mut)]
 #![feature(iter_collect_into)]
+#![feature(iterator_try_collect)] // for nom parser query executor
+
 use std::{
     collections::HashMap,
     net::SocketAddr,

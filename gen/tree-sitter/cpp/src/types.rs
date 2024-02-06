@@ -268,6 +268,13 @@ impl Cpp {
     const INST: Cpp = Cpp;
 }
 
+pub fn as_any(t: &Type) -> AnyType {
+    let t = <Cpp as Lang<Type>>::to_u16(*t);
+    let t = <Cpp as Lang<Type>>::make(t);
+    let t: &'static dyn HyperType = t;
+    t.into()
+}
+
 impl LangRef<AnyType> for Cpp {
     fn make(&self, t: u16) -> &'static AnyType {
         panic!()
@@ -307,6 +314,18 @@ impl Lang<Type> for Cpp {
 }
 
 impl HyperType for Type {
+
+    fn generic_eq(&self, other: &dyn HyperType) -> bool
+    where
+        Self: 'static + PartialEq + Sized,
+    {
+        // Do a type-safe casting. If the types are different,
+        // return false, otherwise test the values for equality.
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self == a)
+    }
     fn is_directory(&self) -> bool {
         self == &Type::Directory
     }

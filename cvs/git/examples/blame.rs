@@ -12,7 +12,7 @@
  * <http://creativecommons.org/publicdomain/zero/1.0/>.
  */
 
-#![deny(warnings)]
+// #![deny(warnings)]
 
 use git2::{BlameOptions, Repository};
 use std::io::{BufRead, BufReader};

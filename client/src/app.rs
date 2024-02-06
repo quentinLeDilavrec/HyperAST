@@ -13,7 +13,7 @@ use tower_http::trace::TraceLayer;
 use crate::{
     commit, fetch, file,
     scripting::{
-        self, ScriptContent, ScriptContentDepth, ScriptingError, ScriptingParam,
+        self, ScriptContent, ScriptContentDepth, ScriptingError, ScriptingParam, ScriptTsQueryContent,
     },
     track, view, SharedState,
 };
@@ -47,6 +47,14 @@ async fn scripting_depth(
     let r = scripting::simple_depth(script, state, path)?;
     Ok(r)
 }
+async fn scripting_tsquery(
+    axum::extract::Path(path): axum::extract::Path<ScriptingParam>,
+    axum::extract::State(state): axum::extract::State<SharedState>,
+    axum::extract::Json(script): axum::extract::Json<ScriptTsQueryContent>,
+) -> axum::response::Result<Json<scripting::ComputeResults>> {
+    let r = scripting::ts_query(script, state, path)?;
+    Ok(r)
+}
 
 pub fn scripting_app(_st: SharedState) -> Router<SharedState> {
     let scripting_service_config = ServiceBuilder::new()
@@ -68,6 +76,10 @@ pub fn scripting_app(_st: SharedState) -> Router<SharedState> {
         .route(
             "/script-depth/github/:user/:name/:commit",
             post(scripting_depth).layer(scripting_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
+        )
+        .route(
+            "/script-tsquery/github/:user/:name/:commit",
+            post(scripting_tsquery).layer(scripting_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
         )
         .route(
             "/shared-scripts-db",

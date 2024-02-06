@@ -1626,15 +1626,16 @@ pub trait HyperType: Display + Debug {
     fn as_any(&self) -> &dyn std::any::Any;
     fn generic_eq(&self, other: &dyn HyperType) -> bool
     where
-        Self: 'static + PartialEq + Sized,
-    {
-        // Do a type-safe casting. If the types are different,
-        // return false, otherwise test the values for equality.
-        other
-            .as_any()
-            .downcast_ref::<Self>()
-            .map_or(false, |a| self == a)
-    }
+        Self: 'static + PartialEq + Sized;
+    // {
+    //     todo!()
+    //     // // Do a type-safe casting. If the types are different,
+    //     // // return false, otherwise test the values for equality.
+    //     // other
+    //     //     .as_any()
+    //     //     .downcast_ref::<Self>()
+    //     //     .map_or(false, |a| self == a)
+    // }
     fn is_file(&self) -> bool;
     fn is_directory(&self) -> bool;
     fn is_spaces(&self) -> bool;
@@ -1644,6 +1645,17 @@ pub trait HyperType: Display + Debug {
         Self: Sized;
 }
 impl HyperType for u8 {
+    fn generic_eq(&self, other: &dyn HyperType) -> bool
+    where
+        Self: 'static + PartialEq + Sized
+    {
+        // Do a type-safe casting. If the types are different,
+        // return false, otherwise test the values for equality.
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self == a)
+    }
     fn as_shared(&self) -> Shared {
         todo!()
     }
@@ -1762,6 +1774,17 @@ impl LangRef<Type> for Old {
 }
 
 impl HyperType for Type {
+    fn generic_eq(&self, other: &dyn HyperType) -> bool
+    where
+        Self: 'static + PartialEq + Sized
+    {
+        // Do a type-safe casting. If the types are different,
+        // return false, otherwise test the values for equality.
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self == a)
+    }
     fn is_directory(&self) -> bool {
         self == &Type::Directory || self == &Type::MavenDirectory || self == &Type::MakeDirectory
     }
@@ -3442,6 +3465,17 @@ impl From<&'static dyn HyperType> for AnyType {
 }
 
 impl HyperType for AnyType {
+    fn generic_eq(&self, other: &dyn HyperType) -> bool
+    where
+        Self: 'static + PartialEq + Sized
+    {
+        // TODO not robust at all...
+        std::ptr::eq(self.0,other)
+        // other
+        //     .as_any()
+        //     .downcast_ref::<Self>()
+        //     .map_or(false, |a| self == a)
+    }
     fn is_file(&self) -> bool {
         self.0.is_file()
     }

@@ -5,6 +5,7 @@ mod max;
 mod mean;
 mod min;
 mod named_container;
+mod parse_tsquery;
 mod quantile;
 mod refs;
 mod stats;
@@ -14,15 +15,23 @@ use average::Merge;
 use axum::Json;
 use hyper_ast::{
     store::defaults::NodeIdentifier,
-    types::{HyperType, LabelStore, Labeled, TypeStore, WithChildren, WithStats},
+    types::{
+        HyperType, IterableChildren, LabelStore, Labeled, TypeStore, Typed, WithChildren, WithStats,
+    },
 };
+use nom::Parser;
 use num::ToPrimitive;
 use rhai::{
     packages::{BasicArrayPackage, CorePackage, Package},
     Array, Dynamic, Engine, Instant, Scope,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::{
+    fmt::{format, Display},
+    ops::DerefMut,
+    sync::atomic::{AtomicU16, AtomicUsize},
+    time::Duration,
+};
 
 #[derive(Deserialize, Clone)]
 pub struct ScriptingParam {
@@ -43,6 +52,25 @@ pub struct ScriptContent {
     pub init: String,
     pub accumulate: String,
     pub filter: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ScriptTsQueryContent {
+    pub stranza_list: Vec<StranzaRaw>,
+    commits: usize,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct StranzaRaw {
+    pub query: String,
+    pub compute: String,
+}
+
+#[derive(Clone)]
+pub struct Stranza<K> {
+    pub root_kind: Option<K>, //hyper_ast::types::AnyType
+    pub query: parse_tsquery::Pattern,
+    pub compute: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -303,8 +331,8 @@ fn simple_aux(
     // let s = state.clone().read().unwrap();
     let result: Dynamic = loop {
         let Some(mut acc) = stack.pop() else {
-        unreachable!()
-    };
+            unreachable!()
+        };
 
         let stack_len = stack.len();
 
@@ -587,8 +615,8 @@ fn simple_aux(
             .map_err(|x| ScriptingError::AtEvaluation(x.to_string()))?;
         stack[acc.parent].value = Some(scope.get_value("p").unwrap());
     };
-    let compute_time = now.elapsed().as_secs_f64();
     let result = result.finalize();
+    let compute_time = now.elapsed().as_secs_f64();
     let r = ComputeResult {
         compute_time,
         result,
@@ -714,4 +742,311 @@ fn add_utils(engine: &mut Engine) {
                 Ok(s.goto(node, i))
             },
         );
+}
+
+pub fn ts_query(
+    script: ScriptTsQueryContent,
+    state: SharedState,
+    path: ScriptingParam,
+) -> Result<Json<ComputeResults>, ScriptingError> {
+    let ScriptTsQueryContent {
+        stranza_list,
+        commits,
+    } = script;
+    let now = Instant::now();
+    let ScriptingParam { user, name, commit } = path.clone();
+    let mut engine = Engine::new();
+    engine.disable_symbol("/");
+    add_utils(&mut engine);
+
+    let mut stranza_list: Vec<_> = stranza_list
+        .into_iter()
+        .map(|StranzaRaw { query, compute }| {
+            let q = parse_tsquery::parse_tsquery(&query)
+                .map_err(|e| ScriptingError::AtCompilation(format!("ill formed query: {:?}", e)))?;
+            let root_kind;
+            let query;
+            match &q {
+                parse_tsquery::Pattern::NamedNode { k: Some(k), .. } => {
+                    root_kind = hyper_ast_gen_ts_cpp::types::Type::from_str(&k)
+                        .unwrap()
+                        .into();
+                }
+                parse_tsquery::Pattern::NamedNode { k: None, .. } => {
+                    root_kind = hyper_ast_gen_ts_cpp::types::Type::End.into();
+                }
+                x => {
+                    return Err(ScriptingError::AtCompilation(format!(
+                        "bad root pattern: {:?}",
+                        x
+                    )))
+                }
+            }
+            query = q;
+
+            let compute: i32 = compute.parse().map_err(|x: std::num::ParseIntError| {
+                ScriptingError::AtCompilation(x.to_string())
+            })?;
+            let compute = Some(compute as u32);
+            Ok(Stranza {
+                root_kind,
+                query,
+                compute,
+            })
+        })
+        .try_collect()?;
+    let repo_spec = hyper_ast_cvs_git::git::Forge::Github.repo(user, name);
+    let repo = state
+        .repositories
+        .write()
+        .unwrap()
+        .get_config(repo_spec.clone());
+    let repo = match repo {
+        Some(repo) => repo,
+        None => {
+            let configs = &mut state.repositories.write().unwrap();
+            configs.register_config(
+                repo_spec.clone(),
+                hyper_ast_cvs_git::processing::RepoConfig::JavaMaven,
+            );
+            log::error!("missing config for {}", repo_spec);
+            configs.get_config(repo_spec.clone()).unwrap()
+        }
+    };
+    // .ok_or_else(|| ScriptingError::Other("missing config for repository".to_string()))?;
+    let mut repo = repo.fetch();
+    log::warn!("done cloning {}", &repo.spec);
+    let commits = state
+        .repositories
+        .write()
+        .unwrap()
+        .pre_process_with_limit(&mut repo, "", &commit, commits)
+        .unwrap();
+    let prepare_time = now.elapsed().as_secs_f64();
+    let mut results = vec![];
+    for commit_oid in &commits {
+        let now = Instant::now();
+        let r = query_aux(
+            state.clone(),
+            &mut repo,
+            commit_oid,
+            &engine,
+            &stranza_list,
+            now,
+        );
+        match r {
+            Ok(r) => results.push(Ok(ComputeResultIdentified {
+                commit: commit_oid.to_string(),
+                inner: r,
+            })),
+            Err(ScriptingError::AtEvaluation(e)) => results.push(Err(e)),
+            Err(e) => return Err(e),
+        }
+    }
+    let r = ComputeResults {
+        prepare_time,
+        results,
+    };
+    Ok(Json(r))
+}
+
+fn query_aux(
+    state: rhai::Shared<crate::AppState>,
+    repo: &mut hyper_ast_cvs_git::processing::ConfiguredRepo2,
+    commit_oid: &hyper_ast_cvs_git::git::Oid,
+    engine: &Engine,
+    stranza_list: &[Stranza<hyper_ast_gen_ts_cpp::types::Type>],
+    now: Instant,
+) -> Result<ComputeResult, ScriptingError> {
+    let repositories = state.repositories.read().unwrap();
+    let commit_src = repositories.get_commit(&repo.config, commit_oid).unwrap();
+    let src_tr = commit_src.ast_root;
+    let node_store = &repositories.processor.main_stores.node_store;
+    // let size = node_store.resolve(src_tr).size();
+    drop(repositories);
+    macro_rules! ns {
+        ($s:expr) => {
+            $s.repositories
+                .read()
+                .unwrap()
+                .processor
+                .main_stores
+                .node_store
+        };
+    }
+    macro_rules! stores {
+        ($s:expr) => {
+            $s.repositories.read().unwrap().processor.main_stores
+        };
+    }
+    let stranza = stranza_list[0].clone();
+    let result: usize = if false {
+        let root_k = stranza.root_kind.unwrap();
+        let root_k = hyper_ast_gen_ts_cpp::types::as_any(&root_k);
+        struct Todos {
+            remaining: AtomicU16,
+            id: Option<NodeIdentifier>,
+            parent: Option<std::sync::Arc<Todos>>,
+            result: AtomicUsize,
+        }
+        let root_todo = std::sync::Arc::new(Todos {
+            remaining: 1.into(),
+            id: None,
+            parent: None,
+            result: 0.into(),
+        });
+        let mut stack: Vec<std::sync::Arc<Todos>> = vec![root_todo.clone()];
+        stack.push(std::sync::Arc::new(Todos {
+            remaining: ns!(state).resolve(src_tr).child_count().into(),
+            id: Some(src_tr),
+            parent: Some(root_todo.clone()),
+            result: 0.into(),
+        }));
+        // let to_finish: Vec<std::sync::Arc<Todos>> = vec![];
+
+        while stack.len() > 1 {
+            let Some(curr) = stack.pop() else {
+                unreachable!()
+            };
+            let node_store = &ns!(state);
+            let n = node_store.resolve(curr.id.unwrap());
+            let k = n.get_type();
+            if k == root_k {
+                curr.parent
+                    .as_ref()
+                    .unwrap()
+                    .result
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            todo!()
+        }
+
+        root_todo.result.load(std::sync::atomic::Ordering::Relaxed)
+    } else {
+        let root_k = stranza.root_kind.unwrap();
+        let root_k = hyper_ast_gen_ts_cpp::types::as_any(&root_k);
+        struct Todos {
+            remaining: u16,
+            id: Option<NodeIdentifier>,
+            parent: usize,
+            result: usize,
+        }
+        let root_todo = Todos {
+            remaining: 1,
+            id: None,
+            parent: 0,
+            result: 0,
+        };
+        let mut stack: Vec<Todos> = vec![root_todo];
+        stack.push(Todos {
+            remaining: 1,
+            id: Some(src_tr),
+            parent: 0,
+            result: 0,
+        });
+        // let to_finish: Vec<std::sync::Arc<Todos>> = vec![];
+
+        while stack.len() > 1 {
+            let curr_i = stack.len() - 1;
+            let (id, parent, rem) = {
+                let Some(curr) = stack.last() else {
+                    unreachable!()
+                };
+
+                (curr.id.unwrap(), curr.parent, curr.remaining)
+            };
+
+            let stores = &stores!(state);
+            let n = stores.node_store.resolve(id);
+            use hyper_ast::types::LangRef;
+            if rem > 0 {
+                if let Some(cs) = n.children() {
+                    // dbg!(curr_i, parent, rem);
+                    let cs = cs.iter_children();
+                    stack[curr_i].remaining = ns!(state).resolve(id).child_count();
+                    for &c in cs {
+                        stack.push(Todos {
+                            remaining: 1,
+                            id: Some(c),
+                            parent: curr_i,
+                            result: 0,
+                        });
+                    }
+                } else {
+                    // dbg!(curr_i, parent, rem, root_k.to_string());
+                    let k = stores.type_store.resolve_type(&n);
+                    if k == root_k {
+                        dbg!(
+                            k.generic_eq(&hyper_ast_gen_ts_cpp::types::Type::TranslationUnit),
+                            hyper_ast_gen_ts_cpp::types::Type::TranslationUnit
+                                .generic_eq(&hyper_ast_gen_ts_cpp::types::Type::TranslationUnit)
+                        );
+                        dbg!(
+                            root_k,
+                            k,
+                            root_k.is_file(),
+                            k.generic_eq(&k),
+                            k == k,
+                            root_k.generic_eq(&root_k),
+                            root_k == root_k,
+                            k.generic_eq(&root_k),
+                            k == root_k
+                        );
+                        // if k == root_k {
+                        stack[parent].result += 1;
+                    }
+                    stack[parent].result += stack[curr_i].result;
+                    stack[parent].remaining -= 1;
+                    stack.pop().unwrap();
+                }
+            } else {
+                // dbg!(curr_i, parent, rem);
+                let k = stores.type_store.resolve_type(&n);
+                if k == root_k {
+                    dbg!(
+                        k.generic_eq(&hyper_ast_gen_ts_cpp::types::Type::TranslationUnit),
+                        hyper_ast_gen_ts_cpp::types::Type::TranslationUnit
+                            .generic_eq(&hyper_ast_gen_ts_cpp::types::Type::TranslationUnit),
+                        hyper_ast_gen_ts_cpp::types::Type::TranslationUnit.generic_eq(&k)
+                    );
+                    dbg!(
+                        root_k,
+                        k,
+                        root_k.is_file(),
+                        k.generic_eq(&k),
+                        k == k,
+                        root_k.generic_eq(&root_k),
+                        root_k == root_k,
+                        k.generic_eq(&root_k),
+                        k == root_k
+                    );
+                    stack[parent].result += 1;
+                }
+                stack[parent].result += stack[curr_i].result;
+                stack[parent].remaining -= 1;
+                stack.pop().unwrap();
+            }
+        }
+        stack.pop().unwrap().result
+    };
+
+    // let rt  = tokio::runtime::Runtime::new().unwrap();
+    // rt.block_on(async {
+    //     tokio::spawn(async move {
+    //         // do some job
+    //     }).await.unwrap();
+
+    // });
+    // let pool = tokio::task::::new(5)
+    //     .with_spawn_timeout(Duration::from_secs(5))
+    //     .with_run_timeout(Duration::from_secs(10));
+
+    let result = Dynamic::from_int(result as i64);
+    // let result = result.finalize();
+    let compute_time = now.elapsed().as_secs_f64();
+    let r = ComputeResult {
+        compute_time,
+        result,
+    };
+    Ok(r)
 }

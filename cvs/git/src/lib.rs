@@ -143,13 +143,15 @@ mod type_store {
 
         fn resolve_type(&self, n: &HashedNodeRef<'a, NodeIdentifier>) -> Self::Ty {
             if let Ok(t) = n.get_component::<hyper_ast_gen_ts_java::types::Type>() {
-                let t = *t as u16;
-                let t = <hyper_ast_gen_ts_java::types::Java as hyper_ast::types::Lang<_>>::make(t);
-                From::<&'static (dyn HyperType)>::from(t)
+                hyper_ast_gen_ts_java::types::as_any(t)
+                // let t = *t as u16;
+                // let t = <hyper_ast_gen_ts_java::types::Java as hyper_ast::types::Lang<_>>::make(t);
+                // From::<&'static (dyn HyperType)>::from(t)
             } else if let Ok(t) = n.get_component::<hyper_ast_gen_ts_cpp::types::Type>() {
-                let t = *t as u16;
-                let t = <hyper_ast_gen_ts_cpp::types::Cpp as hyper_ast::types::Lang<_>>::make(t);
-                From::<&'static (dyn HyperType)>::from(t)
+                // let t = *t as u16;
+                // let t = <hyper_ast_gen_ts_cpp::types::Cpp as hyper_ast::types::Lang<_>>::make(t);
+                // From::<&'static (dyn HyperType)>::from(t)
+                hyper_ast_gen_ts_cpp::types::as_any(t)
             } else if let Ok(t) = n.get_component::<hyper_ast_gen_ts_xml::types::Type>() {
                 let t = *t as u16;
                 let t = <hyper_ast_gen_ts_xml::types::Xml as hyper_ast::types::Lang<_>>::make(t);
@@ -531,6 +533,17 @@ mod type_store {
     }
 
     impl HyperType for MultiType {
+        fn generic_eq(&self, other: &dyn HyperType) -> bool
+        where
+            Self: 'static + PartialEq + Sized
+        {
+            // Do a type-safe casting. If the types are different,
+            // return false, otherwise test the values for equality.
+            other
+                .as_any()
+                .downcast_ref::<Self>()
+                .map_or(false, |a| self == a)
+        }
         fn is_file(&self) -> bool {
             match self {
                 MultiType::Java(t) => t.is_file(),

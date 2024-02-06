@@ -105,10 +105,7 @@ mod legion_impls {
 
         fn resolve_type(&self, n: &HashedNodeRef<'a, NodeIdentifier>) -> Self::Ty {
             let t = n.get_component::<Type>().unwrap();
-            let t = <Java as Lang<Type>>::to_u16(*t);
-            let t = <Java as Lang<Type>>::make(t);
-            let t: &'static dyn HyperType = t;
-            t.into()
+            as_any(t)
         }
 
         fn resolve_lang(
@@ -127,7 +124,16 @@ mod legion_impls {
             }
         }
     }
+
+    pub fn as_any(t: &Type) -> AnyType {
+        let t = <Java as Lang<Type>>::to_u16(*t);
+        let t = <Java as Lang<Type>>::make(t);
+        let t: &'static dyn HyperType = t;
+        t.into()
+    }
 }
+#[cfg(feature = "legion")]
+pub use legion_impls::as_any;
 pub trait JavaEnabledTypeStore<T>: TypeStore<T> {}
 
 // impl Single {
@@ -220,6 +226,17 @@ impl LangRef<AnyType> for Java {
     }
 }
 impl HyperType for Type {
+    fn generic_eq(&self, other: &dyn HyperType) -> bool
+    where
+        Self: 'static + PartialEq + Sized
+    {
+        // Do a type-safe casting. If the types are different,
+        // return false, otherwise test the values for equality.
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self == a)
+    }
     fn is_directory(&self) -> bool {
         self == &Type::Directory
     }

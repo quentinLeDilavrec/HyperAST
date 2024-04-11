@@ -18,6 +18,20 @@ pub trait MappingStore {
     fn is_src(&self, src: &Self::Src) -> bool;
     fn is_dst(&self, dst: &Self::Dst) -> bool;
 }
+pub trait MappingStoreBuilding {
+    type Src;
+    type Dst;
+    fn topit(&mut self, left: usize, right: usize);
+    fn link(&mut self, src: Self::Src, dst: Self::Dst);
+    fn cut(&mut self, src: Self::Src, dst: Self::Dst);
+}
+pub trait MappingStoreReading {
+    type Src;
+    type Dst;
+    fn has(&self, src: &Self::Src, dst: &Self::Dst) -> bool;
+    fn is_src(&self, src: &Self::Src) -> bool;
+    fn is_dst(&self, dst: &Self::Dst) -> bool;
+}
 pub type DefaultMappingStore<T> = VecStore<T>;
 
 pub trait MonoMappingStore: MappingStore {
@@ -213,30 +227,36 @@ impl<'a, T: PrimInt, U: PrimInt> Iterator for MonoIter<'a, T, U> {
     }
 }
 
-pub struct MultiVecStore<T> {
-    pub src_to_dsts: Vec<Option<Vec<T>>>,
-    pub dst_to_srcs: Vec<Option<Vec<T>>>,
+// type SubVec<T> = Vec<T>;
+type SubVec<T> = tinyvec::TinyVec<T>;
+
+pub struct MultiVecStore<T, V: tinyvec::Array = [T; 2]> {
+    pub src_to_dsts: Vec<Option<SubVec<V>>>,
+    pub dst_to_srcs: Vec<Option<SubVec<V>>>,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: PrimInt> Clone for MultiVecStore<T> {
-    fn clone(&self) -> Self {
-        Self {
-            src_to_dsts: self.src_to_dsts.clone(),
-            dst_to_srcs: self.dst_to_srcs.clone(),
-        }
-    }
-}
-
-impl<T> Default for MultiVecStore<T> {
+impl<T: Default> Default for MultiVecStore<T> {
     fn default() -> Self {
         Self {
             src_to_dsts: Default::default(),
             dst_to_srcs: Default::default(),
+            _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<T: PrimInt> MappingStore for MultiVecStore<T> {
+impl<T: Clone + Default> Clone for MultiVecStore<T> {
+    fn clone(&self) -> Self {
+        Self {
+            src_to_dsts: self.src_to_dsts.clone(),
+            dst_to_srcs: self.dst_to_srcs.clone(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: PrimInt + Default> MappingStore for MultiVecStore<T> {
     type Src = T;
     type Dst = T;
 
@@ -255,14 +275,14 @@ impl<T: PrimInt> MappingStore for MultiVecStore<T> {
     fn link(&mut self, src: T, dst: T) {
         // self.src_to_dsts[src.to_usize().unwrap()].get_or_insert_default().push(dst); // todo when not unstable feature
         if self.src_to_dsts[src.to_usize().unwrap()].is_none() {
-            self.src_to_dsts[src.to_usize().unwrap()] = Some(vec![])
+            self.src_to_dsts[src.to_usize().unwrap()] = Some(Default::default())
         }
         self.src_to_dsts[src.to_usize().unwrap()]
             .as_mut()
             .unwrap()
             .push(dst);
         if self.dst_to_srcs[dst.to_usize().unwrap()].is_none() {
-            self.dst_to_srcs[dst.to_usize().unwrap()] = Some(vec![])
+            self.dst_to_srcs[dst.to_usize().unwrap()] = Some(Default::default())
         }
         self.dst_to_srcs[dst.to_usize().unwrap()]
             .as_mut()
@@ -334,7 +354,7 @@ impl<T: PrimInt> MappingStore for MultiVecStore<T> {
     }
 }
 
-impl<T: PrimInt> MultiMappingStore for MultiVecStore<T> {
+impl<T: PrimInt + Default> MultiMappingStore for MultiVecStore<T> {
     type Iter1<'a> = Iter<'a,T> where T: 'a  ;
     type Iter2<'a> = Iter<'a,T> where T: 'a ;
     fn get_srcs(&self, dst: &Self::Dst) -> &[Self::Src] {
@@ -372,11 +392,11 @@ impl<T: PrimInt> MultiMappingStore for MultiVecStore<T> {
     }
 }
 
-pub struct Iter<'a, T: 'a> {
-    v: std::iter::Enumerate<core::slice::Iter<'a, Option<Vec<T>>>>,
+pub struct Iter<'a, T: 'a + Default> {
+    v: std::iter::Enumerate<core::slice::Iter<'a, Option<SubVec<[T; 2]>>>>,
 }
 
-impl<'a, T: PrimInt> Iterator for Iter<'a, T> {
+impl<'a, T: PrimInt + Default> Iterator for Iter<'a, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -593,5 +613,538 @@ impl<'a, T: PrimInt, U: PrimInt> Iterator for HMIter<'a, T, U> {
     fn next(&mut self) -> Option<Self::Item> {
         let (x, y) = self.v.next()?;
         Some((*x, *y))
+    }
+}
+
+// not sure if better potential than tuple approach
+#[allow(unused)]
+mod experimental_triplet {
+    use super::MultiMappingStore;
+
+    use super::MappingStore;
+
+    use num_traits::PrimInt;
+
+    pub struct MultiTripletStore<T> {
+        pub(crate) left: usize,
+        pub(crate) right: usize,
+        pub(crate) src: Vec<T>,
+        pub(crate) dst: Vec<T>,
+        pub(crate) len: Vec<T>,
+    }
+
+    impl<T: Default> Default for MultiTripletStore<T> {
+        fn default() -> Self {
+            Self {
+                left: 0,
+                right: 0,
+                src: Default::default(),
+                dst: Default::default(),
+                len: Default::default(),
+            }
+        }
+    }
+
+    impl<T: Clone + Default> Clone for MultiTripletStore<T> {
+        fn clone(&self) -> Self {
+            Self {
+                left: self.left.clone(),
+                right: self.right.clone(),
+                src: self.src.clone(),
+                dst: self.dst.clone(),
+                len: self.len.clone(),
+            }
+        }
+    }
+
+    impl<T: PrimInt + Default> MappingStore for MultiTripletStore<T> {
+        type Src = T;
+        type Dst = T;
+
+        fn len(&self) -> usize {
+            self.len.iter().map(|l| l.to_usize().unwrap()).sum()
+        }
+
+        fn capacity(&self) -> (usize, usize) {
+            (self.left, self.right)
+        }
+
+        fn link(&mut self, src: T, dst: T) {
+            todo!()
+            // if self.src_to_dsts[src.to_usize().unwrap()].is_none() {
+            //     self.src_to_dsts[src.to_usize().unwrap()] = Some(Default::default())
+            // }
+            // self.src_to_dsts[src.to_usize().unwrap()]
+            //     .as_mut()
+            //     .unwrap()
+            //     .push(dst);
+            // if self.dst_to_srcs[dst.to_usize().unwrap()].is_none() {
+            //     self.dst_to_srcs[dst.to_usize().unwrap()] = Some(Default::default())
+            // }
+            // self.dst_to_srcs[dst.to_usize().unwrap()]
+            //     .as_mut()
+            //     .unwrap()
+            //     .push(src);
+        }
+
+        fn cut(&mut self, src: T, dst: T) {
+            todo!()
+            // if let Some(i) = self.src_to_dsts[src.to_usize().unwrap()]
+            //     .as_ref()
+            //     .and_then(|v| v.iter().position(|x| x == &dst))
+            // {
+            //     if self.src_to_dsts[src.to_usize().unwrap()]
+            //         .as_ref()
+            //         .unwrap()
+            //         .len()
+            //         == 1
+            //     {
+            //         self.src_to_dsts[src.to_usize().unwrap()] = None;
+            //     } else {
+            //         self.src_to_dsts[src.to_usize().unwrap()]
+            //             .as_mut()
+            //             .unwrap()
+            //             .remove(i);
+            //     }
+            // }
+            // if let Some(i) = self.dst_to_srcs[dst.to_usize().unwrap()]
+            //     .as_ref()
+            //     .and_then(|v| v.iter().position(|x| x == &src))
+            // {
+            //     if self.dst_to_srcs[dst.to_usize().unwrap()]
+            //         .as_ref()
+            //         .unwrap()
+            //         .len()
+            //         == 1
+            //     {
+            //         self.dst_to_srcs[dst.to_usize().unwrap()] = None;
+            //     } else {
+            //         self.dst_to_srcs[dst.to_usize().unwrap()]
+            //             .as_mut()
+            //             .unwrap()
+            //             .remove(i);
+            //     }
+            // }
+        }
+
+        fn is_src(&self, src: &T) -> bool {
+            todo!()
+            // self.src_to_dsts[src.to_usize().unwrap()].is_some()
+        }
+
+        fn is_dst(&self, dst: &T) -> bool {
+            todo!()
+            // self.dst_to_srcs[dst.to_usize().unwrap()].is_some()
+        }
+
+        fn topit(&mut self, left: usize, right: usize) {
+            self.left = left;
+            self.right = right;
+        }
+
+        fn has(&self, src: &Self::Src, dst: &Self::Dst) -> bool {
+            todo!()
+            // self.src_to_dsts[src.to_usize().unwrap()]
+            //     .as_ref()
+            //     .and_then(|v| Some(v.contains(dst)))
+            //     .unwrap_or(false)
+            //     && self.dst_to_srcs[dst.to_usize().unwrap()]
+            //         .as_ref()
+            //         .and_then(|v| Some(v.contains(src)))
+            //         .unwrap_or(false)
+        }
+    }
+
+    impl<T: PrimInt + Default> MultiMappingStore for MultiTripletStore<T> {
+        type Iter1<'a> = IterTriplet<'a,T> where T: 'a  ;
+        type Iter2<'a> = IterTriplet<'a,T> where T: 'a ;
+        fn get_srcs(&self, dst: &Self::Dst) -> &[Self::Src] {
+            todo!()
+            // self.dst_to_srcs[cast::<_, usize>(*dst).unwrap()]
+            //     .as_ref()
+            //     .and_then(|x| Some(x.as_slice()))
+            //     .unwrap_or(&[])
+        }
+
+        fn get_dsts(&self, src: &Self::Src) -> &[Self::Dst] {
+            todo!()
+            // self.src_to_dsts[cast::<_, usize>(*src).unwrap()]
+            //     .as_ref()
+            //     .and_then(|x| Some(x.as_slice()))
+            //     .unwrap_or(&[])
+        }
+
+        fn all_mapped_srcs(&self) -> IterTriplet<Self::Src> {
+            todo!()
+            // IterTriplet {
+            //     v: self.src_to_dsts.iter().enumerate(),
+            // }
+        }
+
+        fn all_mapped_dsts(&self) -> IterTriplet<Self::Dst> {
+            todo!()
+            // IterTriplet {
+            //     v: self.dst_to_srcs.iter().enumerate(),
+            // }
+        }
+
+        fn is_src_unique(&self, src: &Self::Src) -> bool {
+            todo!()
+            // self.get_dsts(src).len() == 1
+        }
+
+        fn is_dst_unique(&self, dst: &Self::Dst) -> bool {
+            todo!()
+            // self.get_srcs(dst).len() == 1
+        }
+    }
+
+    pub struct IterTriplet<'a, T: 'a + Default> {
+        pub(crate) v: &'a T,
+    }
+
+    impl<'a, T: PrimInt + Default> Iterator for IterTriplet<'a, T> {
+        type Item = T;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            todo!()
+            // let mut a = self.v.next();
+            // loop {
+            //     if let Some((i, x)) = a {
+            //         if let Some(_) = x {
+            //             return Some(cast::<_, T>(i).unwrap());
+            //         } else {
+            //             a = self.v.next();
+            //         }
+            //     } else {
+            //         return None;
+            //     }
+            // }
+        }
+    }
+}
+
+// trying to phase writing and reading
+#[allow(unused)]
+mod experimental_tuple {
+    use super::*;
+
+    pub struct MultiTupleStoreW<T> {
+        left: usize,
+        right: usize,
+        src: Vec<(T, T)>,
+    }
+
+    impl<T: Default> Default for MultiTupleStoreW<T> {
+        fn default() -> Self {
+            Self {
+                left: 0,
+                right: 0,
+                src: Default::default(),
+            }
+        }
+    }
+
+    impl<T: PrimInt + Default> MappingStoreBuilding for MultiTupleStoreW<T> {
+        type Src = T;
+        type Dst = T;
+
+        /// caution with duplicates
+        fn link(&mut self, src: T, dst: T) {
+            self.src.push((src, dst));
+        }
+
+        /// caution with duplicates
+        fn cut(&mut self, src: T, dst: T) {
+            let Some(i) = self.src.iter().position(|(s, d)| *s == src && *d == dst) else {
+                return;
+            };
+            self.src.swap_remove(i);
+        }
+
+        fn topit(&mut self, left: usize, right: usize) {
+            self.left = left;
+            self.right = right;
+        }
+    }
+
+    impl<T: Copy + Ord> From<MultiTupleStoreW<T>> for MultiTupleStoreR<T> {
+        fn from(value: MultiTupleStoreW<T>) -> Self {
+            let mut dst: Vec<_> = value.src.iter().map(|(s, d)| (*d, *s)).collect();
+            dst.sort_by(|(a, _), (b, _)| a.cmp(b));
+            let mut src = value.src;
+            src.sort_by(|(a, _), (b, _)| a.cmp(b));
+            Self {
+                left: value.left,
+                right: value.right,
+                src,
+                dst,
+            }
+        }
+    }
+
+    pub struct MultiTupleStoreR<T> {
+        left: usize,
+        right: usize,
+        src: Vec<(T, T)>,
+        dst: Vec<(T, T)>,
+    }
+
+    impl<T: PrimInt + Default> MappingStoreReading for MultiTupleStoreR<T> {
+        type Src = T;
+        type Dst = T;
+
+        fn is_src(&self, src: &T) -> bool {
+            todo!()
+            // self.src_to_dsts[src.to_usize().unwrap()].is_some()
+        }
+
+        fn is_dst(&self, dst: &T) -> bool {
+            todo!()
+            // self.dst_to_srcs[dst.to_usize().unwrap()].is_some()
+        }
+
+        fn has(&self, src: &Self::Src, dst: &Self::Dst) -> bool {
+            todo!()
+            // self.src_to_dsts[src.to_usize().unwrap()]
+            //     .as_ref()
+            //     .and_then(|v| Some(v.contains(dst)))
+            //     .unwrap_or(false)
+            //     && self.dst_to_srcs[dst.to_usize().unwrap()]
+            //         .as_ref()
+            //         .and_then(|v| Some(v.contains(src)))
+            //         .unwrap_or(false)
+        }
+    }
+
+    // impl<T: PrimInt + Default> MultiMappingStore for MultiTupleStoreR<T> {
+    //     type Iter1<'a> = IterTuple<'a,T> where T: 'a  ;
+    //     type Iter2<'a> = IterTuple<'a,T> where T: 'a ;
+    //     fn get_srcs(&self, dst: &Self::Dst) -> &[Self::Src] {
+    //         todo!()
+    //         // self.dst_to_srcs[cast::<_, usize>(*dst).unwrap()]
+    //         //     .as_ref()
+    //         //     .and_then(|x| Some(x.as_slice()))
+    //         //     .unwrap_or(&[])
+    //     }
+
+    //     fn get_dsts(&self, src: &Self::Src) -> &[Self::Dst] {
+    //         todo!()
+    //         // self.src_to_dsts[cast::<_, usize>(*src).unwrap()]
+    //         //     .as_ref()
+    //         //     .and_then(|x| Some(x.as_slice()))
+    //         //     .unwrap_or(&[])
+    //     }
+
+    //     fn all_mapped_srcs(&self) -> IterTuple<Self::Src> {
+    //         todo!()
+    //         // IterTuple {
+    //         //     v: self.src_to_dsts.iter().enumerate(),
+    //         // }
+    //     }
+
+    //     fn all_mapped_dsts(&self) -> IterTuple<Self::Dst> {
+    //         todo!()
+    //         // IterTuple {
+    //         //     v: self.dst_to_srcs.iter().enumerate(),
+    //         // }
+    //     }
+
+    //     fn is_src_unique(&self, src: &Self::Src) -> bool {
+    //         todo!()
+    //         // self.get_dsts(src).len() == 1
+    //     }
+
+    //     fn is_dst_unique(&self, dst: &Self::Dst) -> bool {
+    //         todo!()
+    //         // self.get_srcs(dst).len() == 1
+    //     }
+    // }
+
+    pub struct IterTuple<'a, T: 'a + Default> {
+        v: &'a T,
+    }
+
+    impl<'a, T: PrimInt + Default> Iterator for IterTuple<'a, T> {
+        type Item = T;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            todo!()
+            // let mut a = self.v.next();
+            // loop {
+            //     if let Some((i, x)) = a {
+            //         if let Some(_) = x {
+            //             return Some(cast::<_, T>(i).unwrap());
+            //         } else {
+            //             a = self.v.next();
+            //         }
+            //     } else {
+            //         return None;
+            //     }
+            // }
+        }
+    }
+}
+
+/// trying to find more optimized small vecs for nesting
+#[allow(unused)]
+mod experimental_slimmer {
+
+    /// not bad but too leaky with bounds
+    #[derive(Clone)]
+    pub enum BoxedArrayOr1<T, MD = u16>
+    where
+        [T]: slimmer_box::SlimmerPointee<MD>,
+        MD: std::marker::Copy + std::convert::From<<[T] as ptr_meta::Pointee>::Metadata>,
+        <[T] as ptr_meta::Pointee>::Metadata: From<MD>,
+    {
+        Zero,
+        One(T),
+        Boxed(slimmer_box::SlimmerBox<[T], MD>),
+    }
+    fn as_vec<T, MD>(mut v: slimmer_box::SlimmerBox<[T], MD>) -> Vec<T>
+    where
+        [T]: slimmer_box::SlimmerPointee<MD>,
+        MD: std::marker::Copy + std::convert::From<<[T] as ptr_meta::Pointee>::Metadata>,
+        <[T] as ptr_meta::Pointee>::Metadata: From<MD>,
+    {
+        unsafe {
+            let l = v.len();
+            let v = v.as_mut_ptr();
+            Vec::from_raw_parts(v, l, l)
+        }
+    }
+
+    impl<T, MD> BoxedArrayOr1<T, MD>
+    where
+        [T]: slimmer_box::SlimmerPointee<MD>,
+        MD: std::marker::Copy + std::convert::From<<[T] as ptr_meta::Pointee>::Metadata>,
+        <[T] as ptr_meta::Pointee>::Metadata: From<MD>,
+    {
+        fn len(&self) -> usize {
+            match self {
+                BoxedArrayOr1::Zero => 0,
+                BoxedArrayOr1::One(_) => 1,
+                BoxedArrayOr1::Boxed(v) => v.len(),
+            }
+        }
+        fn contains(&self, t: &T) -> bool
+        where
+            T: PartialEq,
+        {
+            match self {
+                BoxedArrayOr1::Zero => false,
+                BoxedArrayOr1::One(u) => t == u,
+                BoxedArrayOr1::Boxed(v) => v.contains(t),
+            }
+        }
+        fn remove(&mut self, i: usize) -> T {
+            if self.len() == 0 {
+                vec![].remove(i)
+            } else if self.len() == 1 {
+                assert!(i == 0);
+                let old = std::mem::replace(
+                    self,
+                    BoxedArrayOr1::Boxed(slimmer_box::SlimmerBox::from_box(Default::default())),
+                );
+                if let BoxedArrayOr1::One(v0) = old {
+                    v0
+                } else {
+                    unreachable!()
+                }
+            } else if self.len() == 2 {
+                let (t, r) =
+                    if let BoxedArrayOr1::Boxed(v) = std::mem::replace(self, BoxedArrayOr1::Zero) {
+                        if i == 0 {
+                            let mut v = as_vec(v).into_iter();
+                            let r: T = v.next().unwrap();
+                            let t: T = v.next().unwrap();
+                            (t, r)
+                        } else if i == 1 {
+                            let mut v = as_vec(v).into_iter();
+                            let t = v.next().unwrap();
+                            let r = v.next().unwrap();
+                            (t, r)
+                        } else {
+                            unreachable!("i should be 0 or 1")
+                        }
+                    } else {
+                        unreachable!()
+                    };
+                let _ = std::mem::replace(self, BoxedArrayOr1::One(t));
+                r
+            } else {
+                match self {
+                    BoxedArrayOr1::Zero => unreachable!(),
+                    BoxedArrayOr1::One(_) => unreachable!(),
+                    BoxedArrayOr1::Boxed(v) => {
+                        let default = slimmer_box::SlimmerBox::from_box(Default::default());
+                        let mut vec = as_vec(std::mem::replace(v, default));
+                        let r = vec.remove(i);
+                        std::mem::replace(
+                            v,
+                            slimmer_box::SlimmerBox::from_box(vec.into_boxed_slice()),
+                        );
+                        r
+                    }
+                }
+            }
+        }
+        fn push(&mut self, t: T) {
+            if self.len() == 0 {
+                let _ = std::mem::replace(self, BoxedArrayOr1::One(t));
+            } else if self.len() == 1 {
+                let mut old = std::mem::replace(self, BoxedArrayOr1::Zero);
+                if let BoxedArrayOr1::One(v0) = old {
+                    let mut v = vec![];
+                    v.push(v0);
+                    v.push(t);
+                    std::mem::replace(
+                        self,
+                        BoxedArrayOr1::Boxed(slimmer_box::SlimmerBox::from_box(
+                            v.into_boxed_slice(),
+                        )),
+                    );
+                } else {
+                    unreachable!()
+                }
+            } else {
+                match self {
+                    BoxedArrayOr1::Boxed(v) => {
+                        let default = slimmer_box::SlimmerBox::from_box(Default::default());
+                        let mut vec = as_vec(std::mem::replace(v, default));
+                        vec.push(t);
+                        std::mem::replace(
+                            v,
+                            slimmer_box::SlimmerBox::from_box(vec.into_boxed_slice()),
+                        );
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        fn iter(&self) -> std::slice::Iter<'_, T> {
+            self.as_slice().iter()
+        }
+
+        pub fn as_slice(&self) -> &[T] {
+            match self {
+                BoxedArrayOr1::Zero => &[],
+                BoxedArrayOr1::One(u) => std::slice::from_ref(u),
+                BoxedArrayOr1::Boxed(v) => v.as_ref(),
+            }
+        }
+    }
+
+    impl<T, MD> Default for BoxedArrayOr1<T, MD>
+    where
+        [T]: slimmer_box::SlimmerPointee<MD>,
+        MD: std::marker::Copy + std::convert::From<<[T] as ptr_meta::Pointee>::Metadata>,
+        <[T] as ptr_meta::Pointee>::Metadata: From<MD>,
+    {
+        fn default() -> Self {
+            Self::Zero
+        }
     }
 }

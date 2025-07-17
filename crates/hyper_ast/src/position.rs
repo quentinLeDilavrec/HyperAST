@@ -43,7 +43,7 @@ use crate::{
 pub trait TreePath<IdN = NodeIdentifier, Idx = u16> {
     fn node(&self) -> Option<&IdN>;
     fn offset(&self) -> Option<&Idx>;
-    fn check<'store, HAST>(&self, stores: &'store HAST) -> Result<(), ()>
+    fn check<HAST>(&self, stores: &HAST) -> Result<(), ()>
     where
         HAST: HyperAST<IdN = IdN::IdN>,
         // for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithChildren<ChildIdx = Idx>,
@@ -169,7 +169,7 @@ pub mod position_accessors {
     }
 
     #[cfg(debug_assertions)]
-    pub fn assert_invariants_pre<'store, IdN, P, HAST>(p: &P, store: &'store HAST)
+    pub fn assert_invariants_pre<IdN, P, HAST>(p: &P, store: &HAST)
     where
         IdN: std::cmp::Eq + std::hash::Hash + std::fmt::Debug + Clone + NodeId,
         P: WithPreOrderPath<IdN> + RootedPosition<IdN>,
@@ -215,7 +215,7 @@ pub mod position_accessors {
     /// - p should only return each node once
     /// - resolved children should correspond
     #[cfg(debug_assertions)]
-    pub fn assert_invariants_post<'store, IdN, P, HAST>(p: &P, store: &'store HAST)
+    pub fn assert_invariants_post<IdN, P, HAST>(p: &P, store: &HAST)
     where
         IdN: std::cmp::Eq + std::hash::Hash + std::fmt::Debug + Clone + NodeId,
         P: WithPostOrderPath<IdN> + SolvedPosition<IdN>,
@@ -252,7 +252,7 @@ pub mod position_accessors {
     /// - p should only return each node once
     /// - resolved children should corespond
     #[cfg(debug_assertions)]
-    pub fn assert_invariants_post_full<'store, IdN, P, HAST>(p: &P, store: &'store HAST)
+    pub fn assert_invariants_post_full<IdN, P, HAST>(p: &P, store: &HAST)
     where
         IdN: std::cmp::Eq + std::hash::Hash + std::fmt::Debug + Clone + NodeId,
         P: WithFullPostOrderPath<IdN>,

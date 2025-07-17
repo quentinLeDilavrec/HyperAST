@@ -152,7 +152,7 @@ impl<T, Id> Accumulator for BasicAccumulator<T, Id> {
 
 /// Builder of a node aware of its indentation for the hyperAST
 pub trait AccIndentation: Accumulator {
-    fn indentation<'a>(&'a self) -> &'a Spaces;
+    fn indentation(&self) -> &Spaces;
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -286,7 +286,7 @@ impl<'a, GD> TextedGlobalData<'a, GD> {
     }
 }
 
-impl<'a, GD: GlobalData> GlobalData for TextedGlobalData<'a, GD> {
+impl<GD: GlobalData> GlobalData for TextedGlobalData<'_, GD> {
     fn up(&mut self) {
         self.inner.up();
     }
@@ -307,14 +307,14 @@ pub struct SpacedGlobalData<'a, GD = BasicGlobalData> {
     inner: TextedGlobalData<'a, GD>,
 }
 
-impl<'a, GD> std::ops::Deref for SpacedGlobalData<'a, GD> {
+impl<GD> std::ops::Deref for SpacedGlobalData<'_, GD> {
     type Target = GD;
 
     fn deref(&self) -> &Self::Target {
         &self.inner.inner
     }
 }
-impl<'a, GD> std::ops::DerefMut for SpacedGlobalData<'a, GD> {
+impl<GD> std::ops::DerefMut for SpacedGlobalData<'_, GD> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner.inner
     }
@@ -328,25 +328,25 @@ impl<'a, GD> From<TextedGlobalData<'a, GD>> for SpacedGlobalData<'a, GD> {
         }
     }
 }
-impl<'a, GD: Clone> SpacedGlobalData<'a, GD> {
+impl<GD: Clone> SpacedGlobalData<'_, GD> {
     pub fn simple(&self) -> GD {
         self.inner.inner.clone()
     }
 }
 
-impl<'a, GD: Clone> TextedGlobalData<'a, GD> {
+impl<GD: Clone> TextedGlobalData<'_, GD> {
     pub fn simple(&self) -> GD {
         self.inner.clone()
     }
 }
 
-impl<'a, GD> SpacedGlobalData<'a, GD> {
+impl<GD> SpacedGlobalData<'_, GD> {
     pub fn sum_byte_length(&self) -> usize {
         self.sum_byte_length
     }
 }
 
-impl<'a, GD> TotalBytesGlobalData for SpacedGlobalData<'a, GD> {
+impl<GD> TotalBytesGlobalData for SpacedGlobalData<'_, GD> {
     fn set_sum_byte_length(&mut self, sum_byte_length: usize) {
         // assert!(self.sum_byte_length <= sum_byte_length);
         assert!(
@@ -359,7 +359,7 @@ impl<'a, GD> TotalBytesGlobalData for SpacedGlobalData<'a, GD> {
     }
 }
 
-impl<'a, GD: GlobalData> GlobalData for SpacedGlobalData<'a, GD> {
+impl<GD: GlobalData> GlobalData for SpacedGlobalData<'_, GD> {
     fn up(&mut self) {
         self.inner.up();
     }
@@ -593,7 +593,7 @@ impl<R> RoleAcc<R> {
     {
         use crate::store::nodes::compo;
         debug_assert!(self.current.is_none());
-        if self.roles.len() > 0 {
+        if !self.roles.is_empty() {
             dyn_builder.add(compo::Roles(self.roles.into_boxed_slice()));
             dyn_builder.add(compo::RoleOffsets(self.offsets.into_boxed_slice()));
         }
@@ -696,7 +696,7 @@ pub mod utils_ts {
     #[repr(transparent)]
     pub struct TNode<'a>(pub tree_sitter::Node<'a>);
 
-    impl<'a> crate::tree_gen::parser::Node for TNode<'a> {
+    impl crate::tree_gen::parser::Node for TNode<'_> {
         fn kind(&self) -> &str {
             self.0.kind()
         }
@@ -730,7 +730,7 @@ pub mod utils_ts {
         }
     }
 
-    impl<'a> crate::tree_gen::parser::NodeWithU16TypeId for TNode<'a> {
+    impl crate::tree_gen::parser::NodeWithU16TypeId for TNode<'_> {
         fn kind_id(&self) -> u16 {
             self.0.kind_id()
         }
@@ -740,7 +740,7 @@ pub mod utils_ts {
     #[derive(Clone)]
     pub struct TTreeCursor<'a, const HIDDEN_NODES: bool = false>(pub tree_sitter::TreeCursor<'a>);
 
-    impl<'a, const HIDDEN_NODES: bool> std::fmt::Debug for TTreeCursor<'a, HIDDEN_NODES> {
+    impl<const HIDDEN_NODES: bool> std::fmt::Debug for TTreeCursor<'_, HIDDEN_NODES> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_tuple("TTreeCursor")
                 .field(&self.0.node().kind())
@@ -780,30 +780,26 @@ pub mod utils_ts {
                     ts_tree_cursor_goto_first_child_internal(s)
                 }
                 .ok()
+            } else if self.0.goto_first_child() {
+                Some(Visibility::Visible)
             } else {
-                if self.0.goto_first_child() {
-                    Some(Visibility::Visible)
-                } else {
-                    None
-                }
+                None
             }
         }
 
         fn goto_next_sibling_extended(&mut self) -> Option<Visibility> {
             if HIDDEN_NODES {
-                let r = unsafe {
+                
+                unsafe {
                     let s = &mut self.0;
                     let s: *mut tree_sitter::ffi::TSTreeCursor = std::mem::transmute(s);
                     ts_tree_cursor_goto_next_sibling_internal(s)
                 }
-                .ok();
-                r
+                .ok()
+            } else if self.0.goto_next_sibling() {
+                Some(Visibility::Visible)
             } else {
-                if self.0.goto_next_sibling() {
-                    Some(Visibility::Visible)
-                } else {
-                    None
-                }
+                None
             }
         }
     }
@@ -821,12 +817,12 @@ pub mod utils_ts {
             use bitvec::prelude::Lsb0;
             let mut vis = bitvec::bitvec![];
             vis.push(Visibility::Hidden == Visibility::Hidden);
-            let pre_post = Self {
+            
+            Self {
                 has: super::zipped::Has::Down,
                 stack: vec![cursor.clone()],
                 vis,
-            };
-            pre_post
+            }
         }
 
         pub fn current(&mut self) -> Option<(&C, &mut super::zipped::Has)> {
@@ -919,7 +915,7 @@ pub(crate) fn things_after_last_lb<'b>(lb: &[u8], spaces: &'b [u8]) -> Option<&'
         .windows(lb.len())
         .rev()
         .position(|window| window == lb)
-        .and_then(|i| Some(&spaces[spaces.len() - i - 1..]))
+        .map(|i| &spaces[spaces.len() - i - 1..])
 }
 
 pub fn compute_indentation<'a>(
@@ -934,7 +930,7 @@ pub fn compute_indentation<'a>(
     // let Some(spaces) = spaces else {
     //     return parent_indentation.to_vec()
     // };
-    let spaces_after_lb = things_after_last_lb(&*line_break, spaces);
+    let spaces_after_lb = things_after_last_lb(line_break, spaces);
     match spaces_after_lb {
         Some(s) => Space::format_indentation(s),
         None => parent_indentation.to_vec(),
@@ -949,7 +945,7 @@ pub fn try_compute_indentation<'a>(
     parent_indentation: &'a [Space],
 ) -> Vec<Space> {
     let spaces = { &text[padding_start..pos] };
-    let spaces_after_lb = things_after_last_lb(&*line_break, spaces);
+    let spaces_after_lb = things_after_last_lb(line_break, spaces);
     match spaces_after_lb {
         Some(s) => Space::try_format_indentation(s).unwrap_or(parent_indentation.to_vec()),
         None => parent_indentation.to_vec(),
@@ -979,14 +975,14 @@ pub fn get_spacing(
                     "{} {} {:?}",
                     x,
                     padding_start,
-                    std::str::from_utf8(&spaces).unwrap()
+                    std::str::from_utf8(spaces).unwrap()
                 )
             }
         });
         debug_assert!(
             !bslash,
             "{}",
-            std::str::from_utf8(&&text[padding_start.saturating_sub(100)..pos + 50]).unwrap()
+            std::str::from_utf8(&text[padding_start.saturating_sub(100)..pos + 50]).unwrap()
         );
         let spaces = spaces.to_vec();
         // let spaces = Space::replace_indentation(parent_indentation, &spaces);
@@ -1009,8 +1005,7 @@ pub fn try_get_spacing(
         // println!("{:?}",std::str::from_utf8(spaces).unwrap());
         if spaces
             .iter()
-            .find(|&x| *x != b' ' && *x != b'\n' && *x != b'\t' && *x != b'\r')
-            .is_some()
+            .any(|x| *x != b' ' && *x != b'\n' && *x != b'\t' && *x != b'\r')
         {
             return None;
         }

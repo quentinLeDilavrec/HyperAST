@@ -3,13 +3,13 @@ use super::{
     StructuralPositionStore,
 };
 use crate::{
+    PrimInt,
     position::TreePath,
     store::defaults::LabelIdentifier,
     types::{
         AnyType, HyperAST, LendT, NodeId, NodeStore, Tree, Typed, WithChildren, WithSerialization,
         WithStats,
     },
-    PrimInt,
 };
 use num::{one, zero};
 use std::fmt::Debug;
@@ -21,7 +21,7 @@ impl<IdN, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
         let nodes = x.parents;
         Self {
             nodes,
-            parents: (0..l).into_iter().collect(),
+            parents: (0..l).collect(),
             offsets: x.offsets,
             // ends: vec![],
         }
@@ -96,11 +96,7 @@ impl<IdN: NodeId, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
         scout: &Scout<IdN, Idx>,
     ) -> Result<(), String>
     where
-        HAST: HyperAST<
-            // T = HashedNodeRef<'store>,
-            IdN = IdN,
-            Label = LabelIdentifier,
-        >,
+        HAST: HyperAST<IdN = IdN, Label = LabelIdentifier>,
         for<'t> LendT<'t, HAST>: WithChildren<ChildIdx = Idx>,
         HAST::Idx: Debug,
         IdN: Copy + Eq + Debug + NodeId<IdN = IdN>,
@@ -116,7 +112,7 @@ impl<IdN: NodeId, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
             let o = scout.path.offsets[0];
             if o.is_zero() {
                 if i != 0 {
-                    return Err(format!("bad offset"));
+                    return Err("bad offset".to_string());
                 }
                 return Ok(());
             }
@@ -203,8 +199,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
             self.nodes.extend(&x.path.parents[1..]);
 
             self.parents.push(x.ancestors);
-            self.parents
-                .extend((o..o + l).into_iter().collect::<Vec<_>>());
+            self.parents.extend(o..o + l);
 
             self.offsets.extend(&x.path.offsets[1..]);
             x.ancestors = self.nodes.len() - 1;
@@ -214,8 +209,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
             let o = self.parents.len();
             self.nodes.extend(x.path.parents.clone());
             self.parents.push(x.ancestors);
-            self.parents
-                .extend((o..o + l).into_iter().collect::<Vec<_>>());
+            self.parents.extend(o..o + l);
             self.offsets.extend(&x.path.offsets);
             // self.ends.push(self.nodes.len() - 1);
             x.ancestors = self.nodes.len() - 1;

@@ -1,10 +1,10 @@
 use super::super::TreePathMut;
 use super::{Position, StructuralPosition, StructuralPositionStore, TreePath};
+use crate::PrimInt;
 use crate::types::{
     AnyType, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, NodeId, Typed,
     WithChildren, WithSerialization,
 };
-use crate::PrimInt;
 use num::{one, traits::NumAssign, zero};
 use std::fmt::Debug;
 
@@ -40,7 +40,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> TreePath<IdN, Idx> for Scout<IdN, Idx> {
     fn offset(&self) -> Option<&Idx> {
         self.path.offset()
     }
-    fn check<'store, HAST>(&self, stores: &'store HAST) -> Result<(), ()>
+    fn check<HAST>(&self, stores: &HAST) -> Result<(), ()>
     where
         HAST: HyperAST<IdN = IdN::IdN>,
         HAST::IdN: Eq,
@@ -123,7 +123,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
             if !(t.is_file() || t.is_directory()) {
                 from_file = true;
             }
-            y as usize
+            y
         } else {
             0
         };
@@ -152,7 +152,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
                     v.iter()
                         .map(|x| {
                             let b = stores.resolve(x);
-                            b.try_bytes_len().unwrap() as usize
+                            b.try_bytes_len().unwrap()
                         })
                         .sum()
                 };
@@ -201,8 +201,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
             offset += c;
             if t.is_file() {
                 from_file = false;
-            } else {
-            }
+            } 
         }
         sp.get(super::SpHandle(self.ancestors + 1))
             .make_position_aux(stores, from_file, len, offset, path)

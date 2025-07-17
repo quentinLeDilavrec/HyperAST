@@ -40,8 +40,8 @@ impl<K, DD> SimpleTree<K, DD> {
     }
 }
 
-fn store<'a>(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> u16 {
-    fn store_aux<'a>(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> Tree {
+fn store(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> u16 {
+    fn store_aux(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> Tree {
         let lid = node
             .label
             .as_ref()
@@ -73,7 +73,7 @@ fn store<'a>(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> u16 
 }
 
 use crate::store::SimpleStores;
-pub fn vpair_to_stores<'a>(
+pub fn vpair_to_stores(
     (src, dst): (SimpleTree<u8>, SimpleTree<u8>),
 ) -> (SimpleStores<TStore, NS<Tree>, LS<u16>>, u16, u16) {
     let (mut label_store, mut compressed_node_store) = make_stores();
@@ -111,7 +111,7 @@ impl<'a, 'b> DisplayTree<'a, 'b, u16, Tree> {
     }
 }
 
-impl<'a, 'b> Display for DisplayTree<'a, 'b, u16, Tree> {
+impl Display for DisplayTree<'_, '_, u16, Tree> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cs = self.ns.resolve(&self.node);
         writeln!(
@@ -141,7 +141,7 @@ impl<'a, 'b> Display for DisplayTree<'a, 'b, u16, Tree> {
     }
 }
 
-impl<'a, 'b> Debug for DisplayTree<'a, 'b, u16, Tree> {
+impl Debug for DisplayTree<'_, '_, u16, Tree> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cs = self.ns.resolve(&self.node);
         write!(f, "{}|-{}", " ".repeat(self.depth), cs.get_type(),)?;
@@ -168,7 +168,7 @@ impl<'a, 'b> Debug for DisplayTree<'a, 'b, u16, Tree> {
 }
 
 #[allow(dead_code)]
-fn make_stores<'a>() -> (LS<u16>, NS<Tree>) {
+fn make_stores() -> (LS<u16>, NS<Tree>) {
     let label_store = LS::<u16> {
         v: Default::default(),
         phantom: PhantomData,
@@ -244,7 +244,7 @@ impl types::Labeled for Tree {
         &self.label
     }
 
-    fn try_get_label<'a>(&'a self) -> Option<&'a Self::Label> {
+    fn try_get_label(&self) -> Option<&Self::Label> {
         (self.label != 0).then_some(self.get_label_unchecked())
     }
 }
@@ -255,7 +255,7 @@ impl<T: types::Labeled> types::Labeled for TreeRef<'_, T> {
         self.0.get_label_unchecked()
     }
 
-    fn try_get_label<'a>(&'a self) -> Option<&'a Self::Label> {
+    fn try_get_label(&self) -> Option<&Self::Label> {
         self.0.try_get_label()
     }
 }
@@ -263,7 +263,7 @@ impl types::Node for Tree {}
 impl<T: types::Node> types::Node for TreeRef<'_, T> {}
 impl types::Tree for Tree {
     fn has_children(&self) -> bool {
-        self.children.len() > 0
+        !self.children.is_empty()
     }
 
     fn has_label(&self) -> bool {
@@ -275,7 +275,7 @@ impl types::ErasedHolder for Tree {
     fn unerase_ref<T: 'static + Send + Sync>(&self, tid: std::any::TypeId) -> Option<&T> {
         if tid == std::any::TypeId::of::<Ty>() {
             let t = &self.t;
-            let t = unsafe { std::mem::transmute(t) };
+            let t = unsafe { std::mem::transmute::<&u8, &T>(t) };
             Some(t)
         } else {
             None
@@ -283,7 +283,7 @@ impl types::ErasedHolder for Tree {
     }
 }
 
-impl<'a, T: types::Tree> types::ErasedHolder for TreeRef<'_, T> {
+impl<T: types::Tree> types::ErasedHolder for TreeRef<'_, T> {
     fn unerase_ref<TT: 'static + Send + Sync>(&self, tid: std::any::TypeId) -> Option<&TT> {
         self.0.unerase_ref(tid)
     }
@@ -325,7 +325,7 @@ impl WithChildren for Tree {
     }
 
     fn child(&self, idx: &Self::ChildIdx) -> Option<Self::TreeId> {
-        self.children.get(idx.to_usize().unwrap()).map(|x| *x)
+        self.children.get(idx.to_usize().unwrap()).copied()
     }
 
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<Self::TreeId> {
@@ -525,7 +525,7 @@ where
     }
 }
 
-impl<'a, T: 'a + WithChildren + Eq> NS<T>
+impl<T: WithChildren + Eq> NS<T>
 where
     T::TreeId: PrimInt,
 {
@@ -579,11 +579,11 @@ pub struct LS<I> {
     phantom: PhantomData<*const I>,
 }
 
-impl<'a, I> types::LStore for LS<I> {
+impl<I> types::LStore for LS<I> {
     type I = I;
 }
 
-impl<'a, I: PrimInt> LabelStore<types::SlicedLabel> for LS<I> {
+impl<I: PrimInt> LabelStore<types::SlicedLabel> for LS<I> {
     type I = I;
     fn get_or_insert<T: Borrow<types::SlicedLabel>>(&mut self, node: T) -> Self::I {
         let a = &mut self.v;

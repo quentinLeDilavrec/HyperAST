@@ -59,7 +59,7 @@ macro_rules! traits_compose {
 }
 
 traits_compose! { pub Compo:
-    #[feature = "legion"] ::legion::storage::Component, 
+    #[feature = "legion"] ::legion::storage::Component,
     #[feature = "bevy_ecs"] ::bevy_ecs::component::Component
     { 'static + Send + Sync }
 }
@@ -71,7 +71,6 @@ pub trait EntityBuilder {
 pub trait DerivedData<EB: EntityBuilder>: Sized {
     fn persist(self, builder: &mut EB);
 }
-
 
 pub trait CompressedCompo {
     fn decomp(ptr: impl ErasedHolder, tid: std::any::TypeId) -> Self
@@ -111,4 +110,3 @@ pub trait CompoRegister {
     type Id;
     fn register_compo<T: 'static + Compo>(&mut self) -> Self::Id;
 }
-

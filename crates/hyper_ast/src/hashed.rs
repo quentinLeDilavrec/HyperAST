@@ -165,7 +165,7 @@ impl ComputableNodeHashs for SyntaxNodeHashs<u32> {
         l: Self::Hash,
         size: Self::Hash,
     ) -> Self::Hash {
-        inner_node_hash(k, l, size as u32, self.hash(kind))
+        inner_node_hash(k, l, size, self.hash(kind))
     }
 }
 
@@ -235,7 +235,7 @@ impl<H: Hash + PrimInt, U: NodeHashs<Hash = H>, N, L: Eq, T> crate::types::Label
         self.node.get_label_unchecked()
     }
 
-    fn try_get_label<'a>(&'a self) -> Option<&'a Self::Label> {
+    fn try_get_label(&self) -> Option<&Self::Label> {
         self.node.try_get_label()
     }
 }

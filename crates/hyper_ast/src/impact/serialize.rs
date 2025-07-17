@@ -200,7 +200,7 @@ impl<H: VaryHasher<u8>> CachedHasher<'static, usize, u8, H> {
     }
 }
 
-impl<'a, H: VaryHasher<u16>> CachedHasher<'a, usize, u16, H> {
+impl<H: VaryHasher<u16>> CachedHasher<'_, usize, u16, H> {
     pub fn once<T: MySerialize + Keyed<usize>>(x: T) -> Vec<u16> {
         let mut table = Default::default();
         let s = CachedHasher::<usize, u16, H> {
@@ -299,7 +299,7 @@ pub struct CachedHasherAux<'a, I, S, H: VaryHasher<S>> {
     _phantom: PhantomData<*const S>,
 }
 
-impl<'a, H: VaryHasher<u8>> MySerializePar for CachedHasherAux<'a, usize, u8, H> {
+impl<H: VaryHasher<u8>> MySerializePar for CachedHasherAux<'_, usize, u8, H> {
     type Ok = SymbolU16;
 
     type Error = CachedHasherError;
@@ -329,7 +329,7 @@ impl<'a, H: VaryHasher<u8>> MySerializePar for CachedHasherAux<'a, usize, u8, H>
     }
 }
 
-impl<'a, H: VaryHasher<u16>> MySerializePar for CachedHasherAux<'a, usize, u16, H> {
+impl<H: VaryHasher<u16>> MySerializePar for CachedHasherAux<'_, usize, u16, H> {
     type Ok = SymbolU16;
 
     type Error = CachedHasherError;
@@ -358,7 +358,7 @@ impl<'a, H: VaryHasher<u16>> MySerializePar for CachedHasherAux<'a, usize, u16, 
         }
     }
 }
-impl<'a, H: VaryHasher<u8>> MySerializeSco for CachedHasherAux<'a, usize, u8, H> {
+impl<H: VaryHasher<u8>> MySerializeSco for CachedHasherAux<'_, usize, u8, H> {
     type Ok = SymbolU16;
 
     type Error = CachedHasherError;
@@ -386,7 +386,7 @@ impl<'a, H: VaryHasher<u8>> MySerializeSco for CachedHasherAux<'a, usize, u8, H>
         Ok(self.table.insert(self.index, self.acc))
     }
 }
-impl<'a, H: VaryHasher<u16>> MySerializeSco for CachedHasherAux<'a, usize, u16, H> {
+impl<H: VaryHasher<u16>> MySerializeSco for CachedHasherAux<'_, usize, u16, H> {
     type Ok = SymbolU16;
 
     type Error = CachedHasherError;

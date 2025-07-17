@@ -291,7 +291,7 @@ mod exp {
         }
 
         fn as_str(&'static self) -> &'static str {
-            Keyword::as_ref(&self)
+            Keyword::as_ref(self)
         }
 
         fn len(&self) -> usize {
@@ -638,10 +638,7 @@ impl HyperType for u8 {
     {
         // Do a type-safe casting. If the types are different,
         // return false, otherwise test the values for equality.
-        other
-            .as_any()
-            .downcast_ref::<Self>()
-            .map_or(false, |a| self == a)
+        other.as_any().downcast_ref::<Self>() == Some(self)
     }
 
     fn as_shared(&self) -> Shared {
@@ -810,9 +807,7 @@ pub trait WithChildren:
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<<Self::TreeId as NodeId>::IdN> {
         let cs = self.children()?;
         let cs: Vec<_> = cs.collect();
-        cs.get(cs.len() - idx.to_usize().unwrap())
-            .cloned()
-            .map(|x| x)
+        cs.get(cs.len() - idx.to_usize().unwrap()).cloned()
     }
     fn children(&self) -> Option<LendC<'_, Self, Self::ChildIdx, <Self::TreeId as NodeId>::IdN>>;
 }
@@ -835,7 +830,7 @@ impl<'a, T> From<&'a [T]> for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T> Default for ChildrenSlice<'a, T> {
+impl<T> Default for ChildrenSlice<'_, T> {
     fn default() -> Self {
         Self(&[])
     }
@@ -883,7 +878,7 @@ impl<T: Debug> Debug for ChildrenSlice<'_, T> {
     }
 }
 
-impl<'a, T: Clone> Iterator for ChildrenSlice<'a, T> {
+impl<T: Clone> Iterator for ChildrenSlice<'_, T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         let r = self.0.first()?.clone();
@@ -892,7 +887,7 @@ impl<'a, T: Clone> Iterator for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T: Clone> DoubleEndedIterator for ChildrenSlice<'a, T> {
+impl<T: Clone> DoubleEndedIterator for ChildrenSlice<'_, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let r = self.0.last()?.clone();
         self.0 = &self.0[..self.0.len() - 1];
@@ -900,7 +895,7 @@ impl<'a, T: Clone> DoubleEndedIterator for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T: Clone> Children<u16, T> for ChildrenSlice<'a, T> {
+impl<T: Clone> Children<u16, T> for ChildrenSlice<'_, T> {
     fn child_count(&self) -> u16 {
         <[T]>::len(self.0).to_u16().unwrap()
     }
@@ -932,7 +927,7 @@ impl<'a, T: Clone> Children<u16, T> for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T: Clone> Childrn<T> for ChildrenSlice<'a, T> {
+impl<T: Clone> Childrn<T> for ChildrenSlice<'_, T> {
     fn len(&self) -> usize {
         <[T]>::len(self.0)
     }
@@ -941,11 +936,11 @@ impl<'a, T: Clone> Childrn<T> for ChildrenSlice<'a, T> {
     }
 
     fn iter_children(&self) -> Self {
-        Self(&self.0[..])
+        Self(self.0)
     }
 }
 
-impl<'a, T: Clone> Children<u8, T> for ChildrenSlice<'a, T> {
+impl<T: Clone> Children<u8, T> for ChildrenSlice<'_, T> {
     fn child_count(&self) -> u8 {
         <[T]>::len(self.0).to_u8().unwrap()
     }
@@ -1014,13 +1009,13 @@ pub trait WithSerialization {
 pub trait WithHashs {
     type HK: HashKind;
     type HP: PrimInt + PartialEq + Eq;
-    fn hash<'a>(&'a self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP;
+    fn hash(&self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP;
 }
 
 pub trait Labeled {
     type Label: Eq;
-    fn get_label_unchecked<'a>(&'a self) -> &'a Self::Label;
-    fn try_get_label<'a>(&'a self) -> Option<&'a Self::Label>;
+    fn get_label_unchecked(&self) -> &Self::Label;
+    fn try_get_label(&self) -> Option<&Self::Label>;
 }
 pub trait Tree: Labeled + WithChildren + ErasedHolder {
     fn has_children(&self) -> bool;
@@ -1348,7 +1343,7 @@ impl<L: LLang<Self, I = u16>> Copy for TypeU16<L> {}
 
 impl<L: LLang<Self, I = u16>> Clone for TypeU16<L> {
     fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1.clone())
+        Self(self.0, self.1)
     }
 }
 
@@ -1500,7 +1495,7 @@ pub trait HyperAST: for<'a> AstLending<'a> {
         let n: <Self as AstLending<'_>>::RT = ns.resolve(id);
         Self::TS::decompress_type(&n, std::any::TypeId::of::<<Self::TS as TypeStore>::Ty>())
     }
-    fn resolve<'a>(&self, id: &'a Self::IdN) -> <Self as AstLending<'_>>::RT {
+    fn resolve(&self, id: &Self::IdN) -> <Self as AstLending<'_>>::RT {
         let ns = self.node_store();
         let n = ns.resolve(id);
         n

@@ -17,21 +17,21 @@ use crate::{
 
 pub struct HashedNodeRef<'a, Id>(pub(super) &'a boxing::ErasedMap, pub(super) PhantomData<Id>);
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNodeRef<'_, Id> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self, other)
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> Eq for HashedNodeRef<'a, Id> {}
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> Eq for HashedNodeRef<'_, Id> {}
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNodeRef<'_, Id> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         crate::types::WithHashs::hash(self, SyntaxNodeHashsKinds::default()).hash(state)
     }
 }
 
-impl<'a, Id: 'static + TypedNodeId<IdN = NodeIdentifier>> Debug for HashedNodeRef<'a, Id>
+impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> Debug for HashedNodeRef<'_, Id>
 where
     Id::Ty: Debug,
 {
@@ -48,8 +48,8 @@ where
     }
 }
 
-impl<'a, Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Typed
-    for HashedNodeRef<'a, Id>
+impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Typed
+    for HashedNodeRef<'_, Id>
 where
     Id::Ty: Copy + Hash + Eq,
 {
@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithStats for HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithStats for HashedNodeRef<'_, Id> {
     fn size(&self) -> usize {
         self.0
             .get::<compo::Size>()
@@ -82,15 +82,15 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithStats for Hash
             .unwrap_or(1)
     }
 }
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithSerialization
-    for HashedNodeRef<'a, Id>
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithSerialization
+    for HashedNodeRef<'_, Id>
 {
     fn try_bytes_len(&self) -> Option<usize> {
         self.0.get::<compo::BytesLen>().and_then(|x| x.0.to_usize())
     }
 }
 
-impl<'a, T> HashedNodeRef<'a, T> {
+impl<T> HashedNodeRef<'_, T> {
     pub fn size_no_spaces(&self) -> usize {
         self.0
             .get::<compo::SizeNoSpaces>()
@@ -99,13 +99,13 @@ impl<'a, T> HashedNodeRef<'a, T> {
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Node for HashedNodeRef<'a, Id> {}
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Node for HashedNodeRef<'_, Id> {}
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Stored for HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Stored for HashedNodeRef<'_, Id> {
     type TreeId = Id;
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> HashedNodeRef<'_, Id> {
     pub fn cs(&self) -> Option<crate::types::LendC<'_, Self, u16, NodeIdentifier>> {
         todo!()
         // self.0
@@ -128,8 +128,8 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::CLending<'a, u16, 
     type Children = crate::types::ChildrenSlice<'a, Id::IdN>;
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren
-    for HashedNodeRef<'a, Id>
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren
+    for HashedNodeRef<'_, Id>
 {
     type ChildIdx = u16;
     // type Children<'b>
@@ -154,8 +154,7 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren
                 panic!()
             })
             .0
-            .get(idx.to_usize().unwrap())
-            .map(|x| *x)
+            .get(idx.to_usize().unwrap()).copied()
     }
 
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<<Self::TreeId as NodeId>::IdN> {
@@ -172,7 +171,7 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithHashs for HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithHashs for HashedNodeRef<'_, Id> {
     type HK = SyntaxNodeHashsKinds;
     type HP = HashSize;
 
@@ -184,14 +183,14 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithHashs for Hash
     }
 }
 
-impl<'a, Id> crate::store::nodes::ErasedHolder for HashedNodeRef<'a, Id> {
+impl<Id> crate::store::nodes::ErasedHolder for HashedNodeRef<'_, Id> {
     fn unerase_ref<T: 'static + Send + Sync>(&self, _tid: std::any::TypeId) -> Option<&T> {
         todo!()
     }
 }
 
-impl<'a, Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree
-    for HashedNodeRef<'a, Id>
+impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree
+    for HashedNodeRef<'_, Id>
 where
     Id::Ty: Copy + Hash + Eq,
 {
@@ -206,7 +205,7 @@ where
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNodeRef<'_, Id> {
     type Label = LabelIdentifier;
 
     fn get_label_unchecked(&self) -> &LabelIdentifier {
@@ -219,11 +218,11 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for Hashed
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> HashedNodeRef<'a, Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> HashedNodeRef<'_, Id> {
     /// Returns a reference to one of the entity's components.
     pub fn get_component<C: std::marker::Send + std::marker::Sync + 'static>(
         &self,
     ) -> Result<&C, ()> {
-        self.0.get::<C>().ok_or_else(|| ())
+        self.0.get::<C>().ok_or(())
     }
 }

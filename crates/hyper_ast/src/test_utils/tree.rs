@@ -73,7 +73,7 @@ pub trait WithHashs {
 
 pub trait Labeled {
     type Label: Eq;
-    fn get_label<'a>(&'a self) -> &'a Self::Label;
+    fn get_label(&self) -> &Self::Label;
 }
 
 pub trait Tree: Typed + Labeled + WithChildren {

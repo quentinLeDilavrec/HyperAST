@@ -28,7 +28,7 @@ where
                 let len = b.try_bytes_len().unwrap_or(0).to_usize().unwrap();
                 if offset + len < start {
                     // not yet reached something
-                } else if end.map_or(true, |end| offset + len <= end) {
+                } else if end.is_none_or(|end| offset + len <= end) {
                     break 'main;
                 } else {
                     offsets.push(y);

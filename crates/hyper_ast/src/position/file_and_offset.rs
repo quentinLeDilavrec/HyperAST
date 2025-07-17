@@ -62,15 +62,15 @@ impl<T: PrimInt + Display> Display for Position<PathBuf, T> {
 
 // TODO use an interface for TopDownPositionBuilder, should actually be the same as position here, this way you can see the generated pos as a DTO
 // TODO in the same way finishing a prepare struct could directly be converted into a position, or be an accumulator itself (actually better for some structs)
-impl<IdN, Idx, IdO: PrimInt> Into<Position<PathBuf, IdO>>
-    for super::spaces_related::TopDownPositionBuilder<IdN, Idx, IdO>
+impl<IdN, Idx, IdO: PrimInt> From<super::spaces_related::TopDownPositionBuilder<IdN, Idx, IdO>>
+    for Position<PathBuf, IdO>
 {
-    fn into(self) -> Position<PathBuf, IdO> {
+    fn from(val: super::spaces_related::TopDownPositionBuilder<IdN, Idx, IdO>) -> Self {
         // TODO how to handle position of directory ?
-        let range = self.range.unwrap();
+        let range = val.range.unwrap();
         let len = range.end - range.start;
         Position {
-            file: self.file,
+            file: val.file,
             offset: range.start,
             len,
         }

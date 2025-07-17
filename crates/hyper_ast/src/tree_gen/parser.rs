@@ -24,11 +24,7 @@ pub trait Node {
         if self.child_count() >= 1 {
             // TODO maybe get node role
             false
-        } else if self.is_named() {
-            true
-        } else {
-            false
-        }
+        } else { self.is_named() }
     }
 }
 

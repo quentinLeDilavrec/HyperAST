@@ -110,10 +110,10 @@ impl<S: Subtree> MetricComputing for NoMetrics<S> {
     }
     type Acc = ();
     fn init(&self, _ty: Ty, _l: Option<&str>) -> Self::Acc {
-        ()
+        
     }
     fn acc(&self, _acc: Self::Acc, _current: &Self::S) -> Self::Acc {
-        ()
+        
     }
     type M = ();
     fn finish(&self, _acc: Self::Acc, current: Self::S) -> Self::S {
@@ -136,8 +136,8 @@ impl<F0: MetricComputing, F1: MetricComputing<S = F0::S>> MetricComputing for Ch
     }
     fn finish(&self, acc: Self::Acc, current: Self::S) -> Self::S {
         let current = self.0.finish(acc.0, current);
-        let current = self.1.finish(acc.1, current);
-        current
+        
+        self.1.finish(acc.1, current)
     }
 }
 
@@ -338,8 +338,7 @@ mod tests {
         let acc_root = builder.0.acc(acc_root, &meth);
         let class_members = Children(vec![meth]);
         let root = STree(root, vec![Box::new(class_members)]);
-        let root = builder.0.finish(acc_root, root);
-        root
+        builder.0.finish(acc_root, root)
     }
 
     fn build_mcc_example_meth(builder: &Builder<impl MetricComputing<S = STree>>) -> STree {
@@ -349,16 +348,14 @@ mod tests {
         let acc_meth = builder.0.acc(acc_meth, &if_statement);
         let meth_statements = Children(vec![if_statement]);
         let meth = STree(meth, vec![Box::new(meth_statements)]);
-        let meth = builder.0.finish(acc_meth, meth);
-        meth
+        builder.0.finish(acc_meth, meth)
     }
 
     fn build_mcc_example_if_statement(builder: &Builder<impl MetricComputing<S = STree>>) -> STree {
         let if_statement = Ty::IfStatement;
         let acc_if_statement = builder.0.init(if_statement, None);
         let if_statement = STree(if_statement, vec![]);
-        let if_statement = builder.0.finish(acc_if_statement, if_statement);
-        if_statement
+        builder.0.finish(acc_if_statement, if_statement)
     }
 
     // region: Stuff provided usually provided by HyperAST

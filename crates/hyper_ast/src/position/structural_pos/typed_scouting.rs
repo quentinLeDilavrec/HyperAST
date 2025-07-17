@@ -1,7 +1,7 @@
 use super::super::{TreePathMut, TypedTreePath};
 use super::{Position, Scout, SpHandle, StructuralPosition, StructuralPositionStore, TreePath};
-use crate::types::{NodeId, TypedNodeId};
 use crate::PrimInt;
+use crate::types::{NodeId, TypedNodeId};
 use crate::{store::defaults::LabelIdentifier, types::HyperAST};
 use num::zero;
 use std::{fmt::Debug, marker::PhantomData};
@@ -26,10 +26,9 @@ where
         self.path.offset()
     }
 
-    fn check<'store, HAST>(&self, stores: &'store HAST) -> Result<(), ()>
+    fn check<HAST>(&self, stores: &HAST) -> Result<(), ()>
     where
         HAST: HyperAST<IdN = <TIdN::IdN as NodeId>::IdN>,
-        // for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithChildren<ChildIdx = Idx>,
         HAST::IdN: Eq,
         TIdN::IdN: NodeId,
         <TIdN::IdN as NodeId>::IdN: NodeId<IdN = <TIdN::IdN as NodeId>::IdN>,
@@ -65,7 +64,7 @@ where
 
     fn goto_typed(&mut self, node: TIdN, i: Idx) {
         self.path.goto(*node.as_id(), i);
-        self.tdepth = self.tdepth + 1;
+        self.tdepth += 1;
     }
 }
 
@@ -84,7 +83,7 @@ where
         mut self,
         x: &StructuralPositionStore<TIdN::IdN, Idx>,
     ) -> Result<Self, Scout<TIdN::IdN, Idx>> {
-        if let Some(_) = self.path.pop() {
+        if self.path.pop().is_some() {
             self.path = StructuralPosition::empty();
             self.ancestors = x.parents[self.ancestors];
             let tdepth = -self.tdepth as usize;
@@ -120,7 +119,7 @@ where
         x: &StructuralPositionStore<TIdN::IdN, Idx>,
     ) -> Result<TIdN, TIdN::IdN> {
         if let Some(n) = self.node_typed() {
-            Ok(n.clone())
+            Ok(*n)
         } else if let Some(y) = self.path.node() {
             Ok(unsafe { TIdN::from_id(*y) })
             // TODO do proper state
@@ -207,10 +206,10 @@ where
     //     }
     // }
 
-    pub fn make_position<'store, HAST>(
+    pub fn make_position<HAST>(
         &self,
         _sp: &StructuralPositionStore<HAST::IdN, Idx>,
-        _stores: &'store HAST,
+        _stores: &HAST,
     ) -> Position
     where
         HAST: HyperAST<
@@ -382,8 +381,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
             self.nodes.extend(&x.path.parents[1..]);
 
             self.parents.push(x.ancestors);
-            self.parents
-                .extend((o..o + l).into_iter().collect::<Vec<_>>());
+            self.parents.extend(o..o + l);
 
             self.offsets.extend(&x.path.offsets[1..]);
             x.ancestors = self.nodes.len() - 1;
@@ -393,8 +391,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
             let o = self.parents.len();
             self.nodes.extend(x.path.parents.clone());
             self.parents.push(x.ancestors);
-            self.parents
-                .extend((o..o + l).into_iter().collect::<Vec<_>>());
+            self.parents.extend(o..o + l);
             self.offsets.extend(&x.path.offsets);
             // self.ends.push(self.nodes.len() - 1);
             x.ancestors = self.nodes.len() - 1;

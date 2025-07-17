@@ -220,8 +220,8 @@ pub(crate) enum Has {
     Right,
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
-    for TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
+    for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -245,26 +245,24 @@ where
             if has != Has::Up && cursor.goto_first_child_extended().is_some() {
                 has = Has::Down;
                 self._pre(global, text, cursor, stack, &mut has);
+            } else if cursor.goto_next_sibling_extended().is_some() {
+                has = Has::Right;
+                global.right();
+                self._post(stack, global, text);
+                self._pre(global, text, cursor, stack, &mut has);
+                dbg!()
+            } else if cursor.goto_parent() {
+                has = Has::Up;
+                self._post(stack, global, text);
             } else {
-                if let Some(_) = cursor.goto_next_sibling_extended() {
-                    has = Has::Right;
-                    global.right();
-                    self._post(stack, global, text);
-                    self._pre(global, text, cursor, stack, &mut has);
-                    dbg!()
-                } else if cursor.goto_parent() {
-                    has = Has::Up;
-                    self._post(stack, global, text);
-                } else {
-                    dbg!();
-                    break;
-                }
+                dbg!();
+                break;
             }
         }
     }
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, _text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -295,7 +293,7 @@ where
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
         };
-        if HIDDEN_NODES {}
+        
         if node.0.is_missing() {
             dbg!("missing");
             return PreResult::Skip;
@@ -303,8 +301,7 @@ where
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
         if !stack
-            .parent()
-            .map_or(false, |a| a.simple.kind.is_supertype())
+            .parent().is_some_and(|a| a.simple.kind.is_supertype())
         {
             if let Some(r) = cursor.0.field_name() {
                 if let Ok(r) = TryInto::<crate::types::Role>::try_into(r) {
@@ -376,8 +373,8 @@ where
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool>
+    TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -477,8 +474,8 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        let full_node = self.make(&mut global, acc, label);
-        full_node
+        
+        self.make(&mut global, acc, label)
     }
 
     fn _pre(
@@ -490,7 +487,7 @@ where
         has: &mut Has,
     ) {
         global.down();
-        match self.pre_skippable(text, cursor, &stack, global) {
+        match self.pre_skippable(text, cursor, stack, global) {
             PreResult::Skip => {
                 stack.push(tree_gen::P::BothHidden);
                 *has = Has::Up;
@@ -544,14 +541,14 @@ pub fn get_spacing(padding_start: usize, pos: usize, text: &[u8]) -> Option<Vec<
                     "{} {} {:?}",
                     x,
                     padding_start,
-                    std::str::from_utf8(&spaces).unwrap()
+                    std::str::from_utf8(spaces).unwrap()
                 )
             }
         });
         debug_assert!(
             !bslash,
             "{}",
-            std::str::from_utf8(&&text[padding_start.saturating_sub(100)..pos + 50]).unwrap()
+            std::str::from_utf8(&text[padding_start.saturating_sub(100)..pos + 50]).unwrap()
         );
         let spaces = spaces.to_vec();
         // let spaces = Space::replace_indentation(parent_indentation, &spaces);
@@ -581,8 +578,8 @@ pub trait TreeGen {
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 }
 
-impl<'stores, 'cache, TS, More, const HIDDEN_NODES: bool> TreeGen
-    for TsTreeGen<'stores, 'cache, TS, More, HIDDEN_NODES>
+impl<'stores, TS, More, const HIDDEN_NODES: bool> TreeGen
+    for TsTreeGen<'stores, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -648,7 +645,7 @@ where
             self.md_cache.insert(
                 compressed_node,
                 DD {
-                    metrics: metrics.clone(),
+                    metrics,
                 },
             );
             Local {
@@ -658,10 +655,10 @@ where
             }
         };
 
-        let full_node = FullNode {
+        
+        FullNode {
             global: global.simple(),
             local,
-        };
-        full_node
+        }
     }
 }

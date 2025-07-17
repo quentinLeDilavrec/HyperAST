@@ -98,7 +98,7 @@ impl<T> Accumulator for Acc<T> {
 }
 
 impl<T> AccIndentation for Acc<T> {
-    fn indentation<'a>(&'a self) -> &'a Spaces {
+    fn indentation(&self) -> &Spaces {
         &self.indentation
     }
 }
@@ -181,7 +181,7 @@ pub trait TsType: HyperType + Copy {
     fn is_repeat(&self) -> bool;
 }
 
-impl<'store, 'cache, TS, More> TsTreeGen<'store, 'cache, TS, More>
+impl<TS, More> TsTreeGen<'_, '_, TS, More>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -189,8 +189,8 @@ where
 {
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
-    for TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
+    for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -202,7 +202,7 @@ where
     type TreeCursor<'b> = TTreeCursor<'b>;
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -242,10 +242,8 @@ where
     ) -> PreResult<<Self as TreeGen>::Acc> {
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
-        if HIDDEN_NODES {
-            if kind.is_hidden() || kind.is_repeat() {
-                // return PreResult::Ignore;
-            }
+        if HIDDEN_NODES && (kind.is_hidden() || kind.is_repeat()) {
+            // return PreResult::Ignore;
         }
         if node.0.is_missing() {
             return PreResult::Skip;
@@ -253,8 +251,7 @@ where
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
         if !stack
-            .parent()
-            .map_or(false, |a| a.simple.kind.is_supertype())
+            .parent().is_some_and(|a| a.simple.kind.is_supertype())
         {
             if let Some(r) = cursor.0.field_name() {
                 if let Ok(r) = r.try_into() {
@@ -280,7 +277,7 @@ where
             text,
             node.start_byte(),
             global.sum_byte_length(),
-            &parent_indentation,
+            parent_indentation,
         );
         Acc {
             labeled: node.has_label(),
@@ -330,8 +327,8 @@ where
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool>
+    TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -441,13 +438,13 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        let full_node = self.make(&mut global, acc, label);
-        full_node
+        
+        self.make(&mut global, acc, label)
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> TreeGen
-    for TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
+    for TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -519,7 +516,7 @@ where
             self.md_cache.insert(
                 compressed_node,
                 DD {
-                    metrics: metrics.clone(),
+                    metrics,
                 },
             );
             Local {
@@ -529,10 +526,10 @@ where
             }
         };
 
-        let full_node = FullNode {
+        
+        FullNode {
             global: global.simple(),
             local,
-        };
-        full_node
+        }
     }
 }

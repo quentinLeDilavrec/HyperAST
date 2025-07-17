@@ -67,7 +67,7 @@ impl<TS: Clone, NS: Clone, LS: Clone> Clone for SimpleStores<TS, NS, LS> {
         Self {
             label_store: self.label_store.clone(),
             node_store: self.node_store.clone(),
-            type_store: self.type_store.clone(),
+            type_store: self.type_store,
         }
     }
 }

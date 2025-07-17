@@ -151,7 +151,7 @@ where
                 // #pre
                 // self._pre(global, text, cursor, stack, has, vis);
                 global.down();
-                let n = self.pre_skippable(text, cursor, &stack, global);
+                let n = self.pre_skippable(text, cursor, stack, global);
                 match n {
                     PreResult::Skip => {
                         stack.push(P::BothHidden);
@@ -184,7 +184,6 @@ where
                 }
             }
         }
-        return;
     }
 }
 

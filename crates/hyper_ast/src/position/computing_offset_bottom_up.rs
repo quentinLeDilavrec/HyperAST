@@ -68,8 +68,8 @@ where
     }
 }
 
-pub fn extract_file_postion_it_rec<'store, HAST, It>(
-    stores: &'store HAST,
+pub fn extract_file_postion_it_rec<HAST, It>(
+    stores: &HAST,
     mut nodes: It,
 ) -> Position
 where
@@ -122,7 +122,7 @@ where
     }
 }
 
-pub fn extract_file_postion_it<'store, HAST, It>(stores: &'store HAST, nodes: It) -> Position
+pub fn extract_file_postion_it<HAST, It>(stores: &HAST, nodes: It) -> Position
 where
     HAST: HyperAST,
     It: Iterator<Item = HAST::IdN>,

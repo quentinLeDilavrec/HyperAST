@@ -33,36 +33,36 @@ pub struct ExploreStructuralPositions<'a, IdN, Idx = usize, Config = tags::Botto
     i: usize,
     _phantom: std::marker::PhantomData<Config>,
 }
-impl<'a, IdN, Idx> super::node_filter_traits::Full for ExploreStructuralPositions<'a, IdN, Idx> {}
-impl<'a, IdN, Idx> super::node_filter_traits::NoSpace
-    for ExploreStructuralPositions<'a, IdN, Idx, tags::BottomUpNoSpace>
+impl<IdN, Idx> super::node_filter_traits::Full for ExploreStructuralPositions<'_, IdN, Idx> {}
+impl<IdN, Idx> super::node_filter_traits::NoSpace
+    for ExploreStructuralPositions<'_, IdN, Idx, tags::BottomUpNoSpace>
 {
 }
 
 mod esp_impl {
     use super::super::position_accessors::*;
     use super::*;
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> SolvedPosition<IdN>
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> SolvedPosition<IdN>
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
         fn node(&self) -> IdN {
             self.sps.nodes[self.i]
         }
     }
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> RootedPosition<IdN>
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> RootedPosition<IdN>
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
         fn root(&self) -> IdN {
             todo!("value must be computed")
         }
     }
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> WithOffsets
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> WithOffsets
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
         type Idx = Idx;
     }
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> WithPostOrderOffsets
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> WithPostOrderOffsets
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
         fn iter(&self) -> impl Iterator<Item = Self::Idx> {
             IterOffsets(self.clone())
@@ -71,7 +71,7 @@ mod esp_impl {
 
     pub struct IterOffsets<'a, IdN, Idx = usize>(ExploreStructuralPositions<'a, IdN, Idx>);
 
-    impl<'a, IdN, Idx: PrimInt> Iterator for IterOffsets<'a, IdN, Idx> {
+    impl<IdN, Idx: PrimInt> Iterator for IterOffsets<'_, IdN, Idx> {
         type Item = Idx;
 
         fn next(&mut self) -> Option<Self::Item> {
@@ -80,19 +80,19 @@ mod esp_impl {
         }
     }
 
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> WithPath<IdN>
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> WithPath<IdN>
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
     }
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> WithPostOrderPath<IdN>
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> WithPostOrderPath<IdN>
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
         fn iter_offsets_and_parents(&self) -> impl Iterator<Item = (Self::Idx, IdN)> {
             IterOffsetsNodes(self.clone())
         }
     }
-    impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> WithFullPostOrderPath<IdN>
-        for ExploreStructuralPositions<'a, IdN, Idx>
+    impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> WithFullPostOrderPath<IdN>
+        for ExploreStructuralPositions<'_, IdN, Idx>
     {
         fn iter_with_nodes(&self) -> (IdN, impl Iterator<Item = (Self::Idx, IdN)>) {
             (self.node(), IterOffsetsNodes(self.clone()))
@@ -101,7 +101,7 @@ mod esp_impl {
 
     pub struct IterOffsetsNodes<'a, IdN, Idx = usize>(ExploreStructuralPositions<'a, IdN, Idx>);
 
-    impl<'a, IdN: Copy, Idx: PrimInt> Iterator for IterOffsetsNodes<'a, IdN, Idx> {
+    impl<IdN: Copy, Idx: PrimInt> Iterator for IterOffsetsNodes<'_, IdN, Idx> {
         type Item = (Idx, IdN);
 
         fn next(&mut self) -> Option<Self::Item> {
@@ -132,7 +132,7 @@ impl<IdN, Idx> Debug for StructuralPositionStore<IdN, Idx> {
     }
 }
 
-impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, IdN, Idx> {
+impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'_, IdN, Idx> {
     pub(super) fn peek_parent_node(&self) -> Option<IdN> {
         if self.i == 0 {
             return None;
@@ -159,7 +159,7 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, I
     }
 }
 
-impl<'a, IdN: Copy, Idx> Iterator for ExploreStructuralPositions<'a, IdN, Idx> {
+impl<IdN: Copy, Idx> Iterator for ExploreStructuralPositions<'_, IdN, Idx> {
     type Item = IdN;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -177,7 +177,7 @@ impl<'a, IdN: Copy, Idx> Iterator for ExploreStructuralPositions<'a, IdN, Idx> {
         // Some(r)
     }
 }
-impl<'a, IdN, Idx> ExploreStructuralPositions<'a, IdN, Idx> {
+impl<IdN, Idx> ExploreStructuralPositions<'_, IdN, Idx> {
     /// return previous index
     #[inline]
     fn try_go_up(&mut self) -> Option<SpHandle> {
@@ -292,7 +292,7 @@ impl<'a, IdN, Idx> ExploreStructuralPositions<'a, IdN, Idx> {
 //     // }
 // }
 
-impl<'store, 'src, 'a, HAST, S> WithHyperAstPositionConverter<'store, 'src, S, HAST>
+impl<'a, HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
 where
     S: super::node_filter_traits::Full,
     HAST: HyperAST,
@@ -349,10 +349,10 @@ where
                     HAST::IdN: NodeId<IdN = HAST::IdN> + Eq + Debug,
                     for<'t> LendT<'t, HAST>: WithStats + WithSerialization + WithChildren,
                 {
-                    let b = stores.node_store().resolve(&x);
+                    let b = stores.node_store().resolve(x);
                     let l = b.line_count();
                     if l == 0 {
-                        *col += b.try_bytes_len().unwrap_or_default() as usize;
+                        *col += b.try_bytes_len().unwrap_or_default();
                     } else if let Some(cs) = b.children() {
                         for x in cs.iter_children() {
                             if compute(stores, &x, col) > 0 {
@@ -360,7 +360,7 @@ where
                             }
                         }
                     } else {
-                        *col += b.try_bytes_len().unwrap_or_default() as usize - b.line_count();
+                        *col += b.try_bytes_len().unwrap_or_default() - b.line_count();
                     }
                     l
                 }
@@ -459,17 +459,17 @@ where
             x = *c;
             let idx1 = o;
             let bytes = cs
-                .before(o.clone())
+                .before(o)
                 .map(|x| stores.resolve(&x).try_bytes_len().unwrap_or_default())
                 .sum();
             let rows = cs
-                .before(o.clone())
+                .before(o)
                 .map(|x| stores.resolve(&x).line_count())
                 .sum();
             let mut no_s_idx = zero();
-            for y in cs.before(o.clone()).iter_children() {
+            for y in cs.before(o).iter_children() {
                 if !stores.resolve_type(&y).is_spaces() {
-                    no_s_idx = no_s_idx + one();
+                    no_s_idx += one();
                 }
             }
             use top_down::ReceiveIdxNoSpace;
@@ -516,7 +516,7 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, I
                 if t.is_file() {
                     from_file = true;
                 }
-                y as usize
+                y
             } else {
                 0
             }
@@ -585,7 +585,7 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, I
                             let b = stores.node_store().resolve(x);
                             // println!("{:?}", b.get_type());
                             // println!("T1:{:?}", b.get_type());
-                            b.try_bytes_len().unwrap() as usize
+                            b.try_bytes_len().unwrap()
                         })
                         .sum()
                 };
@@ -732,7 +732,7 @@ impl<IdN, Idx> Debug for StructuralPositionStore2<IdN, Idx> {
 
 impl<IdN, Idx> StructuralPositionStore2<IdN, Idx> {
     fn persist(&mut self, h: Handle) {
-        if self.persisted.0 <= h.0 - 1 {
+        if self.persisted.0 < h.0 {
             self.persisted.0 = h.0;
         }
     }
@@ -1086,16 +1086,16 @@ pub struct RefNode<'a, IdN, Idx = u16> {
     h: Handle,
 }
 
-impl<'a, IdN, Idx> Clone for RefNode<'a, IdN, Idx> {
+impl<IdN, Idx> Clone for RefNode<'_, IdN, Idx> {
     fn clone(&self) -> Self {
         Self {
             s: std::cell::Ref::clone(&self.s),
-            h: self.h.clone(),
+            h: self.h,
         }
     }
 }
 
-impl<'a, IdN, Idx> PartialOrd for RefNode<'a, IdN, Idx> {
+impl<IdN, Idx> PartialOrd for RefNode<'_, IdN, Idx> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if !std::ptr::eq(&self.s, &other.s) {
             return None;
@@ -1104,7 +1104,7 @@ impl<'a, IdN, Idx> PartialOrd for RefNode<'a, IdN, Idx> {
     }
 }
 
-impl<'a, IdN, Idx> Ord for RefNode<'a, IdN, Idx> {
+impl<IdN, Idx> Ord for RefNode<'_, IdN, Idx> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         if !std::ptr::eq(&self.s, &other.s) {
             panic!()
@@ -1135,7 +1135,7 @@ where
     }
 }
 
-impl<'a, IdN, Idx> AAA<IdN, Idx> for RefNode<'a, IdN, Idx>
+impl<IdN, Idx> AAA<IdN, Idx> for RefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,
@@ -1159,15 +1159,15 @@ where
     }
 }
 
-impl<'a, IdN, Idx> PartialEq for RefNode<'a, IdN, Idx> {
+impl<IdN, Idx> PartialEq for RefNode<'_, IdN, Idx> {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(&*self.s, &*other.s) && self.h.0 == other.h.0
     }
 }
 
-impl<'a, IdN, Idx> Eq for RefNode<'a, IdN, Idx> {}
+impl<IdN, Idx> Eq for RefNode<'_, IdN, Idx> {}
 
-impl<'a, IdN: std::hash::Hash, Idx: std::hash::Hash> std::hash::Hash for RefNode<'a, IdN, Idx>
+impl<IdN: std::hash::Hash, Idx: std::hash::Hash> std::hash::Hash for RefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,
@@ -1198,11 +1198,11 @@ pub struct ExtRefNode<'a, IdN, Idx = u16> {
     ext_nodes: Vec<IdN>,
     ext_offsets: Vec<Idx>,
 }
-impl<'a, IdN: Clone, Idx: Clone> Clone for ExtRefNode<'a, IdN, Idx> {
+impl<IdN: Clone, Idx: Clone> Clone for ExtRefNode<'_, IdN, Idx> {
     fn clone(&self) -> Self {
         Self {
             s: std::cell::Ref::clone(&self.s),
-            h: self.h.clone(),
+            h: self.h,
             ext_nodes: self.ext_nodes.clone(),
             ext_offsets: self.ext_offsets.clone(),
         }
@@ -1219,7 +1219,7 @@ impl<'a, IdN, Idx> ExtRefNode<'a, IdN, Idx> {
     }
 }
 
-impl<'a, IdN, Idx> BBB<IdN, Idx> for ExtRefNode<'a, IdN, Idx>
+impl<IdN, Idx> BBB<IdN, Idx> for ExtRefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: PrimInt,
@@ -1246,7 +1246,7 @@ where
     }
 }
 
-impl<'a, IdN, Idx> AAA<IdN, Idx> for ExtRefNode<'a, IdN, Idx>
+impl<IdN, Idx> AAA<IdN, Idx> for ExtRefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,

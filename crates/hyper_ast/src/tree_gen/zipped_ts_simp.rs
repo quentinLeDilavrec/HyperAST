@@ -93,7 +93,7 @@ impl<T> Accumulator for Acc<T> {
 }
 
 impl<T> AccIndentation for Acc<T> {
-    fn indentation<'a>(&'a self) -> &'a Spaces {
+    fn indentation(&self) -> &Spaces {
         &self.indentation
     }
 }
@@ -163,7 +163,7 @@ where
     }
 }
 
-impl<'store, 'cache, TS, More> TsTreeGen<'store, 'cache, TS, More>
+impl<TS, More> TsTreeGen<'_, '_, TS, More>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -172,8 +172,7 @@ where
 }
 
 #[allow(unreachable_code)]
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
-    for TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -216,7 +215,7 @@ where
                 // #pre
                 // self._pre(global, text, cursor, stack, has, vis);
                 global.down();
-                match self.pre_skippable(text, cursor, &stack, global) {
+                match self.pre_skippable(text, cursor, stack, global) {
                     PreResult::Skip => {
                         stack.push(tree_gen::P::BothHidden);
                         *has = Has::Up;
@@ -238,7 +237,7 @@ where
             if has != Has::Up && cursor.goto_first_child_extended().is_some() {
                 has = Has::Down;
                 global.down();
-                match self.pre_skippable(text, cursor, &stack, global) {
+                match self.pre_skippable(text, cursor, stack, global) {
                     PreResult::Skip => {
                         stack.push(tree_gen::P::BothHidden);
                         has = Has::Up;
@@ -251,53 +250,51 @@ where
                         stack.push(tree_gen::P::Visible(acc))
                     }
                 }
-            } else {
-                if let Some(_) = cursor.goto_next_sibling_extended() {
-                    has = Has::Right;
-                    let acc = stack.pop().unwrap();
-                    let acc = match acc {
-                        P::ManualyHidden => todo!(),
-                        P::BothHidden => continue,
-                        P::Hidden(_) => todo!(),
-                        P::Visible(acc) => acc,
-                    };
-                    dbg!(acc.simple.kind, acc.end_byte());
-                    global.set_sum_byte_length(acc.end_byte());
-                    let parent = stack.parent_mut().unwrap();
-                    let full_node = self.post(parent, global, text, acc);
-                    self.acc(parent, full_node);
-                    match self.pre_skippable(text, cursor, &stack, global) {
-                        PreResult::Skip => {
-                            dbg!(cursor.node().start_byte(), cursor.node().end_byte());
-                            stack.push(tree_gen::P::BothHidden);
-                            has = Has::Up;
-                            global.up();
-                        }
-                        PreResult::Ignore => todo!(),
-                        PreResult::SkipChildren(_) => todo!(),
-                        PreResult::Ok(acc) => {
-                            global.set_sum_byte_length(acc.begin_byte());
-                            stack.push(tree_gen::P::Visible(acc))
-                        }
+            } else if cursor.goto_next_sibling_extended().is_some() {
+                has = Has::Right;
+                let acc = stack.pop().unwrap();
+                let acc = match acc {
+                    P::ManualyHidden => todo!(),
+                    P::BothHidden => continue,
+                    P::Hidden(_) => todo!(),
+                    P::Visible(acc) => acc,
+                };
+                dbg!(acc.simple.kind, acc.end_byte());
+                global.set_sum_byte_length(acc.end_byte());
+                let parent = stack.parent_mut().unwrap();
+                let full_node = self.post(parent, global, text, acc);
+                self.acc(parent, full_node);
+                match self.pre_skippable(text, cursor, stack, global) {
+                    PreResult::Skip => {
+                        dbg!(cursor.node().start_byte(), cursor.node().end_byte());
+                        stack.push(tree_gen::P::BothHidden);
+                        has = Has::Up;
+                        global.up();
                     }
-                    dbg!()
-                } else if cursor.goto_parent() {
-                    has = Has::Up;
-                    let acc = stack.pop().unwrap();
-                    let acc = match acc {
-                        P::ManualyHidden => todo!(),
-                        P::BothHidden => continue,
-                        P::Hidden(_) => todo!(),
-                        P::Visible(acc) => acc,
-                    };
-                    global.set_sum_byte_length(acc.end_byte());
-                    let parent = stack.parent_mut().unwrap();
-                    let full_node = self.post(parent, global, text, acc);
-                    self.acc(parent, full_node);
-                } else {
-                    dbg!();
-                    break;
+                    PreResult::Ignore => todo!(),
+                    PreResult::SkipChildren(_) => todo!(),
+                    PreResult::Ok(acc) => {
+                        global.set_sum_byte_length(acc.begin_byte());
+                        stack.push(tree_gen::P::Visible(acc))
+                    }
                 }
+                dbg!()
+            } else if cursor.goto_parent() {
+                has = Has::Up;
+                let acc = stack.pop().unwrap();
+                let acc = match acc {
+                    P::ManualyHidden => todo!(),
+                    P::BothHidden => continue,
+                    P::Hidden(_) => todo!(),
+                    P::Visible(acc) => acc,
+                };
+                global.set_sum_byte_length(acc.end_byte());
+                let parent = stack.parent_mut().unwrap();
+                let full_node = self.post(parent, global, text, acc);
+                self.acc(parent, full_node);
+            } else {
+                dbg!();
+                break;
             }
             continue;
             if let Some(visibility) = (has != Has::Up)
@@ -306,7 +303,7 @@ where
             {
                 has = Has::Down;
                 global.down();
-                let n = self.pre_skippable(text, cursor, &stack, global);
+                let n = self.pre_skippable(text, cursor, stack, global);
                 match n {
                     PreResult::Skip => {
                         has = Has::Up;
@@ -450,7 +447,7 @@ where
                         }
                     }
                     global.down();
-                    let n = self.pre_skippable(text, cursor, &stack, global);
+                    let n = self.pre_skippable(text, cursor, stack, global);
                     match n {
                         PreResult::Skip => {
                             has = Has::Up;
@@ -484,7 +481,7 @@ where
                     }
                 } else {
                     has = Has::Up;
-                    if is_parent_hidden || stack.0.last().map_or(false, P::is_both_hidden) {
+                    if is_parent_hidden || stack.0.last().is_some_and(P::is_both_hidden) {
                         if let Some(full_node) = full_node {
                             let parent = stack.parent_mut().unwrap();
                             self.acc(parent, full_node);
@@ -495,12 +492,10 @@ where
                             let parent = stack.parent_mut().unwrap();
                             self.acc(parent, full_node);
                         } else if is_visible {
-                            if has == Has::Down {}
                             return;
                         }
                     } else {
                         assert!(full_node.is_none());
-                        if has == Has::Down {}
                         return;
                     }
                 }
@@ -509,7 +504,7 @@ where
     }
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -548,17 +543,14 @@ where
     ) -> PreResult<<Self as TreeGen>::Acc> {
         let node = cursor.node();
         // let kind = TS::obtain_type(&node);
-        if HIDDEN_NODES {}
+
         if node.0.is_missing() {
             dbg!("missing");
             return PreResult::Skip;
         }
         let acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
-        if !stack
-            .parent()
-            .map_or(false, |a| a.simple.kind.is_supertype())
-        {
+        if !stack.parent().is_some_and(|a| a.simple.kind.is_supertype()) {
             if let Some(r) = cursor.0.field_name() {
                 if let Ok(_r) = TryInto::<crate::types::Role>::try_into(r) {
                     // acc.role.current = Some(r);
@@ -597,7 +589,7 @@ where
             text,
             node.start_byte(),
             global.sum_byte_length(),
-            &parent_indentation,
+            parent_indentation,
         );
         Acc {
             simple: BasicAccumulator {
@@ -646,8 +638,7 @@ where
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -757,13 +748,13 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        let full_node = self.make(&mut global, acc, label);
-        full_node
+
+        self.make(&mut global, acc, label)
     }
 }
 
-impl<'stores, 'cache, TS, More, const HIDDEN_NODES: bool> TreeGen
-    for TsTreeGen<'stores, 'cache, TS, More, HIDDEN_NODES>
+impl<'stores, TS, More, const HIDDEN_NODES: bool> TreeGen
+    for TsTreeGen<'stores, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -826,12 +817,7 @@ where
             let compressed_node =
                 NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
 
-            self.md_cache.insert(
-                compressed_node,
-                DD {
-                    metrics: metrics.clone(),
-                },
-            );
+            self.md_cache.insert(compressed_node, DD { metrics });
             Local {
                 compressed_node,
                 metrics,
@@ -839,10 +825,9 @@ where
             }
         };
 
-        let full_node = FullNode {
+        FullNode {
             global: global.simple(),
             local,
-        };
-        full_node
+        }
     }
 }

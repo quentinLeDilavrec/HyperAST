@@ -203,7 +203,7 @@ impl ArchetypeSource for BuiltEntity {
 
         for (tid, _offset, meta) in &self.inner.inner.info {
             unsafe {
-                layout.register_component_raw(tid.id(), meta.clone());
+                layout.register_component_raw(tid.id(), *meta);
             }
         }
 
@@ -212,9 +212,9 @@ impl ArchetypeSource for BuiltEntity {
 }
 
 impl ComponentSource for BuiltEntity {
-    fn push_components<'a>(
+    fn push_components(
         &mut self,
-        writer: &mut ArchetypeWriter<'a>,
+        writer: &mut ArchetypeWriter<'_>,
         mut entities: impl Iterator<Item = Entity>,
     ) {
         let entity = entities.next().unwrap();
@@ -404,7 +404,7 @@ impl<M> Common<M> {
         self.indices.contains_key(&TypeId::of::<T>())
     }
 
-    fn get_by_tid<'a, T>(&'a self, tid: &TypeId) -> Option<T> {
+    fn get_by_tid<T>(&self, tid: &TypeId) -> Option<T> {
         let index = self.indices.get(tid)?;
         let (_, offset, _) = self.inner.info[*index];
         unsafe {

@@ -75,7 +75,7 @@ where
 
         let Some(cs) = b.children() else { break };
         if !t.is_directory() {
-            for y in cs.before(o.clone()).iter_children() {
+            for y in cs.before(o).iter_children() {
                 let b = stores.resolve(&y);
                 offset += b.try_bytes_len().unwrap().to_usize().unwrap();
             }
@@ -186,7 +186,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
             if !(t.is_file() || t.is_directory()) {
                 from_file = true;
             }
-            y as usize
+            y
         } else {
             0
         };
@@ -199,7 +199,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         let mut i = self.parents.len() - 1;
         if from_file {
             loop {
-                if !(i > 0) {
+                if i <= 0 {
                     break;
                 }
                 let p = self.parents[i - 1];
@@ -216,7 +216,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
                             .resolve(&x)
                             .try_bytes_len()
                             .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                            .unwrap() as usize
+                            .unwrap()
                     })
                     .sum();
                 offset += c;
@@ -260,7 +260,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
                         .resolve(&x)
                         .try_bytes_len()
                         .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                        .unwrap() as usize
+                        .unwrap()
                 })
                 .sum();
             offset += c;
@@ -301,7 +301,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         let mut i = self.parents.len() - 1;
         if from_file {
             loop {
-                if !(i > 0) {
+                if i <= 0 {
                     break;
                 }
                 let p = self.parents[i - 1];
@@ -362,7 +362,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
                         .resolve(&x)
                         .try_bytes_len()
                         .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                        .unwrap() as usize
+                        .unwrap()
                 })
                 .sum();
             offset += c;

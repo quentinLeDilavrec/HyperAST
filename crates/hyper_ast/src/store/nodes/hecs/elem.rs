@@ -148,8 +148,8 @@ impl<'a, 'b, IdN: Send + Sync + Eq + 'static> Iterator for ChildIter<'a, 'b, IdN
     type Item = &'b IdN;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.children.0 .0.len() {
-            let r = &self.children.0 .0[self.index];
+        if self.index < self.children.0.0.len() {
+            let r = &self.children.0.0[self.index];
             self.index += 1;
             Some(r)
         } else {
@@ -181,7 +181,7 @@ impl<'b, T: Send + Sync + Eq + 'static> std::ops::Index<u16> for ChildrenSlice<'
     type Output = T;
 
     fn index(&self, index: u16) -> &Self::Output {
-        &self.0 .0.deref()[index as usize]
+        &self.0.0.deref()[index as usize]
     }
 }
 
@@ -193,10 +193,9 @@ impl<'b, T: Send + Sync + Eq + 'static> Iterator for ChildrenSlice<'b, T> {
     }
 }
 
-
-impl<'b, T: Send + Sync + Eq + Clone + 'static> Childrn< T> for ChildrenSlice<'b, T> {
+impl<'b, T: Send + Sync + Eq + Clone + 'static> Childrn<T> for ChildrenSlice<'b, T> {
     fn len(&self) -> usize {
-        self.0 .0.deref().len()
+        self.0.0.deref().len()
     }
     fn is_empty(&self) -> bool {
         unimplemented!("cannot be implemented on ChildrenSlice")
@@ -204,11 +203,11 @@ impl<'b, T: Send + Sync + Eq + Clone + 'static> Childrn< T> for ChildrenSlice<'b
 }
 impl<'b, T: Send + Sync + Eq + Clone + 'static> Children<u16, T> for ChildrenSlice<'b, T> {
     fn child_count(&self) -> u16 {
-        self.0 .0.deref().len().to_u16().unwrap()
+        self.0.0.deref().len().to_u16().unwrap()
     }
 
     fn get(&self, i: u16) -> Option<&T> {
-        self.0 .0.deref().get(usize::from(i))
+        self.0.0.deref().get(usize::from(i))
     }
 
     fn rev(&self, idx: u16) -> Option<&T> {
@@ -315,7 +314,9 @@ where
     Id::Ty: Copy + Hash + Eq,
 {
     fn has_children(&self) -> bool {
-        self.cs().map(|x| !crate::types::Childrn::is_empty(&x)).unwrap_or(false)
+        self.cs()
+            .map(|x| !crate::types::Childrn::is_empty(&x))
+            .unwrap_or(false)
     }
 
     fn has_label(&self) -> bool {

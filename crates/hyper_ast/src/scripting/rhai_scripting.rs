@@ -9,7 +9,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::time::Instant;
 
-pub static PREPRO_SIZE: &'static str = r#"
+pub static PREPRO_SIZE: &str = r#"
 let size = 1; # init
 
 fn acc(c) {
@@ -17,7 +17,7 @@ fn acc(c) {
 }
 "#;
 
-pub static PREPRO_SIZE_WITH_FINISH: &'static str = r#"
+pub static PREPRO_SIZE_WITH_FINISH: &str = r#"
 let size = 1; # init
 
 fn acc(c) {
@@ -29,7 +29,7 @@ fn finish() {
 }
 "#;
 
-pub static PREPRO_MCC: &'static str = r#"
+pub static PREPRO_MCC: &str = r#"
 let mcc = if is_branch(TY) {1} else {0};
 
 fn acc(c) {
@@ -37,7 +37,7 @@ fn acc(c) {
 }
 "#;
 
-pub static PREPRO_MCC_WITH_FINISH: &'static str = r#"
+pub static PREPRO_MCC_WITH_FINISH: &str = r#"
 let mcc = 0
 
 fn acc(c) {
@@ -52,7 +52,7 @@ fn finish() {
 }
 "#;
 
-pub static PREPRO_LOC: &'static str = r#"
+pub static PREPRO_LOC: &str = r#"
 let LoC = 0;
 let b = true;
 
@@ -157,14 +157,13 @@ impl StorePtr {
 
 impl super::Accumulable for Acc {
     fn acc<
-        'a,
         T: crate::types::HyperType + 'static,
         T2: crate::types::HyperType + Send + Sync + 'static,
         HAST: mlua::UserData + 'static,
     >(
         &mut self,
         _scripts: &Self::Scripts,
-        _store: &'a HAST,
+        _store: &HAST,
         _ty: T,
         _child: crate::scripting::SubtreeHandle<T2>,
     ) -> Result<(), Self::Error> {
@@ -172,14 +171,13 @@ impl super::Accumulable for Acc {
     }
 
     fn acc2<
-        'a,
         T: crate::types::HyperType + 'static,
         T2: crate::types::HyperType + Send + Sync + 'static,
         HAST: crate::scripting::ScriptingHyperAST + 'static,
     >(
         &mut self,
         scripts: &Self::Scripts,
-        store: &'a HAST::S<'_>,
+        store: &HAST::S<'_>,
         ty: T,
         child: crate::scripting::SubtreeHandle<T2>,
     ) -> Result<(), Self::Error> {

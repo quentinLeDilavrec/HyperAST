@@ -56,7 +56,7 @@ where
         .arg(&src)
         .arg(&dst)
         .arg(mapping_algo)
-        .arg(&out_format)
+        .arg(out_format)
         .arg(diff_algo)
         .arg(&gt_out)
         .stdin(std::process::Stdio::null())
@@ -98,7 +98,7 @@ where
                 status = None;
                 break;
             }
-            timeout = timeout - wait;
+            timeout -= wait;
         }
     }
     let gt_processing_time = now.elapsed().as_secs_f64();

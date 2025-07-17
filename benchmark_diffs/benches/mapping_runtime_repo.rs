@@ -75,23 +75,23 @@ fn mapping_group(c: &mut Criterion) {
         },
     ];
     let mut repositories = PreProcessedRepositories::default();
-    for p in inputs.into_iter() {
+    for p in inputs.iter() {
         repositories.register_config(p.repo.clone(), p.config);
     }
-    for p in inputs.into_iter() {
+    for p in inputs.iter() {
         use hyper_diff::matchers::heuristic::cd;
         use hyper_diff::matchers::heuristic::gt;
 
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("Xy", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
                     let hyperast = &repositories.processor.main_stores;
-                    let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper = hyper_diff::matchers::Mapper::new(
                         hyperast,
                         VecStore::default(),
@@ -109,12 +109,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("PartialLazyXy", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -136,13 +136,13 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("GreedyGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
                     let hyperast = &repositories.processor.main_stores;
-                    let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper = hyper_diff::matchers::Mapper::new(
                         hyperast,
                         VecStore::default(),
@@ -161,12 +161,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("PartialLazyGreedyGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -189,12 +189,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("LazyGreedyGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -211,12 +211,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("PartialLazyHybridGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -239,12 +239,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("LazyHybridGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -261,12 +261,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("PartialLazyStableGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -289,12 +289,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("LazyStableGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
@@ -312,12 +312,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("ChangeDistiller", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper = hyper_diff::matchers::Mapper::new(
                         hyperast,
                         VecStore::default(),
@@ -335,12 +335,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("PartialLazyChangeDistiller", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
                     use cd::lazy_leaves_matcher::LazyLeavesMatcher;
@@ -361,12 +361,12 @@ fn mapping_group(c: &mut Criterion) {
         prep_bench(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("LazyChangeDistiller", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
-                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
                     use cd::lazy_leaves_matcher::LazyLeavesMatcher;
@@ -414,7 +414,7 @@ fn prep_commits(
     repositories: &mut PreProcessedRepositories,
 ) -> (NodeIdentifier, NodeIdentifier) {
     let repo = repositories
-        .get_config((&p.repo).clone())
+        .get_config(p.repo.clone())
         .ok_or_else(|| "missing config for repository".to_string())
         .unwrap();
     let repository = if p.fetch
@@ -431,7 +431,7 @@ fn prep_commits(
     };
 
     let commits = repositories
-        .pre_process_with_limit(&repository, "", &p.commit, 2)
+        .pre_process_with_limit(&repository, "", p.commit, 2)
         .unwrap();
     let src = repositories
         .get_commit(&repository.config, &commits[1])

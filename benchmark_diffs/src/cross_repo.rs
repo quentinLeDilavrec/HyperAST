@@ -111,7 +111,7 @@ pub fn windowed_commits_compare(
             let mut src_mem = hyperast::utils::Bytes::default(); // NOTE it does not consider the size of the root, but it is an implementation detail
             let mut src_s = 0;
             for (i, (oid_src, repo)) in oid_src.iter().enumerate() {
-                let commit_src = preprocessed.get_commit(repo.config(), &oid_src).unwrap();
+                let commit_src = preprocessed.get_commit(repo.config(), oid_src).unwrap();
                 let node_store = &preprocessed.processor.main_stores.node_store;
                 let src_tr = commit_src.ast_root;
                 let s = node_store.resolve(src_tr).size();
@@ -140,7 +140,7 @@ pub fn windowed_commits_compare(
             let mut dst_mem = hyperast::utils::Bytes::default();
             let mut dst_s = 0;
             for (i, (oid_dst, repo)) in oid_dst.iter().enumerate() {
-                let commit_dst = preprocessed.get_commit(repo.config(), &oid_dst).unwrap();
+                let commit_dst = preprocessed.get_commit(repo.config(), oid_dst).unwrap();
                 let node_store = &preprocessed.processor.main_stores.node_store;
                 let dst_tr = commit_dst.ast_root;
                 let s = node_store.resolve(dst_tr).size();
@@ -216,7 +216,7 @@ pub fn windowed_commits_compare(
                 }
             } else if gt_out_format == "JSON" {
                 if let Some(gt_out) = &gt_out {
-                    let pp = PathJsonPostProcess::new(&gt_out);
+                    let pp = PathJsonPostProcess::new(gt_out);
                     let gt_timings = pp.performances();
                     let counts = pp.counts();
                     let valid = pp.validity_mappings(&lazy.mapper);
@@ -252,9 +252,7 @@ pub fn windowed_commits_compare(
                     dbg!(&gt_counts, &valid, &gt_timings,);
                     writeln!(
                         buf_validity,
-                        "{oid_src}/{oid_dst},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-                        "java_gumtree",
-                        "gumtree_lazy",
+                        "{oid_src}/{oid_dst},java_gumtree,gumtree_lazy,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                         src_s,
                         dst_s,
                         gt_counts.mappings,

@@ -55,7 +55,7 @@ pub struct CompressedBfPostProcess;
 impl CompressedBfPostProcess {
     pub fn create(file: &Path) -> compressed_bf_post_process::PP0 {
         use byteorder::{BigEndian, ReadBytesExt};
-        let mut cursor = std::io::Cursor::new(fs::read(&file).unwrap());
+        let mut cursor = std::io::Cursor::new(fs::read(file).unwrap());
         assert_eq!(424242, cursor.read_u32::<BigEndian>().unwrap());
         compressed_bf_post_process::PP0 { file: cursor }
     }
@@ -118,7 +118,7 @@ pub mod compressed_bf_post_process {
             let t_len = self.file.read_u32::<BigEndian>().unwrap() as usize;
             let timings: Vec<_> = (0..t_len)
                 .map(|_| self.file.read_u64::<BigEndian>().unwrap())
-                .map(|x| Duration::from_nanos(x as u64))
+                .map(Duration::from_nanos)
                 .collect();
             (PP2 { file: self.file }, timings)
         }
@@ -217,7 +217,7 @@ pub mod compressed_bf_post_process {
             };
             let with_lsib = |pos: V<HAST::Idx>, _lsib: HAST::IdN| -> V<HAST::Idx> {
                 let mut pos = pos.unwrap();
-                pos.1 = pos.1 + num_traits::one();
+                pos.1 += num_traits::one();
                 Some(pos)
             };
 
@@ -238,10 +238,10 @@ pub mod compressed_bf_post_process {
             assert!(!is_not_here(42));
             let mut g = |h: &[u8; 16]| {
                 let [l1, l2, l3, l4] = h
-                    .into_iter()
+                    .iter()
                     .cloned()
                     .const_chunks::<4>()
-                    .map(|x| u32::from_be_bytes(x))
+                    .map(u32::from_be_bytes)
                     .const_chunks::<4>()
                     .next()
                     .unwrap();
@@ -520,7 +520,7 @@ impl SimpleJsonPostProcess {
             let r = stores.node_store().resolve(&ori);
             let t = stores.resolve_type(&ori);
             if t.is_directory() || t.is_file() {
-                pos.inc_path(stores.label_store().resolve(&r.get_label_unchecked()));
+                pos.inc_path(stores.label_store().resolve(r.get_label_unchecked()));
             }
             pos.set_len(r.try_bytes_len().unwrap_or(0));
             pos
@@ -652,7 +652,7 @@ impl PathJsonPostProcess {
         };
         let with_lsib = |pos: CP<HAST::Idx>, _lsib: HAST::IdN| -> CP<HAST::Idx> {
             let mut pos = pos.unwrap();
-            pos.1 = pos.1 + num_traits::one();
+            pos.1 += num_traits::one();
             Some(pos)
         };
         let mut formator_src = PathCached::from((src_arena, src_tr, with_p, with_lsib));
@@ -723,7 +723,7 @@ impl<'a, S: HyperASTShared, D, U, F: Clone, G: Clone> From<(S, &'a D, S::IdN, F,
         }
     }
 }
-impl<'a, HAST, D, U: Clone + Default, F, G> FormatCached<'a, HAST, D, U, F, G>
+impl<HAST, D, U: Clone + Default, F, G> FormatCached<'_, HAST, D, U, F, G>
 where
     HAST: HyperAST + Copy,
     HAST::IdN: Debug,
@@ -756,7 +756,7 @@ impl<'a, IdN, D, U, F: Clone, G: Clone> From<(&'a D, IdN, F, G)>
     }
 }
 
-impl<'a, IdN, D, U: Clone + Default, F, G> PathCached<'a, IdN, D, U, F, G>
+impl<IdN, D, U: Clone + Default, F, G> PathCached<'_, IdN, D, U, F, G>
 where
     F: Fn(U, IdN) -> U,
     G: Fn(U, IdN) -> U,
@@ -825,7 +825,7 @@ pub fn print_mappings<
         stores: &stores,
     }
     .to_string();
-    let cols = vec![src_arena, mappings, dst_arena];
+    let cols = [src_arena, mappings, dst_arena];
     let sizes: Vec<_> = cols
         .iter()
         .map(|x| x.lines().map(|x| x.len()).max().unwrap_or(0))
@@ -900,7 +900,7 @@ pub fn print_mappings_no_ranges<
             stores: &stores
         }
     );
-    let cols = vec![src_arena, mappings, dst_arena];
+    let cols = [src_arena, mappings, dst_arena];
     let sizes: Vec<_> = cols
         .iter()
         .map(|x| x.lines().map(|x| x.len()).max().unwrap_or(0))

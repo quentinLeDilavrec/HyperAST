@@ -42,7 +42,7 @@ fn main() {
     let diff_algorithm = "Chawathe".to_string();
     let diff_algorithm = args.get(8).unwrap_or(&diff_algorithm);
     // concecutive_commits
-    let preprocessed = PreProcessedRepository::new(&repo_name);
+    let preprocessed = PreProcessedRepository::new(repo_name);
     windowed_commits_compare(
         window_size,
         preprocessed,

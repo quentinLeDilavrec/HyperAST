@@ -79,7 +79,7 @@ pub fn windowed_commits_compare(
             let src_s = stores.node_store.resolve(src_tr).size();
             dbg!(src_s, stores.node_store.resolve(src_tr).size_no_spaces());
 
-            let commit_dst = preprocessed.commits.get_key_value(&oid_dst).unwrap();
+            let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
             let dst_tr = commit_dst.1.ast_root;
             let dst_s = stores.node_store.resolve(dst_tr).size();
             dbg!(dst_s, stores.node_store.resolve(dst_tr).size_no_spaces());
@@ -128,7 +128,7 @@ pub fn windowed_commits_compare(
                 }
             } else if gt_out_format == "JSON" {
                 if let Some(gt_out) = &gt_out {
-                    let pp = PathJsonPostProcess::new(&gt_out);
+                    let pp = PathJsonPostProcess::new(gt_out);
                     let gt_timings = pp.performances();
                     let counts = pp.counts();
                     let valid = pp.validity_mappings(&lazy.mapper);
@@ -251,43 +251,41 @@ pub fn windowed_commits_compare(
                 .unwrap();
                 buf_validity.flush().unwrap();
                 buf_perfs.flush().unwrap();
-            } else {
-                if let Some((gt_timings, gt_counts, valid)) = res {
-                    let sumrzd_lazy = summarized_lazy;
-                    dbg!(&gt_timings);
-                    println!(
-                        "{oid_src}/{oid_dst},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-                        src_s,
-                        dst_s,
-                        Into::<isize>::into(&commit_src.1.memory_used()),
-                        Into::<isize>::into(&commit_dst.1.memory_used()),
-                        sumrzd_lazy.actions.map_or(-1, |x| x as isize),
-                        gt_counts.actions,
-                        valid.missing_mappings,
-                        valid.additional_mappings,
-                        &gt_timings[0].as_secs_f64(),
-                        &gt_timings[1].as_secs_f64(),
-                        &gt_timings[2].as_secs_f64(),
-                        sumrzd_lazy.exec_data.phase1().prep.0.as_secs_f64(),
-                        sumrzd_lazy.exec_data.phase1().mapping.0.as_secs_f64(),
-                        sumrzd_lazy.exec_data.phase2().prep.0.as_secs_f64(),
-                        sumrzd_lazy.exec_data.phase2().mapping.0.as_secs_f64(),
-                        sumrzd_lazy.exec_data.phase3().prep.0.as_secs_f64(),
-                        sumrzd_lazy.exec_data.phase3().mapping.0.as_secs_f64(),
-                        not_lazy.exec_data.phase1().prep.0.as_secs_f64(),
-                        not_lazy.exec_data.phase1().mapping.0.as_secs_f64(),
-                        not_lazy.exec_data.phase2().prep.0.as_secs_f64(),
-                        not_lazy.exec_data.phase2().mapping.0.as_secs_f64(),
-                        not_lazy.exec_data.phase3().prep.0.as_secs_f64(),
-                        not_lazy.exec_data.phase3().mapping.0.as_secs_f64(),
-                        partial_lazy.exec_data.phase1().prep.0.as_secs_f64(),
-                        partial_lazy.exec_data.phase1().mapping.0.as_secs_f64(),
-                        partial_lazy.exec_data.phase2().prep.0.as_secs_f64(),
-                        partial_lazy.exec_data.phase2().mapping.0.as_secs_f64(),
-                        partial_lazy.exec_data.phase3().prep.0.as_secs_f64(),
-                        partial_lazy.exec_data.phase3().mapping.0.as_secs_f64(),
-                    );
-                }
+            } else if let Some((gt_timings, gt_counts, valid)) = res {
+                let sumrzd_lazy = summarized_lazy;
+                dbg!(&gt_timings);
+                println!(
+                    "{oid_src}/{oid_dst},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                    src_s,
+                    dst_s,
+                    Into::<isize>::into(&commit_src.1.memory_used()),
+                    Into::<isize>::into(&commit_dst.1.memory_used()),
+                    sumrzd_lazy.actions.map_or(-1, |x| x as isize),
+                    gt_counts.actions,
+                    valid.missing_mappings,
+                    valid.additional_mappings,
+                    &gt_timings[0].as_secs_f64(),
+                    &gt_timings[1].as_secs_f64(),
+                    &gt_timings[2].as_secs_f64(),
+                    sumrzd_lazy.exec_data.phase1().prep.0.as_secs_f64(),
+                    sumrzd_lazy.exec_data.phase1().mapping.0.as_secs_f64(),
+                    sumrzd_lazy.exec_data.phase2().prep.0.as_secs_f64(),
+                    sumrzd_lazy.exec_data.phase2().mapping.0.as_secs_f64(),
+                    sumrzd_lazy.exec_data.phase3().prep.0.as_secs_f64(),
+                    sumrzd_lazy.exec_data.phase3().mapping.0.as_secs_f64(),
+                    not_lazy.exec_data.phase1().prep.0.as_secs_f64(),
+                    not_lazy.exec_data.phase1().mapping.0.as_secs_f64(),
+                    not_lazy.exec_data.phase2().prep.0.as_secs_f64(),
+                    not_lazy.exec_data.phase2().mapping.0.as_secs_f64(),
+                    not_lazy.exec_data.phase3().prep.0.as_secs_f64(),
+                    not_lazy.exec_data.phase3().mapping.0.as_secs_f64(),
+                    partial_lazy.exec_data.phase1().prep.0.as_secs_f64(),
+                    partial_lazy.exec_data.phase1().mapping.0.as_secs_f64(),
+                    partial_lazy.exec_data.phase2().prep.0.as_secs_f64(),
+                    partial_lazy.exec_data.phase2().mapping.0.as_secs_f64(),
+                    partial_lazy.exec_data.phase3().prep.0.as_secs_f64(),
+                    partial_lazy.exec_data.phase3().mapping.0.as_secs_f64(),
+                );
             }
         }
         log::warn!("done computing diff {i}");
@@ -379,11 +377,11 @@ mod test {
         let oid_src = &c[0];
         let oid_dst = &c[1];
 
-        let commit_src = preprocessed.commits.get_key_value(&oid_src).unwrap();
+        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
         let src_tr = commit_src.1.ast_root;
         // let src_tr = preprocessed.child_by_name(src_tr, "hadoop-common-project").unwrap();
 
-        let commit_dst = preprocessed.commits.get_key_value(&oid_dst).unwrap();
+        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
         let dst_tr = commit_dst.1.ast_root;
         // let dst_tr = preprocessed.child_by_name(dst_tr, "hadoop-common-project").unwrap();
         let stores = &preprocessed.processor.main_stores;
@@ -402,7 +400,7 @@ mod test {
             mappings,
             ..
         } = mapper.into();
-        print_mappings(&dst_arena, &src_arena, &stores, &mappings);
+        print_mappings(&dst_arena, &src_arena, stores, &mappings);
     }
 
     #[test]
@@ -437,14 +435,14 @@ mod test {
         let oid_dst = &c[1];
         let stores = &preprocessed.processor.main_stores;
 
-        let commit_src = preprocessed.commits.get_key_value(&oid_src).unwrap();
+        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
         let src_tr = commit_src.1.ast_root;
         let src_tr = preprocessed.child_by_name(src_tr, "spoon-pom").unwrap();
         let src_tr = preprocessed.child_by_name(src_tr, "pom.xml").unwrap();
         // let src_tr = stores.node_store.resolve(src_tr).get_child(&0);
         dbg!(stores.node_store.resolve(src_tr).child_count());
 
-        let commit_dst = preprocessed.commits.get_key_value(&oid_dst).unwrap();
+        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
         let dst_tr = commit_dst.1.ast_root;
         let dst_tr = preprocessed.child_by_name(dst_tr, "spoon-pom").unwrap();
         let dst_tr = preprocessed.child_by_name(dst_tr, "pom.xml").unwrap();
@@ -464,7 +462,7 @@ mod test {
             mappings,
             ..
         } = mapper.into();
-        print_mappings(&dst_arena, &src_arena, &stores, &mappings);
+        print_mappings(&dst_arena, &src_arena, stores, &mappings);
 
         let gt_out_format = "JSON";
         let gt_out = other_tools::gumtree::subprocess(
@@ -528,14 +526,14 @@ mod test {
         dbg!(oid_src, oid_dst);
         let stores = &preprocessed.processor.main_stores;
 
-        let commit_src = preprocessed.commits.get_key_value(&oid_src).unwrap();
+        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
         let src_tr = commit_src.1.ast_root;
         // let src_tr = preprocessed.child_by_name(src_tr, "spoon-pom").unwrap();
         // let src_tr = preprocessed.child_by_name(src_tr, "pom.xml").unwrap();
         // let src_tr = stores.node_store.resolve(src_tr).get_child(&0);
         dbg!(stores.node_store.resolve(src_tr).child_count());
 
-        let commit_dst = preprocessed.commits.get_key_value(&oid_dst).unwrap();
+        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
         let dst_tr = commit_dst.1.ast_root;
         // let dst_tr = preprocessed.child_by_name(dst_tr, "spoon-pom").unwrap();
         // let dst_tr = preprocessed.child_by_name(dst_tr, "pom.xml").unwrap();
@@ -599,13 +597,13 @@ mod test {
         let oid_dst = &c[1];
         let stores = &preprocessed.processor.main_stores;
 
-        let commit_src = preprocessed.commits.get_key_value(&oid_src).unwrap();
+        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
         let src_tr = commit_src.1.ast_root;
         let src_tr = preprocessed.child_by_name(src_tr, "pom.xml").unwrap();
         // let src_tr = stores.node_store.resolve(src_tr).get_child(&0);
         dbg!(stores.node_store.resolve(src_tr).child_count());
 
-        let commit_dst = preprocessed.commits.get_key_value(&oid_dst).unwrap();
+        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
         let dst_tr = commit_dst.1.ast_root;
         let dst_tr = preprocessed.child_by_name(dst_tr, "pom.xml").unwrap();
         // let dst_tr = stores.node_store.resolve(dst_tr).get_child(&0);
@@ -671,7 +669,7 @@ mod test {
             hyperast: stores,
             decomp: &dst_arena,
         };
-        print_mappings(&dst_arena, &src_arena, &stores, &mappings);
+        print_mappings(&dst_arena, &src_arena, stores, &mappings);
 
         let gt_out_format = "JSON";
         let gt_out = other_tools::gumtree::subprocess(

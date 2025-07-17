@@ -67,7 +67,7 @@ impl Tree {
             r#type: t.to_string(),
             label: r
                 .try_get_label()
-                .map(|x| stores.label_store().resolve(&x).to_string())
+                .map(|x| stores.label_store().resolve(x).to_string())
                 .filter(|x| !x.is_empty()),
             file,
             start,
@@ -101,7 +101,7 @@ where
             r#type: t.to_string(),
             label: r
                 .try_get_label()
-                .map(|x| stores.label_store().resolve(&x).to_string())
+                .map(|x| stores.label_store().resolve(x).to_string())
                 .filter(|x| !x.is_empty()),
             file,
             start,

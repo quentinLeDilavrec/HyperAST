@@ -47,7 +47,7 @@ fn bottomup_group(c: &mut Criterion) {
         },
     ];
     let mut repositories = PreProcessedRepositories::default();
-    for p in inputs.into_iter() {
+    for p in inputs.iter() {
         repositories.register_config(p.repo.clone(), p.config);
     }
     for p in inputs.iter() {
@@ -82,7 +82,7 @@ fn bottomup_group(c: &mut Criterion) {
         prep_bench_cd_subtree(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("Baseline", p.repo.name()),
             |b, (repositories, (owned, mappings))| {
                 let hyperast = &repositories.processor.main_stores;
@@ -112,7 +112,7 @@ fn bottomup_group(c: &mut Criterion) {
         prep_bench_cd_subtree(
             &mut group,
             &mut repositories,
-            &p,
+            p,
             BenchmarkId::new("Lazy", p.repo.name()),
             |b, (repositories, (owned, mappings))| {
                 let hyperast = &repositories.processor.main_stores;
@@ -156,7 +156,7 @@ fn bench_xy(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new("Xy", p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -186,7 +186,7 @@ fn bench_lazy_greedy<const MAX_SIZE: usize>(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new(format!("LazyGreedy_{}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -221,7 +221,7 @@ fn bench_greedy<const MAX_SIZE: usize>(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new(format!("Greedy_{}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -252,7 +252,7 @@ fn bench_hybrid<const MAX_SIZE: usize>(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new(format!("Hybrid_{}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -283,7 +283,7 @@ fn bench_lazy_hybrid<const MAX_SIZE: usize>(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new(format!("LazyHybrid_{}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -318,7 +318,7 @@ fn bench_stable<const MAX_SIZE: usize>(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new(format!("Stable_{}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -349,7 +349,7 @@ fn bench_lazy_stable<const MAX_SIZE: usize>(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new(format!("LazyStable_{}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -384,7 +384,7 @@ fn bench_simple(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new("Simple_{}", p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -414,7 +414,7 @@ fn bench_lazy_simple(
     prep_bench_gt_subtree(
         group,
         repositories,
-        &p,
+        p,
         BenchmarkId::new("LazySimple", p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
@@ -516,7 +516,7 @@ fn prep_commits(
     repositories: &mut PreProcessedRepositories,
 ) -> (NodeIdentifier, NodeIdentifier) {
     let repo = repositories
-        .get_config((&p.repo).clone())
+        .get_config(p.repo.clone())
         .ok_or_else(|| "missing config for repository".to_string())
         .unwrap();
     let repository = if p.fetch
@@ -533,7 +533,7 @@ fn prep_commits(
     };
 
     let commits = repositories
-        .pre_process_with_limit(&repository, "", &p.commit, 2)
+        .pre_process_with_limit(&repository, "", p.commit, 2)
         .unwrap();
     let src = repositories
         .get_commit(&repository.config, &commits[1])

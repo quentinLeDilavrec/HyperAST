@@ -13,8 +13,7 @@ use std::path::{Path, PathBuf};
 
 pub fn iter_dirs(root_buggy: &std::path::Path) -> impl Iterator<Item = std::fs::DirEntry> + use<> {
     std::fs::read_dir(root_buggy)
-        .expect(&format!("{:?} should be a dir", root_buggy))
-        .into_iter()
+        .unwrap_or_else(|_| panic!("{:?} should be a dir", root_buggy))
         .filter_map(|x| x.ok())
         .filter(|x| x.file_type().unwrap().is_dir())
 }
@@ -109,16 +108,14 @@ impl JavaPreprocessFileSys {
 
 pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local {
     let a = std::fs::read_dir(path)
-        .expect(&format!("{:?} should be a dir", path))
-        .into_iter()
-        .filter_map(|x| x.ok())
-        .map(|x| x);
+        .unwrap_or_else(|_| panic!("{:?} should be a dir", path))
+        .filter_map(|x| x.ok());
     let mut w = JavaAcc::new("".to_string(), None);
     for x in a {
         match x.file_type() {
             Ok(t) => {
                 if t.is_file() {
-                    let file = std::fs::read_to_string(&x.path()).expect("the code");
+                    let file = std::fs::read_to_string(x.path()).expect("the code");
                     let name = x.file_name();
                     let name = name.to_string_lossy();
                     {
@@ -253,14 +250,13 @@ impl MyFile {
 
 fn prepare_dir_exploration(dir: MyFile) -> Vec<PathBuf> {
     std::fs::read_dir(&dir.path)
-        .expect(&format!("{:?} should be a dir", dir.path))
-        .into_iter()
+        .unwrap_or_else(|_| panic!("{:?} should be a dir", dir.path))
         .filter_map(|x| x.ok())
         .map(|x| x.path())
         .collect()
 }
 
-impl<'fs, 'prepro> Processor<JavaAcc> for JavaProcessor<'fs, 'prepro, JavaAcc> {
+impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
     fn pre(&mut self, path: PathBuf) {
         let file = self.filesys.find_file(&path);
         let name = file.name();
@@ -285,7 +281,7 @@ impl<'fs, 'prepro> Processor<JavaAcc> for JavaProcessor<'fs, 'prepro, JavaAcc> {
     fn post(&mut self, acc: JavaAcc) -> Option<(Local,)> {
         let name = acc.primary.name.clone();
         let full_node = make(acc, &mut self.prepro.main_stores);
-        let key = full_node.compressed_node.clone();
+        let key = full_node.compressed_node;
         self.prepro
             .java_md_cache
             .insert(key, MD::from(full_node.clone()));
@@ -361,8 +357,8 @@ fn make(
         dyn_builder.build(),
     );
 
-    let full_node = Local {
-        compressed_node: node_id.clone(),
+    Local {
+        compressed_node: node_id,
         metrics,
         ana,
         mcc: Mcc::new(&kind),
@@ -370,8 +366,7 @@ fn make(
         precomp_queries: Default::default(),
         stmt_count: 0,
         member_import_count: 0,
-    };
-    full_node
+    }
 }
 
 pub fn parse_dir_pair(

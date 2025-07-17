@@ -209,7 +209,7 @@ role_impl!(
 mod exp {
     use super::*;
 
-    // keywords (leafs with a specific unique serialized form)
+    // keywords (leaves with a specific unique serialized form)
     // and concrete types (concrete rules) should definitely be stored.
     // But hidden nodes are can either be supertypes or nodes that are just deemed uninteresting (but still useful to for example the treesitter internal repr.)
     // The real important difference is the (max) number of children (btw an it cannot be a leaf (at least one child)),
@@ -336,7 +336,7 @@ mod exp {
             }
         };
 
-        // Handle a variant, optionally with an with initialiser.
+        // Handle a variant, optionally with an initializer.
         (
             @collect_unitary_variants $fixed:tt,
             ($var:ident $(= $_val:expr)*, $($tail:tt)*) -> ($($var_names:tt)*)
@@ -521,10 +521,10 @@ mod exp {
     }
 }
 
-/// set of possible abtract type of nodes
+/// set of possible abstract type of nodes
 pub type Abstracts = enumset::EnumSet<Abstract>;
 
-/// the posible abstract type that a node can have
+/// the possible abstract type that a node can have
 #[derive(Debug, Hash, Display, enumset::EnumSetType)]
 pub enum Abstract {
     Expression,
@@ -557,7 +557,7 @@ pub enum Shared {
     TypeDeclaration,
     Branch,
     Other,
-    // WARN do not include Abtract type/rules (should go in Abstract) ie.
+    // WARN do not include Abstract type/rules (should go in Abstract) ie.
     // Expression,
     // Statement,
 }

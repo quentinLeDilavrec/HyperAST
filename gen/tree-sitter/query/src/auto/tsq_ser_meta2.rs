@@ -55,7 +55,7 @@ where
     <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let pos = hyperast::position::structural_pos::CursorWithPersistance::new(self.root);
+        let pos = hyperast::position::structural_pos::CursorWithPersistence::new(self.root);
         let mut cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);
         self.serialize(&mut cursor, &mut 0, 0, f).map(|_| ())
     }
@@ -247,7 +247,7 @@ where
     }
 
     fn should_pred_label(&self, id: &HAST::IdN) -> bool {
-        let pos = hyperast::position::structural_pos::CursorWithPersistance::new(*id);
+        let pos = hyperast::position::structural_pos::CursorWithPersistence::new(*id);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);
         let mut matches = self.meta.matches_immediate(cursor);
         let Some(m) = matches.next_match() else {
@@ -266,7 +266,7 @@ where
     }
 
     fn should_ignore(&self, id: &HAST::IdN) -> bool {
-        let pos = hyperast::position::structural_pos::CursorWithPersistance::new(*id);
+        let pos = hyperast::position::structural_pos::CursorWithPersistence::new(*id);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);
         let mut matches = self.meta.matches_immediate(cursor);
         let Some(m) = matches.next_match() else {
@@ -282,7 +282,7 @@ where
     }
 
     fn should_skip(&self, id: &HAST::IdN) -> bool {
-        let pos = hyperast::position::structural_pos::CursorWithPersistance::new(*id);
+        let pos = hyperast::position::structural_pos::CursorWithPersistence::new(*id);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);
         let mut matches = self.meta.matches_immediate(cursor);
         let Some(cid) = self.meta.capture_index_for_name("skip") else {
@@ -301,7 +301,7 @@ where
             return false;
         };
         use hyperast::position::structural_pos::AAA;
-        let mut pos = hyperast::position::structural_pos::CursorWithPersistance::new(c.pos.node());
+        let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(c.pos.node());
         std::mem::swap(&mut pos, &mut c.pos);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);
         let mut matches = self.meta.matches_immediate(cursor);

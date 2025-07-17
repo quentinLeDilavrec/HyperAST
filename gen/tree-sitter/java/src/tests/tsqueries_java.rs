@@ -563,7 +563,7 @@ mod test_tsg_queries {
                 //     )
                 // };
                 let h_res = prep_prepro(query.0, subqueries.next().unwrap(), text);
-                let pos = hyperast::position::structural_pos::CursorWithPersistance::new(h_res.2);
+                let pos = hyperast::position::structural_pos::CursorWithPersistence::new(h_res.2);
                 let tree_cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&h_res.1, pos);
                 let h_matches = h_res.0.matches(tree_cursor);
                 let g_c = g_matches.into_iter().count();
@@ -1262,7 +1262,7 @@ mod test_tsg_queries {
         let pre_processing = now.elapsed();
         let now = Instant::now();
         let (query, stores, code) = (query, stores, full_node.local.compressed_node);
-        let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+        let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&stores, pos);
         // let pos = hyperast::position::StructuralPosition::new(code);
         // let cursor = hyperast_tsquery::hyperast::TreeCursor::new(&stores, pos);

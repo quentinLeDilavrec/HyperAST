@@ -54,7 +54,7 @@ pub(crate) fn cpp_preproc_call_decl_test() {
         hyperast::nodes::SyntaxSerializer::new(&stores, full_node.local.compressed_node)
     );
     let (query, stores, code) = (query, stores, full_node.local.compressed_node);
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&stores, pos);
     let mut matches = query.matches(cursor);
     let Some(_) = matches.next() else {

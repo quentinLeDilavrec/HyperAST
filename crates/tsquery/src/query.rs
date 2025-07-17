@@ -110,7 +110,7 @@ pub(crate) struct QueryStep {
     capture_ids: [CaptureId; MAX_STEP_CAPTURE_COUNT],
     // done variant marker
     pub(crate) depth: SmallDepth,
-    // optional, madatory when dead_end or pass_through
+    // optional, mandatory when dead_end or pass_through
     alternative_index: StepId,
     // optional
     negated_field_list_id: u16, // TODO use a custom id
@@ -435,7 +435,7 @@ impl PrecomputedPatterns {
                 continue;
             }
             if id != stepid {
-                // prevents skiping first step
+                // prevents skipping first step
                 let mut id = id.clone();
                 id.inc();
                 stack.push((hasher.clone(), id));
@@ -526,7 +526,7 @@ impl PrecomputedPatterns {
                 }
             } else {
                 if id != stepid {
-                    // prevents skiping first step
+                    // prevents skipping first step
                     let mut id = id.clone();
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher.clone(), res);
@@ -2471,7 +2471,7 @@ mod exp_union {
         field: ffi::TSFieldId,
         // optional
         capture_ids: [CaptureId; MAX_STEP_CAPTURE_COUNT],
-        // optional, madatory when dead_end or pass_through
+        // optional, mandatory when dead_end or pass_through
         alternative_index: StepId,
         // optional
         negated_field_list_id: u16,
@@ -2486,7 +2486,7 @@ mod exp_union {
         field: ffi::TSFieldId,
         // optional
         capture_ids: (),
-        // optional, madatory when dead_end or pass_through
+        // optional, mandatory when dead_end or pass_through
         alternative_index: StepId,
         // optional
         negated_field_list_id: u16,
@@ -2501,7 +2501,7 @@ mod exp_union {
         field: ffi::TSFieldId,
         // optional
         capture_ids: [CaptureId; 2],
-        // optional, madatory when dead_end or pass_through
+        // optional, mandatory when dead_end or pass_through
         alternative_index: (),
         // optional
         negated_field_list_id: (),
@@ -2516,7 +2516,7 @@ mod exp_union {
         field: (),
         // optional
         capture_ids: [CaptureId; MAX_STEP_CAPTURE_COUNT],
-        // optional, madatory when dead_end or pass_through
+        // optional, mandatory when dead_end or pass_through
         alternative_index: (),
         // optional
         negated_field_list_id: (),
@@ -2529,7 +2529,7 @@ mod exp_union {
         supertype_symbol: ffi::TSSymbol,
         // optional
         field: ffi::TSFieldId,
-        // optional, madatory when dead_end or pass_through
+        // optional, mandatory when dead_end or pass_through
         alternative_index: StepId,
     }
     #[derive(Copy, Clone)]

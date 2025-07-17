@@ -1687,7 +1687,7 @@ fn simp_search_atleast(
     let Some(cid) = meta_simp.capture_index_for_name("atleast") else {
         return true;
     };
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
     let mut matches = meta_simp.matches(cursor);
     // at least one match
@@ -1709,7 +1709,7 @@ fn simp_search_need(
     let Some(cid) = meta_simp.capture_index_for_name("need") else {
         return true;
     };
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
     let mut matches = meta_simp.matches(cursor);
     let mut bs = bitvec::bitvec!(0;meta_simp.pattern_count());
@@ -1735,7 +1735,7 @@ pub fn pred_uniq(
     let Some(cid) = cid else {
         return true;
     };
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
     let mut matches = meta_simp.matches(cursor);
     // exactly one match, unique
@@ -1763,7 +1763,7 @@ fn simp_search_need2(
     if need.is_none() && uniq.is_none() {
         return true;
     };
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
     let mut matches = meta_simp.matches(cursor);
     // // at least one match
@@ -1865,9 +1865,9 @@ pub fn find_matches_aux(
     query: NodeIdentifier,
     meta_simp: &hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
-) -> position::structural_pos::CursorWithPersistanceOrderedSet<NodeIdentifier> {
+) -> position::structural_pos::CursorWithPersistenceOrderedSet<NodeIdentifier> {
     // let mut result = vec![];
-    let mut pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+    let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let mut set = pos.build_empty_set();
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
     let mut matches = meta_simp.matches(cursor);
@@ -2014,7 +2014,7 @@ fn simp_search_imm_preds(
     meta_simp: &hyperast_tsquery::Query,
 ) -> std::collections::HashMap<Lab, Vec<(Cap, P)>> {
     let mut per_label = std::collections::HashMap::default();
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
     let mut matches = meta_simp.matches(cursor);
     let Some(cid_p) = meta_simp.capture_index_for_name("pred") else {

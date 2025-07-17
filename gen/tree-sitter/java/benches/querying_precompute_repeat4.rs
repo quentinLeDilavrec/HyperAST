@@ -344,7 +344,7 @@ fn compare_querying_group(c: &mut Criterion) {
                 b.iter(|| {
                     let mut count = 0;
                     for &n in roots {
-                        let pos = hyperast::position::structural_pos::CursorWithPersistance::new(n);
+                        let pos = hyperast::position::structural_pos::CursorWithPersistence::new(n);
                         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(stores, pos);
                         let matches = query.matches(cursor);
                         count += black_box(matches.count());

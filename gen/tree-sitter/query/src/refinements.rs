@@ -66,13 +66,13 @@ pub fn try_pattern_union(
     >::new();
     for (top, count) in roots {
         let mut union = HashMap::new();
-        let mut unions = HashMap::new();
-        let mut global_preds = HashMap::new();
+        let unions = HashMap::new();
+        let global_preds = HashMap::new();
         {
             let query_store = &lattice.query_store;
             let query = *top;
             let meta_simp: &hyperast_tsquery::Query = &meta_simp;
-            let mut pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+            let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
             let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
             let mut matches = meta_simp.matches(cursor);
             loop {
@@ -317,7 +317,7 @@ pub fn try_pattern_captures(
             let query_store = &lattice.query_store;
             let query = *top;
             let meta_simp: &hyperast_tsquery::Query = &meta_simp;
-            let mut pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+            let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
             let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
             let mut matches = meta_simp.matches(cursor);
             loop {
@@ -414,7 +414,7 @@ pub fn try_pattern_renames(
             let query_store = &lattice.query_store;
             let query = *top;
             let meta_simp: &hyperast_tsquery::Query = &meta_simp;
-            let mut pos = hyperast::position::structural_pos::CursorWithPersistance::new(query);
+            let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
             let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
             let mut matches = meta_simp.matches(cursor);
             let mut count = 0;

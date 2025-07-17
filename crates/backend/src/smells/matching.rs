@@ -53,7 +53,7 @@ pub(crate) fn matches_default<'a>(
     }
     let qcursor = qqq.matches(hyperast_tsquery::hyperast_opt::TreeCursor::new(
         with_spaces_stores,
-        hyperast::position::structural_pos::CursorWithPersistance::new(tr),
+        hyperast::position::structural_pos::CursorWithPersistence::new(tr),
     ));
     let mut res = vec![0; len];
     for m in qcursor {

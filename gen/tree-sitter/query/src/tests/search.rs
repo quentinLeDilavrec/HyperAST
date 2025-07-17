@@ -142,7 +142,7 @@ fn test_new_matcher_for_xml_element() -> Result<(), Box<dyn std::error::Error>> 
     let query = r#"(element) @root"#;
     let qqq = hyperast_tsquery::Query::new(query, hyperast_gen_ts_xml::language())
         .map_err(|e| e.to_string())?;
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&code_store, pos);
     let root_cap = qqq.capture_index_for_name("root").unwrap();
     let qcursor = qqq.matches(cursor);
@@ -172,7 +172,7 @@ fn test_new_matcher_for_xml_eq() -> Result<(), Box<dyn std::error::Error>> {
     let query = r#"(element (STag (Name) @id (#eq? @id "artifactId"))) @root"#;
     let qqq = hyperast_tsquery::Query::new(query, hyperast_gen_ts_xml::language())
         .map_err(|e| e.to_string())?;
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&code_store, pos);
     let root_cap = qqq.capture_index_for_name("root").unwrap();
     let qcursor = qqq.matches(cursor);
@@ -203,7 +203,7 @@ fn test_new_matcher_for_xml_imm_eq() -> Result<(), Box<dyn std::error::Error>> {
     // let query = r#"(element) @root"#;
     let qqq = hyperast_tsquery::Query::new(query, hyperast_gen_ts_xml::language())
         .map_err(|e| e.to_string())?;
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&code_store, pos);
     let root_cap = qqq.capture_index_for_name("root").unwrap();
     let qcursor = qqq.matches(cursor);
@@ -235,7 +235,7 @@ fn test_new_matcher_for_xml_proj_artid() -> Result<(), Box<dyn std::error::Error
 )))"#;
     let qqq = hyperast_tsquery::Query::new(query, hyperast_gen_ts_xml::language())
         .map_err(|e| e.to_string())?;
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&code_store, pos);
     let root_cap = qqq.capture_index_for_name("root").unwrap();
     let qcursor = qqq.matches(cursor);
@@ -267,7 +267,7 @@ fn test_new_matcher_for_xml_deps_artid() -> Result<(), Box<dyn std::error::Error
 ))"#;
     let qqq = hyperast_tsquery::Query::new(query, hyperast_gen_ts_xml::language())
         .map_err(|e| e.to_string())?;
-    let pos = hyperast::position::structural_pos::CursorWithPersistance::new(code);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&code_store, pos);
     let root_cap = qqq.capture_index_for_name("root").unwrap();
     let qcursor = qqq.matches(cursor);

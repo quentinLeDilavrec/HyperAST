@@ -7,7 +7,7 @@ use hyperast::types::{
 
 pub struct TreeCursor<'hast, HAST: HyperASTShared> {
     pub stores: &'hast HAST,
-    pub pos: structural_pos::CursorWithPersistance<HAST::IdN, HAST::Idx>,
+    pub pos: structural_pos::CursorWithPersistence<HAST::IdN, HAST::Idx>,
     pub p: structural_pos::PersistedNode<HAST::IdN, HAST::Idx>,
 }
 
@@ -67,7 +67,7 @@ where
 impl<'hast, HAST: HyperAST> TreeCursor<'hast, HAST> {
     pub fn new(
         stores: &'hast HAST,
-        mut pos: structural_pos::CursorWithPersistance<HAST::IdN, HAST::Idx>,
+        mut pos: structural_pos::CursorWithPersistence<HAST::IdN, HAST::Idx>,
     ) -> Self {
         let p = pos.persist();
         Self { stores, pos, p }

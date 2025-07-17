@@ -14,7 +14,8 @@ pub struct SimpleTree<K, DD = ()> {
     kind: K,
     label: Option<String>,
     children: Vec<SimpleTree<K, DD>>,
-    derived_data: DD,
+    #[doc(hidden)]
+    pub derived_data: DD,
 }
 
 impl<K, DD: Default> SimpleTree<K, DD> {

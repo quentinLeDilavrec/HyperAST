@@ -494,7 +494,7 @@ where
 }
 
 // TODO separate concerns
-// TODO make_position should be a From<ExploreStructuralPositions> for FileAndOffsetPostionT and moved to relevant place
+// TODO make_position should be a From<ExploreStructuralPositions> for FileAndOffsetPositionT and moved to relevant place
 // TODO here the remaining logic should be about giving an iterator through the structural position
 impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, IdN, Idx> {
     pub fn make_position<'store, HAST>(self, stores: &'store HAST) -> Position
@@ -849,23 +849,23 @@ use std::rc::Rc;
 /// Cursor backed by a store, thus allowing to efficiently yield nodes, while sharing the shared sub path between all nodes.
 /// As long as a node is not persisted, this cursor reuses and mutate to update itself.
 // only tags::BottomUpFull is possible for efficiency
-pub struct CursorWithPersistance<IdN, Idx = u16> {
+pub struct CursorWithPersistence<IdN, Idx = u16> {
     s: Rc<RefCell<StructuralPositionStore2<IdN, Idx>>>,
     h: Handle,
 }
 
-impl<IdN, Idx> PartialEq for CursorWithPersistance<IdN, Idx> {
+impl<IdN, Idx> PartialEq for CursorWithPersistence<IdN, Idx> {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.s, &other.s) && self.h.0 == other.h.0
     }
 }
 
-pub struct CursorWithPersistanceOrderedSet<IdN, Idx = u16> {
+pub struct CursorWithPersistenceOrderedSet<IdN, Idx = u16> {
     s: Rc<RefCell<StructuralPositionStore2<IdN, Idx>>>,
     handles: Vec<usize>,
 }
 
-impl<IdN, Idx> CursorWithPersistanceOrderedSet<IdN, Idx> {
+impl<IdN, Idx> CursorWithPersistenceOrderedSet<IdN, Idx> {
     pub fn register(&mut self, p: &PersistedNode<IdN, Idx>) {
         assert!(Rc::ptr_eq(&self.s, &p.s));
         if !self.handles.contains(&p.h.0) {
@@ -883,7 +883,7 @@ impl<IdN, Idx> CursorWithPersistanceOrderedSet<IdN, Idx> {
     }
 }
 
-impl<'a, IdN: 'a, Idx: 'a> CursorWithPersistanceOrderedSet<IdN, Idx> {
+impl<'a, IdN: 'a, Idx: 'a> CursorWithPersistenceOrderedSet<IdN, Idx> {
     pub fn iter(&'a self) -> impl Iterator<Item = RefNode<'a, IdN, Idx>> {
         self.handles.iter().map(move |h| {
             let s = self.s.borrow();
@@ -892,9 +892,9 @@ impl<'a, IdN: 'a, Idx: 'a> CursorWithPersistanceOrderedSet<IdN, Idx> {
     }
 }
 
-impl<IdN, Idx> Eq for CursorWithPersistance<IdN, Idx> {}
+impl<IdN, Idx> Eq for CursorWithPersistence<IdN, Idx> {}
 
-impl<IdN, Idx> CursorWithPersistance<IdN, Idx> {
+impl<IdN, Idx> CursorWithPersistence<IdN, Idx> {
     pub fn new(node: IdN) -> Self
     where
         Idx: PrimInt,
@@ -903,11 +903,11 @@ impl<IdN, Idx> CursorWithPersistance<IdN, Idx> {
         n.h = n.s.borrow_mut().down(n.h, node, num::zero());
         n
     }
-    pub fn build_empty_set(&mut self) -> CursorWithPersistanceOrderedSet<IdN, Idx>
+    pub fn build_empty_set(&mut self) -> CursorWithPersistenceOrderedSet<IdN, Idx>
     where
         Idx: PrimInt,
     {
-        CursorWithPersistanceOrderedSet {
+        CursorWithPersistenceOrderedSet {
             s: self.s.clone(),
             handles: vec![],
         }
@@ -952,7 +952,7 @@ impl<IdN, Idx> CursorWithPersistance<IdN, Idx> {
     }
 }
 
-impl<IdN, Idx> BBB<IdN, Idx> for CursorWithPersistance<IdN, Idx>
+impl<IdN, Idx> BBB<IdN, Idx> for CursorWithPersistence<IdN, Idx>
 where
     IdN: Copy,
     Idx: PrimInt,
@@ -966,7 +966,7 @@ where
     }
 }
 
-impl<IdN, Idx> AAA<IdN, Idx> for CursorWithPersistance<IdN, Idx>
+impl<IdN, Idx> AAA<IdN, Idx> for CursorWithPersistence<IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,
@@ -990,7 +990,7 @@ where
     }
 }
 
-/// Node that was persited i.e. mutating the cursor guarantee that this node observable values won't change.
+/// Node that was persisted i.e. mutating the cursor guarantee that this node observable values won't change.
 #[derive(Clone)]
 pub struct PersistedNode<IdN, Idx = u16> {
     s: Rc<RefCell<StructuralPositionStore2<IdN, Idx>>>,
@@ -1079,7 +1079,7 @@ where
         Some(self.s.borrow().node(p))
     }
 }
-/// Node that is possibly not persited i.e. cannot safely mutate the cursor at the same time.
+/// Node that is possibly not persisted i.e. cannot safely mutate the cursor at the same time.
 /// If you need to read a node and modify the cursor at the same time, make a [`PersistedNode`].
 pub struct RefNode<'a, IdN, Idx = u16> {
     s: std::cell::Ref<'a, StructuralPositionStore2<IdN, Idx>>,
@@ -1293,7 +1293,7 @@ mod tests {
 
     #[test]
     fn simple2() {
-        let mut c = CursorWithPersistance::default();
+        let mut c = CursorWithPersistence::default();
         c.down(0u32, 0u32);
         assert_eq!(c.node(), 0);
         assert_eq!(c.offset(), 0);

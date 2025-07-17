@@ -31,7 +31,7 @@ pub struct NodeR<P> {
     pub pos: P,
 }
 
-impl<'hast, HAST: HyperAST> PartialEq for Node<'hast, HAST> {
+impl<HAST: HyperAST> PartialEq for Node<'_, HAST> {
     fn eq(&self, other: &Self) -> bool {
         self.pos == other.pos
     }
@@ -46,7 +46,7 @@ impl<'hast, HAST: HyperAST> Node<'hast, HAST> {
     }
 }
 
-impl<'hast, HAST: HyperAST> Clone for Node<'hast, HAST> {
+impl<HAST: HyperAST> Clone for Node<'_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
@@ -91,14 +91,14 @@ impl<IdF: Copy> Status for CursorStatus<IdF> {
     }
 }
 
-impl<'hast, HAST: HyperAST> crate::WithField for self::TreeCursor<'hast, HAST>
+impl<HAST: HyperAST> crate::WithField for self::TreeCursor<'_, HAST>
 where
     HAST::TS: RoleStore,
 {
     type IdF = <HAST::TS as RoleStore>::IdF;
 }
 
-impl<'a, 'hast, HAST: HyperAST> CNLending<'a> for self::TreeCursor<'hast, HAST>
+impl<'hast, HAST: HyperAST> CNLending<'_> for self::TreeCursor<'hast, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -257,7 +257,7 @@ where
     }
 
     fn text_provider(&self) -> <Self::Node as super::TextLending<'_>>::TP {
-        &self.stores.label_store()
+        self.stores.label_store()
     }
 
     fn is_visible_at_root(&self) -> bool {
@@ -275,7 +275,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> self::TreeCursor<'hast, HAST>
+impl<HAST: HyperAST> self::TreeCursor<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -340,11 +340,11 @@ where
     }
 }
 
-impl<'a, 'hast, HAST: HyperAST> super::TextLending<'a> for self::Node<'hast, HAST> {
+impl<'hast, HAST: HyperAST> super::TextLending<'_> for self::Node<'hast, HAST> {
     type TP = &'hast <HAST as HyperAST>::LS;
 }
 
-impl<'hast, HAST: HyperAST> super::Node for self::Node<'hast, HAST>
+impl<HAST: HyperAST> super::Node for self::Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -421,11 +421,11 @@ where
             // todo!()
             return super::BiCow::A(l);
         }
-        super::BiCow::B("".into()) // TODO check if it is the right behavior
+        super::BiCow::B("") // TODO check if it is the right behavior
     }
 }
 
-impl<'hast, HAST: HyperAST> Node<'hast, HAST>
+impl<HAST: HyperAST> Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -470,7 +470,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> Node<'hast, HAST>
+impl<HAST: HyperAST> Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
 {
@@ -479,7 +479,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> Node<'hast, HAST>
+impl<HAST: HyperAST> Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
 {

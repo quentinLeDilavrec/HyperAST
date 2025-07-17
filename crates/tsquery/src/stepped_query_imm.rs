@@ -79,7 +79,7 @@ impl<'hast, HAST: HyperASTShared, Acc: WithLabel> PartialEq for Node<HAST, Acc> 
 
 type IdF = u16;
 
-impl<'a, 'hast, 'acc, HAST: HyperAST, Acc> super::TextLending<'a> for self::Node<HAST, &'acc Acc>
+impl<'hast, 'acc, HAST: HyperAST, Acc> super::TextLending<'_> for self::Node<HAST, &'acc Acc>
 where
     &'acc Acc: WithLabel,
 {
@@ -146,7 +146,7 @@ where
     type IdF = IdF;
 }
 
-impl<'a, 'hast, 'acc, HAST, Acc> crate::CNLending<'a> for Node<HAST, &'acc Acc>
+impl<'hast, 'acc, HAST, Acc> crate::CNLending<'_> for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type> + RoleStore<IdF = IdF, Role = Role>,
@@ -241,7 +241,7 @@ impl<'hast, HAST: HyperASTShared, Acc: WithLabel> Node<HAST, Acc> {
 }
 
 pub struct MyNodeErazing<HAST, Acc>(std::marker::PhantomData<(HAST, Acc)>);
-impl<'acc, HAST, Acc> Default for MyNodeErazing<HAST, &'acc Acc> {
+impl<HAST, Acc> Default for MyNodeErazing<HAST, &Acc> {
     fn default() -> Self {
         Self(Default::default())
     }
@@ -303,13 +303,13 @@ impl<TS, Acc> Debug for QueryMatcher<TS, Acc> {
 }
 
 #[cfg(feature = "tsg")]
-impl<'acc, TS, Acc> tree_sitter_graph::QueryWithLang for QueryMatcher<TS, &'acc Acc> {
+impl<TS, Acc> tree_sitter_graph::QueryWithLang for QueryMatcher<TS, &Acc> {
     type Lang = tree_sitter::Language;
     type I = CaptureId;
 }
 
 #[cfg(feature = "tsg")]
-impl<'a, 'acc, HAST, Acc> NodeLending<'a> for QueryMatcher<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> NodeLending<'_> for QueryMatcher<HAST, &'acc Acc>
 where
     // HAST: types::StoreLending<'a, __ImplBound>,
     HAST: types::HyperAST + Copy,
@@ -746,7 +746,7 @@ pub struct MyQMatch<
 }
 
 #[cfg(feature = "tsg")]
-impl<'cursor, HAST: HyperASTShared, Acc: WithLabel> QueryWithLang for MyQMatch<'cursor, HAST, Acc> {
+impl<HAST: HyperASTShared, Acc: WithLabel> QueryWithLang for MyQMatch<'_, HAST, Acc> {
     type Lang = tree_sitter::Language;
     type I = CaptureId;
 }
@@ -764,8 +764,7 @@ pub struct CapturedNodesIter<
 }
 
 #[cfg(feature = "tsg")]
-impl<'a, 'cursor, 'acc, HAST: HyperAST, Acc> NodeLending<'a>
-    for CapturedNodesIter<'cursor, HAST, &'acc Acc>
+impl<'acc, HAST: HyperAST, Acc> NodeLending<'_> for CapturedNodesIter<'_, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::IdN: Copy + std::hash::Hash + Debug,
@@ -783,7 +782,7 @@ where
 }
 
 #[cfg(feature = "tsg")]
-impl<'cursor, 'acc, HAST: HyperAST, Acc> NodeLender for CapturedNodesIter<'cursor, HAST, &'acc Acc>
+impl<'acc, HAST: HyperAST, Acc> NodeLender for CapturedNodesIter<'_, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::IdN: Copy + std::hash::Hash + Debug,
@@ -814,7 +813,7 @@ where
 }
 
 #[cfg(feature = "tsg")]
-impl<'a, 'cursor, 'acc, HAST, Acc> NodesLending<'a> for MyQMatch<'cursor, HAST, &'acc Acc>
+impl<'a, 'acc, HAST, Acc> NodesLending<'a> for MyQMatch<'_, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type> + hyperast::types::RoleStore<IdF = IdF, Role = Role>,
@@ -850,8 +849,7 @@ type Pos<HAST: HyperASTShared> = hyperast::position::StructuralPosition<
 >;
 
 #[cfg(feature = "tsg")]
-impl<'cursor, 'acc, HAST, Acc> tree_sitter_graph::graph::QMatch
-    for MyQMatch<'cursor, HAST, &'acc Acc>
+impl<'acc, HAST, Acc> tree_sitter_graph::graph::QMatch for MyQMatch<'_, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type> + hyperast::types::RoleStore<IdF = IdF, Role = Role>,
@@ -868,7 +866,7 @@ where
 
     fn nodes_for_capture_index(&self, index: Self::I) -> <Self as NodesLending<'_>>::Nodes {
         CapturedNodesIter::<HAST, &'acc Acc> {
-            stores: self.stores.clone(),
+            stores: self.stores,
             index,
             inner: self.qm.captures.captures(),
         }
@@ -876,7 +874,7 @@ where
 
     fn nodes_for_capture_indexi(&self, index: Self::I) -> Option<NNN<'_, '_, Self>> {
         CapturedNodesIter::<HAST, &'acc Acc> {
-            stores: self.stores.clone(),
+            stores: self.stores,
             index,
             inner: self.qm.captures.captures(),
         }
@@ -889,7 +887,7 @@ where
     ) -> impl tree_sitter_graph::graph::NodeLender
     + tree_sitter_graph::graph::NodeLending<'_, Node = NNN<'_, '_, Self>> {
         CapturedNodesIter::<HAST, &'acc Acc> {
-            stores: self.stores.clone(),
+            stores: self.stores,
             index,
             inner: self.qm.captures.captures(),
         }
@@ -932,8 +930,7 @@ pub struct MyQMatches<
 }
 
 #[cfg(feature = "tsg")]
-impl<'query, 'cursor, 'acc, It, HAST, Acc> QueryWithLang
-    for MyQMatches<'query, 'cursor, It, HAST, &'acc Acc>
+impl<'acc, It, HAST, Acc> QueryWithLang for MyQMatches<'_, '_, It, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     It: Iterator<Item = crate::QueryMatch<Node<HAST, &'acc Acc>>>,
@@ -944,8 +941,7 @@ where
 }
 
 #[cfg(feature = "tsg")]
-impl<'a, 'query, 'cursor, 'acc, It, HAST, Acc> MatchLending<'a>
-    for MyQMatches<'query, 'cursor, It, HAST, &'acc Acc>
+impl<'cursor, 'acc, It, HAST, Acc> MatchLending<'_> for MyQMatches<'_, 'cursor, It, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     It: Iterator<Item = crate::QueryMatch<Node<HAST, &'acc Acc>>>,
@@ -966,8 +962,7 @@ where
 }
 
 #[cfg(feature = "tsg")]
-impl<'query, 'cursor, 'acc, It, HAST, Acc> MatchLender
-    for MyQMatches<'query, 'cursor, It, HAST, &'acc Acc>
+impl<'acc, It, HAST, Acc> MatchLender for MyQMatches<'_, '_, It, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     It: Iterator<Item = crate::QueryMatch<Node<HAST, &'acc Acc>>>,
@@ -986,7 +981,7 @@ where
 {
     fn next(&mut self) -> Option<<Self as MatchLending<'_>>::Match> {
         let qm = self.matchs.next()?;
-        let stores = self.node.0.stores.clone();
+        let stores = self.node.0.stores;
         let i = self
             .q
             .query
@@ -994,15 +989,14 @@ where
             .unwrap();
         Some(self::MyQMatch {
             stores,
-            b: &&(),
+            b: &(),
             qm,
             i,
         })
     }
 }
 
-impl<'query, 'cursor, 'acc, It, HAST, Acc> Iterator
-    for MyQMatches<'query, 'cursor, It, HAST, &'acc Acc>
+impl<'cursor, 'acc, It, HAST, Acc> Iterator for MyQMatches<'_, 'cursor, It, HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     It: Iterator<Item = crate::QueryMatch<Node<HAST, &'acc Acc>>>,
@@ -1012,7 +1006,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let qm = self.matchs.next()?;
-        let stores = self.node.0.stores.clone();
+        let stores = self.node.0.stores;
         let i = self
             .q
             .query
@@ -1020,7 +1014,7 @@ where
             .unwrap();
         Some(self::MyQMatch {
             stores,
-            b: &&(),
+            b: &(),
             qm,
             i,
         })

@@ -56,10 +56,7 @@ pub struct QueryPredicate {
 }
 
 impl<P: Debug> PerPattern<P> {
-    pub fn preds_for_patern_id<'a>(
-        &'a self,
-        id: crate::indexed::PatternId,
-    ) -> impl Iterator<Item = &'a P> {
+    pub fn preds_for_patern_id(&self, id: crate::indexed::PatternId) -> impl Iterator<Item = &P> {
         self.0[id.to_usize()].iter()
     }
 

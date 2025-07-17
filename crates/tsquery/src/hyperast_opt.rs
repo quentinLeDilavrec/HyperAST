@@ -26,7 +26,7 @@ struct ExtNodeRef<'a, 'hast, HAST: HyperASTShared> {
     pub pos: structural_pos::ExtRefNode<'a, HAST::IdN, HAST::Idx>,
 }
 
-impl<'a, 'hast, HAST: HyperAST> Clone for NodeRef<'a, 'hast, HAST> {
+impl<HAST: HyperAST> Clone for NodeRef<'_, '_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
@@ -36,7 +36,7 @@ impl<'a, 'hast, HAST: HyperAST> Clone for NodeRef<'a, 'hast, HAST> {
 }
 
 #[cfg(feature = "tsg")]
-impl<'a, 'hast, HAST: HyperAST> tree_sitter_graph::graph::SimpleNode for NodeRef<'a, 'hast, HAST>
+impl<HAST: HyperAST> tree_sitter_graph::graph::SimpleNode for NodeRef<'_, '_, HAST>
 where
     <HAST as HyperASTShared>::IdN: std::hash::Hash + Copy,
     <HAST as HyperASTShared>::Idx: std::hash::Hash,
@@ -74,7 +74,7 @@ impl<'hast, HAST: HyperAST> TreeCursor<'hast, HAST> {
     }
 }
 
-impl<'hast, HAST: HyperAST> Clone for Node<'hast, HAST> {
+impl<HAST: HyperAST> Clone for Node<'_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
@@ -119,7 +119,7 @@ impl<IdF: Copy> Status for CursorStatus<IdF> {
     }
 }
 
-impl<'hast, HAST: HyperAST> crate::WithField for self::TreeCursor<'hast, HAST>
+impl<HAST: HyperAST> crate::WithField for self::TreeCursor<'_, HAST>
 where
     HAST::TS: RoleStore,
 {
@@ -274,7 +274,7 @@ where
     }
 }
 
-impl<'a, 'hast, HAST: HyperAST> self::NodeRef<'a, 'hast, HAST>
+impl<HAST: HyperAST> self::NodeRef<'_, '_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -310,11 +310,11 @@ where
     }
 }
 
-impl<'a, 'hast, HAST: HyperAST> super::TextLending<'a> for self::Node<'hast, HAST> {
+impl<'hast, HAST: HyperAST> super::TextLending<'_> for self::Node<'hast, HAST> {
     type TP = &'hast <HAST as HyperAST>::LS;
 }
 
-impl<'hast, HAST: HyperAST> PartialEq for self::Node<'hast, HAST>
+impl<HAST: HyperAST> PartialEq for self::Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -327,7 +327,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> super::Node for self::Node<'hast, HAST>
+impl<HAST: HyperAST> super::Node for self::Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -402,11 +402,11 @@ where
     }
 }
 
-impl<'a, 'b, 'hast, HAST: HyperAST> super::TextLending<'a> for self::NodeRef<'b, 'hast, HAST> {
+impl<'hast, HAST: HyperAST> super::TextLending<'_> for self::NodeRef<'_, 'hast, HAST> {
     type TP = &'hast <HAST as HyperAST>::LS;
 }
 
-impl<'a, 'hast, HAST: HyperAST> PartialEq for self::NodeRef<'a, 'hast, HAST>
+impl<HAST: HyperAST> PartialEq for self::NodeRef<'_, '_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -419,7 +419,7 @@ where
     }
 }
 
-impl<'a, 'hast, HAST: HyperAST> super::Node for self::NodeRef<'a, 'hast, HAST>
+impl<HAST: HyperAST> super::Node for self::NodeRef<'_, '_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -489,7 +489,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> Node<'hast, HAST>
+impl<HAST: HyperAST> Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
 {
@@ -498,8 +498,8 @@ where
     }
 }
 
-fn kind<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn kind<HAST: HyperAST>(
+    stores: &HAST,
     pos: &impl AAA<HAST::IdN, HAST::Idx>,
 ) -> <HAST::TS as TypeStore>::Ty {
     stores.resolve_type(&pos.node())
@@ -515,17 +515,11 @@ fn resolve<'hast, HAST: HyperAST>(
     n
 }
 
-fn is_visible<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
-    pos: &impl AAA<HAST::IdN, HAST::Idx>,
-) -> bool {
+fn is_visible<HAST: HyperAST>(stores: &HAST, pos: &impl AAA<HAST::IdN, HAST::Idx>) -> bool {
     !kind(stores, pos).is_hidden()
 }
 
-fn symbol<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
-    pos: &impl AAA<HAST::IdN, HAST::Idx>,
-) -> Symbol {
+fn symbol<HAST: HyperAST>(stores: &HAST, pos: &impl AAA<HAST::IdN, HAST::Idx>) -> Symbol {
     let n = pos.node();
     let t = stores.resolve_type(&n);
     use hyperast::types::NodeStore;
@@ -557,7 +551,7 @@ where
         super::BiCow::A(ty.as_static_str())
         // ty.to_string().into()
     } else {
-        super::BiCow::A("".into())
+        super::BiCow::A("")
     }
 }
 
@@ -583,7 +577,7 @@ struct SuperTypeIter<'a, 'hast, HAST: HyperASTShared> {
     pub pos: structural_pos::RefNode<'a, HAST::IdN, HAST::Idx>,
 }
 
-impl<'a, 'hast, HAST: HyperAST> Iterator for SuperTypeIter<'a, 'hast, HAST>
+impl<HAST: HyperAST> Iterator for SuperTypeIter<'_, '_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -609,10 +603,7 @@ where
     }
 }
 
-fn goto_parent<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
-    pos: &mut impl AAA<HAST::IdN, HAST::Idx>,
-) -> bool {
+fn goto_parent<HAST: HyperAST>(stores: &HAST, pos: &mut impl AAA<HAST::IdN, HAST::Idx>) -> bool {
     loop {
         if !pos.up() {
             return false;
@@ -623,8 +614,8 @@ fn goto_parent<'hast, HAST: HyperAST>(
     }
 }
 
-fn goto_next_sibling_internal<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn goto_next_sibling_internal<HAST: HyperAST>(
+    stores: &HAST,
     pos: &mut impl BBB<HAST::IdN, HAST::Idx>,
 ) -> TreeCursorStep
 where
@@ -657,8 +648,8 @@ where
     }
 }
 
-fn goto_first_child_internal<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn goto_first_child_internal<HAST: HyperAST>(
+    stores: &HAST,
     pos: &mut impl BBB<HAST::IdN, HAST::Idx>,
 ) -> TreeCursorStep
 where

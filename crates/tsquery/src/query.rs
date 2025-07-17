@@ -307,7 +307,7 @@ impl<I, T, const INTERM: u16> SubFinder<I, T, INTERM> {
     pub(crate) fn matches<Q, SId>(&self, query: &Q, sid: SId) -> Vec<PatternId> {
         let mut res = vec![];
         let hasher = IncHasher(std::hash::DefaultHasher::new(), 0);
-        let mut stack = vec![(hasher, sid)];
+        let mut stack = [(hasher, sid)];
         loop {}
         res
     }
@@ -410,7 +410,7 @@ impl PrecomputedPatterns {
             if hasher.1 % PrecomputedPatterns::INTERM == 0 && hasher.1 > 0 {
                 let hash = hasher.0.clone().finish();
                 // dbg!(&hash);
-                if !self.intermediate_hashes.binary_search(&hash).is_ok() {
+                if self.intermediate_hashes.binary_search(&hash).is_err() {
                     continue;
                 }
             }
@@ -436,7 +436,7 @@ impl PrecomputedPatterns {
             }
             if id != stepid {
                 // prevents skipping first step
-                let mut id = id.clone();
+                let mut id = id;
                 id.inc();
                 stack.push((hasher.clone(), id));
             }
@@ -444,7 +444,7 @@ impl PrecomputedPatterns {
                 let mut hasher = hasher.clone();
                 hasher.1 += 1;
                 hash_single_step1(query, id, &mut hasher.0);
-                let mut id = id.clone();
+                let mut id = id;
                 id.inc();
                 stack.push((hasher, id));
             }
@@ -452,7 +452,7 @@ impl PrecomputedPatterns {
                 let mut hasher = hasher.clone();
                 hasher.1 += 1;
                 hash_single_step2(query, id, &mut hasher.0);
-                let mut id = id.clone();
+                let mut id = id;
                 id.inc();
                 stack.push((hasher, id));
             }
@@ -460,7 +460,7 @@ impl PrecomputedPatterns {
                 let mut hasher = hasher.clone();
                 hasher.1 += 1;
                 hash_single_step12(query, id, &mut hasher.0);
-                let mut id = id.clone();
+                let mut id = id;
                 id.inc();
                 stack.push((hasher, id));
             }
@@ -481,13 +481,12 @@ impl PrecomputedPatterns {
         mut hasher: IncHasher,
         res: &mut Vec<PatternId>,
     ) {
-        if hasher.1 % PrecomputedPatterns::INTERM == 1 {
-            if !self
+        if hasher.1 % PrecomputedPatterns::INTERM == 1
+            && !self
                 .intermediate_hashes
                 .contains(&hasher.0.clone().finish())
-            {
-                return;
-            }
+        {
+            return;
         }
 
         if id != stepid {
@@ -527,28 +526,28 @@ impl PrecomputedPatterns {
             } else {
                 if id != stepid {
                     // prevents skipping first step
-                    let mut id = id.clone();
+                    let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher.clone(), res);
                 }
                 if step.field != 0 {
                     let mut hasher = hasher.div();
                     hash_single_step1(query, id, &mut hasher.0);
-                    let mut id = id.clone();
+                    let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
                 if step.symbol != 0 {
                     let mut hasher = hasher.div();
                     hash_single_step2(query, id, &mut hasher.0);
-                    let mut id = id.clone();
+                    let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
                 if step.symbol != 0 {
                     let mut hasher = hasher.div();
                     hash_single_step12(query, id, &mut hasher.0);
-                    let mut id = id.clone();
+                    let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
@@ -709,9 +708,9 @@ impl Query {
         assert!(self.steps.contains(step_index.next_step_index()));
         let step = &self.steps[step_index];
         let next_step = &self.steps[step_index.next_step_index()];
-        return next_step.depth != PATTERN_DONE_MARKER
+        next_step.depth != PATTERN_DONE_MARKER
             && next_step.depth > step.depth
-            && !next_step.parent_pattern_guaranteed();
+            && !next_step.parent_pattern_guaranteed()
     }
 
     pub(super) fn pattern_map_search(&self, needle: super::Symbol) -> Option<usize> {
@@ -761,19 +760,19 @@ impl Query {
         }
     }
 
-    pub(crate) fn text_predicates_for_pattern_id<'a>(
-        &'a self,
+    pub(crate) fn text_predicates_for_pattern_id(
+        &self,
         pattern_index: indexed::PatternId,
-    ) -> impl Iterator<Item = &'a TextPredicateCapture> {
+    ) -> impl Iterator<Item = &TextPredicateCapture> {
         self.text_predicates.preds_for_patern_id(pattern_index)
     }
 }
 
 impl Query {
     pub fn big(source: &[&str], language: Language) -> Result<Self, QueryError> {
-        let mut source = source.into_iter();
+        let mut source = source.iter();
         let s = source.next().unwrap_or(&"");
-        let mut byte_offset = s.as_bytes().len();
+        let mut byte_offset = s.len();
         let mut query = Self::new(s, language.clone())?;
         for source in source {
             let step_offset = query.steps.count();
@@ -864,7 +863,7 @@ impl Query {
                 todo!() // NOTE probably better to process precomputeds after Self::big
             }
 
-            byte_offset = source.as_bytes().len();
+            byte_offset = source.len();
         }
         Ok(query)
     }
@@ -918,7 +917,7 @@ impl Query {
                     capture_quantifiers.push(quantifier.into());
                 }
             }
-            capture_quantifiers_vec.push(capture_quantifiers.into());
+            capture_quantifiers_vec.push(capture_quantifiers);
         }
 
         // Build a vector of strings to represent literal values used in predicates.
@@ -1339,11 +1338,11 @@ impl Query {
 
     pub fn disable_pattern(&mut self, pattern_index: PatternId) {
         for (i, pattern) in self.pattern_map.iter().enumerate() {
-            if pattern.pattern_index == pattern_index {
-                if i < self.wildcard_root_pattern_count as usize {
-                    self.wildcard_root_pattern_count -= 1;
-                    break;
-                }
+            if pattern.pattern_index == pattern_index
+                && i < self.wildcard_root_pattern_count as usize
+            {
+                self.wildcard_root_pattern_count -= 1;
+                break;
             }
         }
         if self.enabled_pattern_map[pattern_index.to_usize()] != u16::MAX {
@@ -1674,7 +1673,7 @@ impl Query {
                 // source[so.byte_offset as usize..].starts_with("(#EQ?")
                 let op = cap.get(1).unwrap().as_str();
                 // dbg!(op, so.byte_offset);
-                let so2 = if stpid as usize + 1 < step_offsets.len() {
+                let so2 = if stpid + 1 < step_offsets.len() {
                     let x = step_offsets[stpid + 1].byte_offset;
                     x as usize
                 } else {
@@ -1958,10 +1957,10 @@ impl Display for Query {
             write!(f, " bitfield: {:b}", step.bit_field)
         }
 
-        pub(crate) fn symbol_name<'a>(
-            query: &'a Query,
+        pub(crate) fn symbol_name(
+            query: &Query,
             symbol: tree_sitter::ffi::TSSymbol,
-        ) -> Option<&'a str> {
+        ) -> Option<&str> {
             let ptr = unsafe { tree_sitter::ffi::ts_language_symbol_name(query.language, symbol) };
             if !ptr.is_null() {
                 Some(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap())
@@ -1970,10 +1969,10 @@ impl Display for Query {
             }
         }
 
-        pub(crate) fn field_name<'a>(
-            query: &'a Query,
+        pub(crate) fn field_name(
+            query: &Query,
             field: tree_sitter::ffi::TSFieldId,
-        ) -> Option<&'a str> {
+        ) -> Option<&str> {
             let ptr =
                 unsafe { tree_sitter::ffi::ts_language_field_name_for_id(query.language, field) };
             if !ptr.is_null() {
@@ -1985,7 +1984,7 @@ impl Display for Query {
         for (i, step) in self.steps.iter().enumerate() {
             write!(f, "  {:>2}: ", i)?;
             print_query_step(self, step, f)?;
-            write!(f, ",\n")?;
+            writeln!(f, ",")?;
         }
         Ok(())
     }
@@ -2050,15 +2049,15 @@ impl From<&crate::ffi_extra::TSQueryStep> for QueryStep {
     }
 }
 
-impl Into<Vec<PatternEntry>> for &Array<crate::ffi_extra::TSPatternEntry> {
-    fn into(self) -> Vec<PatternEntry> {
-        self.iter().map(|x| x.into()).collect()
+impl From<&Array<crate::ffi_extra::TSPatternEntry>> for Vec<PatternEntry> {
+    fn from(val: &Array<crate::ffi_extra::TSPatternEntry>) -> Self {
+        val.iter().map(|x| x.into()).collect()
     }
 }
 
-impl Into<Vec<StepOffset>> for &Array<crate::ffi_extra::TSStepOffset> {
-    fn into(self) -> Vec<StepOffset> {
-        self.iter()
+impl From<&Array<crate::ffi_extra::TSStepOffset>> for Vec<StepOffset> {
+    fn from(val: &Array<crate::ffi_extra::TSStepOffset>) -> Self {
+        val.iter()
             .map(|x| StepOffset {
                 byte_offset: x.byte_offset,
                 step_index: StepId::new(x.step_index),
@@ -2105,10 +2104,10 @@ mod tests {
                 assert!(s.has_immediate_pred());
             }
         }
-        pub(crate) fn symbol_name<'a>(
-            query: &'a Query,
+        pub(crate) fn symbol_name(
+            query: &Query,
             symbol: tree_sitter::ffi::TSSymbol,
-        ) -> Option<&'a str> {
+        ) -> Option<&str> {
             let ptr = unsafe { tree_sitter::ffi::ts_language_symbol_name(query.language, symbol) };
             if !ptr.is_null() {
                 Some(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap())
@@ -2390,7 +2389,7 @@ mod exp_union {
                     negated_field_list_id = 0;
                     bit_field = f(bf);
                 }
-                (d, bf, U { jump: _ }) if bf.0 & 1 << 3 != 0 => {
+                (d, bf, U { jump: _ }) if bf.0 & (1 << 3) != 0 => {
                     symbol = 0;
                     supertype_symbol = 0;
                     field = 0;

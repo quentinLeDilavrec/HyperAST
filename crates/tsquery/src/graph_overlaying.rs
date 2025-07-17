@@ -12,10 +12,10 @@ pub struct PreparedOverlay<Q, O> {
 }
 
 #[cfg(feature = "tsg")]
-impl<'aaa, 'hast, 'g, 'q, 'm, HAST, Acc> tree_gen::More<HAST>
+impl<'aaa, 'hast, 'g, HAST, Acc> tree_gen::More<HAST>
     for PreparedOverlay<
-        &'q crate::Query,
-        &'m tree_sitter_graph::ast::File<
+        &crate::Query,
+        &tree_sitter_graph::ast::File<
             stepped_query_imm::QueryMatcher<<HAST as StoreRefAssoc>::S<'_>, &Acc>,
         >,
     >
@@ -79,10 +79,10 @@ where
 }
 
 #[cfg(feature = "tsg")]
-impl<'aaa, 'g, 'q, 'm, 'hast, HAST, Acc> tree_gen::Prepro<HAST>
+impl<HAST, Acc> tree_gen::Prepro<HAST>
     for PreparedOverlay<
-        &'q crate::Query,
-        &'m tree_sitter_graph::ast::File<
+        &crate::Query,
+        &tree_sitter_graph::ast::File<
             stepped_query_imm::QueryMatcher<<HAST as StoreRefAssoc>::S<'_>, &Acc>,
         >,
     >
@@ -117,10 +117,10 @@ where
 }
 
 #[cfg(feature = "tsg")]
-impl<'aaa, 'g, 'q, 'm, 'hast, HAST, Acc> tree_gen::PreproTSG<HAST>
+impl<HAST, Acc> tree_gen::PreproTSG<HAST>
     for PreparedOverlay<
-        &'q crate::Query,
-        &'m tree_sitter_graph::ast::File<
+        &crate::Query,
+        &tree_sitter_graph::ast::File<
             stepped_query_imm::QueryMatcher<<HAST as StoreRefAssoc>::S<'_>, &Acc>,
         >,
     >
@@ -216,13 +216,13 @@ where
             // ORI: ... matches.next() ...
             let mat: stepped_query_imm::MyQMatch<_, &Acc> = {
                 let Some(mat) = matches.next() else { break };
-                let mat = stepped_query_imm::MyQMatch {
-                    stores: tree.0.stores.clone(),
+
+                stepped_query_imm::MyQMatch {
+                    stores: tree.0.stores,
                     b: mat.b,
                     qm: unsafe { std::mem::transmute(mat.qm) },
                     i: mat.i,
-                };
-                mat
+                }
             };
             use tree_sitter_graph::graph::QMatch;
             let stanza = &self.overlayer.stanzas[mat.pattern_index()];
@@ -246,7 +246,7 @@ where
                     // NOTE could not properly get the source location, just use a zeroed location
                     // ORI: let error_context = StatementContext::new(...
                     let error_context = {
-                        let stmt: &tree_sitter_graph::ast::Statement = &statement;
+                        let stmt: &tree_sitter_graph::ast::Statement = statement;
                         let stanza = &stanza;
                         let source_node = &node;
                         // use crate::graph::SyntaxNode;
@@ -279,14 +279,14 @@ where
                             mat,
                             config,
                             &current_regex_captures,
-                            &statement,
+                            statement,
                             error_context,
                         )
                     {
                         log::trace!("{}", graph.pretty_print());
                         let source_path = std::path::Path::new(&"");
                         let tsg_path = std::path::Path::new(&"");
-                        log::error!("{}", err.display_pretty(&source_path, "", &tsg_path, ""));
+                        log::error!("{}", err.display_pretty(source_path, "", tsg_path, ""));
                     }
                     // .with_context(|| exec.error_context.into())?
                 }
@@ -302,7 +302,7 @@ where
             log::trace!("{}", graph.pretty_print());
             let source_path = std::path::Path::new(&"");
             let tsg_path = std::path::Path::new(&"");
-            log::error!("{}", err.display_pretty(&source_path, "", &tsg_path, ""));
+            log::error!("{}", err.display_pretty(source_path, "", tsg_path, ""));
         }
         // }
 
@@ -318,11 +318,11 @@ where
 
 // pub use tree_sitter_stack_graphs::functions::add_path_functions;
 
-static DEBUG_ATTR_PREFIX: &'static str = "debug_";
-pub static ROOT_NODE_VAR: &'static str = "ROOT_NODE";
+static DEBUG_ATTR_PREFIX: &str = "debug_";
+pub static ROOT_NODE_VAR: &str = "ROOT_NODE";
 /// The name of the file path global variable
 pub const FILE_PATH_VAR: &str = "FILE_PATH";
-static JUMP_TO_SCOPE_NODE_VAR: &'static str = "JUMP_TO_SCOPE_NODE";
+static JUMP_TO_SCOPE_NODE_VAR: &str = "JUMP_TO_SCOPE_NODE";
 static FILE_NAME: &str = "a/b/AAA.java";
 
 #[cfg(feature = "tsg")]

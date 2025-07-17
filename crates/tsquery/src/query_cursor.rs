@@ -518,19 +518,18 @@ where
                 if later_sibling_can_match
                     && (state!(@step).contains_captures()
                         || query.step_is_fallible(state!().step_index))
+                    && self.copy_state(&mut state!(@index)).is_some()
                 {
-                    if self.copy_state(&mut state!(@index)).is_some() {
-                        // TODO check if it properly passes a double pointer
-                        log::trace!(
-                            "  split state for capture. pattern:{}, step:{} {} {} {}",
-                            state!().pattern_index,
-                            state!().step_index,
-                            later_sibling_can_match,
-                            state!(@step).contains_captures(),
-                            query.step_is_fallible(state!().step_index),
-                        );
-                        copy_count += 1;
-                    }
+                    // TODO check if it properly passes a double pointer
+                    log::trace!(
+                        "  split state for capture. pattern:{}, step:{} {} {} {}",
+                        state!().pattern_index,
+                        state!().step_index,
+                        later_sibling_can_match,
+                        state!(@step).contains_captures(),
+                        query.step_is_fallible(state!().step_index),
+                    );
+                    copy_count += 1;
                 }
 
                 // If this pattern started with a wildcard, such that the pattern map

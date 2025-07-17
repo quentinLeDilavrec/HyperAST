@@ -115,7 +115,7 @@ where
     type IdF = IdF;
 }
 
-impl<'a, 'acc, HAST, Acc> crate::CNLending<'a> for self::TreeCursor<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> crate::CNLending<'_> for self::TreeCursor<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
     HAST::TS:
@@ -338,7 +338,6 @@ where
 
     fn text_provider(&self) -> <Self::Node as crate::TextLending<'_>>::TP {
         // &self.stores.label_store()
-        ()
     }
 
     fn is_visible_at_root(&self) -> bool {
@@ -438,7 +437,7 @@ where
 
 type IdF = u16;
 
-impl<'a, 'acc, HAST, Acc> super::TextLending<'a> for self::Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> super::TextLending<'_> for self::Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
     &'acc Acc: hyperast::tree_gen::WithLabel,
@@ -540,7 +539,7 @@ where
                 log::error!(
                     "trying to serialize a subtree for pattern matching during the construction of the HyperAST. You should instead properly describe your code pattern"
                 );
-                return super::BiCow::B("".into()); // silently returns
+                return super::BiCow::B(""); // silently returns
                 // TODO implement the serialization in another function, in case it is needed for a legitimate purpose.
                 // let r = hyperast::nodes::TextSerializer::new(self.stores, *id).to_string();
                 // return r.into();
@@ -550,7 +549,7 @@ where
                 let l = ls.resolve(l);
                 return super::BiCow::A(l);
             }
-            super::BiCow::B("".into())
+            super::BiCow::B("")
         } else if !self.acc.child_count() == 0 {
             if cfg!(debug_assertions) {
                 unimplemented!(
@@ -560,7 +559,7 @@ where
             log::error!(
                 "trying to serialize a subtree for pattern matching during the construction of the HyperAST. You should instead properly describe your code pattern"
             );
-            super::BiCow::B("".into()) // silently returns
+            super::BiCow::B("") // silently returns
         // TODO implement the serialization in another function, in case it is needed for a legitimate purpose.
         // let mut buf = String::new();
         // for id in self.acc.children() {
@@ -570,7 +569,7 @@ where
         } else if let Some(label) = &self.label {
             super::BiCow::A(label.as_ref())
         } else {
-            super::BiCow::B("".into())
+            super::BiCow::B("")
         }
     }
 }

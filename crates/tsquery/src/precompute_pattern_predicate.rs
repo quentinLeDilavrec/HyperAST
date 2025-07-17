@@ -80,7 +80,7 @@ where
             > as crate::Cursor>::Node,
         > = self.0.matches_immediate(cursor); // TODO filter on height (and visibility?)
         let mut r = Default::default();
-        while let Some(m) = qcursor.next() {
+        for m in qcursor {
             assert!(m.pattern_index.to_usize() < 16);
             r |= 1 << m.pattern_index.to_usize() as u16;
         }

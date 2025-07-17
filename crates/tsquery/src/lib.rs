@@ -106,10 +106,10 @@ impl<I> Slice<I> {
 }
 
 impl Query {
-    pub fn matches<'query, Cursor: self::Cursor, Node: crate::Node + Clone>(
-        &'query self,
+    pub fn matches<Cursor: self::Cursor, Node: crate::Node + Clone>(
+        &self,
         cursor: Cursor,
-    ) -> QueryCursor<'query, Cursor, Node> {
+    ) -> QueryCursor<'_, Cursor, Node> {
         QueryCursor::<Cursor, _> {
             halted: false,
             ascending: false,
@@ -127,10 +127,10 @@ impl Query {
     }
 
     /// Match all patterns that starts on cursor current node
-    pub fn matches_immediate<'query, Cursor: self::Cursor, N: crate::Node + Clone>(
-        &'query self,
+    pub fn matches_immediate<Cursor: self::Cursor, N: crate::Node + Clone>(
+        &self,
         cursor: Cursor,
-    ) -> QueryCursor<'query, Cursor, N> {
+    ) -> QueryCursor<'_, Cursor, N> {
         let mut qcursor = self.matches(cursor);
         // can only match patterns starting on provided node
         qcursor.set_max_start_depth(0);
@@ -176,7 +176,7 @@ pub struct QueryCursor<'query, Cursor, Node> {
     pub did_exceed_match_limit: bool,
 }
 
-impl<'query, Cursor, N> QueryCursor<'query, Cursor, N> {
+impl<Cursor, N> QueryCursor<'_, Cursor, N> {
     pub fn cursor(&self) -> &Cursor {
         &self.cursor
     }
@@ -289,9 +289,9 @@ pub trait Node: for<'a> TextLending<'a> + Clone + PartialEq {
     /// Natural ordering over the position of source code elements (represented by `self` and `other`)
     fn compare(&self, other: &Self) -> std::cmp::Ordering;
     fn text<'s, 'l>(&'s self, text_provider: <Self as TextLending<'l>>::TP) -> BiCow<'s, 'l, str>;
-    fn text_equal<'s, 'l>(
-        &'s self,
-        text_provider: <Self as TextLending<'l>>::TP,
+    fn text_equal(
+        &self,
+        text_provider: <Self as TextLending<'_>>::TP,
         other: impl Iterator<Item = u8>,
     ) -> bool {
         self.text(text_provider)
@@ -384,7 +384,7 @@ where
     }
 }
 
-impl<'query, Cursor: self::Cursor> Iterator for QueryCursor<'query, Cursor, Cursor::Node>
+impl<Cursor: self::Cursor> Iterator for QueryCursor<'_, Cursor, Cursor::Node>
 where
     <Cursor::Status as Status>::IdF: Into<u16> + From<u16>,
 {
@@ -473,10 +473,7 @@ impl<Node: self::Node> QueryMatch<Node> {
         })
     }
 
-    pub fn nodes_for_capture_index<'a>(
-        &'a self,
-        index: CaptureId,
-    ) -> impl Iterator<Item = &'a Node> {
+    pub fn nodes_for_capture_index(&self, index: CaptureId) -> impl Iterator<Item = &Node> {
         self.captures.nodes_for_capture_index(index)
     }
 }

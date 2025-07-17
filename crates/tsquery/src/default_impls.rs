@@ -13,11 +13,11 @@ impl<'a> TreeCursor<'a> {
     }
 }
 
-impl<'a> crate::WithField for TreeCursor<'a> {
+impl crate::WithField for TreeCursor<'_> {
     type IdF = ffi::TSFieldId;
 }
 
-impl<'a, 'b> CNLending<'b> for TreeCursor<'a> {
+impl<'b> CNLending<'b> for TreeCursor<'_> {
     type NR = tree_sitter::Node<'b>;
 }
 
@@ -178,11 +178,11 @@ impl Status for TSStatus {
     }
 }
 
-impl<'a, 'b> super::TextLending<'a> for tree_sitter::Node<'b> {
+impl<'a> super::TextLending<'a> for tree_sitter::Node<'_> {
     type TP = &'a [u8];
 }
 
-impl<'a> super::Node for tree_sitter::Node<'a> {
+impl super::Node for tree_sitter::Node<'_> {
     type IdF = ffi::TSFieldId;
     fn symbol(&self) -> Symbol {
         self.kind_id().into()

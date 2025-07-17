@@ -100,8 +100,8 @@ where
     pub fn last_chance_match_histogram(&mut self, src: &M::Src, dst: &M::Dst) {
         self.lcs_equal_matching(src, dst);
         self.lcs_structure_matching(src, dst);
-        let src_is_root = self.src_arena.parent(&src).is_none();
-        let dst_is_root = self.dst_arena.parent(&dst).is_none();
+        let src_is_root = self.src_arena.parent(src).is_none();
+        let dst_is_root = self.dst_arena.parent(dst).is_none();
         if src_is_root && dst_is_root {
             self.histogram_matching(src, dst);
         } else if !(src_is_root || dst_is_root) {
@@ -238,20 +238,20 @@ where
             .src_arena
             .children(src)
             .into_iter()
-            .filter(|child| !self.mappings.is_src(&child))
+            .filter(|child| !self.mappings.is_src(child))
             .fold(HashMap::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.src_arena.original(&child));
-                acc.entry(t).or_insert_with(Vec::new).push(child);
+                acc.entry(t).or_default().push(child);
                 acc
             });
         let dst_histogram: HashMap<_, Vec<M::Dst>> = self
             .dst_arena
             .children(dst)
             .into_iter()
-            .filter(|child| !self.mappings.is_dst(&child))
+            .filter(|child| !self.mappings.is_dst(child))
             .fold(HashMap::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.dst_arena.original(&child));
-                acc.entry(t).or_insert_with(Vec::new).push(child);
+                acc.entry(t).or_default().push(child);
                 acc
             });
 

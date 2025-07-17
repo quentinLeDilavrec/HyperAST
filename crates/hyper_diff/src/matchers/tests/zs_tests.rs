@@ -1,13 +1,9 @@
-use crate::{
-    decompressed_tree_store::{ShallowDecompressedTreeStore, SimpleZsTree},
-    matchers::{
-        mapping_store::{DefaultMappingStore, MappingStore},
-        optimal::zs::ZsMatcher, Decompressible,
-    },
-    tests::examples::{example_gt_java_code, example_gt_slides, example_zs_paper},
-};
+use crate::decompressed_tree_store::{ShallowDecompressedTreeStore, SimpleZsTree};
+use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::matchers::{Decompressible, optimal::zs::ZsMatcher};
+use crate::tests::examples::{example_gt_java_code, example_gt_slides, example_zs_paper};
 
-use hyperast::test_utils::simple_tree::{vpair_to_stores, DisplayTree};
+use hyperast::test_utils::simple_tree::{DisplayTree, vpair_to_stores};
 use hyperast::types::LabelStore;
 
 #[test]
@@ -33,7 +29,9 @@ fn test_with_custom_example() {
     );
 
     let mapper =
-        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(&stores, src, dst);
+        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(
+            &stores, src, dst,
+        );
     let ZsMatcher {
         src_arena,
         dst_arena,
@@ -64,10 +62,7 @@ fn test_with_custom_example() {
         &(src_arena.child(src, &[0])),
         &(dst_arena.child(dst, &[0, 0]))
     ));
-    assert!(mappings.has(
-        &src_arena.child(src, &[1]),
-        &dst_arena.child(dst, &[0, 1])
-    ));
+    assert!(mappings.has(&src_arena.child(src, &[1]), &dst_arena.child(dst, &[0, 1])));
     assert!(mappings.has(
         &src_arena.child(src, &[1, 0]),
         &dst_arena.child(dst, &[0, 1, 0])
@@ -87,7 +82,9 @@ fn test_with_custom_example2() {
     // assert_eq!(label_store.resolve(&0).to_owned(), b"");
 
     let mapper =
-    ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(&stores, src, dst);
+        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(
+            &stores, src, dst,
+        );
     let ZsMatcher {
         src_arena,
         dst_arena,
@@ -96,14 +93,8 @@ fn test_with_custom_example2() {
     let src = &src_arena.root();
     let dst = &dst_arena.root();
     assert_eq!(6, mappings.src_to_dst.iter().filter(|x| **x != 0).count());
-    assert!(mappings.has(
-        &src_arena.child(src, &[0]),
-        &dst_arena.child(dst, &[0, 0])
-    ));
-    assert!(mappings.has(
-        &src_arena.child(src, &[1]),
-        &dst_arena.child(dst, &[0, 1])
-    ));
+    assert!(mappings.has(&src_arena.child(src, &[0]), &dst_arena.child(dst, &[0, 0])));
+    assert!(mappings.has(&src_arena.child(src, &[1]), &dst_arena.child(dst, &[0, 1])));
     assert!(mappings.has(
         &src_arena.child(src, &[1, 0]),
         &dst_arena.child(dst, &[0, 1, 0])
@@ -124,7 +115,9 @@ fn test_with_slide_example() {
     // assert_eq!(label_store.resolve(&0).to_owned(), b"");
 
     let mapper =
-        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(&stores, src, dst);
+        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(
+            &stores, src, dst,
+        );
     let ZsMatcher {
         src_arena,
         dst_arena,
@@ -135,10 +128,7 @@ fn test_with_slide_example() {
     let dst = &dst_arena.root();
     assert_eq!(5, mappings.src_to_dst.iter().filter(|x| **x != 0).count());
     assert!(mappings.has(src, dst));
-    assert!(mappings.has(
-        &src_arena.child(src, &[0, 0]),
-        &dst_arena.child(dst, &[0])
-    ));
+    assert!(mappings.has(&src_arena.child(src, &[0, 0]), &dst_arena.child(dst, &[0])));
     assert!(mappings.has(
         &src_arena.child(src, &[0, 0, 0]),
         &dst_arena.child(dst, &[0, 0])
@@ -147,10 +137,7 @@ fn test_with_slide_example() {
         &src_arena.child(src, &[0, 1]),
         &dst_arena.child(dst, &[1, 0])
     ));
-    assert!(mappings.has(
-        &src_arena.child(src, &[0, 2]),
-        &dst_arena.child(dst, &[2])
-    ));
+    assert!(mappings.has(&src_arena.child(src, &[0, 2]), &dst_arena.child(dst, &[2])));
 }
 
 #[test]
@@ -159,7 +146,9 @@ fn test_with_slide_example2() {
     // assert_eq!(label_store.resolve(&0).to_owned(), b"");
 
     let mapper =
-        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(&stores, src, dst);
+        ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(
+            &stores, src, dst,
+        );
     let ZsMatcher {
         src_arena,
         dst_arena,
@@ -170,10 +159,7 @@ fn test_with_slide_example2() {
     let dst = &dst_arena.root();
     assert_eq!(5, mappings.src_to_dst.iter().filter(|x| **x != 0).count());
     assert!(mappings.has(src, dst));
-    assert!(mappings.has(
-        &src_arena.child(src, &[0, 0]),
-        &dst_arena.child(dst, &[0])
-    ));
+    assert!(mappings.has(&src_arena.child(src, &[0, 0]), &dst_arena.child(dst, &[0])));
     assert!(mappings.has(
         &src_arena.child(src, &[0, 0, 0]),
         &dst_arena.child(dst, &[0, 0])
@@ -182,8 +168,5 @@ fn test_with_slide_example2() {
         &src_arena.child(src, &[0, 1]),
         &dst_arena.child(dst, &[1, 0])
     ));
-    assert!(mappings.has(
-        &src_arena.child(src, &[0, 2]),
-        &dst_arena.child(dst, &[2])
-    ));
+    assert!(mappings.has(&src_arena.child(src, &[0, 2]), &dst_arena.child(dst, &[2])));
 }

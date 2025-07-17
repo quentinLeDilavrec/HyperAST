@@ -6,9 +6,9 @@
 //! - [ ] low compute cost extend
 use std::{fmt::Debug, marker::PhantomData};
 
-use hyperast::position::position_accessors::SharedPath;
 use hyperast::PrimInt;
-use num_traits::{cast, ToPrimitive};
+use hyperast::position::position_accessors::SharedPath;
+use num_traits::{ToPrimitive, cast};
 
 pub trait TreePath: IntoIterator {
     type ItemIterator<'a>: Iterator<Item = Self::Item>

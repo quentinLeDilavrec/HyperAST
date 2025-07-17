@@ -54,16 +54,16 @@ pub struct SimplePOSlice<'a, IdN, IdD> {
     pub(super) id_parent: &'a [IdD],
 }
 
-impl<'a, IdN, IdD> Clone for SimplePOSlice<'a, IdN, IdD> {
+impl<IdN, IdD> Clone for SimplePOSlice<'_, IdN, IdD> {
     fn clone(&self) -> Self {
         Self {
-            basic: self.basic.clone(),
+            basic: self.basic,
             id_parent: self.id_parent,
         }
     }
 }
 
-impl<'a, IdN, IdD> Copy for SimplePOSlice<'a, IdN, IdD> {}
+impl<IdN, IdD> Copy for SimplePOSlice<'_, IdN, IdD> {}
 
 impl<'a, IdN, IdD> Deref for SimplePOSlice<'a, IdN, IdD> {
     type Target = BasicPOSlice<'a, IdN, IdD>;
@@ -129,7 +129,7 @@ where
     }
 
     fn has_parent(&self, id: &IdD) -> bool {
-        self.parent(id) != None
+        self.parent(id).is_some()
     }
 
     fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
@@ -146,7 +146,7 @@ where
     }
 
     fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
-        let ref this = self;
+        let this = self;
         let mut idxs = vec![];
         let mut curr = *descendant;
         while &curr != parent {
@@ -196,7 +196,7 @@ pub struct IterParents<'a, IdD> {
     pub(super) id_parent: &'a [IdD],
 }
 
-impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
+impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -204,7 +204,7 @@ impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
             return None;
         }
         let r = self.id_parent[self.id.to_usize().unwrap()];
-        self.id = r.clone();
+        self.id = r;
         Some(r)
     }
 }
@@ -220,6 +220,10 @@ where
 
     fn tree(&self, id: &IdD) -> HAST::IdN {
         self.as_basic().tree(id)
+    }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.as_basic().has_children(id)
     }
 }
 
@@ -388,7 +392,7 @@ where
         while i > 0 {
             i -= 1;
             let s = self.size(&c);
-            c = c - s;
+            c -= s;
             r[i] = c;
         }
         assert_eq!(
@@ -552,7 +556,7 @@ impl<'a, HAST: HyperASTShared + Copy, IdD: PrimInt + Hash + Eq>
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq> RecCachedPositionProcessor<'a, HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq> RecCachedPositionProcessor<'_, HAST, IdD>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
     HAST::IdN: Debug,
@@ -560,20 +564,17 @@ where
 {
     pub fn position<'b>(&mut self, c: &IdD) -> &Position {
         let stores = self.ds.hyperast;
-        if self.cache.contains_key(&c) {
-            return self.cache.get(&c).unwrap();
+        if self.cache.contains_key(c) {
+            self.cache.get(c).unwrap()
         } else if let Some(p) = self.ds.parent(c) {
             let id = self.ds.original(&p);
             let p_t = stores.resolve_type(&id);
             if p_t.is_directory() {
-                let ori = self.ds.original(&c);
+                let ori = self.ds.original(c);
                 if self.root == ori {
                     let r = stores.node_store().resolve(&ori);
                     return self.cache.entry(*c).or_insert(Position::new(
-                        stores
-                            .label_store()
-                            .resolve(&r.get_label_unchecked())
-                            .into(),
+                        stores.label_store().resolve(r.get_label_unchecked()).into(),
                         0,
                         r.try_bytes_len().unwrap_or(0),
                     ));
@@ -584,7 +585,7 @@ where
                     .cloned()
                     .unwrap_or_else(|| self.position(&p).clone());
                 let r = stores.node_store().resolve(&ori);
-                pos.inc_path(stores.label_store().resolve(&r.get_label_unchecked()));
+                pos.inc_path(stores.label_store().resolve(r.get_label_unchecked()));
                 pos.set_len(r.try_bytes_len().unwrap_or(0));
                 return self.cache.entry(*c).or_insert(pos);
             }
@@ -598,7 +599,7 @@ where
                     .cloned()
                     .unwrap_or_else(|| self.position(&lsib).clone());
                 pos.inc_offset(pos.range().end - pos.range().start);
-                let r = stores.node_store().resolve(&self.ds.original(&c));
+                let r = stores.node_store().resolve(&self.ds.original(c));
                 pos.set_len(r.try_bytes_len().unwrap());
                 self.cache.entry(*c).or_insert(pos)
             } else {
@@ -607,7 +608,7 @@ where
                     "{:?}",
                     self.ds.position_in_parent::<usize>(c).unwrap().to_usize()
                 );
-                let ori = self.ds.original(&c);
+                let ori = self.ds.original(c);
                 if self.root == ori {
                     let r = stores.node_store().resolve(&ori);
                     return self.cache.entry(*c).or_insert(Position::new(
@@ -629,15 +630,12 @@ where
                 self.cache.entry(*c).or_insert(pos)
             }
         } else {
-            let ori = self.ds.original(&c);
+            let ori = self.ds.original(c);
             assert_eq!(self.root, ori);
             let r = stores.node_store().resolve(&ori);
             let t = stores.resolve_type(&ori);
             let pos = if t.is_directory() || t.is_file() {
-                let file = stores
-                    .label_store()
-                    .resolve(&r.get_label_unchecked())
-                    .into();
+                let file = stores.label_store().resolve(r.get_label_unchecked()).into();
                 let offset = 0;
                 let len = r.try_bytes_len().unwrap_or(0);
                 Position::new(file, offset, len)
@@ -685,8 +683,8 @@ impl<'a, HAST: HyperASTShared + Copy, IdD: PrimInt + Hash + Eq, U, F, G>
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq, U: Clone + Default, F, G>
-    RecCachedProcessor<'a, HAST, IdD, U, F, G>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq, U: Clone + Default, F, G>
+    RecCachedProcessor<'_, HAST, IdD, U, F, G>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
     HAST::IdN: Debug,
@@ -695,13 +693,13 @@ where
 {
     pub fn position<'b>(&mut self, c: &IdD) -> &U {
         let stores = self.ds.hyperast;
-        if self.cache.contains_key(&c) {
-            return self.cache.get(&c).unwrap();
+        if self.cache.contains_key(c) {
+            self.cache.get(c).unwrap()
         } else if let Some(p) = self.ds.parent(c) {
             let id = self.ds.original(&p);
             let p_t = stores.resolve_type(&id);
             if p_t.is_directory() {
-                let ori = self.ds.original(&c);
+                let ori = self.ds.original(c);
                 if self.root == ori {
                     return self
                         .cache
@@ -718,14 +716,14 @@ where
                 let pos = self.position(&lsib).clone();
                 self.cache
                     .entry(*c)
-                    .or_insert((self.with_lsib)(pos, self.ds.original(&c)))
+                    .or_insert((self.with_lsib)(pos, self.ds.original(c)))
             } else {
                 assert!(
                     self.ds.position_in_parent::<usize>(c).unwrap().is_zero(),
                     "{:?}",
                     self.ds.position_in_parent::<usize>(c).unwrap().to_usize()
                 );
-                let ori = self.ds.original(&c);
+                let ori = self.ds.original(c);
                 if self.root == ori {
                     return self
                         .cache
@@ -736,7 +734,7 @@ where
                 self.cache.entry(*c).or_insert((self.with_p)(pos, ori))
             }
         } else {
-            let ori = self.ds.original(&c);
+            let ori = self.ds.original(c);
             assert_eq!(self.root, ori);
             self.cache
                 .entry(*c)

@@ -60,7 +60,7 @@ fn test_no_actions() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -71,7 +71,7 @@ fn test_no_actions() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -137,7 +137,7 @@ fn test_delete_actions_1() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -148,7 +148,7 @@ fn test_delete_actions_1() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -221,7 +221,7 @@ fn test_insert_actions_1() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -232,7 +232,7 @@ fn test_insert_actions_1() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -308,7 +308,7 @@ fn test_rename_actions_1() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -319,7 +319,7 @@ fn test_rename_actions_1() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -398,7 +398,7 @@ fn test_move_actions_1() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -409,7 +409,7 @@ fn test_move_actions_1() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -482,7 +482,7 @@ fn test_subdelete_actions_1() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -493,7 +493,7 @@ fn test_subdelete_actions_1() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -566,7 +566,7 @@ fn test_subdelete_actions_2() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -577,7 +577,7 @@ fn test_subdelete_actions_2() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );

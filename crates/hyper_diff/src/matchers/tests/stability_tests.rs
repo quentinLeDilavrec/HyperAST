@@ -32,10 +32,10 @@ enum GumtreeVariant {
 
 impl GumtreeVariant {
     fn is_lazy(&self) -> bool {
-        return match self {
+        match self {
             Self::Greedy | Self::Stable => false,
             Self::GreedyLazy | Self::StableLazy => true,
-        };
+        }
     }
 }
 
@@ -84,7 +84,7 @@ fn is_stable(
     let result2 = test_with_mappings(&stores, dst, src, mappings.mirror(), variant).mirror();
 
     println!("result1: {:?}\nresult2: {:?}", result1, result2);
-    return result1 == result2;
+    result1 == result2
 }
 
 fn _calculate_mappings(example: ((SimpleTree<u8>, SimpleTree<u8>), Vec<Vec<u8>>, Vec<Vec<u8>>)) {
@@ -102,7 +102,7 @@ fn _calculate_mappings(example: ((SimpleTree<u8>, SimpleTree<u8>), Vec<Vec<u8>>,
 
     for (map_src, map_dst) in map_src.iter().zip(map_dst) {
         m.link(
-            src_arena.child(&src, &map_src),
+            src_arena.child(&src, map_src),
             dst_arena.child(&dst, &map_dst),
         );
     }
@@ -159,7 +159,7 @@ fn test_with_mappings(
                 &|dst: u16| mapping.dst_arena.original(&dst).to_string(),
             )
         );
-        return mapping.mappings;
+        mapping.mappings
     } else {
         let mut owned_src_arena =
             Decompressible::<_, LazyPostOrder<u16, u16>>::decompress(stores, &src);
@@ -218,7 +218,7 @@ fn test_with_mappings(
         // &|dst: u16| mapping.dst_arena.original(&dst).to_string(),
         // )
         // );
-        return mapping.mappings;
+        mapping.mappings
     }
 }
 

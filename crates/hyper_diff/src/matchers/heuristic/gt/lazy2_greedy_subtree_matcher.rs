@@ -178,16 +178,14 @@ where
         // dbg!(&ambiguous_mappings.len());
         ambiguous_mappings.sort_by(|a, b| {
             let cached_coef_sib = |l: &(Dsrc::IdD, Ddst::IdD)| {
-                sib_sim
+                *sib_sim
                     .entry(*l)
-                    .or_insert_with(|| Self::coef_sib(mapper, &l))
-                    .clone()
+                    .or_insert_with(|| Self::coef_sib(mapper, l))
             };
             let cached_coef_parent = |l: &(Dsrc::IdD, Ddst::IdD)| {
-                psib_sim
+                *psib_sim
                     .entry(*l)
-                    .or_insert_with(|| Self::coef_parent(mapper, &l))
-                    .clone()
+                    .or_insert_with(|| Self::coef_parent(mapper, l))
             };
             let (alink, blink) = (a, b);
             if Self::same_parents(mapper, alink, blink) {
@@ -200,10 +198,9 @@ where
             .then_with(|| {
                 Self::cached_compare(
                     |l: &(Dsrc::IdD, Ddst::IdD)| {
-                        p_in_p_sim
+                        *p_in_p_sim
                             .entry(*l)
-                            .or_insert_with(|| Self::coef_pos_in_parent(mapper, &l))
-                            .clone()
+                            .or_insert_with(|| Self::coef_pos_in_parent(mapper, l))
                     },
                     a,
                     b,
@@ -300,8 +297,8 @@ where
         alink: &(Dsrc::IdD, Ddst::IdD),
         blink: &(Dsrc::IdD, Ddst::IdD),
     ) -> bool {
-        let ap = Self::mapping_parents(mapper, &alink);
-        let bp = Self::mapping_parents(mapper, &blink);
+        let ap = Self::mapping_parents(mapper, alink);
+        let bp = Self::mapping_parents(mapper, blink);
         ap.0 == bp.0 && ap.1 == bp.1
     }
 
@@ -316,7 +313,7 @@ where
         alink: &(Dsrc::IdD, Ddst::IdD),
         blink: &(Dsrc::IdD, Ddst::IdD),
     ) -> std::cmp::Ordering {
-        return (alink
+        (alink
             .0
             .shallow()
             .to_usize()
@@ -329,7 +326,7 @@ where
                 .to_usize()
                 .unwrap()
                 .abs_diff(blink.1.shallow().to_usize().unwrap()),
-        );
+        )
     }
 }
 impl<
@@ -407,12 +404,12 @@ where
                 }
             }
             for i in 0..marks_for_src_trees.len() {
-                if marks_for_src_trees[i] == false {
+                if !marks_for_src_trees[i] {
                     src_trees.open_tree(&current_height_src_trees[i]);
                 }
             }
             for j in 0..marks_for_dst_trees.len() {
-                if marks_for_dst_trees[j] == false {
+                if !marks_for_dst_trees[j] {
                     dst_trees.open_tree(&current_height_dst_trees[j]);
                 }
             }

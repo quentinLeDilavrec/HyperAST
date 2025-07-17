@@ -142,10 +142,10 @@ where
         let mut leaves_mappings = vec![];
 
         let mut src_iter = LeafIter::new(hyperast, &mut mapping.src_arena, is_leaf_src);
-        while let Some(src) = src_iter.next_mappable(|src| mappings.is_src(&src.shallow())) {
+        while let Some(src) = src_iter.next_mappable(|src| mappings.is_src(src.shallow())) {
             let mut dst_iter = LeafIter::new(hyperast, &mut mapping.dst_arena, is_leaf_dst);
-            while let Some(dst) = dst_iter.next_mappable(|dst| mappings.is_dst(&dst.shallow())) {
-                if !mappings.is_src(&src.shallow()) && !mappings.is_dst(&dst.shallow()) {
+            while let Some(dst) = dst_iter.next_mappable(|dst| mappings.is_dst(dst.shallow())) {
+                if !mappings.is_src(src.shallow()) && !mappings.is_dst(dst.shallow()) {
                     let osrc = src_iter.arena.original(&src);
                     let tsrc = hyperast.resolve_type(&osrc);
                     let odst = dst_iter.arena.original(&dst);
@@ -153,7 +153,7 @@ where
                     if osrc == odst {
                         // VALIDITY delaying and sorting would not change the result as sim would be 1.0
                         // NOTE it also avoids going multiple times over the same mapping
-                        Self::link(mappings, &src_iter.arena, &dst_iter.arena, src, dst);
+                        Self::link(mappings, src_iter.arena, dst_iter.arena, src, dst);
                     } else if tsrc == tdst
                         && !mappings.is_src(src.shallow())
                         && !mappings.is_dst(dst.shallow())
@@ -270,7 +270,7 @@ where
                     self.down = false;
                     continue;
                 }
-                if (self.is_leaf)(self.stores, &self.arena, self.idd) {
+                if (self.is_leaf)(self.stores, self.arena, self.idd) {
                     self.down = false;
                     return Some(self.idd);
                 }

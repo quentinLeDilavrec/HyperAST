@@ -11,7 +11,7 @@ pub struct SimplePreOrderMapper<'a, IdD, D> {
     back: &'a D,
 }
 
-impl<'a, IdD: Debug, D: Debug> Debug for SimplePreOrderMapper<'a, IdD, D> {
+impl<IdD: Debug, D: Debug> Debug for SimplePreOrderMapper<'_, IdD, D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SD")
             .field("map", &self.map)
@@ -133,7 +133,7 @@ where
                 let mut s = self
                     .stores
                     .label_store()
-                    .resolve(&node.get_label_unchecked())
+                    .resolve(node.get_label_unchecked())
                     .to_owned();
                 s.truncate(5);
                 writeln!(

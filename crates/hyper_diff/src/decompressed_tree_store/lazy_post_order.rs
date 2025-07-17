@@ -138,7 +138,7 @@ where
             while i > 0 {
                 i -= 1;
                 let s = self._size(&c);
-                c = c - s;
+                c -= s;
                 r[i] = c;
             }
             assert_eq!(
@@ -169,7 +169,7 @@ where
         }
 
         fn has_parent(&self, id: &IdD) -> bool {
-            self.parent(id) != None
+            self.parent(id).is_some()
         }
 
         fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
@@ -184,7 +184,7 @@ where
             }
         }
         fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
-            let ref this = self;
+            let this = self;
             let mut idxs: Vec<Idx> = vec![];
             let mut curr = *descendant;
             while &curr != parent {
@@ -240,6 +240,10 @@ where
         fn tree(&self, id: &IdD) -> HAST::IdN {
             self.id_compressed[id.to_usize().unwrap()].clone()
         }
+
+        fn has_children(&self, id: &IdD) -> bool {
+            self.lld(id) != *id
+        }
     }
 
     impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> PostOrderIterable<HAST, IdD>
@@ -282,7 +286,7 @@ where
     }
 
     fn has_parent(&self, id: &IdD) -> bool {
-        self.parent(id) != None
+        self.parent(id).is_some()
     }
 
     fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
@@ -296,7 +300,7 @@ where
         }
     }
     fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
-        let ref this = self;
+        let this = self;
         let mut idxs: Vec<Idx> = vec![];
         let mut curr = *descendant;
         while &curr != parent {
@@ -350,7 +354,7 @@ pub struct IterParents<'a, IdD> {
     pub(super) id_parent: &'a [IdD],
 }
 
-impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
+impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -358,7 +362,7 @@ impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
             return None;
         }
         let r = self.id_parent[self.id.to_usize().unwrap()];
-        self.id = r.clone();
+        self.id = r;
         Some(r)
     }
 }
@@ -374,6 +378,10 @@ where
 
     fn tree(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
+    }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.lld(id) != *id
     }
 }
 
@@ -463,7 +471,7 @@ where
         let c_n = &cs[cast(i).unwrap()];
         let offset = c.to_usize().unwrap();
         self.id_compressed[offset] = c_n.clone();
-        self.id_parent[offset] = x.clone();
+        self.id_parent[offset] = *x;
         let r = cs
             .before(cs.child_count() - one())
             .iter_children()
@@ -493,12 +501,12 @@ where
                 // );
                 let Some(rem) = rem else {
                     if c > zero() {
-                        c = c - one();
+                        c -= one();
                     }
                     break;
                 };
                 s.push((c, rem));
-                c = c - one();
+                c -= one();
             }
             let mut next = None;
             loop {
@@ -531,7 +539,7 @@ where
     }
 
     pub fn decompress_descendants(&mut self, x: &IdD) {
-        let mut q = vec![x.clone()];
+        let mut q = vec![*x];
         while let Some(x) = q.pop() {
             assert!(self.id_parent[x.to_usize().unwrap()] != zero());
             q.extend(self.decompress_children(&x));
@@ -541,7 +549,7 @@ where
     // TODO remove
     pub fn go_through_descendants(&mut self, x: &IdD) {
         let store = self.hyperast;
-        let mut q = vec![x.clone()];
+        let mut q = vec![*x];
         while let Some(x) = q.pop() {
             assert!(self.id_parent[x.to_usize().unwrap()] != zero());
             assert_eq!(
@@ -553,22 +561,22 @@ where
     }
     pub fn complete_subtree(&mut self, x: &IdD) {
         assert!(
-            self.parent(x).map_or(true, |p| p != zero()),
+            self.parent(x).is_none_or(|p| p != zero()),
             "x is not initialized"
         );
         // self.decompress_descendants_continuous(store, &x);
         // // self.go_through_descendants(store, &x);
         let first = self.first_descendant(x);
-        let mut i = x.clone();
+        let mut i = *x;
         while i > first {
             // dbg!(i);
             // dbg!(self.parent(&i));
             // dbg!(self.lld(&i));
             if self.id_parent[i.to_usize().unwrap() - 1] != zero() {
-                i = i - one();
+                i -= one();
             } else {
                 assert!(
-                    self.parent(&i).map_or(true, |p| p != zero()),
+                    self.parent(&i).is_none_or(|p| p != zero()),
                     "i is not initialized"
                 );
 
@@ -732,7 +740,7 @@ impl<'d, IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
                 .get(..(d + one()).to_usize().unwrap())
                 .expect("no child corresponding to given path");
             for x in cs {
-                z = z + self._size(x); //Self::size2(store, x);
+                z += self._size(x); //Self::size2(store, x);
             }
             let dec = Decompressible {
                 decomp: &mut self,
@@ -759,7 +767,7 @@ where
                 .get(..(d + one()).to_usize().unwrap())
                 .expect("no child corresponding to given path");
             for x in cs {
-                z = z + self._size(x); //Self::size2(store, x);
+                z += self._size(x); //Self::size2(store, x);
             }
             r = self.first_descendant(&r) + cast(z).unwrap() - one();
         }
@@ -807,12 +815,12 @@ where
             let offset = c.to_usize().unwrap();
             r[i] = c;
             self.id_compressed[offset] = c_n.clone();
-            self.id_parent[offset] = x.clone();
+            self.id_parent[offset] = *x;
             self.llds[offset] = c + one() - cast(s).unwrap();
             if i == 0 {
                 break;
             }
-            c = c - cast(s).unwrap();
+            c -= cast(s).unwrap();
             i -= 1;
         }
 
@@ -841,7 +849,7 @@ where
                 }
                 break;
             }
-            p = p + one();
+            p += one();
         }
         while &p > x {
             debug_assert!(&self.lld(&p) <= x);

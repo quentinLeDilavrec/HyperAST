@@ -73,6 +73,10 @@ where
     fn tree(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
     }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.lld(id) != *id
+    }
 }
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrderIterable<HAST, IdD>
@@ -129,9 +133,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt>
-    Decompressible<HAST, BasicPOSlice<'a, HAST::IdN, IdD>>
-{
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>> {
     /// WARN oposite order than id_compressed
     pub fn compute_kr(&self) -> Box<[IdD]> {
         let node_count = self.id_compressed.len();
@@ -292,7 +294,7 @@ where
         while i > 0 {
             i -= 1;
             let s = self.size(&c);
-            c = c - s;
+            c -= s;
             r[i] = c;
         }
         assert_eq!(
@@ -403,7 +405,7 @@ pub struct BasicPOSlice<'a, IdN, IdD> {
     pub(crate) llds: &'a [IdD],
 }
 
-impl<'a, IdN, IdD> Clone for BasicPOSlice<'a, IdN, IdD> {
+impl<IdN, IdD> Clone for BasicPOSlice<'_, IdN, IdD> {
     fn clone(&self) -> Self {
         Self {
             id_compressed: self.id_compressed,
@@ -412,9 +414,9 @@ impl<'a, IdN, IdD> Clone for BasicPOSlice<'a, IdN, IdD> {
     }
 }
 
-impl<'a, IdN, IdD> Copy for BasicPOSlice<'a, IdN, IdD> {}
+impl<IdN, IdD> Copy for BasicPOSlice<'_, IdN, IdD> {}
 
-impl<'d, IdN, IdD: PrimInt> BasicPOSlice<'d, IdN, IdD> {
+impl<IdN, IdD: PrimInt> BasicPOSlice<'_, IdN, IdD> {
     pub(crate) fn size(&self, i: &IdD) -> IdD {
         *i - self.llds[(*i).to_usize().unwrap()] + one()
     }
@@ -423,8 +425,8 @@ impl<'d, IdN, IdD: PrimInt> BasicPOSlice<'d, IdN, IdD> {
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
-    for Decompressible<HAST, BasicPOSlice<'a, HAST::IdN, IdD>>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
+    for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
 {
@@ -435,10 +437,14 @@ where
     fn tree(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
     }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.lld(id) != *id
+    }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
-    for Decompressible<HAST, BasicPOSlice<'a, HAST::IdN, IdD>>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
+    for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
 {
@@ -490,7 +496,7 @@ where
         while i > 0 {
             i -= 1;
             let s = self.size(&c);
-            c = c - s;
+            c -= s;
             r[i] = c;
         }
         assert_eq!(
@@ -501,8 +507,8 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
-    for Decompressible<HAST, BasicPOSlice<'a, HAST::IdN, IdD>>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+    for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
 {

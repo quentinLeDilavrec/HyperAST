@@ -216,7 +216,7 @@ where
         self.moved.resize(self.src_arena_dont_use.len(), false);
         for x in self.src_arena_dont_use.iter_df_post::<true>() {
             let children = self.src_arena_dont_use.children(&x);
-            let children = if children.len() > 0 {
+            let children = if !children.is_empty() {
                 Some(children)
             } else {
                 None
@@ -257,7 +257,7 @@ where
         for x in self.dst_arena.iter_bf() {
             let w;
             let y = self.dst_arena.parent(&x);
-            let z = y.and_then(|y| Some(self.cpy_mappings.get_src_unchecked(&y)));
+            let z = y.map(|y| self.cpy_mappings.get_src_unchecked(&y));
             if !self.cpy_mappings.is_dst(&x) {
                 // insertion
                 let k = if let Some(y) = y {
@@ -410,25 +410,23 @@ where
             .children
             .as_ref()
             .unwrap_or(&d); //self.src_arena.children(self.store, w);
-        self.src_in_order.remove_all(&w_c);
+        self.src_in_order.remove_all(w_c);
         let x_c: Vec<IdD> = self.dst_arena.children(x);
         self.dst_in_order.remove_all(&x_c);
 
         // todo use iter filter collect
         let mut s1 = vec![];
         for c in w_c {
-            if self.cpy_mappings.is_src(c) {
-                if x_c.contains(&self.cpy_mappings.get_dst_unchecked(c)) {
-                    s1.push(*c);
-                }
+            if self.cpy_mappings.is_src(c) && x_c.contains(&self.cpy_mappings.get_dst_unchecked(c))
+            {
+                s1.push(*c);
             }
         }
         let mut s2 = vec![];
         for c in &x_c {
-            if self.cpy_mappings.is_dst(c) {
-                if w_c.contains(&self.cpy_mappings.get_src_unchecked(c)) {
-                    s2.push(*c);
-                }
+            if self.cpy_mappings.is_dst(c) && w_c.contains(&self.cpy_mappings.get_src_unchecked(c))
+            {
+                s2.push(*c);
             }
         }
 
@@ -596,21 +594,18 @@ where
         w: &IdD,
         x: &IdD,
     ) {
-        match action {
-            SimpleAction::MoveUpdate { .. } => {
-                self.apply_update(action, w, x);
-            }
-            _ => (),
+        if let SimpleAction::MoveUpdate { .. } = action {
+            self.apply_update(action, w, x);
         }
         // self.moved.set(cast::<_, usize>(*w).unwrap(), true);
         self.cpy_mappings.cut(*w, *x);
         self.apply_insert(action, z, w, x);
     }
 
-    fn iter_mid_in_post_order<'d>(
+    fn iter_mid_in_post_order(
         root: IdD,
-        mid_arena: &'d [MidNode<HAST::IdN, IdD>],
-    ) -> Iter<'d, HAST::IdN, IdD> {
+        mid_arena: &[MidNode<HAST::IdN, IdD>],
+    ) -> Iter<'_, HAST::IdN, IdD> {
         let parent: Vec<(IdD, usize)> = vec![(root, num_traits::zero())];
         Iter { parent, mid_arena }
     }
@@ -629,16 +624,12 @@ struct Iter<'a, IdC, IdD: PrimInt> {
     mid_arena: &'a [MidNode<IdC, IdD>],
 }
 
-impl<'a, IdC, IdD: num_traits::PrimInt> Iterator for Iter<'a, IdC, IdD> {
+impl<IdC, IdD: num_traits::PrimInt> Iterator for Iter<'_, IdC, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (id, idx) = if let Some(id) = self.parent.pop() {
-                id
-            } else {
-                return None;
-            };
+            let (id, idx) = self.parent.pop()?;
             let curr = &self.mid_arena[cast::<_, usize>(id).unwrap()];
             if let Some(cs) = &curr.children {
                 if cs.len() == idx {
@@ -669,7 +660,7 @@ impl<IdD: Eq> InOrderNodes<IdD> {
     fn remove_all(&mut self, w: &[IdD]) {
         if let Some(a) = self.0.take() {
             let c: Vec<IdD> = a.into_iter().filter(|x| !w.contains(x)).collect();
-            if c.len() > 0 {
+            if !c.is_empty() {
                 self.0 = Some(c);
             }
         }

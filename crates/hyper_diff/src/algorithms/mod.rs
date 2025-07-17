@@ -531,4 +531,4 @@ macro_rules! tr {
     };
 }
 use hyperast::types::{self, HyperASTShared};
-pub(self) use tr;
+use tr;

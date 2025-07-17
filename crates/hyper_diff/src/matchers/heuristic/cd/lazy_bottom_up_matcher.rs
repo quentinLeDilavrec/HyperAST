@@ -195,23 +195,20 @@ where
         let tsrc = hyperast.resolve_type(&osrc);
         let odst = dst_arena.original(&dst);
         let tdst = hyperast.resolve_type(&odst);
-        if tsrc == tdst {
-            if !(src_arena.lld(&src) == src.to_shallow() || dst_arena.lld(&dst) == dst.to_shallow())
-            {
-                let sim = similarity_metrics::SimilarityMeasure::range(
-                    &src_arena.descendants_range(&src),
-                    &dst_arena.descendants_range(&dst),
-                    &*mappings,
-                )
-                .chawathe();
-                let cond1 = number_of_leaves > SIZE_THRESHOLD
-                    && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64;
-                let cond2 = number_of_leaves <= SIZE_THRESHOLD
-                    && sim >= SIM_THRESHOLD2_NUM as f64 / SIM_THRESHOLD2_DEN as f64;
-                if cond1 || cond2 {
-                    mappings.link(src.to_shallow(), dst.to_shallow());
-                    return true;
-                }
+        if tsrc == tdst && src_arena.has_children(&src) && dst_arena.has_children(&dst) {
+            let sim = similarity_metrics::SimilarityMeasure::range(
+                &src_arena.descendants_range(&src),
+                &dst_arena.descendants_range(&dst),
+                &*mappings,
+            )
+            .chawathe();
+            let cond1 = number_of_leaves > SIZE_THRESHOLD
+                && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64;
+            let cond2 = number_of_leaves <= SIZE_THRESHOLD
+                && sim >= SIM_THRESHOLD2_NUM as f64 / SIM_THRESHOLD2_DEN as f64;
+            if cond1 || cond2 {
+                mappings.link(src.to_shallow(), dst.to_shallow());
+                return true;
             }
         }
         false

@@ -2,15 +2,13 @@
 ///! as action_vec only allow one order to apply actions.
 ///! Maybe it can be integrated in the existing script generator or it needs major changes.
 ///! Maybe an other algorithm similar to the Chawathe that better fits my needs exists in the literature.
-use hyperast::PrimInt;
-
-use crate::tree::tree_path::{CompressedTreePath, TreePath};
 use std::fmt::{Debug, Display};
 
-use super::{
-    script_generator2::{Act, ApplicablePath, SimpleAction},
-    Actions,
-};
+use hyperast::PrimInt;
+
+use super::Actions;
+use super::script_generator2::{Act, ApplicablePath, SimpleAction};
+use crate::tree::tree_path::{CompressedTreePath, TreePath};
 
 #[derive(Debug)]
 pub struct ActionsTree<A> {
@@ -56,7 +54,7 @@ where
             }
             Ok(())
         }
-        impl<'a, A> Debug for Summary<'a, A>
+        impl<A> Debug for Summary<'_, A>
         where
             Node<A>: NodeSummary,
         {

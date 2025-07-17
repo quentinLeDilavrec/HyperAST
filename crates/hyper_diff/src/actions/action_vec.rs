@@ -83,7 +83,7 @@ where
         curr: &'a mut Option<T>,
         it: It,
     }
-    impl<'a, T: Clone, It: Iterator<Item = T>> Iterator for A<'a, T, It> {
+    impl<T: Clone, It: Iterator<Item = T>> Iterator for A<'_, T, It> {
         type Item = T;
 
         fn next(&mut self) -> Option<Self::Item> {
@@ -146,7 +146,7 @@ where
             writeln!(
                 f,
                 "Del {} file=\"{}\" line {} to {} {:?}",
-                stores.resolve_type(&i).to_string(),
+                stores.resolve_type(&i),
                 p.file().to_string_lossy(),
                 r.start,
                 r.end,

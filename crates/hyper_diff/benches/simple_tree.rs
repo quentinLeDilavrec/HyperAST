@@ -54,7 +54,7 @@ fn compare_simple_tree_group(c: &mut Criterion) {
 
     let pairs = &[(src, dst)];
 
-    for (i, p) in pairs.into_iter().enumerate() {
+    for (i, p) in pairs.iter().enumerate() {
         group.bench_with_input(BenchmarkId::new("zs", i), &p, |b, p| {
             b.iter(|| {
                 ZsMatcher::<DefaultMappingStore<u16>, Decompressible<_, SimpleZsTree<_, u16>>>::matchh(

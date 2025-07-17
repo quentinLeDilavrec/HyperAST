@@ -32,11 +32,11 @@ fn test_with_action_example() {
 
     println!(
         "src tree:\n{:?}",
-        DisplayTree::new(&label_store, &node_store, src)
+        DisplayTree::new(label_store, node_store, src)
     );
     println!(
         "dst tree:\n{:?}",
-        DisplayTree::new(&label_store, &node_store, dst)
+        DisplayTree::new(label_store, node_store, dst)
     );
 
     let mut ms = DefaultMappingStore::default();
@@ -69,7 +69,7 @@ fn test_with_action_example() {
             src_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -80,7 +80,7 @@ fn test_with_action_example() {
             dst_arena
                 .iter()
                 .enumerate()
-                .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
             write!(f, "")
         })
     );
@@ -113,7 +113,7 @@ fn test_with_action_example() {
 
     let lab = |x: &IdD| {
         label_store
-            .resolve(&node_store.resolve(x).get_label_unchecked())
+            .resolve(node_store.resolve(x).get_label_unchecked())
             .to_string()
     };
 
@@ -334,7 +334,7 @@ fn test_with_zs_custom_example() {
     assert!(actions.has_actions(&[
         // new Insert(dst, null, 0),
         SimpleAction::Insert {
-            sub: dst_arena.original(&dst),
+            sub: dst_arena.original(dst),
             parent: None,
             idx: 0,
         },

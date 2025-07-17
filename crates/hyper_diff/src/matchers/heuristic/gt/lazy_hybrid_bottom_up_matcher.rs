@@ -197,8 +197,8 @@ where
         let mappings = &mut mapping.mappings;
         for (i, t) in zs_mappings.iter() {
             //remapping
-            let src: Dsrc::IdD = src_offset.clone() + cast(i).unwrap();
-            let dst: Ddst::IdD = dst_offset.clone() + cast(t).unwrap();
+            let src: Dsrc::IdD = src_offset + cast(i).unwrap();
+            let dst: Ddst::IdD = dst_offset + cast(t).unwrap();
             // use it
             if !mappings.is_src(src.shallow()) && !mappings.is_dst(dst.shallow()) {
                 let tsrc = stores.resolve_type(&mapping.src_arena.original(&src));

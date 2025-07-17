@@ -262,7 +262,7 @@ where
                     self.down = false;
                     continue;
                 }
-                if (self.is_leaf)(self.stores, &self.arena, self.idd) {
+                if (self.is_leaf)(self.stores, self.arena, self.idd) {
                     self.down = false;
                     return Some(self.idd);
                 }

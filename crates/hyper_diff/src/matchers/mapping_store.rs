@@ -217,7 +217,7 @@ pub struct MonoIter<'a, T: 'a + PrimInt, U: 'a> {
     _phantom: std::marker::PhantomData<*const T>,
 }
 
-impl<'a, T: PrimInt, U: PrimInt> Iterator for MonoIter<'a, T, U> {
+impl<T: PrimInt, U: PrimInt> Iterator for MonoIter<'_, T, U> {
     type Item = (T, U);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -345,11 +345,11 @@ impl<T: PrimInt> MappingStore for MultiVecStore<T> {
     fn has(&self, src: &Self::Src, dst: &Self::Dst) -> bool {
         self.src_to_dsts[src.to_usize().unwrap()]
             .as_ref()
-            .and_then(|v| Some(v.contains(dst)))
+            .map(|v| v.contains(dst))
             .unwrap_or(false)
             && self.dst_to_srcs[dst.to_usize().unwrap()]
                 .as_ref()
-                .and_then(|v| Some(v.contains(src)))
+                .map(|v| v.contains(src))
                 .unwrap_or(false)
     }
 }
@@ -365,15 +365,13 @@ impl<T: PrimInt> MultiMappingStore for MultiVecStore<T> {
         T: 'a;
     fn get_srcs(&self, dst: &Self::Dst) -> &[Self::Src] {
         self.dst_to_srcs[cast::<_, usize>(*dst).unwrap()]
-            .as_ref()
-            .and_then(|x| Some(x.as_slice()))
+            .as_deref()
             .unwrap_or(&[])
     }
 
     fn get_dsts(&self, src: &Self::Src) -> &[Self::Dst] {
         self.src_to_dsts[cast::<_, usize>(*src).unwrap()]
-            .as_ref()
-            .and_then(|x| Some(x.as_slice()))
+            .as_deref()
             .unwrap_or(&[])
     }
 
@@ -402,14 +400,14 @@ pub struct Iter<'a, T: 'a> {
     v: std::iter::Enumerate<core::slice::Iter<'a, Option<Vec<T>>>>,
 }
 
-impl<'a, T: PrimInt> Iterator for Iter<'a, T> {
+impl<T: PrimInt> Iterator for Iter<'_, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut a = self.v.next();
         loop {
             if let Some((i, x)) = a {
-                if let Some(_) = x {
+                if x.is_some() {
                     return Some(cast::<_, T>(i).unwrap());
                 } else {
                     a = self.v.next();
@@ -443,8 +441,8 @@ pub struct DisplayVecStore<'a, 'b, T, Src, Dst> {
     dst_store: &'b Dst,
 }
 
-impl<'a, 'b, T: PrimInt + TryFrom<usize>, Src, Dst, D: Display> Display
-    for DisplayVecStore<'a, 'b, T, Src, Dst>
+impl<T: PrimInt + TryFrom<usize>, Src, Dst, D: Display> Display
+    for DisplayVecStore<'_, '_, T, Src, Dst>
 where
     Src: Fn(T) -> D,
     Dst: Fn(T) -> D,
@@ -614,7 +612,7 @@ pub struct HMIter<'a, T: 'a + PrimInt, U: 'a> {
     v: hyperast::compat::hash_map::Iter<'a, T, U>,
 }
 
-impl<'a, T: PrimInt, U: PrimInt> Iterator for HMIter<'a, T, U> {
+impl<T: PrimInt, U: PrimInt> Iterator for HMIter<'_, T, U> {
     type Item = (T, U);
 
     fn next(&mut self) -> Option<Self::Item> {

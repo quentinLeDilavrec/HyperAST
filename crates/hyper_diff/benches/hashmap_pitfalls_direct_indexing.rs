@@ -31,7 +31,7 @@ struct SortedVecSoA<K, V>(Vec<K>, Vec<V>);
 
 impl<K: Clone + Ord, V: Clone> SortedVecSoA<K, V> {
     fn new(collec: &[(K, V)]) -> Self {
-        let mut collec: Vec<(K, V)> = collec.into_iter().map(|x| x.clone()).collect();
+        let mut collec: Vec<(K, V)> = collec.iter().cloned().collect();
         collec.sort_by_key(|x| x.0.clone());
         let (ks, vs) = collec.into_iter().unzip();
         Self(ks, vs)
@@ -40,7 +40,7 @@ impl<K: Clone + Ord, V: Clone> SortedVecSoA<K, V> {
 
 impl<K: Ord, V> Searchable<K, V> for SortedVecSoA<K, V> {
     fn search(&self, seek: &K) -> Option<&V> {
-        let i = self.0.binary_search_by(|probe| probe.cmp(&seek)).ok()?;
+        let i = self.0.binary_search_by(|probe| probe.cmp(seek)).ok()?;
         Some(&self.1[i])
     }
 }
@@ -110,19 +110,19 @@ fn compare_hashmaps(c: &mut Criterion) {
         (&simple[0..4000], k),
     ];
 
-    for (_i, (collec, keys)) in INPUTS.into_iter().enumerate() {
+    for (collec, keys) in INPUTS.iter() {
         let id = collec.len();
         group.throughput(Throughput::Elements(collec.len() as u64));
         let mut hashmap = None;
         let mut ahash = None;
         let mut sorted_vec_soa = None;
         let mut direct_indexing = None;
-        for key in keys.into_iter().take(1) {
+        for key in keys.iter().take(1) {
             group.bench_with_input(BenchmarkId::new("HashMap", id), key, |b, key| {
                 let collec = hashmap.get_or_insert_with(|| {
                     collec
-                        .into_iter()
-                        .map(|x| x.clone())
+                        .iter()
+                        .copied()
                         .collect::<std::collections::HashMap<K, V>>()
                 });
                 b.iter(|| collec.search(key))
@@ -130,8 +130,8 @@ fn compare_hashmaps(c: &mut Criterion) {
             group.bench_with_input(BenchmarkId::new("AHash", id), key, |b, key| {
                 let collec = ahash.get_or_insert_with(|| {
                     collec
-                        .into_iter()
-                        .map(|x| x.clone())
+                        .iter()
+                        .copied()
                         .collect::<hyperast::compat::HashMap<K, V>>()
                 });
                 b.iter(|| collec.search(key))

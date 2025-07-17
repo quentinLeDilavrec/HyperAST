@@ -12,9 +12,9 @@ use num_traits::PrimInt;
 
 use crate::{
     decompressed_tree_store::{
+        FullyDecompressedTreeStore, PostOrder,
         complete_post_order::DisplayCompletePostOrder,
         pre_order_wrapper::{DisplaySimplePreOrderMapper, SimplePreOrderMapper},
-        FullyDecompressedTreeStore, PostOrder,
     },
     matchers::mapping_store::MonoMappingStore,
 };

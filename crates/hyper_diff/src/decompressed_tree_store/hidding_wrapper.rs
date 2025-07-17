@@ -45,13 +45,12 @@ pub struct SimpleHiddingMapper<
 
 // TODO deref to back
 impl<
-    'a,
     IdD: Debug,
     DTS: Debug, // + DecompressedTreeStore<HAST, IdD>,
     M: BorrowMut<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> Debug for SimpleHiddingMapper<'a, IdD, DTS, M, R, D>
+> Debug for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SD")
@@ -103,7 +102,7 @@ where
         if i == num_traits::zero() {
             break;
         }
-        i = i - num_traits::one();
+        i -= num_traits::one();
     }
 
     map.shrink_to_fit();
@@ -124,7 +123,7 @@ pub struct MonoMappingWrap<'map, 'back, Src, Dst, M> {
     back: &'back mut M,
 }
 
-impl<'map, 'back, M: MappingStore> MappingStore for MonoMappingWrap<'map, 'back, M::Src, M::Dst, M>
+impl<M: MappingStore> MappingStore for MonoMappingWrap<'_, '_, M::Src, M::Dst, M>
 where
     <M as MappingStore>::Src: PrimInt,
     <M as MappingStore>::Dst: PrimInt,
@@ -177,8 +176,7 @@ where
     }
 }
 
-impl<'map, 'back, M: MonoMappingStore> MonoMappingStore
-    for MonoMappingWrap<'map, 'back, M::Src, M::Dst, M>
+impl<M: MonoMappingStore> MonoMappingStore for MonoMappingWrap<'_, '_, M::Src, M::Dst, M>
 where
     <M as MappingStore>::Src: PrimInt,
     <M as MappingStore>::Dst: PrimInt,
@@ -262,7 +260,7 @@ pub struct MonoIter<'a, T: 'a + PrimInt, U: 'a> {
     _phantom: std::marker::PhantomData<*const T>,
 }
 
-impl<'a, T: PrimInt, U: PrimInt> Iterator for MonoIter<'a, T, U> {
+impl<T: PrimInt, U: PrimInt> Iterator for MonoIter<'_, T, U> {
     type Item = (T, U);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -347,14 +345,13 @@ where
 // }
 
 impl<
-    'a,
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
     DTS: ShallowDecompressedTreeStore<HAST, IdD>, //: DecompressedTreeStore<HAST, IdD>,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> ShallowDecompressedTreeStore<HAST, IdD> for SimpleHiddingMapper<'a, IdD, DTS, M, R, D>
+> ShallowDecompressedTreeStore<HAST, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     fn len(&self) -> usize {
         self.map.borrow().len()
@@ -389,14 +386,13 @@ impl<
 }
 
 impl<
-    'a,
     HAST: HyperAST + Copy, // + WithStats,
     IdD: PrimInt + Debug,  // + Shallow<IdD> + Debug,
     DTS: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD> + PostOrder<HAST, IdD>, //: DecompressedTreeStore<HAST, IdD, IdD> + PostOrder<HAST, IdD>, // + LazyDecompressedTreeStore<HAST, IdD>,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> DecompressedTreeStore<HAST, IdD> for SimpleHiddingMapper<'a, IdD, DTS, M, R, D>
+> DecompressedTreeStore<HAST, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     fn descendants(&self, x: &IdD) -> Vec<IdD> {
         let cs = self
@@ -430,7 +426,7 @@ impl<
             };
             // dbg!(conv, y);
             if lld < *conv {
-                y = y - num_traits::one();
+                y -= num_traits::one();
             } else {
                 break;
             }
@@ -448,27 +444,24 @@ impl<
 
 impl<
     'a,
-    'd,
-    // HAST: HyperAST + Copy,
     IdD: PrimInt,
     DTS: DecompressedParentsLending<'a, IdD>, //: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> DecompressedParentsLending<'a, IdD> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> DecompressedParentsLending<'a, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     type PIt = <DTS as DecompressedParentsLending<'a, IdD>>::PIt;
 }
 
 impl<
-    'd,
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
     DTS: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> DecompressedWithParent<HAST, IdD> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> DecompressedWithParent<HAST, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     fn has_parent(&self, id: &IdD) -> bool {
         self.back
@@ -506,7 +499,6 @@ impl<
     }
 }
 impl<
-    'a,
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
     DTS, //DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
@@ -514,7 +506,7 @@ impl<
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
 > super::DecompressedSubtree<HAST::IdN>
-    for Decompressible<HAST, SimpleHiddingMapper<'a, IdD, DTS, M, R, D>>
+    for Decompressible<HAST, SimpleHiddingMapper<'_, IdD, DTS, M, R, D>>
 where
     for<'t> <HAST as AstLending<'t>>::RT: WithStats,
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -527,14 +519,13 @@ where
 }
 
 impl<
-    'a,
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
     DTS: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD> + PostOrder<HAST, IdD>,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> PostOrder<HAST, IdD> for SimpleHiddingMapper<'a, IdD, DTS, M, R, D>
+> PostOrder<HAST, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 where
     HAST::IdN: Debug,
 {
@@ -553,16 +544,19 @@ where
             .borrow()
             .tree(&self.map.borrow()[self.len() - id.to_usize().unwrap() - 1])
     }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.lld(id) != *id
+    }
 }
 impl<
-    'd,
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
     DTS: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD> + PostOrder<HAST, IdD>,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> PostOrderIterable<HAST, IdD> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> PostOrderIterable<HAST, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     type It = super::Iter<IdD>;
     fn iter_df_post<const ROOT: bool>(&self) -> Self::It {
@@ -591,7 +585,6 @@ impl<
 // }
 
 impl<
-    'd,
     'a,
     // HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
@@ -599,13 +592,12 @@ impl<
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> DecendantsLending<'a> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> DecendantsLending<'a> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     type Slice = <DTS as DecendantsLending<'a>>::Slice;
 }
 
 impl<
-    'd,
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
     DTS: for<'t> DecendantsLending<'t>
@@ -615,7 +607,7 @@ impl<
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> ContiguousDescendants<HAST, IdD> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> ContiguousDescendants<HAST, IdD> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     fn descendants_range(&self, x: &IdD) -> std::ops::Range<IdD> {
         let conv = self.map.borrow()[self.map.borrow().len() - 1 - x.to_usize().unwrap()]; //self.back.borrow_mut().lld(aaa);
@@ -698,7 +690,7 @@ pub struct IterParents<'a, IdD> {
     id_parent: &'a [IdD],
 }
 
-impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
+impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -706,7 +698,7 @@ impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
             return None;
         }
         let r = self.id_parent[self.id.to_usize().unwrap()];
-        self.id = r.clone();
+        self.id = r;
         Some(r)
     }
 }
@@ -746,20 +738,18 @@ impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
 // }
 
 impl<
-    'd,
     IdS: PrimInt + Shallow<IdS> + Debug,
     IdD: Shallow<IdS>,
     DTS,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> LazyDecompressed<IdS> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> LazyDecompressed<IdS> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 {
     type IdD = IdD;
 }
 
 impl<
-    'd,
     HAST: HyperAST + Copy,
     IdS: PrimInt + Shallow<IdS> + Debug,
     IdD: PrimInt + Shallow<IdS> + Debug,
@@ -771,7 +761,7 @@ impl<
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
-> LazyDecompressedTreeStore<HAST, IdS> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
+> LazyDecompressedTreeStore<HAST, IdS> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
     Self: DecompressedTreeStore<HAST, IdD, IdS>,
@@ -884,7 +874,7 @@ where
         let mut kr = bitvec::bitbox!(0;len);
         // - llds: should be easy when extracting
         let mut llds: Vec<IdD> = vec![*x; len];
-        let mut curr = map_lld.clone();
+        let mut curr = map_lld;
         while curr <= *x {
             let conv = self.map.borrow()[self.map.borrow().len() - 1 - curr.to_usize().unwrap()];
             // dbg!(conv);
@@ -902,7 +892,7 @@ where
                 llds[parent.to_usize().unwrap()] = llds[id_compressed.len()];
             }
             id_compressed.push(self.back.borrow_mut().original(&conv));
-            curr = curr + num_traits::one();
+            curr += num_traits::one();
         }
         let mut visited = bitvec::bitbox!(0; len);
         for i in (1..len).rev() {
@@ -934,8 +924,8 @@ pub struct CompleteWHPO<'a, IdN, IdD, Kr: Borrow<BitSlice>> {
     pub(super) kr: Kr,
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
-    ShallowDecompressedTreeStore<HAST, IdD> for CompleteWHPO<'a, HAST::IdN, IdD, Kr>
+impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
+    ShallowDecompressedTreeStore<HAST, IdD> for CompleteWHPO<'_, HAST::IdN, IdD, Kr>
 {
     fn len(&self) -> usize {
         self.id_compressed.len()
@@ -960,8 +950,8 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> DecompressedTreeStore<HAST, IdD>
-    for CompleteWHPO<'a, HAST::IdN, IdD, Kr>
+impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> DecompressedTreeStore<HAST, IdD>
+    for CompleteWHPO<'_, HAST::IdN, IdD, Kr>
 {
     fn descendants(&self, _x: &IdD) -> Vec<IdD> {
         todo!()
@@ -984,26 +974,30 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> Decompressed
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> PostOrder<HAST, IdD>
-    for CompleteWHPO<'a, HAST::IdN, IdD, Kr>
+impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> PostOrder<HAST, IdD>
+    for CompleteWHPO<'_, HAST::IdN, IdD, Kr>
 {
-    fn lld(&self, i: &IdD) -> IdD {
-        self.llds[i.to_usize().unwrap()]
+    fn lld(&self, id: &IdD) -> IdD {
+        self.llds[id.to_usize().unwrap()]
     }
 
     fn tree(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
     }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.llds[id.to_usize().unwrap()] != *id
+    }
 }
 
-impl<'a, 'b, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
-    PostOrdKeyRoots<'b, HAST, IdD> for CompleteWHPO<'a, HAST::IdN, IdD, Kr>
+impl<'b, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> PostOrdKeyRoots<'b, HAST, IdD>
+    for CompleteWHPO<'_, HAST::IdN, IdD, Kr>
 {
     type Iter = IterKr<'b, IdD>;
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> PostOrderKeyRoots<HAST, IdD>
-    for CompleteWHPO<'a, HAST::IdN, IdD, Kr>
+impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> PostOrderKeyRoots<HAST, IdD>
+    for CompleteWHPO<'_, HAST::IdN, IdD, Kr>
 {
     fn iter_kr(&self) -> <Self as PostOrdKeyRoots<'_, HAST, IdD>>::Iter {
         IterKr(self.kr.borrow().iter_ones(), PhantomData)

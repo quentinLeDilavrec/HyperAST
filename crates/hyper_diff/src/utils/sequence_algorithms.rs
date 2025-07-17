@@ -15,7 +15,7 @@ pub fn longest_common_subsequence_str(s0: &str, s1: &str) -> Vec<(u32, u32)> {
             }
         }
     }
-    return extract_indexes(lens, s0.len(), s1.len());
+    extract_indexes(lens, s0.len(), s1.len())
 }
 
 /// Returns the hunks of the longest common subsequence between s1 and s2.
@@ -24,7 +24,7 @@ pub fn longest_common_subsequence_str(s0: &str, s1: &str) -> Vec<(u32, u32)> {
 pub fn hunks(s0: &str, s1: &str) -> Vec<Vec<u32>> {
     let lcs: Vec<(u32, u32)> = longest_common_subsequence_str(s0, s1);
     let mut hunks: Vec<Vec<u32>> = vec![];
-    let matchh = lcs.get(0).unwrap();
+    let matchh = lcs.first().unwrap();
     let mut inf0 = matchh.0;
     let mut inf1 = matchh.1;
     let mut last0 = 0;
@@ -42,7 +42,7 @@ pub fn hunks(s0: &str, s1: &str) -> Vec<Vec<u32>> {
         last0 = matchh.0;
         last1 = matchh.1;
     }
-    return hunks;
+    hunks
 }
 
 /// Returns the longest common sequence between two strings as a string.
@@ -70,7 +70,7 @@ pub fn longest_common_sequence<'a>(s1: &'a str, s2: &str) -> &'a str {
         }
         it1.next();
     }
-    return &s1[start..start + max];
+    &s1[start..start + max]
 }
 
 // /// Returns the longest common subsequence between the two list of nodes. This version use
@@ -120,7 +120,7 @@ pub fn longest_common_subsequence<T1, T2, U: PrimInt, F: Fn(&T1, &T2) -> bool>(
             }
         }
     }
-    return extract_indexes(lens, s0.len(), s1.len());
+    extract_indexes(lens, s0.len(), s1.len())
 }
 
 pub fn extract_indexes<T: Eq, U: PrimInt>(

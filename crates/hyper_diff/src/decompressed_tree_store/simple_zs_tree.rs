@@ -2,15 +2,15 @@ use std::{fmt::Debug, marker::PhantomData, ops::Deref};
 
 use num_traits::{cast, one, zero};
 
-use hyperast::types::{self, Children, Childrn, HyperAST, WithChildren, WithStats};
 use hyperast::PrimInt;
+use hyperast::types::{self, Children, Childrn, HyperAST, WithChildren, WithStats};
 
 use crate::matchers::Decompressible;
 
 use super::{
-    basic_post_order::BasicPostOrder, simple_post_order::SimplePostOrder, CompletePostOrder,
-    DecompressedTreeStore, InitializableWithStats, Iter, IterKr, PostOrdKeyRoots, PostOrder,
-    PostOrderIterable, PostOrderKeyRoots, ShallowDecompressedTreeStore,
+    CompletePostOrder, DecompressedTreeStore, InitializableWithStats, Iter, IterKr,
+    PostOrdKeyRoots, PostOrder, PostOrderIterable, PostOrderKeyRoots, ShallowDecompressedTreeStore,
+    basic_post_order::BasicPostOrder, simple_post_order::SimplePostOrder,
 };
 
 /// made for the zs diff algo
@@ -75,6 +75,10 @@ where
 
     fn tree(&self, id: &IdD) -> HAST::IdN {
         self.as_basic().tree(id)
+    }
+
+    fn has_children(&self, id: &IdD) -> bool {
+        self.as_basic().has_children(id)
     }
 }
 
@@ -145,8 +149,8 @@ where
         };
         let kr = basic.compute_kr_bitset();
         let basic = basic.decomp;
-        let decomp = SimpleZsTree { basic, kr };
-        decomp
+
+        SimpleZsTree { basic, kr }
     }
 }
 

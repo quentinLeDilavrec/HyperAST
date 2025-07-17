@@ -168,7 +168,7 @@ where
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn has_unmapped_dst_children(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, dst: &M::Dst) -> bool {
@@ -177,7 +177,7 @@ where
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn best_dst_candidate(

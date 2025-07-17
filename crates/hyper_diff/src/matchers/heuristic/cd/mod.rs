@@ -36,7 +36,7 @@ where
             return 1.0;
         }
         let l = p.each_ref().map(|x| try_label(hyperast, *x));
-        if l[0] == l[1] && !l[0].is_none() {
+        if l[0] == l[1] && l[0].is_some() {
             return 1.0;
         }
         let l = p.each_ref().map(|x| retrieve_text(hyperast, *x));
@@ -51,11 +51,11 @@ where
             return 0;
         }
         let l = p.each_ref().map(|x| try_label(hyperast, *x));
-        if l[0] == l[1] && !l[0].is_none() {
+        if l[0] == l[1] && l[0].is_some() {
             return 0;
         }
         let l = p.each_ref().map(|x| retrieve_text(hyperast, *x));
-        let [src_l, dst_l] = l.each_ref().map(|x| x.as_bytes().into_iter());
+        let [src_l, dst_l] = l.each_ref().map(|x| x.as_bytes().iter());
         QGram::new(3).distance(src_l, dst_l)
     }
 }
@@ -102,7 +102,7 @@ where
             return 1.0;
         }
         let l = p.each_ref().map(|x| try_label(hyperast, *x));
-        if l[0] == l[1] && !l[0].is_none() {
+        if l[0] == l[1] && l[0].is_some() {
             return 1.0;
         }
         if l[0].is_none() || l[1].is_none() {
@@ -121,7 +121,7 @@ where
             return 0;
         }
         let l = p.each_ref().map(|x| try_label(hyperast, *x));
-        if l[0] == l[1] && !l[0].is_none() {
+        if l[0] == l[1] && l[0].is_some() {
             return 0;
         }
         if l[0].is_none() || l[1].is_none() {
@@ -129,7 +129,7 @@ where
         }
         let l = l.map(|x| x.unwrap());
         let l = l.map(|x| hyperast.label_store().resolve(&x));
-        let [src_l, dst_l] = l.each_ref().map(|x| x.as_bytes().into_iter());
+        let [src_l, dst_l] = l.each_ref().map(|x| x.as_bytes().iter());
         QGram::new(3).distance(src_l, dst_l)
     }
 }
@@ -152,7 +152,7 @@ where
 {
     let id = arena.original(&idd);
     let n = stores.node_store().resolve(&id);
-    n.get_metadata().map_or(false, |x| x.0 == 1)
+    n.get_metadata().is_some_and(|x| x.0 == 1)
 }
 
 fn is_leaf_stmt<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
@@ -163,7 +163,7 @@ where
 {
     let id = arena.original(&idd);
     let n = stores.node_store().resolve(&id);
-    n.get_metadata().map_or(false, |x| x.0 == 1)
+    n.get_metadata().is_some_and(|x| x.0 == 1)
 }
 
 fn is_leaf<HAST, D, IdD, IdS>(stores: HAST, arena: &D, idd: IdD) -> bool

@@ -74,7 +74,7 @@ where
     ) -> GreedySubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT> {
         let mut matcher = GreedySubtreeMatcher::<Dsrc, Ddst, HAST, M, MIN_HEIGHT> {
             internal: SubtreeMatcher {
-                stores: stores,
+                stores,
                 src_arena: Dsrc::decompress(stores, &src),
                 dst_arena: Ddst::decompress(stores, &dst),
                 mappings,
@@ -161,18 +161,10 @@ where
         let mut p_in_p_sim = HashMap::<(M::Src, M::Dst), f64>::default();
         log::trace!("ambiguous_mappings.len: {}", &ambiguous_mappings.len());
         ambiguous_mappings.sort_by(|a, b| {
-            let cached_coef_sib = |l: &(M::Src, M::Dst)| {
-                sib_sim
-                    .entry(*l)
-                    .or_insert_with(|| self.coef_sib(&l))
-                    .clone()
-            };
-            let cached_coef_parent = |l: &(M::Src, M::Dst)| {
-                psib_sim
-                    .entry(*l)
-                    .or_insert_with(|| self.coef_parent(&l))
-                    .clone()
-            };
+            let cached_coef_sib =
+                |l: &(M::Src, M::Dst)| *sib_sim.entry(*l).or_insert_with(|| self.coef_sib(l));
+            let cached_coef_parent =
+                |l: &(M::Src, M::Dst)| *psib_sim.entry(*l).or_insert_with(|| self.coef_parent(l));
             let (alink, blink) = (a, b);
             if self.same_parents(alink, blink) {
                 std::cmp::Ordering::Equal
@@ -184,10 +176,9 @@ where
             .then_with(|| {
                 self.cached_compare(
                     |l: &(M::Src, M::Dst)| {
-                        p_in_p_sim
+                        *p_in_p_sim
                             .entry(*l)
-                            .or_insert_with(|| self.coef_pos_in_parent(&l))
-                            .clone()
+                            .or_insert_with(|| self.coef_pos_in_parent(l))
                     },
                     a,
                     b,
@@ -280,8 +271,8 @@ where
     }
 
     fn same_parents(&self, alink: &(M::Src, M::Dst), blink: &(M::Src, M::Dst)) -> bool {
-        let ap = self.mapping_parents(&alink);
-        let bp = self.mapping_parents(&blink);
+        let ap = self.mapping_parents(alink);
+        let bp = self.mapping_parents(blink);
         ap.0 == bp.0 && ap.1 == bp.1
     }
 
@@ -297,7 +288,7 @@ where
         alink: &(M::Src, M::Dst),
         blink: &(M::Src, M::Dst),
     ) -> std::cmp::Ordering {
-        return (alink
+        (alink
             .0
             .to_usize()
             .unwrap()
@@ -308,9 +299,10 @@ where
                 .to_usize()
                 .unwrap()
                 .abs_diff(blink.1.to_usize().unwrap()),
-        );
+        )
     }
 }
+
 impl<'a, Dsrc, Ddst, S, M: MonoMappingStore, const MIN_HEIGHT: usize>
     Into<SubtreeMatcher<Dsrc, Ddst, S, M, MIN_HEIGHT>>
     for GreedySubtreeMatcher<Dsrc, Ddst, S, M, MIN_HEIGHT>
@@ -425,13 +417,13 @@ where
             }
             // println!("multi_mappings'={}", multi_mappings.len());
             for i in 0..marks_for_src_trees.len() {
-                if marks_for_src_trees[i] == false {
+                if !marks_for_src_trees[i] {
                     src_trees.open_tree(&current_height_src_trees[i]);
                 }
             }
             // println!("multi_mappings''={}", multi_mappings.len());
             for j in 0..marks_for_dst_trees.len() {
-                if marks_for_dst_trees[j] == false {
+                if !marks_for_dst_trees[j] {
                     dst_trees.open_tree(&current_height_dst_trees[j]);
                 }
             }
@@ -516,7 +508,7 @@ where
             None
         };
         // let src_t = src.get_type();
-        let src_t = self.stores.resolve_type(&src);
+        let src_t = self.stores.resolve_type(src);
         let src_l = if _src.has_label() {
             Some(_src.get_label_unchecked())
         } else {
@@ -533,14 +525,12 @@ where
             }
         }
         // let dst_t = dst.get_type();
-        let dst_t = self.stores.resolve_type(&dst);
+        let dst_t = self.stores.resolve_type(dst);
         if src_t != dst_t {
             return false;
         }
-        if _dst.has_label() {
-            if src_l.is_none() || src_l.unwrap() != _dst.get_label_unchecked() {
-                return false;
-            }
+        if _dst.has_label() && (src_l.is_none() || src_l.unwrap() != _dst.get_label_unchecked()) {
+            return false;
         };
 
         let dst_c: Option<Vec<_>> = _dst.children().map(|x| x.iter_children().collect());
@@ -614,7 +604,7 @@ where
     }
 
     fn add_tree(&mut self, tree: IdD) {
-        let h = super::height(self.store.node_store(), &self.arena.original(&tree)) as usize;
+        let h = super::height(self.store.node_store(), &self.arena.original(&tree));
         self.add_tree_aux(tree, h)
     }
 

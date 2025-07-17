@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use num_traits::{cast, zero};
 
+use hyperast::PrimInt;
 use hyperast::types::WithChildren;
 use hyperast::types::{self, Childrn, HyperAST};
-use hyperast::PrimInt;
 
 use super::{BreadthFirstIt, DecompressedTreeStore, Iter, ShallowDecompressedTreeStore};
 
@@ -28,7 +28,7 @@ where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
 {
     fn has_children(&self, id: &IdD) -> bool {
-        BreadthFirstContiguousSiblings::first_child(self, id) != None
+        BreadthFirstContiguousSiblings::first_child(self, id).is_some()
     }
 
     fn first_child(&self, id: &IdD) -> Option<IdD> {
@@ -83,7 +83,7 @@ where
     }
 
     fn has_parent(&self, id: &IdD) -> bool {
-        self.parent(id) != None
+        self.parent(id).is_some()
     }
 
     fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
@@ -112,7 +112,7 @@ pub struct IterParents<'a, IdD> {
     id_parent: &'a Vec<IdD>,
 }
 
-impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
+impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -120,7 +120,7 @@ impl<'a, IdD: PrimInt> Iterator for IterParents<'a, IdD> {
         if r == num_traits::zero() {
             return None;
         }
-        self.id = r.clone();
+        self.id = r;
         Some(r)
     }
 }
@@ -142,7 +142,7 @@ where
         while i < id_compressed.len() {
             let x = store.resolve(&id_compressed[i].clone());
             let l = x.children();
-            let value = if l.as_ref().map_or(false, |x| !types::Childrn::is_empty(x)) {
+            let value = if l.as_ref().is_some_and(|x| !types::Childrn::is_empty(x)) {
                 cast(id_compressed.len()).unwrap()
             } else {
                 num_traits::zero()

@@ -23,11 +23,11 @@ where
     S: NodeStore<IdC>,
     for<'t> <S as hyperast::types::NLending<'t, IdC>>::N: WithChildren<TreeId = IdC>,
 {
-    let node = store.resolve(&x);
+    let node = store.resolve(x);
     let cs = node.children().unwrap();
     let mut z = 0;
     for x in cs.iter_children() {
-        z = z + size(store, &x);
+        z += size(store, &x);
     }
     z + 1
 }
@@ -38,7 +38,7 @@ where
     S: NodeStore<IdC>,
     for<'t> <S as hyperast::types::NLending<'t, IdC>>::N: WithChildren<TreeId = IdC>,
 {
-    let node = store.resolve(&x);
+    let node = store.resolve(x);
     let cs = node.children();
     let Some(cs) = cs else {
         return 0;
@@ -90,8 +90,8 @@ where
         }
     }
 
-    let src_type = hyperast.resolve_type(&src);
-    let dst_type = hyperast.resolve_type(&dst);
+    let src_type = hyperast.resolve_type(src);
+    let dst_type = hyperast.resolve_type(dst);
     if src_type != dst_type {
         return false;
     }

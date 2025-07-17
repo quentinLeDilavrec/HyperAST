@@ -107,7 +107,7 @@ impl<L: Debug, P: Debug, I: Debug> super::action_tree::NodeSummary
         struct D<'a, L: Debug, P: Debug, I: Debug>(
             &'a super::action_tree::Node<SimpleAction<L, P, I>>,
         );
-        impl<'a, L: Debug, P: Debug, I: Debug> Display for D<'a, L, P, I> {
+        impl<L: Debug, P: Debug, I: Debug> Display for D<'_, L, P, I> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let t = aux(self.0);
                 let a = match self.0.action.action {
@@ -327,7 +327,7 @@ where
         // self.moved.resize(len, false);
         for x in self.src_arena_dont_use.iter_df_post::<true>() {
             let children = self.src_arena_dont_use.children(&x);
-            let children = if children.len() > 0 {
+            let children = if !children.is_empty() {
                 Some(children)
             } else {
                 None
@@ -429,15 +429,11 @@ where
             let z = y.map(|y| self.cpy_mappings.get_src_unchecked(&y));
             if !self.cpy_mappings.is_dst(&x) {
                 // insertion
-                let k = if let Some(y) = y {
-                    Some(self.find_pos(&x, &y))
-                } else {
-                    None
-                };
+                let k = y.map(|y| self.find_pos(&x, &y));
                 w = self.make_inserted_node(&x, &z);
                 let ori = self.path_dst(&self.dst_arena.root(), &x);
                 let mid = if let Some(z) = z {
-                    let p: P = self.path(z).into();
+                    let p: P = self.path(z);
                     p.extend(&[k.unwrap()])
                 } else if let Some(k) = k {
                     vec![k].into()
@@ -798,25 +794,23 @@ where
             .children
             .as_ref()
             .unwrap_or(&d); //self.src_arena.children(self.store, w);
-        self.src_in_order.remove_all(&w_c);
+        self.src_in_order.remove_all(w_c);
         let x_c = self.dst_arena.children(x);
         self.dst_in_order.remove_all(x_c.as_slice());
 
         // todo use iter filter collect
         let mut s1 = vec![];
         for c in w_c {
-            if self.cpy_mappings.is_src(c) {
-                if x_c.contains(&self.cpy_mappings.get_dst_unchecked(c)) {
-                    s1.push(*c);
-                }
+            if self.cpy_mappings.is_src(c) && x_c.contains(&self.cpy_mappings.get_dst_unchecked(c))
+            {
+                s1.push(*c);
             }
         }
         let mut s2 = vec![];
         for c in &x_c {
-            if self.cpy_mappings.is_dst(c) {
-                if w_c.contains(&self.cpy_mappings.get_src_unchecked(c)) {
-                    s2.push(*c);
-                }
+            if self.cpy_mappings.is_dst(c) && w_c.contains(&self.cpy_mappings.get_src_unchecked(c))
+            {
+                s2.push(*c);
             }
         }
 
@@ -829,8 +823,8 @@ where
 
         for a in &s1 {
             for b in &s2 {
-                if self.ori_mappings.unwrap().has(&a, &b) && !lcs.contains(&(*a, *b)) {
-                    let k = self.find_pos(&b, x);
+                if self.ori_mappings.unwrap().has(a, b) && !lcs.contains(&(*a, *b)) {
+                    let k = self.find_pos(b, x);
                     let path = ApplicablePath {
                         ori: self.orig_src(*w).extend(&[k]),
                         mid: self.path(*w),
@@ -1031,16 +1025,12 @@ struct Iter<'a, IdC, IdD: PrimInt> {
     mid_arena: &'a mut [MidNode<IdC, IdD>],
 }
 
-impl<'a, IdC, IdD: PrimInt> Iterator for Iter<'a, IdC, IdD> {
+impl<IdC, IdD: PrimInt> Iterator for Iter<'_, IdC, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (id, idx) = if let Some(id) = self.parent.pop() {
-                id
-            } else {
-                return None;
-            };
+            let (id, idx) = self.parent.pop()?;
             let curr = &self.mid_arena[id.to_usize().unwrap()];
             if let Some(cs) = &curr.children {
                 if cs.len() == idx {

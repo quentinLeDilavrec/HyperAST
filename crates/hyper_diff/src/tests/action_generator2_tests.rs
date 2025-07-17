@@ -42,11 +42,11 @@ fn test_with_action_example() {
     let label_store = &stores.label_store;
     log::debug!(
         "src tree:\n{:?}",
-        DisplayTree::new(&label_store, &node_store, src)
+        DisplayTree::new(label_store, node_store, src)
     );
     log::debug!(
         "dst tree:\n{:?}",
-        DisplayTree::new(&label_store, &node_store, dst)
+        DisplayTree::new(label_store, node_store, dst)
     );
     let mut ms = DefaultMappingStore::default();
     let src_arena = Decompressible::<_, CompletePostOrder<_, u16>>::decompress(&stores, &src);
@@ -78,7 +78,7 @@ fn test_with_action_example() {
                 src_arena
                     .iter()
                     .enumerate()
-                    .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                    .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
                 write!(f, "")
             })
         );
@@ -89,7 +89,7 @@ fn test_with_action_example() {
                 dst_arena
                     .iter()
                     .enumerate()
-                    .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                    .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
                 write!(f, "")
             })
         );
@@ -493,7 +493,7 @@ fn test_with_action_example2() {
                 src_arena
                     .iter()
                     .enumerate()
-                    .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                    .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
                 write!(f, "")
             })
         );
@@ -504,7 +504,7 @@ fn test_with_action_example2() {
                 dst_arena
                     .iter()
                     .enumerate()
-                    .for_each(|(i, x)| write!(f, "[{}]: {}\n", i, g(x)).unwrap());
+                    .for_each(|(i, x)| writeln!(f, "[{}]: {}", i, g(x)).unwrap());
                 write!(f, "")
             })
         );

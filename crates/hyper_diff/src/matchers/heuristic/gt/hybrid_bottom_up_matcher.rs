@@ -144,8 +144,8 @@ where
     }
 
     fn last_chance_match_hybrid(&mut self, src: &M::Src, dst: &M::Dst) {
-        if self.internal.src_arena.descendants_count(&src) < SIZE_THRESHOLD
-            && self.internal.dst_arena.descendants_count(&dst) < SIZE_THRESHOLD
+        if self.internal.src_arena.descendants_count(src) < SIZE_THRESHOLD
+            && self.internal.dst_arena.descendants_count(dst) < SIZE_THRESHOLD
         {
             self.last_chance_match_optimal(src, dst);
         } else {
@@ -154,11 +154,11 @@ where
     }
 
     fn last_chance_match_optimal(&mut self, src: &M::Src, dst: &M::Dst) {
-        let src_arena = self.internal.src_arena.slice_po(&src);
-        let dst_arena = self.internal.dst_arena.slice_po(&dst);
+        let src_arena = self.internal.src_arena.slice_po(src);
+        let dst_arena = self.internal.dst_arena.slice_po(dst);
 
         let src_offset: M::Src = *src - src_arena.root();
-        let dst_offset: M::Dst = self.internal.dst_arena.first_descendant(&dst);
+        let dst_offset: M::Dst = self.internal.dst_arena.first_descendant(dst);
 
         let mappings: MZs = ZsMatcher::match_with(self.internal.hyperast, src_arena, dst_arena);
 

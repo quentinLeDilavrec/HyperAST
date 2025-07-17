@@ -65,8 +65,7 @@ where
     }
 
     pub(crate) fn add_mapping_recursively_lazy(&mut self, src: &Dsrc::IdD, dst: &Ddst::IdD) {
-        self.mappings
-            .link(src.shallow().clone(), dst.shallow().clone());
+        self.mappings.link(*src.shallow(), *dst.shallow());
         // WARN check if it works well
         let src = self.src_arena.descendants(src);
         let dst = self.dst_arena.descendants(dst);
@@ -119,8 +118,8 @@ where
         for x in lcs {
             let t1 = src_children.get(x.0).unwrap();
             let t2 = dst_children.get(x.1).unwrap();
-            if self.are_srcs_unmapped_lazy(&t1) && self.are_dsts_unmapped_lazy(&t2) {
-                self.add_mapping_recursively_lazy(&t1, &t2);
+            if self.are_srcs_unmapped_lazy(t1) && self.are_dsts_unmapped_lazy(t2) {
+                self.add_mapping_recursively_lazy(t1, t2);
             }
         }
     }
@@ -281,7 +280,7 @@ where
             .src_arena
             .decompress_children(&src)
             .into_iter()
-            .filter(|child| !self.mappings.is_src(&child.shallow()))
+            .filter(|child| !self.mappings.is_src(child.shallow()))
             .fold(HashMap::new(), |mut acc, child| {
                 let child_type = self.hyperast.resolve_type(&self.src_arena.original(&child));
                 acc.entry(child_type).or_insert_with(Vec::new).push(child);
@@ -292,7 +291,7 @@ where
             .dst_arena
             .decompress_children(&dst)
             .into_iter()
-            .filter(|child| !self.mappings.is_dst(&child.shallow()))
+            .filter(|child| !self.mappings.is_dst(child.shallow()))
             .fold(HashMap::new(), |mut acc, child| {
                 let child_type = self.hyperast.resolve_type(&self.dst_arena.original(&child));
                 acc.entry(child_type).or_insert_with(Vec::new).push(child);

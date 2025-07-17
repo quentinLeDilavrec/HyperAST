@@ -6,7 +6,7 @@ use hyperast_vcs_git::processing::RepoConfig;
 #[test]
 // slow test, more of an integration test, benefits from being run in release mode
 fn test_track_at_file_pos() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_env_filter("backend=debug")
         .try_init()
         .unwrap();

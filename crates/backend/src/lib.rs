@@ -335,7 +335,7 @@ pub mod log_languages {
 #[test]
 // slow test, more of an integration test, try using release
 fn test_measuring_size() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_env_filter("backend=debug,hyperast_vcs_git=info,hyperast=error")
         .try_init()
         .unwrap();
@@ -344,7 +344,7 @@ fn test_measuring_size() -> std::result::Result<(), Box<dyn std::error::Error>> 
     let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
     let commit = "f5f2b7765e6b392c5e8c7855986153af82cc1abe";
     let language = "Java";
-    let prepro = hyperast::scripting::lua_scripting::PREPRO_SIZE_WITH_FINISH.into();
+    let prepro = hyperast::scripting::lua_scripting::PREPRO_SIZE_WITH_FINISH;
     run_scripting(repo_spec, config, commit, language, prepro, "size")
 }
 
@@ -352,7 +352,7 @@ fn test_measuring_size() -> std::result::Result<(), Box<dyn std::error::Error>> 
 #[test]
 // slow test, more of an integration test, try using release
 fn test_measuring_mcc() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_env_filter("backend=debug,hyperast_vcs_git=info,hyperast=error")
         .try_init()
         .unwrap();
@@ -361,7 +361,7 @@ fn test_measuring_mcc() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
     let commit = "f5f2b7765e6b392c5e8c7855986153af82cc1abe";
     let language = "Java";
-    let prepro = hyperast::scripting::lua_scripting::PREPRO_MCC_WITH_FINISH.into();
+    let prepro = hyperast::scripting::lua_scripting::PREPRO_MCC_WITH_FINISH;
     run_scripting(repo_spec, config, commit, language, prepro, "mcc")
 }
 
@@ -369,7 +369,7 @@ fn test_measuring_mcc() -> std::result::Result<(), Box<dyn std::error::Error>> {
 #[test]
 // slow test, more of an integration test, try using release
 fn test_measuring_loc() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_env_filter("backend=debug,hyperast_vcs_git=info,hyperast=error")
         .try_init()
         .unwrap();
@@ -378,7 +378,7 @@ fn test_measuring_loc() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
     let commit = "f5f2b7765e6b392c5e8c7855986153af82cc1abe";
     let language = "Java";
-    let prepro = hyperast::scripting::lua_scripting::PREPRO_LOC.into();
+    let prepro = hyperast::scripting::lua_scripting::PREPRO_LOC;
     run_scripting(repo_spec, config, commit, language, prepro, "LoC")
 }
 
@@ -412,7 +412,7 @@ fn run_scripting(
     let commits = state.repositories.write().unwrap().pre_process_with_limit(
         &mut repository,
         "",
-        &commit,
+        commit,
         1,
     )?;
     {
@@ -437,7 +437,7 @@ fn run_scripting(
     let commits = state.repositories.write().unwrap().pre_process_with_limit(
         &mut repository,
         "",
-        &commit,
+        commit,
         2,
     )?;
     let repositories = state.repositories.read().unwrap();
@@ -486,7 +486,7 @@ fn run_scripting(
 #[test]
 // slow test, more of an integration test, try using release
 fn test_tsg_incr() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt()
+    tracing_subscriber::fmt()
         .with_env_filter("backend=debug,hyperast_vcs_git=info,hyperast=error")
         .try_init()
         .unwrap();
@@ -529,7 +529,7 @@ fn run_tsg(
     let commits = state.repositories.write().unwrap().pre_process_with_limit(
         &mut repository,
         "",
-        &commit,
+        commit,
         1,
     )?;
     #[cfg(feature = "subtree-stats")]

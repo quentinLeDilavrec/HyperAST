@@ -25,7 +25,7 @@ pub(crate) fn matches_default<'a>(
             .get_each_pat_start_byte()
             .into_iter()
             .skip(1)
-            .chain(vec![collect.len()].into_iter());
+            .chain(vec![collect.len()]);
         for (i, a) in a.enumerate() {
             count += 1;
             let a = a.split("@_root").next().unwrap().trim();

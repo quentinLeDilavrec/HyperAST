@@ -72,11 +72,11 @@ impl hyperast::types::WithChildren for T {
 impl hyperast::types::Labeled for T {
     type Label = LabelIdentifier;
 
-    fn get_label_unchecked<'a>(&'a self) -> &'a Self::Label {
+    fn get_label_unchecked(&self) -> &Self::Label {
         todo!()
     }
 
-    fn try_get_label<'a>(&'a self) -> Option<&'a Self::Label> {
+    fn try_get_label(&self) -> Option<&Self::Label> {
         todo!()
     }
 }
@@ -321,7 +321,7 @@ pub(crate) fn extract_moves<'a>(
         dbg!(from.iter().count());
         let (from_path, f_id) =
             hyperast::position::path_with_spaces(src_tr, &mut from.iter(), with_spaces_stores);
-        dbg!(from_path.iter().count());
+        dbg!(from_path.len());
         let (from, _from) = hyperast::position::compute_position(
             src_tr,
             &mut from_path.iter().copied(),
@@ -712,7 +712,7 @@ pub(crate) fn got_through<F>(
     let mut id = path.node();
     let mut nn = stores.node_store.resolve(id);
     loop {
-        if result(&path, &nn, &n, id) {
+        if result(&path, &nn, n, id) {
             return;
         }
         // if t.as_static_str() == "try_statement" {
@@ -739,7 +739,7 @@ pub(crate) fn got_through<F>(
         };
         p = _p;
     }
-    if result(&path, &nn, &n, id) {
+    if result(&path, &nn, n, id) {
         return;
     }
     for n in &n.children {

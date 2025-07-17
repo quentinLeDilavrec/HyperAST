@@ -195,7 +195,7 @@ fn simple_aux(
         println!("{}", graph.pretty_print());
         let source_path = std::path::Path::new(&"");
         let tsg_path = std::path::Path::new(&"");
-        eprintln!("{}", err.display_pretty(&source_path, "", &tsg_path, query));
+        eprintln!("{}", err.display_pretty(source_path, "", tsg_path, query));
     }
     dbg!();
     let result = serde_json::to_value(graph).unwrap();
@@ -206,11 +206,11 @@ fn simple_aux(
     })
 }
 
-static DEBUG_ATTR_PREFIX: &'static str = "debug_";
-pub static ROOT_NODE_VAR: &'static str = "ROOT_NODE";
+static DEBUG_ATTR_PREFIX: &str = "debug_";
+pub static ROOT_NODE_VAR: &str = "ROOT_NODE";
 /// The name of the file path global variable
 pub const FILE_PATH_VAR: &str = "FILE_PATH";
-static JUMP_TO_SCOPE_NODE_VAR: &'static str = "JUMP_TO_SCOPE_NODE";
+static JUMP_TO_SCOPE_NODE_VAR: &str = "JUMP_TO_SCOPE_NODE";
 static FILE_NAME: &str = "a/b/AAA.java";
 
 fn configure<'a, 'b, 'g, Node>(

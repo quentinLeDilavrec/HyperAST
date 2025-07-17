@@ -1,9 +1,9 @@
 use automerge::sync::SyncDoc;
-use axum_extra::TypedHeader;
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
 };
+use axum_extra::TypedHeader;
 use axum_macros::debug_handler;
 use serde::{Deserialize, Serialize};
 

@@ -331,8 +331,7 @@ pub fn track_code(
                     intermediary,
                     fallback: None,
                     matched: matches,
-                }
-                .into());
+                });
             }
             MappingResult::Missing { src: aaa, fallback } => {
                 let aaa = aaa.globalize(repository.spec, commit);
@@ -349,8 +348,7 @@ pub fn track_code(
                     intermediary,
                     fallback: Some(fallback),
                     matched: vec![],
-                }
-                .into());
+                });
             }
             MappingResult::Error(err) => Err(TrackingError {
                 compute_time: now.elapsed().as_secs_f64(),
@@ -376,8 +374,7 @@ pub fn track_code(
                         intermediary,
                         fallback: None,
                         matched: next,
-                    }
-                    .into());
+                    });
                 }
                 if source.is_none() {
                     source = Some(src.globalize(repository.spec.clone(), commit));
@@ -692,7 +689,7 @@ pub(crate) fn track_code_at_path_with_changes(
                 dbg!(src_oid, dst_oid);
                 // TODO fix issue of not stoping when failling to match accurately,
                 // most likely related to miss use of fallback value ?
-                if commits.len() < 3 || !(node_processed < MAX_NODES) {
+                if commits.len() < 3 || (node_processed >= MAX_NODES) {
                     // no commit remaining (first + second < 3)
                     // NOTE there is no parent commit to dst_commit, thus we should stop now
                     let changes =
@@ -970,7 +967,7 @@ fn track_aux(
         .unwrap();
     let src_tr = commit_src.ast_root;
     let commit_dst = repositories
-        .get_commit(&repo_handle.config(), &dst_oid)
+        .get_commit(repo_handle.config(), &dst_oid)
         .unwrap();
     let dst_tr = commit_dst.ast_root;
     let stores = &repositories.processor.main_stores;
@@ -1007,7 +1004,7 @@ fn track_aux(
         no_spaces_path_to_target.into()
     } else {
         let (_, _, no_spaces_path_to_target) =
-            compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().map(|x| *x), stores);
+            compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
         no_spaces_path_to_target
     };
     let dst_oid = dst_oid; // WARN not sure what I was doing there commit_dst.clone();
@@ -1054,7 +1051,7 @@ fn track_aux2(
     let dst_tr = commit_dst.ast_root;
     let stores = &repositories.processor.main_stores;
 
-    let path_to_target: Vec<_> = path.iter().map(|x| *x as u16).collect();
+    let path_to_target: Vec<_> = path.to_vec();
     dbg!(&path_to_target);
     let (pos, target_node, no_spaces_path_to_target): _ = if false {
         // NOTE trying stuff
@@ -1076,7 +1073,7 @@ fn track_aux2(
         let (node, path) = path.into();
         (pos, node, path)
     } else {
-        compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().map(|x| *x), stores)
+        compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores)
     };
     let range = pos.range();
     let target = TargetCodeElement::<IdN, Idx> {

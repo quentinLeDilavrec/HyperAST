@@ -162,9 +162,9 @@ fn resolve_path(
     curr
 }
 
-fn make_view<'a, HAST>(
+fn make_view<HAST>(
     mut queue: Vec<(HAST::IdN, usize)>,
-    stores: &'a HAST,
+    stores: &HAST,
     // node_store: &hyperast::store::nodes::legion::NodeStore,
     // label_store: &hyperast::store::labels::LabelStore,
 ) -> View
@@ -193,14 +193,7 @@ where
     pub struct EntityHasher(u64);
     impl Hasher for EntityHasher {
         fn write(&mut self, a: &[u8]) {
-            self.0 = u64::from_be_bytes(
-                a.into_iter()
-                    .cloned()
-                    .const_chunks::<8>()
-                    .next()
-                    .unwrap()
-                    .clone(),
-            )
+            self.0 = u64::from_be_bytes(a.iter().cloned().const_chunks::<8>().next().unwrap())
         }
         fn finish(&self) -> u64 {
             self.0
@@ -211,8 +204,8 @@ where
     let root = {
         let mut id = EntityHasher::default();
         queue[0].0.hash(&mut id);
-        let nid = id.finish();
-        nid
+
+        id.finish()
     };
 
     while let Some((curr, advance)) = queue.pop() {
@@ -238,8 +231,8 @@ where
                     }
                     let mut id = EntityHasher::default();
                     curr.hash(&mut id);
-                    let id = id.finish();
-                    id
+
+                    id.finish()
                 }));
                 with_both.labels.push(*l);
             } else {
@@ -264,8 +257,8 @@ where
                     }
                     let mut id = EntityHasher::default();
                     curr.hash(&mut id);
-                    let id = id.finish();
-                    id
+
+                    id.finish()
                 }));
         } else {
             only_typed.ids.push(nid);
@@ -280,15 +273,15 @@ where
         .into_iter()
         .map(|l| stores.label_store().resolve(&l).to_string())
         .collect();
-    let view = View {
+
+    View {
         label_list,
         root,
         labeled,
         children: with_children,
         both: with_both,
         typed: only_typed,
-    };
-    view
+    }
 }
 
 #[derive(Default)]
@@ -298,7 +291,8 @@ struct BuffOut {
 
 impl std::fmt::Write for BuffOut {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        Ok(self.buff.extend(s.chars()))
+        self.buff.push_str(s);
+        Ok(())
     }
 }
 

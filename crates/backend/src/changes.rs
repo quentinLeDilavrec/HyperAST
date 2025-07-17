@@ -1,4 +1,4 @@
-use hyperast_vcs_git::{processing::ConfiguredRepoTrait, SimpleStores};
+use hyperast_vcs_git::{SimpleStores, processing::ConfiguredRepoTrait};
 use serde::{Deserialize, Serialize};
 
 use std::fmt::Debug;
@@ -181,24 +181,22 @@ pub(crate) fn added_deleted(
     let unmapped_dst: Vec<_> = global_pos_with_spaces(
         &repositories.processor.main_stores,
         dst_tr,
-        mapped.1.dst_to_src.iter().enumerate().filter_map(|(i, x)| {
-            if *x == 0 {
-                Some(i as u32)
-            } else {
-                None
-            }
-        }),
+        mapped
+            .1
+            .dst_to_src
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| if *x == 0 { Some(i as u32) } else { None }),
     );
     let unmapped_src: Vec<_> = global_pos_with_spaces(
         &repositories.processor.main_stores,
         src_tr,
-        mapped.1.src_to_dst.iter().enumerate().filter_map(|(i, x)| {
-            if *x == 0 {
-                Some(i as u32)
-            } else {
-                None
-            }
-        }),
+        mapped
+            .1
+            .src_to_dst
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| if *x == 0 { Some(i as u32) } else { None }),
     );
 
     Ok((
@@ -220,8 +218,8 @@ pub(crate) fn added_deleted(
 // TODO try to move it in hyperast::position
 /// no_spaces gives topolgical indexes, topologically ordered,
 /// it maps onto a tree without spaces
-pub fn global_pos_with_spaces<'store, It: Iterator<Item = u32>>(
-    stores: &'store SimpleStores,
+pub fn global_pos_with_spaces<It: Iterator<Item = u32>>(
+    stores: &SimpleStores,
     root: NodeIdentifier,
     // increasing order
     mut no_spaces: It,
@@ -253,7 +251,7 @@ pub fn global_pos_with_spaces<'store, It: Iterator<Item = u32>>(
     };
     let mut index_with_spaces: u32 = 0;
     let mut index_no_spaces: u32 = 0;
-    while let Some(curr_no_space) = no_spaces.next() {
+    for curr_no_space in no_spaces {
         loop {
             // dbg!(stack.len());
             let mut ele = stack.pop().unwrap();

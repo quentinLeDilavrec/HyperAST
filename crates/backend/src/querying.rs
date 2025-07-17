@@ -1,15 +1,11 @@
-use crate::{smells::globalize, SharedState};
-use axum::{response::IntoResponse, Json};
+use crate::{SharedState, smells::globalize};
+use axum::{Json, response::IntoResponse};
 use http::{HeaderMap, StatusCode};
-use hyper_diff::{
-    decompressed_tree_store::ShallowDecompressedTreeStore,
-    matchers::{mapping_store::MultiMappingStore, Decompressible},
-};
-use hyperast::{
-    position::position_accessors::WithPreOrderOffsets,
-    store::defaults::NodeIdentifier,
-    types::{Children, Childrn, HyperAST, Typed, WithChildren, WithStats},
-};
+use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
+use hyper_diff::matchers::{Decompressible, mapping_store::MultiMappingStore};
+use hyperast::position::position_accessors::WithPreOrderOffsets;
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast::types::{Children, Childrn, HyperAST, Typed, WithChildren, WithStats};
 use hyperast_vcs_git::git::Oid;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -151,7 +147,7 @@ pub fn simple(
 
     let mut repo = repo.fetch();
     log::warn!("done cloning {}", &repo.spec);
-    let commits = crate::utils::handle_pre_processing(&state, &mut repo, "", &commit, commits)
+    let commits = crate::utils::handle_pre_processing(&state, &mut repo, "", commit, commits)
         .map_err(|x| QueryingError::ProcessingError(x.to_string()))?;
     log::info!("done construction of {commits:?} in  {}", repo.spec);
     let language: tree_sitter::Language = language.clone();
@@ -198,7 +194,7 @@ pub fn simple(
             Err(err) if results.is_empty() => {
                 return Err(QueryingError::MatchingErrOnFirst(
                     err.map(|inner| inner.with(commit_oid)),
-                ))
+                ));
             }
             Err(err) => {
                 matching_error_count += 1;
@@ -372,8 +368,15 @@ fn pre_repo(
         Some(_) | None => {
             let configs = &mut state.repositories.write().unwrap();
             if let Some(precomp) = precomp {
-                let precomp = precomp.split("\n\n").filter(|x|!x.is_empty()).collect::<Vec<_>>();
-                configs.register_config_with_prequeries(repo_spec.clone(), config, precomp.as_slice());
+                let precomp = precomp
+                    .split("\n\n")
+                    .filter(|x| !x.is_empty())
+                    .collect::<Vec<_>>();
+                configs.register_config_with_prequeries(
+                    repo_spec.clone(),
+                    config,
+                    precomp.as_slice(),
+                );
             } else {
                 configs.register_config(repo_spec.clone(), config);
             }
@@ -383,7 +386,7 @@ fn pre_repo(
     };
     let repo = repo.fetch();
     log::warn!("done cloning {}", &repo.spec);
-    let afters = [commit].into_iter().chain(additional.into_iter());
+    let afters = [commit].into_iter().chain(additional);
     let rw = crate::utils::walk_commits_multi(&repo, afters)?.take(commits);
     assert!(state.repositories.try_write().is_ok());
     let commits = crate::utils::handle_pre_processing_aux(state, &repo, rw);
@@ -417,7 +420,7 @@ fn pre_query(
         hyperast_vcs_git::processing::RepoConfig::Any
     };
     let lang = &language;
-    let language: tree_sitter::Language = hyperast_vcs_git::resolve_language(&language)
+    let language: tree_sitter::Language = hyperast_vcs_git::resolve_language(language)
         .ok_or_else(|| QueryingError::MissingLanguage(language.to_string()))?;
     let language: tree_sitter::Language = language.clone();
 
@@ -429,9 +432,9 @@ fn pre_query(
             .get_precomp_query(repo_config, lang)
     });
     let query = if let Some(Some(precomputeds)) = precomputeds {
-        hyperast_tsquery::Query::with_precomputed(&query, language, precomputeds).map(|x| x.1)
+        hyperast_tsquery::Query::with_precomputed(query, language, precomputeds).map(|x| x.1)
     } else {
-        hyperast_tsquery::Query::new(&query, language)
+        hyperast_tsquery::Query::new(query, language)
     }
     .map_err(|e| QueryingError::ParsingError(e.to_string()))?;
     Ok(query)
@@ -595,12 +598,11 @@ pub fn differential(
         let code = commit.ast_root;
         current_tr = code;
         let stores = &repositories.processor.main_stores;
-        let result = differential_aux(stores, code, &query, timeout, max_matches)
-            .map_err(|e| QueryingError::MatchingError(e))?;
 
         // (p.make_position(stores), p.iter_offsets().collect())
 
-        result
+        differential_aux(stores, code, &query, timeout, max_matches)
+            .map_err(QueryingError::MatchingError)?
     };
     let other_tr;
     let results: Vec<_> = {
@@ -613,15 +615,16 @@ pub fn differential(
         let code = commit.ast_root;
         other_tr = code;
         let stores = &repositories.processor.main_stores;
-        let result = differential_aux(stores, code, &query, timeout, max_matches)
-            .map_err(|e| QueryingError::MatchingError(e))?;
-        result
+
+        differential_aux(stores, code, &query, timeout, max_matches)
+            .map_err(QueryingError::MatchingError)?
     };
     log::info!(
         "done querying of {commit:?} and {baseline:?} in  {}",
         repo.spec
     );
-    if results.len() == baseline_results.len() {}
+    results.len();
+    baseline_results.len();
     log::info!(
         "lengths results/baseline_results: {}/{}",
         results.len(),

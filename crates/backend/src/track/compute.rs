@@ -24,8 +24,8 @@ impl<'store, HAST> MappingTracker<'store, HAST> {
         for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithStats,
     {
         let node_store = self.stores.node_store();
-        let src_size: usize = node_store.resolve(&other_tr).size();
-        let dst_size: usize = node_store.resolve(&current_tr).size();
+        let src_size: usize = node_store.resolve(other_tr).size();
+        let dst_size: usize = node_store.resolve(current_tr).size();
         src_size + dst_size
     }
 }
@@ -40,13 +40,13 @@ pub trait WithPreOrderOffsetsNoSpaces: WithOffsets {
     fn iter_offsets_nospaces(&self) -> Self::It<'_>;
 }
 
-pub(super) fn do_tracking<'store, 'p, P, C>(
-    repositories: &'store multi_preprocessed::PreProcessedRepositories,
+pub(super) fn do_tracking<P, C>(
+    repositories: &multi_preprocessed::PreProcessedRepositories,
     partial_decomps: &PartialDecompCache,
     mappings_alone: &MappingAloneCache,
     flags: &Flags,
     // no_spaces_path_to_target: Vec<super::Idx>,
-    target: &'p P,
+    target: &P,
     other_tr: super::IdN,
     postprocess_matching: &impl Fn(LocalPieceOfCode<super::IdN, super::Idx>) -> C,
 ) -> MappingResult<super::IdN, super::Idx, C>
@@ -240,9 +240,9 @@ where
     // }
 }
 
-fn track_with_mappings<'store, 's, C, P>(
+fn track_with_mappings<C, P>(
     with_spaces_stores: &SimpleStores<TStore>,
-    stores: &'s NoSpaceStore<'_, 'store>,
+    stores: &NoSpaceStore<'_, '_>,
     src_tree: &mut DecompressedTree,
     dst_tree: &mut DecompressedTree,
     flags: &Flags,
@@ -440,9 +440,9 @@ fn compute_mappings_full<'store, 'alone, 'trees, 'mapper, 'rest, 's: 'trees>(
 
 const CONST_NODE_COUNTING: Option<usize> = Some(500_000);
 
-fn track_greedy<'store, 's, C, P>(
+fn track_greedy<'s, C, P>(
     with_spaces_stores: &'s SimpleStores<TStore>,
-    stores: &'s NoSpaceStore<'_, 'store>,
+    stores: &'s NoSpaceStore<'_, '_>,
     src_tree: &mut DecompressedTree,
     dst_tree: &mut DecompressedTree,
     subtree_mappings: &mapping_store::MultiVecStore<IdD>,
@@ -481,7 +481,7 @@ where
         if dsts.is_empty() {
             // continue through path_to_target
             // dbg!(curr);
-        } else if path.len() == 0 {
+        } else if path.is_empty() {
             // need to check curr node flags
             if flags.is_subset(curr_flags) {
                 // only trigger on curr and children changed
@@ -597,7 +597,7 @@ where
             // can we test if parent changed ? at least we can ckeck some attributes
         }
 
-        let Some(i) = path.get(0) else {
+        let Some(i) = path.first() else {
             break;
         };
         path = &path[1..];
@@ -626,8 +626,10 @@ fn compute_local(
 }
 
 fn compute_local2(
-    path: &(impl position_accessors::WithPreOrderOffsets<Idx = super::Idx>
-          + position_accessors::RootedPosition<super::IdN>),
+    path: &(
+         impl position_accessors::WithPreOrderOffsets<Idx = super::Idx>
+         + position_accessors::RootedPosition<super::IdN>
+     ),
     with_spaces_stores: &SimpleStores<TStore>,
 ) -> LocalPieceOfCode<super::IdN, super::Idx> {
     let tr = path.root();
@@ -657,55 +659,55 @@ pub enum FlagsE {
     Declaration,
 }
 
-impl Into<EnumSet<FlagsE>> for &Flags {
-    fn into(self) -> EnumSet<FlagsE> {
+impl From<&Flags> for EnumSet<FlagsE> {
+    fn from(val: &Flags) -> Self {
         let mut r = EnumSet::new();
-        if self.upd {
+        if val.upd {
             r.insert(FlagsE::Upd);
         }
-        if self.child {
+        if val.child {
             r.insert(FlagsE::Child);
         }
-        if self.parent {
+        if val.parent {
             r.insert(FlagsE::Parent);
         }
-        if self.exact_child {
+        if val.exact_child {
             r.insert(FlagsE::ExactChild);
         }
-        if self.exact_parent {
+        if val.exact_parent {
             r.insert(FlagsE::ExactParent);
         }
-        if self.sim_child {
+        if val.sim_child {
             r.insert(FlagsE::SimChild);
         }
-        if self.sim_parent {
+        if val.sim_parent {
             r.insert(FlagsE::SimParent);
         }
-        if self.meth {
+        if val.meth {
             r.insert(FlagsE::Meth);
         }
-        if self.typ {
+        if val.typ {
             r.insert(FlagsE::Typ);
         }
-        if self.top {
+        if val.top {
             r.insert(FlagsE::Top);
         }
-        if self.file {
+        if val.file {
             r.insert(FlagsE::File);
         }
-        if self.pack {
+        if val.pack {
             r.insert(FlagsE::Pack);
         }
-        if self.dependency {
+        if val.dependency {
             r.insert(FlagsE::Dependency);
         }
-        if self.dependent {
+        if val.dependent {
             r.insert(FlagsE::Dependent);
         }
-        if self.references {
+        if val.references {
             r.insert(FlagsE::References);
         }
-        if self.declaration {
+        if val.declaration {
             r.insert(FlagsE::Declaration);
         }
         r

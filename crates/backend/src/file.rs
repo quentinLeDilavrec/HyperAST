@@ -2,7 +2,7 @@ use hyperast_vcs_git::preprocessed::child_at_path;
 use serde::Deserialize;
 use tokio::time::Instant;
 
-use crate::{utils, SharedState};
+use crate::{SharedState, utils};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct FetchFileParam {
@@ -29,7 +29,8 @@ pub fn from_hyperast(state: SharedState, path: FetchFileParam) -> Result<String,
         .ok_or_else(|| "missing config for repository".to_string())?;
     let mut repo = repo.fetch();
     log::debug!("done cloning {}", repo.spec);
-    let commits = utils::handle_pre_processing(&state, &mut repo, "", &commit, 2).map_err(|e| e.to_string())?;
+    let commits = utils::handle_pre_processing(&state, &mut repo, "", &commit, 2)
+        .map_err(|e| e.to_string())?;
     // let commits = state
     //     .repositories
     //     .write()
@@ -49,7 +50,8 @@ pub fn from_hyperast(state: SharedState, path: FetchFileParam) -> Result<String,
         return Err("not found".to_string());
     };
 
-    let content = hyperast::nodes::TextSerializer::new(&repositories.processor.main_stores, content);
+    let content =
+        hyperast::nodes::TextSerializer::new(&repositories.processor.main_stores, content);
     log::debug!("sending file {file} from {}/{commits:?}", repo.spec);
 
     Ok(content.to_string())
@@ -62,7 +64,8 @@ struct BuffOut {
 
 impl std::fmt::Write for BuffOut {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        Ok(self.buff.extend(s.chars()))
+        self.buff.push_str(s);
+        Ok(())
     }
 }
 

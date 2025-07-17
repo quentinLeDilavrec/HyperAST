@@ -99,7 +99,8 @@ struct BuffOut {
 
 impl std::fmt::Write for BuffOut {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        Ok(self.buff.extend(s.chars()))
+        self.buff.push_str(s);
+        Ok(())
     }
 }
 
@@ -133,16 +134,14 @@ pub fn add_remote(_state: SharedState, path: ParamRemote) -> Result<(), String> 
     let r = repo.remote(&other, &remote);
 
     let r = match r {
-        Ok(x) => {
-            Ok(x)
-        }
+        Ok(x) => Ok(x),
         Err(e) => {
             log::warn!("{}", e);
             if e.raw_code() == -4 {
                 repo.find_remote(&other)
             } else {
                 log::error!("{:?}", e);
-                return Err(e.to_string())
+                return Err(e.to_string());
             }
         }
     };

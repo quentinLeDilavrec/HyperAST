@@ -162,10 +162,10 @@ pub(crate) fn handle_pre_processing(
     Ok(handle_pre_processing_aux(state, repo, rw))
 }
 
-pub(crate) fn walk_commits_multi<'a, R: AsRef<str>>(
-    repo: &'a hyperast_vcs_git::processing::ConfiguredRepo2,
+pub(crate) fn walk_commits_multi<R: AsRef<str>>(
+    repo: &hyperast_vcs_git::processing::ConfiguredRepo2,
     after: impl Iterator<Item = R>,
-) -> Result<impl Iterator<Item = hyperast_vcs_git::git::Oid> + 'a, Box<dyn std::error::Error>> {
+) -> Result<impl Iterator<Item = hyperast_vcs_git::git::Oid> + '_, Box<dyn std::error::Error>> {
     let mut rw = hyperast_vcs_git::git::Builder::new(&repo.repo)?;
     for after in after {
         rw = rw.after(after.as_ref())?;

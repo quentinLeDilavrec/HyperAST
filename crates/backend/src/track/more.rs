@@ -186,8 +186,8 @@ fn lazy_subtree_mapping<'a, 'b>(
     }
 }
 
-pub fn child_by_type<'store, HAST: HyperAST<IdN = NodeIdentifier>>(
-    stores: &'store HAST,
+pub fn child_by_type<HAST: HyperAST<IdN = NodeIdentifier>>(
+    stores: &HAST,
     d: NodeIdentifier,
     t: &<HAST::TS as types::TypeStore>::Ty,
 ) -> Option<(NodeIdentifier, usize)> {

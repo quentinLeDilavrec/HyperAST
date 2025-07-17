@@ -1,19 +1,19 @@
 use std::time::Duration;
 
 use axum::{
+    BoxError, Json, Router,
     error_handling::HandleErrorLayer,
     response::{IntoResponse, Response},
     routing::{get, post},
-    BoxError, Json, Router,
 };
 use http::StatusCode;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    commit, fetch, file, pull_requests, querying,
+    SharedState, commit, fetch, file, pull_requests, querying,
     scriptingv1::{self, ScriptContent, ScriptContentDepth, ScriptingError, ScriptingParam},
-    smells, track, view, SharedState,
+    smells, track, view,
 };
 
 impl IntoResponse for ScriptingError {
@@ -204,9 +204,7 @@ pub fn querying_app(_st: SharedState) -> Router<SharedState> {
 }
 
 #[cfg(not(feature = "tsg"))]
-async fn tsg(
-    axum::extract::Path(_): axum::extract::Path<tsg::Param>,
-) -> impl IntoResponse {
+async fn tsg(axum::extract::Path(_): axum::extract::Path<tsg::Param>) -> impl IntoResponse {
     log::warn!("trying to use disabled tsg feature");
     Result::<(), _>::Err(r#""tsg comptime-feature is disabled on backend""#)
 }
@@ -467,8 +465,7 @@ async fn fetch_labels(
 
 impl IntoResponse for fetch::FetchedLabels {
     fn into_response(self) -> Response {
-        let resp = Json(self).into_response();
-        resp
+        Json(self).into_response()
     }
 }
 

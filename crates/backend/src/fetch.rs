@@ -13,7 +13,7 @@ use hyperast_vcs_git::TStore;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
-use crate::{app::Timed, SharedState};
+use crate::{SharedState, app::Timed};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Parameters {
@@ -256,8 +256,8 @@ pub fn fetch_labels<'a>(
         // if id == 0 {
         //     panic!()
         // }
-        let id = label_id_from_usize(id).unwrap();
-        id
+
+        label_id_from_usize(id).unwrap()
     });
     let mut get_mut = state;
     let repositories = get_mut.repositories.read().unwrap();
@@ -284,7 +284,7 @@ fn resolve_path<'a>(
     mut path: impl Iterator<Item = &'a str>,
 ) -> Result<defaults::NodeIdentifier, defaults::NodeIdentifier> {
     let mut curr = root;
-    while let Some(i) = path.next() {
+    for i in path {
         let Ok(i) = i.parse() else {
             return Err(curr);
         };
@@ -320,7 +320,8 @@ struct BuffOut {
 
 impl std::fmt::Write for BuffOut {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        Ok(self.buff.extend(s.chars()))
+        self.buff.push_str(s);
+        Ok(())
     }
 }
 

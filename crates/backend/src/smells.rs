@@ -242,12 +242,12 @@ pub(crate) fn smells(
                 .iter()
                 .filter_map(|x| query_lattice.raw_rels.get(&query_lattice.leaf(*x)))
                 .flat_map(|x| {
-                    x.into_iter()
+                    x.iter()
                         .filter_map(|x| match x {
                             hyperast_gen_ts_tsquery::code2query::TR::Init(c) => Some(c),
                             _ => None,
                         })
-                        .flat_map(|x| ex_map.get(&x))
+                        .flat_map(|x| ex_map.get(x))
                 })
                 .flatten()
                 .copied()

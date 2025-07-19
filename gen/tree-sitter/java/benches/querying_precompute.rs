@@ -84,22 +84,21 @@ fn compare_querying_group(c: &mut Criterion) {
     let codes = "../../../../spoon/src/main/java";
     let codes = Path::new(&codes).to_owned();
     let codes = It::new(codes).map(|x| {
-        let text = std::fs::read_to_string(&x).expect(&format!(
-            "{:?} is not a java file or a dir containing java files: ",
-            x
-        ));
+        let Ok(text) = std::fs::read_to_string(&x) else {
+            panic!("{x:?} is not a java file or a dir containing java files")
+        };
         (x, text)
     });
     let codes: Box<[_]> = codes.collect();
     // let queries: Vec<_> = QUERIES.iter().enumerate().collect();
 
-    for (_i, p) in QUERIES.into_iter().map(|x| (x, codes.as_ref())).enumerate() {
+    for p in QUERIES.iter().map(|x| (x, codes.as_ref())) {
         let i = p.0.3;
         let mut compute_size = true;
         // group.throughput(Throughput::Bytes((p.0.len() + p.1.len()) as u64));
         group.bench_with_input(BenchmarkId::new("baseline", i), &p, |b, (q, f)| {
             b.iter(|| {
-                for p in f.into_iter() {
+                for p in f.iter() {
                     let (q, t, text) = prep_baseline(q.2)(p);
                     if compute_size {
                         compute_size = false;
@@ -114,7 +113,7 @@ fn compare_querying_group(c: &mut Criterion) {
             &p,
             |b, (q, f)| {
                 b.iter(|| {
-                    for p in f.into_iter() {
+                    for p in f.iter() {
                         let (q, t, text) = prep_baseline_query_cursor(q.2)(p);
                         let cursor = hyperast_tsquery::default_impls::TreeCursor::new(
                             text.as_bytes(),
@@ -130,7 +129,7 @@ fn compare_querying_group(c: &mut Criterion) {
             &p,
             |b, (q, f)| {
                 b.iter(|| {
-                    for p in f.into_iter() {
+                    for p in f.iter() {
                         let (q, t, text) = prep_baseline_query_cursor(q.2)(p);
                         let cursor = hyperast_tsquery::default_impls::TreeCursor::new(
                             text.as_bytes(),
@@ -143,7 +142,7 @@ fn compare_querying_group(c: &mut Criterion) {
         );
         group.bench_with_input(BenchmarkId::new("default", i), &p, |b, (q, f)| {
             b.iter(|| {
-                for (name, text) in f.into_iter() {
+                for (name, text) in f.iter() {
                     let (q, stores, n) = prep_default(q.1, name.to_str().unwrap(), text.as_bytes());
                     let pos = hyperast::position::StructuralPosition::new(n);
                     let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(&stores, pos);
@@ -154,7 +153,7 @@ fn compare_querying_group(c: &mut Criterion) {
         });
         group.bench_with_input(BenchmarkId::new("precomputed", i), &p, |b, (q, f)| {
             b.iter(|| {
-                for (name, text) in f.into_iter() {
+                for (name, text) in f.iter() {
                     let (q, stores, n) =
                         prep_precomputed(q.0, q.1, name.to_str().unwrap(), text.as_bytes());
                     let pos = hyperast::position::StructuralPosition::new(n);
@@ -176,7 +175,7 @@ fn compare_querying_group(c: &mut Criterion) {
                     &mut md_cache,
                 );
                 let roots: Vec<_> = f
-                    .into_iter()
+                    .iter()
                     .map(|(name, text)| {
                         let tree = match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(
                             text.as_bytes(),
@@ -223,7 +222,7 @@ fn compare_querying_group(c: &mut Criterion) {
                     let mut java_tree_gen =
                         JavaTreeGen::with_preprocessing(&mut stores, &mut md_cache, more);
                     let roots: Vec<_> = f
-                        .into_iter()
+                        .iter()
                         .map(|(name, text)| {
                             let tree =
                                 match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(

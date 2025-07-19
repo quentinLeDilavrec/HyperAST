@@ -213,10 +213,10 @@ pub fn try_pattern_union(
         let p = lattice.pretty(p);
         let count = count.len();
         println!(";;count: {count}");
-        let mut p = format!("{p}");
+        let mut p = p.to_string();
         for (name, subs) in subs {
             let name = lattice.pretty(name);
-            let name = format!("{name}");
+            let name = name.to_string();
             let mut alternation = " [\n".to_string();
             for sub in subs {
                 let p = lattice.pretty(sub.0);
@@ -276,7 +276,7 @@ pub fn try_pattern_removes(
         let p = if actions.is_empty() {
             None
         } else {
-            actions.sort_by(|a, b| a.cmp(&b));
+            actions.sort();
             dbg!(&actions);
             let actions: Vec<_> = actions
                 .into_iter()

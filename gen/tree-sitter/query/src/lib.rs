@@ -42,8 +42,8 @@ where
     for<'a> <Ty as TryFrom<&'a str>>::Error: std::fmt::Debug,
 {
     let (query_store, query) = crate::search::ts_query(query.as_bytes());
-    let prepared_matcher = crate::search::PreparedMatcher::<Ty, Conv<Ty>>::new(&query_store, query);
-    prepared_matcher
+
+    crate::search::PreparedMatcher::<Ty, Conv<Ty>>::new(&query_store, query)
 }
 
 pub struct IterMatched<M, HAST, It, TIdN> {
@@ -53,8 +53,8 @@ pub struct IterMatched<M, HAST, It, TIdN> {
     _phantom: std::marker::PhantomData<TIdN>,
 }
 
-impl<'a, HAST, It: Iterator, TIdN> Iterator
-    for IterMatched<&crate::search::PreparedMatcher<TIdN::Ty, Conv<TIdN::Ty>>, &'a HAST, It, TIdN>
+impl<HAST, It: Iterator, TIdN> Iterator
+    for IterMatched<&crate::search::PreparedMatcher<TIdN::Ty, Conv<TIdN::Ty>>, &HAST, It, TIdN>
 where
     HAST: hyperast::types::HyperAST + hyperast::types::TypedHyperAST<TIdN>,
     TIdN: 'static + hyperast::types::TypedNodeId, //<IdN = <HAST as hyperast::types::HyperASTShared>::IdN>,
@@ -68,7 +68,7 @@ where
     type Item = (It::Item, Captured<HAST::IdN, HAST::Idx>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(e) = self.iter.next() {
+        for e in self.iter.by_ref() {
             use hyperast::position::TreePath;
             if let Some(c) = self
                 .matcher

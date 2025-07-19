@@ -1,10 +1,8 @@
+use hyperast_gen_ts_java::legion_with_refs;
+use hyperast_gen_ts_java::tsg::{Functions, It, configure, init_globals};
 use std::fmt::Display;
 
-use hyperast::store::SimpleStores;
-use hyperast_gen_ts_java::{
-    legion_with_refs,
-    tsg::{configure, init_globals, Functions, It},
-};
+type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>;
 
 fn main() {
     use std::path::Path;
@@ -54,7 +52,7 @@ fn tsg_hyperast_stepped_loop(
     codes: impl Iterator<Item = (impl Display, impl AsRef<str>)>,
     queries: &[(impl Display, impl AsRef<str>)],
 ) {
-    let mut stores = hyperast::store::SimpleStores::<hyperast_gen_ts_java::types::TStore>::default();
+    let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
     for code in codes {
         for query in queries {
@@ -67,14 +65,10 @@ fn tsg_hyperast_stepped<'a, 'c, 'd>(
     code_name: impl Display,
     code_text: &'a str,
     query: &(impl Display, impl AsRef<str>),
-    stores: &'a mut SimpleStores<hyperast_gen_ts_java::types::TStore>,
+    stores: &'a mut SimpleStores,
     md_cache: &'c mut std::collections::HashMap<legion::Entity, legion_with_refs::MD>,
-) -> tree_sitter_graph::graph::Graph<
-    hyperast_gen_ts_java::tsg::stepped_query::Node<
-        'a,
-        SimpleStores<hyperast_gen_ts_java::types::TStore>,
-    >,
-> {
+) -> tree_sitter_graph::graph::Graph<hyperast_gen_ts_java::tsg::stepped_query::Node<'a, SimpleStores>>
+{
     unsafe { legion_with_refs::HIDDEN_NODES = true };
     let language = tree_sitter_java::language();
 
@@ -102,9 +96,7 @@ fn tsg_hyperast_stepped<'a, 'c, 'd>(
     // parsing tsg query
     use tree_sitter_graph::GenQuery;
     let tsg = impls::QueryMatcher::from_str(language.clone(), tsg_source).unwrap();
-    type Graph<'a> = tree_sitter_graph::graph::Graph<
-        impls::Node<'a, SimpleStores<hyperast_gen_ts_java::types::TStore>>,
-    >;
+    type Graph<'a> = tree_sitter_graph::graph::Graph<impls::Node<'a, SimpleStores>>;
 
     let mut globals = tree_sitter_graph::Variables::new();
     let mut graph = Graph::default();

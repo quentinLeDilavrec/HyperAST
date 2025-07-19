@@ -264,8 +264,8 @@ impl HyperType for Type {
 
     fn as_static(&self) -> &'static dyn HyperType {
         let t = <Xml as hyperast::types::Lang<Type>>::to_u16(*self);
-        let t = <Xml as hyperast::types::Lang<Type>>::make(t);
-        t
+
+        (<Xml as hyperast::types::Lang<Type>>::make(t)) as _
     }
 
     fn as_static_str(&self) -> &'static str {
@@ -514,17 +514,19 @@ impl From<u16> for Type {
         S_T_L[value as usize]
     }
 }
-impl Into<TypeU16<Xml>> for Type {
-    fn into(self) -> TypeU16<Xml> {
-        TypeU16::new(self)
+
+impl From<Type> for TypeU16<Xml> {
+    fn from(val: Type) -> Self {
+        TypeU16::new(val)
     }
 }
 
-impl Into<u16> for Type {
-    fn into(self) -> u16 {
-        self as u8 as u16
+impl From<Type> for u16 {
+    fn from(val: Type) -> Self {
+        val as u8 as u16
     }
 }
+
 #[repr(u16)]
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum Type {
@@ -1268,7 +1270,7 @@ fn test_tslanguage_and_type_identity() {
     }
 }
 
-const S_T_L: &'static [Type] = &[
+const S_T_L: &[Type] = &[
     Type::End,
     Type::Name,
     Type::TS0,

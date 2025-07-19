@@ -880,11 +880,11 @@ where
         remains.chunks(1000).enumerate().for_each(|(i, x)| {
             let i = i * 1000;
             log::info!("remains removes {i:4}/{rem_count}");
-            rms.extend(x.into_iter().filter_map(|(query, path)| {
+            rms.extend(x.iter().filter_map(|(query, path)| {
                 let query = *query;
                 let label_h;
                 let new_q = {
-                    let query = apply_rms_aux(&mut s.query_store, query, &path)?;
+                    let query = apply_rms_aux(&mut s.query_store, query, path)?;
                     if !simp_search_need(&s.query_store, query, meta_simp) {
                         return None;
                     }
@@ -930,12 +930,12 @@ where
             let i = i * 1000;
             log::info!("remains removesall {i:4}/{rem_count}");
 
-            rms.extend(x.into_iter().filter_map(|(query, curr, paths)| {
+            rms.extend(x.iter().filter_map(|(query, curr, paths)| {
                 let query = *query;
                 let mut curr = *curr;
                 // dbg!(&paths);
-                for path in paths.into_iter() {
-                    curr = apply_rms_aux2(&mut s.query_store, curr, &path)?;
+                for path in paths.iter() {
+                    curr = apply_rms_aux2(&mut s.query_store, curr, path)?;
                 }
                 if !simp_search_need(&s.query_store, curr, meta_simp) {
                     return None;
@@ -989,7 +989,7 @@ where
         let ((remains, already), mut rms): (
             (Vec<(IdNQ, IdNQ, Vec<Vec<u16>>)>, Vec<IdNQ>),
             Vec<(u32, (IdNQ, TR<Init>))>,
-        ) = ParallelIterator::partition_map(rms, |x| x.into());
+        ) = ParallelIterator::partition_map(rms, |x| x);
         log::info!("remains: {}", remains.len());
         log::info!("uniqs: {}", rms.len());
 
@@ -1585,7 +1585,7 @@ fn simp_uniq<'a>(
         // TODO perf: do all the removes at once
         dbg!(&paths);
         for path in paths {
-            curr = apply_rms_aux(query_store, curr, &path)?;
+            curr = apply_rms_aux(query_store, curr, path)?;
         }
         if !simp_search_need(query_store, query, meta_simp) {
             return None;
@@ -1642,7 +1642,7 @@ fn try_simp_uniq<'a>(
             assert_ne!(curr, query);
             ResSimpUniq::Deduplicated(curr, query_store.resolve(&curr).hash(&HashKind::label()))
         })
-        .chain(already.into_iter().map(|x| ResSimpUniq::AlreadyUniq(x)))
+        .chain(already.into_iter().map(ResSimpUniq::AlreadyUniq))
 }
 
 fn generate_query_aux<

@@ -47,11 +47,10 @@ impl<
 }
 
 impl<
-    'store,
     HAST: TypedHyperAST<TIdN>,
     TIdN: hyperast::types::TypedNodeId, // <IdN = HAST::IdN>,
     PM: Deref<Target = PreparedMatcher<TIdN::Ty, Conv<TIdN::Ty>>>,
-> Iterator for MatchingIter<'store, HAST, TIdN, PM>
+> Iterator for MatchingIter<'_, HAST, TIdN, PM>
 where
     HAST::IdN: std::fmt::Debug,
 {
@@ -63,8 +62,8 @@ where
         }
         let mut res = std::collections::VecDeque::default();
         let arc = self.slf.patterns.clone();
-        for (i, pat) in arc.as_ref().into_iter().enumerate() {
-            let r = self.is_matching(&pat, self.root.clone());
+        for (i, pat) in arc.as_ref().iter().enumerate() {
+            let r = self.is_matching(pat, self.root.clone());
             res.extend(r.into_iter().map(|res| Captured(res.captures, i)));
         }
         self.res = Some(res);
@@ -90,7 +89,7 @@ where
         pattern: &Pattern<TIdN::Ty>,
         id: HAST::IdN,
     ) -> Vec<MatchingRes<HAST::IdN, HAST::Idx>> {
-        let Some((n, tid)) = (&self.code_store).try_resolve(&id) else {
+        let Some((n, tid)) = self.code_store.try_resolve(&id) else {
             dbg!();
             return vec![];
         };
@@ -258,8 +257,8 @@ where
                             matched: Quant::One,
                             mut captures,
                         } => {
-                            let name = name.clone();
-                            let n = (&self.code_store).try_resolve(&id).unwrap().0;
+                            let name = *name;
+                            let n = self.code_store.try_resolve(&id).unwrap().0;
                             let v = CaptureRes {
                                 id: name,
                                 match_node: id.clone(),
@@ -279,7 +278,7 @@ where
                             matched: Quant::ZeroOrOne,
                             mut captures,
                         } => {
-                            let name = name.clone();
+                            let name = *name;
                             let v = CaptureRes {
                                 id: name,
                                 match_node: id.clone(),
@@ -302,7 +301,7 @@ where
                     .into_iter()
                     .filter_map(|matching_res| {
                         if matching_res.matched == Quant::One {
-                            let matched = matching_res.capture(*left).map_or(false, |x| {
+                            let matched = matching_res.capture(*left).is_some_and(|x| {
                                 Some(&x.path) == matching_res.capture(*right).map(|x| &x.path)
                             });
                             let captures = if matched {
@@ -398,7 +397,7 @@ where
                         Pattern::AnyNode { .. } => todo!(),
                         _ => (),
                     }
-                    for res in self.is_matching(&pat, id.clone()) {
+                    for res in self.is_matching(pat, id.clone()) {
                         if res.matched == Quant::One {
                             result.push(res);
                         } else if res.matched == Quant::Zero {
@@ -649,7 +648,7 @@ where
                 }
             }
             dbg!(t);
-            let mut m_res = self.is_matching(&curr_p, child.clone());
+            let mut m_res = self.is_matching(curr_p, child.clone());
             let last = m_res.pop();
             for res in m_res {
                 match res {
@@ -835,13 +834,13 @@ struct ChildIt<'store, HAST, IdN> {
     waiting: VecDeque<IdN>,
     role: Option<hyperast::types::Role>,
 }
-impl<'store, HAST, IdN: Clone> Clone for ChildIt<'store, HAST, IdN> {
+impl<HAST, IdN: Clone> Clone for ChildIt<'_, HAST, IdN> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
             id: self.id.clone(),
             waiting: self.waiting.clone(),
-            role: self.role.clone(),
+            role: self.role,
         }
     }
 }

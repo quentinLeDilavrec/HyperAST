@@ -130,7 +130,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation<'a>(&'a self) -> &'a Spaces {
+    fn indentation(&self) -> &Spaces {
         &self.indentation
     }
 }
@@ -207,7 +207,7 @@ where
     type TreeCursor<'b> = TTreeCursor<'b, HIDDEN_NODES>;
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -490,7 +490,7 @@ where
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
         let bytes_len = text.len();
-        let text = std::str::from_utf8(&text).unwrap().to_string();
+        let text = std::str::from_utf8(text).unwrap().to_string();
         let line_count = text
             .matches("\n")
             .count()
@@ -604,8 +604,8 @@ where
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> TreeGen
-    for CppTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
+    for CppTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: CppEnabledTypeStore<Ty2 = Type>,
     More: tree_gen::Prepro<SimpleStores<TS>>
@@ -666,7 +666,7 @@ where
             let vacant = insertion.vacant();
             let node_store: &_ = vacant.1.1;
             let stores = SimpleStores {
-                type_store: self.stores.type_store.clone(),
+                type_store: self.stores.type_store,
                 label_store: &self.stores.label_store,
                 node_store,
             };
@@ -708,9 +708,9 @@ where
             self.md_cache.insert(
                 compressed_node,
                 MD {
-                    metrics: metrics.clone(),
+                    metrics,
                     ana: acc.ana.clone(),
-                    precomp_queries: acc.precomp_queries.clone(),
+                    precomp_queries: acc.precomp_queries,
                 },
             );
             Local {
@@ -723,10 +723,9 @@ where
             }
         };
 
-        let full_node = FullNode {
+        FullNode {
             global: global.simple(),
             local,
-        };
-        full_node
+        }
     }
 }

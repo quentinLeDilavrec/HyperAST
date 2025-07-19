@@ -47,7 +47,7 @@ fn preps_default(
     let mut md_cache = Default::default();
     let mut java_tree_gen = JavaTreeGen::new(&mut stores, &mut md_cache);
     let roots: Vec<_> = f
-        .into_iter()
+        .iter()
         .map(|(name, text)| {
             let tree = match tree_sitter_parse(text.as_bytes()) {
                 Ok(t) => t,
@@ -86,7 +86,7 @@ fn preps_precomputed(
         );
     let mut java_tree_gen = JavaTreeGen::with_preprocessing(&mut stores, &mut md_cache, more);
     let roots: Vec<_> = f
-        .into_iter()
+        .iter()
         .map(|(name, text)| {
             let tree = match tree_sitter_parse(text.as_bytes()) {
                 Ok(t) => t,
@@ -111,14 +111,13 @@ fn compare_querying_group(c: &mut Criterion) {
     let codes = "../../../../spoon/src/main/java"; // spoon dataset (only source code to avoid including resources), could add tests if necessary
     let codes = Path::new(&codes).to_owned();
     let codes = It::new(codes).map(|x| {
-        let text = std::fs::read_to_string(&x).expect(&format!(
-            "{:?} is not a java file or a dir containing java files: ",
-            x
-        ));
+        let Ok(text) = std::fs::read_to_string(&x) else {
+            panic!("{x:?} is not a java file or a dir containing java files")
+        };
         (x, text)
     });
     let codes: Box<[_]> = codes.collect();
-    for parameter in QUERIES.into_iter().map(|x| (x, codes.as_ref())) {
+    for parameter in QUERIES.iter().map(|x| (x, codes.as_ref())) {
         group.throughput(criterion::Throughput::Elements(parameter.0.4));
 
         bench_baseline(&mut group, parameter);
@@ -203,16 +202,14 @@ fn bench_baseline(
 ) {
     let id = BenchmarkId::new("baseline", parameter.0.3);
     group.bench_with_input(id, &parameter, |b, parameter| {
-        let f: Box<[_]> = parameter
-            .1
-            .into_iter()
+        let f: Box<[_]> = (parameter.1.iter())
             .map(prep_baseline(parameter.0.2))
             .collect();
         b.iter(|| {
             let mut count = 0;
             for (q, t, text) in f.iter() {
                 let mut cursor = tree_sitter::QueryCursor::default();
-                count += black_box(cursor.matches(&q, t.root_node(), text.as_bytes()).count());
+                count += black_box(cursor.matches(q, t.root_node(), text.as_bytes()).count());
             }
             assert_eq!(count as u64, parameter.0.4);
         })
@@ -223,9 +220,7 @@ fn bench_rust_baseline(
     group: &mut criterion::BenchmarkGroup<criterion::measurement::WallTime>,
     parameter: (&BenchQuery, &[(PathBuf, String)]),
 ) {
-    let pp: Box<[_]> = parameter
-        .1
-        .into_iter()
+    let pp: Box<[_]> = (parameter.1.iter())
         .map(prep_baseline_query_cursor(parameter.0.2))
         .collect();
     group.bench_with_input(

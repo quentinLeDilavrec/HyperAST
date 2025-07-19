@@ -19,7 +19,7 @@ impl TsEnableTS for TStore {
     ) -> Option<Self::Ty2> {
         let k = n.kind_id();
         const LEN: u16 = S_T_L.len() as u16;
-        if LEN <= k && k < TStore::LOWEST_RESERVED {
+        if (LEN..TStore::LOWEST_RESERVED).contains(&k) {
             return None;
         }
         debug_assert_eq!(
@@ -457,8 +457,8 @@ impl HyperType for Type {
     /// ```
     fn as_static(&self) -> &'static dyn HyperType {
         let t = <Cpp as hyperast::types::Lang<Type>>::to_u16(*self);
-        let t = <Cpp as hyperast::types::Lang<Type>>::make(t);
-        t
+
+        (<Cpp as hyperast::types::Lang<Type>>::make(t)) as _
     }
 
     fn as_static_str(&self) -> &'static str {
@@ -657,14 +657,15 @@ impl From<u16> for Type {
         S_T_L[value as usize]
     }
 }
-impl Into<TypeU16<Cpp>> for Type {
-    fn into(self) -> TypeU16<Cpp> {
-        TypeU16::new(self)
+
+impl From<Type> for TypeU16<Cpp> {
+    fn from(val: Type) -> Self {
+        TypeU16::new(val)
     }
 }
 
-impl Into<u16> for Type {
-    fn into(self) -> u16 {
+impl From<Type> for u16 {
+    fn from(_val: Type) -> Self {
         todo!()
         // self as u16
     }
@@ -3272,7 +3273,7 @@ fn test_tslanguage_and_type_identity() {
     }
 }
 
-const S_T_L: &'static [Type] = &[
+const S_T_L: &[Type] = &[
     Type::End,
     Type::Identifier,
     Type::HashInclude,

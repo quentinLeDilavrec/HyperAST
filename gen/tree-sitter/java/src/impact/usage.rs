@@ -13,9 +13,8 @@ use hyperast::{
         WithSerialization,
     },
 };
-use num::{cast, one, zero, ToPrimitive, Zero};
+use num::{ToPrimitive, Zero, cast, one, zero};
 use std::fmt::Debug;
-// use hyperast_core::tree::tree::{WithChildren, Tree, Labeled};
 
 use crate::impact::{
     element::{IdentifierFormat, LabelPtr},
@@ -78,13 +77,7 @@ macro_rules! missing_rule {
 /// thus is should not search for references to `this` or `super`
 impl<'a, IdN, HAST> RefsFinder<'a, IdN, HAST>
 where
-    HAST: TypedHyperAST<
-        'a,
-        TIdN<IdN>,
-        IdN = IdN,
-        // T = HashedNodeRef<'a,Type>,
-        Label = LabelIdentifier,
-    >,
+    HAST: TypedHyperAST<'a, TIdN<IdN>, IdN = IdN, Label = LabelIdentifier>,
     IdN: 'a + Copy + Eq + Debug + NodeId<IdN = IdN>,
     HAST::Idx: num::PrimInt + num::traits::NumAssign + Debug,
     HAST: hyperast::types::TypeStore,
@@ -95,8 +88,7 @@ where
     <HAST as hyperast::types::HyperAST<'a>>::T: RefContainer<Result = BloomResult>,
     <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
         TypedTree<Type = Type, ChildIdx = HAST::Idx>,
-    <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
-        RefContainer<Result = BloomResult>,
+    <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT: RefContainer<Result = BloomResult>,
 {
     pub fn eq_root_scoped(
         d: ExplorableRef,
@@ -241,7 +233,7 @@ where
             };
             return self.find_refs2::<IM>(package, target, current, b, scout);
         }
-        let b = hyperast::types::NodeStore::resolve(self.stores.node_store(), &current);
+        let b = self.stores.node_store().resolve(&current);
         let t = self.stores.resolve_type(&current);
         if !IM && !has_children {
             log::debug!("d=1 {:?}", "'Not Java'");
@@ -817,13 +809,7 @@ where
 /// prerequisite: recusive traversal limited to expressions ie. should not cross declarations
 impl<'a, IdN, HAST> RefsFinder<'a, IdN, HAST>
 where
-    HAST: TypedHyperAST<
-        'a,
-        TIdN<IdN>,
-        IdN = IdN,
-        // T = HashedNodeRef<'a,Type>,
-        Label = LabelIdentifier,
-    >,
+    HAST: TypedHyperAST<'a, TIdN<IdN>, IdN = IdN, Label = LabelIdentifier>,
     IdN: Copy + Eq + Debug + NodeId<IdN = IdN>,
     HAST::Idx: num::PrimInt + num::traits::NumAssign + Debug,
     HAST: hyperast::types::TypeStore,
@@ -833,8 +819,7 @@ where
     <HAST as hyperast::types::HyperAST<'a>>::T: RefContainer<Result = BloomResult>,
     <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
         TypedTree<Type = Type, ChildIdx = HAST::Idx>,
-    <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
-        RefContainer<Result = BloomResult>,
+    <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT: RefContainer<Result = BloomResult>,
 {
     pub fn exact_match(&mut self, target: RefPtr, scout: TypedScout<TIdN<IdN>, HAST::Idx>) {
         let d = ExplorableRef {
@@ -2182,7 +2167,7 @@ where
                             oo,
                             ii.as_ref(),
                             scout,
-                        )
+                        );
                     }
                     x => todo!("{:?}", x),
                 }
@@ -2888,13 +2873,7 @@ pub fn remake_pkg_ref<'a, IdN: Copy + Eq + NodeId<IdN = IdN> + Debug, HAST>(
     x: TIdN<HAST::IdN>,
 ) -> Option<RefPtr>
 where
-    HAST: TypedHyperAST<
-        'a,
-        TIdN<IdN>,
-        IdN = IdN,
-        // T = HashedNodeRef<'a,Type>,
-        Label = LabelIdentifier,
-    >,
+    HAST: TypedHyperAST<'a, TIdN<IdN>, IdN = IdN, Label = LabelIdentifier>,
     <HAST as hyperast::types::HyperAST<'a>>::T: Tree<ChildIdx = HAST::Idx>,
     <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
         TypedTree<Type = Type, ChildIdx = HAST::Idx>,
@@ -2944,13 +2923,7 @@ where
 
 impl<'a, IdN: Copy + Eq + NodeId + Debug, HAST> RefsFinder<'a, IdN, HAST>
 where
-    HAST: TypedHyperAST<
-        'a,
-        TIdN<IdN>,
-        IdN = IdN,
-        // T = HashedNodeRef<'a,Type>,
-        Label = LabelIdentifier,
-    >,
+    HAST: TypedHyperAST<'a, TIdN<IdN>, IdN = IdN, Label = LabelIdentifier>,
     HAST: hyperast::types::TypeStore,
     HAST: hyperast::types::LabelStore<str, I = LabelIdentifier>,
     HAST: hyperast::types::NodeStore<IdN, R<'a> = <HAST as hyperast::types::HyperAST<'a>>::T>,
@@ -2960,8 +2933,7 @@ where
     <HAST as hyperast::types::HyperAST<'a>>::T: RefContainer<Result = BloomResult>,
     <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
         TypedTree<Type = Type, ChildIdx = HAST::Idx>,
-    <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT:
-        RefContainer<Result = BloomResult>,
+    <HAST as hyperast::types::TypedHyperAST<'a, TIdN<IdN>>>::TT: RefContainer<Result = BloomResult>,
 {
     /// Structurally find constructors in class
     pub fn find_constructors(&mut self, mut scout: TypedScout<TIdN<IdN>, HAST::Idx>) {

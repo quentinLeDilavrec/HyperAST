@@ -1,12 +1,9 @@
-use std::fmt::{self, Debug};
-
-use hyperast::types::{AAAA, TypedHyperAST};
-use hyperast::{
-    position::{TreePath, TreePathMut},
-    store::nodes::legion::NodeIdentifier,
-    types::{Childrn, HyperAST, NodeId, Tree, TypedNodeStore, WithChildren},
-};
+use hyperast::position::{TreePath, TreePathMut};
+use hyperast::store::nodes::legion::NodeIdentifier;
+use hyperast::types::{AAAA, NodeStore, TypedHyperAST};
+use hyperast::types::{Childrn, HyperAST, NodeId, Tree, TypedNodeStore, WithChildren};
 use num::ToPrimitive;
+use std::fmt;
 
 use crate::types::TIdN;
 
@@ -30,7 +27,7 @@ impl<IdN: Clone + Eq + AAAA> Id<IdN> {
     }
 }
 
-impl<'a, T: TreePath<NodeIdentifier, u16>, HAST> Debug for IterAll<'a, T, HAST> {
+impl<T: TreePath<NodeIdentifier, u16>, HAST> fmt::Debug for IterAll<'_, T, HAST> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("IterAllNodes")
             // .field("parents", &self.parents())
@@ -59,19 +56,9 @@ where
 }
 
 impl<
-    'a,
-    T: TreePathMut<NodeIdentifier, u16> + Clone + Debug,
+    T: TreePathMut<NodeIdentifier, u16> + Clone + fmt::Debug,
     HAST: TypedHyperAST<TIdN<NodeIdentifier>, Idx = u16>,
-> Iterator for IterAll<'a, T, HAST>
-where
-// HAST::NS: TypedNodeStore<TIdN<NodeIdentifier>>,
-// HAST::TS: TypeStore<HAST::T, Ty = Type>,
-// HAST::TT: TypedTree<Type = Type>,
-// <HAST::T as Typed>::Type: Copy + Send + Sync,
-// for<'b> <HAST::NS as TypedNodeStore<TIdN<HAST::IdN>>>::R<'b>:
-//     TypedTree<Type = Type, TreeId = HAST::IdN, Label = HAST::Label, ChildIdx = u16>,
-// <HAST::NS as NodeStore<HAST::IdN>>::R<'a>:
-//     TypedTree<Type = AnyType, TreeId = HAST::IdN, Label = HAST::Label, ChildIdx = u16>,
+> Iterator for IterAll<'_, T, HAST>
 {
     type Item = T;
 
@@ -83,10 +70,7 @@ where
                     let child = children[offset.to_usize().unwrap()];
                     self.path.check(self.stores).unwrap();
                     {
-                        let b = hyperast::types::NodeStore::resolve(
-                            self.stores.node_store(),
-                            node.id(),
-                        );
+                        let b = self.stores.node_store().resolve(node.id());
                         if b.has_children() {
                             assert!(offset < b.child_count());
                             let cs = b.children();
@@ -96,27 +80,27 @@ where
                         }
                     }
                     if offset == 0 {
-                        match self.path.node() {
-                            Some(x) => assert_eq!(x, node.id()),
-                            None => {}
+                        if let Some(x) = self.path.node() {
+                            assert_eq!(x, node.id())
                         }
                         self.path.goto(child, offset);
                         self.path.check(self.stores).unwrap();
                     } else {
-                        match self.path.node() {
-                            Some(x) => assert_eq!(*x, children[offset.to_usize().unwrap() - 1]),
-                            None => {}
+                        if let Some(x) = self.path.node() {
+                            assert_eq!(*x, children[offset.to_usize().unwrap() - 1])
                         }
                         self.path.inc(child);
                         assert_eq!(*self.path.offset().unwrap(), offset + 1);
-                        self.path.check(self.stores).expect(&format!(
-                            "{:?} {} {:?} {:?} {:?}",
-                            node.id(),
-                            offset,
-                            child,
-                            children,
-                            self.path
-                        ));
+                        self.path.check(self.stores).unwrap_or_else(|_| {
+                            panic!(
+                                "{:?} {} {:?} {:?} {:?}",
+                                node.id(),
+                                offset,
+                                child,
+                                children,
+                                self.path
+                            )
+                        });
                     }
                     self.stack.push((node, offset + 1, Some(children)));
                     let child = if let Some(tid) = self.stores.try_typed(&child) {
@@ -136,7 +120,7 @@ where
                 let b = match &node {
                     Id::Query(node) => self.stores.resolve_typed(node),
                     Id::Other(node) => {
-                        let b = hyperast::types::NodeStore::resolve(self.stores.node_store(), node);
+                        let b = self.stores.node_store().resolve(node);
                         if b.has_children() {
                             let children = b.children();
                             let children = children.unwrap();

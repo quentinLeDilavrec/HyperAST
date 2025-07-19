@@ -19,7 +19,7 @@ pub struct TreeToQuery<
     phantom: PhantomData<TIdN>,
 }
 
-static Q_STORE: LazyLock<QStore<crate::types::TStore>> = LazyLock::new(|| Default::default());
+static Q_STORE: LazyLock<QStore<crate::types::TStore>> = LazyLock::new(Default::default);
 
 struct QStore<
     TS,
@@ -40,7 +40,7 @@ pub(crate) struct QStoreRef<
     LS = hyperast::store::labels::LabelStore,
 >(std::sync::RwLockReadGuard<'a, hyperast::store::SimpleStores<TS, NS, LS>>);
 
-impl<'a, TS, NS, LS> std::ops::Deref for QStoreRef<'a, TS, NS, LS> {
+impl<TS, NS, LS> std::ops::Deref for QStoreRef<'_, TS, NS, LS> {
     type Target = store::SimpleStores<TS, NS, LS>;
 
     fn deref(&self) -> &Self::Target {
@@ -48,14 +48,14 @@ impl<'a, TS, NS, LS> std::ops::Deref for QStoreRef<'a, TS, NS, LS> {
     }
 }
 
-impl<'a, TS> types::HyperASTShared for QStoreRef<'a, TS, store::nodes::DefaultNodeStore> {
+impl<TS> types::HyperASTShared for QStoreRef<'_, TS, store::nodes::DefaultNodeStore> {
     type IdN = store::nodes::DefaultNodeIdentifier;
     type Idx = u16;
     type Label = store::labels::DefaultLabelIdentifier;
 }
 
-impl<'a, 'b, TS> hyperast::types::NLending<'a, <Self as HyperASTShared>::IdN>
-    for QStoreRef<'b, TS, store::nodes::DefaultNodeStore>
+impl<'a, TS> hyperast::types::NLending<'a, <Self as HyperASTShared>::IdN>
+    for QStoreRef<'_, TS, store::nodes::DefaultNodeStore>
 {
     type N = <store::nodes::DefaultNodeStore as hyperast::types::NLending<
         'a,
@@ -63,15 +63,14 @@ impl<'a, 'b, TS> hyperast::types::NLending<'a, <Self as HyperASTShared>::IdN>
     >>::N;
 }
 
-impl<'a, 'b, TS> hyperast::types::AstLending<'a>
-    for QStoreRef<'b, TS, store::nodes::DefaultNodeStore>
+impl<'a, TS> hyperast::types::AstLending<'a> for QStoreRef<'_, TS, store::nodes::DefaultNodeStore>
 where
     TS: types::TypeStore<Ty = types::AnyType>,
 {
     type RT = <store::nodes::DefaultNodeStore as hyperast::types::NLending<'a, Self::IdN>>::N;
 }
 
-impl<'a, TS> types::HyperAST for QStoreRef<'a, TS, store::nodes::DefaultNodeStore>
+impl<TS> types::HyperAST for QStoreRef<'_, TS, store::nodes::DefaultNodeStore>
 where
     TS: types::TypeStore<Ty = types::AnyType>,
 {
@@ -165,12 +164,11 @@ impl<
 }
 
 impl<
-    'store,
     HAST: types::TypedHyperAST<TIdN>,
     TIdN: hyperast::types::TypedNodeId + 'static,
     F: Converter<Ty = TIdN::Ty>,
     const PP: bool,
-> Display for TreeToQuery<'store, HAST, TIdN, F, PP>
+> Display for TreeToQuery<'_, HAST, TIdN, F, PP>
 where
     HAST::IdN: Debug + Copy,
     TIdN::Ty: types::TypeTrait,
@@ -181,12 +179,11 @@ where
 }
 
 impl<
-    'store,
     HAST: types::TypedHyperAST<TIdN>,
     TIdN: hyperast::types::TypedNodeId + 'static,
     F: Converter<Ty = TIdN::Ty>,
     const PP: bool,
-> TreeToQuery<'store, HAST, TIdN, F, PP>
+> TreeToQuery<'_, HAST, TIdN, F, PP>
 where
     HAST::IdN: Debug + Copy,
     TIdN::Ty: types::TypeTrait,
@@ -212,13 +209,13 @@ where
 
         match (label, children) {
             (None, None) => {
-                write!(out, "\"{}\"", kind.to_string())?;
+                write!(out, "\"{}\"", kind)?;
             }
             (_, Some(children)) => {
                 if !children.is_empty() {
                     let it = children.iter_children();
                     write!(out, "(")?;
-                    write!(out, "{}", kind.to_string())?;
+                    write!(out, "{}", kind)?;
                     for id in it {
                         let kind = self.stores.resolve_type(&id);
                         if !kind.is_spaces() {
@@ -238,7 +235,7 @@ where
             }
             (Some(label), None) => {
                 write!(out, "(")?;
-                write!(out, "{}", kind.to_string())?;
+                write!(out, "{}", kind)?;
                 write!(out, ")")?;
                 if self.matcher.is_matching::<_, TIdN>(self.stores, *id) {
                     let s = self.stores.label_store().resolve(label);
@@ -247,6 +244,6 @@ where
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 }

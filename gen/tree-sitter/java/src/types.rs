@@ -2291,7 +2291,7 @@ fn test_tslanguage_and_type_identity() {
     }
 }
 
-const S_T_L: &'static [Type] = &[
+const S_T_L: &[Type] = &[
     Type::End,
     Type::Identifier,
     Type::DecimalIntegerLiteral,

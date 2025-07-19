@@ -133,8 +133,8 @@ impl Debug for Acc {
     }
 }
 
-impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
-    ZippedTreeGen for TsQueryTreeGen<'store, 'cache, TS>
+impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>> ZippedTreeGen
+    for TsQueryTreeGen<'store, '_, TS>
 {
     type Stores = SimpleStores<TS>;
     type Text = [u8];
@@ -142,7 +142,7 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
     type TreeCursor<'b> = TTreeCursor<'b>;
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -388,8 +388,8 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
     }
 }
 
-impl<'stores, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>>> TreeGen
-    for TsQueryTreeGen<'stores, 'cache, TS>
+impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>>> TreeGen
+    for TsQueryTreeGen<'stores, '_, TS>
 {
     type Acc = Acc;
     type Global = SpacedGlobalData<'stores>;
@@ -440,7 +440,7 @@ impl<'stores, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIde
             dyn_builder.add(compo::BytesLen(
                 (acc.end_byte - acc.start_byte).try_into().unwrap(),
             ));
-            if acc.simple.children.len() > 0 {
+            if !acc.simple.children.is_empty() {
                 dyn_builder.add(compo::Size(size));
                 dyn_builder.add(compo::SizeNoSpaces(size_no_spaces));
                 dyn_builder.add(compo::Height(height));
@@ -473,7 +473,7 @@ impl<'stores, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIde
     }
 }
 
-impl<'stores, 'cache> TsQueryTreeGen<'stores, 'cache, crate::types::TStore> {
+impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
     pub fn build_then_insert(
         &mut self,
         _i: <hashed::HashedNode as hyperast::types::Stored>::TreeId,
@@ -580,7 +580,7 @@ impl<'stores, 'cache> TsQueryTreeGen<'stores, 'cache, crate::types::TStore> {
             if let Some(label_id) = label_id {
                 dyn_builder.add(label_id);
             }
-            if acc.simple.children.len() > 0 {
+            if !acc.simple.children.is_empty() {
                 dyn_builder.add(compo::Size(size));
                 dyn_builder.add(compo::SizeNoSpaces(size_no_spaces));
                 dyn_builder.add(compo::Height(height));

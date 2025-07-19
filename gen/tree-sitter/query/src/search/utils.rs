@@ -12,7 +12,7 @@ impl CaptureNames {
             self.0.push(name.to_string());
             return CaptureId(len as u32);
         };
-        CaptureId(p as u32)
+        CaptureId(p)
     }
 }
 
@@ -21,7 +21,7 @@ fn find(s: &[String], name: &str) -> Option<u32> {
 }
 
 pub mod arc {
-    use super::{find, CaptureId};
+    use super::{CaptureId, find};
     use std::sync::Arc;
 
     pub struct CaptureNames(Arc<[String]>);
@@ -82,7 +82,7 @@ pub mod opt {
     }
 
     pub mod arc {
-        use super::{find, CaptureId};
+        use super::{CaptureId, find};
         use std::sync::Arc;
 
         pub struct CaptureNames {

@@ -341,9 +341,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         // let hsyntax = hbuilder.most_discriminating();
         // let hashable = &hsyntax;
 
-        let metrics = acc
-            .metrics
-            .finalize(&interned_kind, &label, line_count as u16);
+        let metrics = acc.metrics.finalize(&interned_kind, &label, line_count);
 
         let hashable = &metrics.hashs.most_discriminating();
 
@@ -413,9 +411,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         dyn_builder.add(byte_len);
 
         let children_is_empty = acc.simple.children.is_empty();
-        let hashs = metrics
-            .clone()
-            .add_md_metrics(&mut dyn_builder, children_is_empty);
+        let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
         hashs.persist(&mut dyn_builder);
         acc.simple
             .add_primary(&mut dyn_builder, interned_kind, label_id);
@@ -454,8 +450,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         for c in cs {
             let local = {
                 let metrics = if let Some(md) = md(c) {
-                    let metrics = md.metrics;
-                    metrics
+                    md.metrics
                 } else {
                     use hyperast::hashed::SyntaxNodeHashsKinds;
                     use hyperast::types::WithHashs;
@@ -470,14 +465,14 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
                     byte_len += node.try_bytes_len().unwrap();
                     use hyperast::types::WithStats;
                     use num::ToPrimitive;
-                    let metrics = SubTreeMetrics {
+
+                    SubTreeMetrics {
                         size: node.size().to_u32().unwrap(),
                         height: node.height().to_u32().unwrap(),
                         size_no_spaces: node.size_no_spaces().to_u32().unwrap(),
                         hashs,
                         line_count: node.line_count().to_u16().unwrap(),
-                    };
-                    metrics
+                    }
                 };
                 Local {
                     compressed_node: c,

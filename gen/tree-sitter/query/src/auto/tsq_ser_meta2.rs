@@ -41,12 +41,11 @@ impl<'store, 'a, HAST: types::TypedHyperAST<TIdN>, TIdN: hyperast::types::TypedN
 }
 
 impl<
-    'hast,
     HAST: types::TypedHyperAST<TIdN>,
     TIdN: hyperast::types::TypedNodeId + 'static,
     const V: bool,
     const PP: bool,
-> Display for TreeToQuery<'hast, HAST, TIdN, V, PP>
+> Display for TreeToQuery<'_, HAST, TIdN, V, PP>
 where
     HAST::IdN: Debug + Copy,
     HAST::TS: hyperast::types::RoleStore,
@@ -62,12 +61,11 @@ where
 }
 
 impl<
-    'hast,
     HAST: types::TypedHyperAST<TIdN>,
     TIdN: hyperast::types::TypedNodeId + 'static,
     const V: bool,
     const PP: bool,
-> TreeToQuery<'hast, HAST, TIdN, V, PP>
+> TreeToQuery<'_, HAST, TIdN, V, PP>
 where
     HAST::IdN: Debug + Copy,
     HAST::TS: hyperast::types::RoleStore,

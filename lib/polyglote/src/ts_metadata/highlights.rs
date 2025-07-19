@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Display, str::FromStr};
 
 use tree_sitter::TreeCursor;
 
-use super::{ts_query_tree_from_str, Error, Patt, Query};
+use super::{Error, Patt, Query, ts_query_tree_from_str};
 
 #[derive(Debug, Default)]
 pub struct HighLights {

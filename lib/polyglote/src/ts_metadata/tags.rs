@@ -4,7 +4,7 @@ use tree_sitter::TreeCursor;
 
 type TagedRole = String;
 
-use super::{ts_query_tree_from_str, Error, Patt, Query};
+use super::{Error, Patt, Query, ts_query_tree_from_str};
 
 #[derive(Debug, Default)]
 pub struct Tags {
@@ -170,8 +170,9 @@ impl Tag {
             .and_then(|x| {
                 dbg!(&x);
                 if x.1.len() > 1 {
-                    Ok(x.0) // should be ok actually
-                            // Err("missplaced tag variable name".into())
+                    Ok(x.0)
+                    // should be ok actually
+                    // Err("missplaced tag variable name".into())
                 } else {
                     Ok(x.0)
                 }

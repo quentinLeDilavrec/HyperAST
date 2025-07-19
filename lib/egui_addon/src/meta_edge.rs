@@ -60,7 +60,7 @@ pub fn meta_egde(
             p_down = x;
         } else {
             let mut i = idx;
-            while let Some(x) = up.next() {
+            for x in up.by_ref() {
                 out.colored_vertex(x, color);
                 color = f(idx);
                 i += 1;
@@ -76,7 +76,7 @@ pub fn meta_egde(
             p_up = x;
         } else {
             let mut i = idx;
-            while let Some(x) = down.next() {
+            for x in down.by_ref() {
                 out.colored_vertex(x, color);
                 color = f(idx);
                 i += 1;

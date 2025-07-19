@@ -118,7 +118,7 @@ impl<Value, Computer> BorrowFrameCache<Value, Computer> {
         Key: std::hash::Hash,
     {
         let hash = egui::util::hash(&key);
-        self.cache.remove(&hash).map(|x|x.1)
+        self.cache.remove(&hash).map(|x| x.1)
     }
 }
 
@@ -312,7 +312,7 @@ pub(crate) fn show_commit_menu2(ui: &mut egui::Ui, commit: &mut Commit) -> bool 
             .get(("github.com", commit));
     });
     let c = ui.ctx().memory_mut(|mem| {
-        let aaa =AAA{};
+        let aaa = AAA {};
         let a = mem
             .caches
             .cache::<BorrowFrameCache<String, ComputeCommitStr2>>()

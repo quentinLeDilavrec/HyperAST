@@ -108,7 +108,7 @@ pub fn highlight_byte_range_aux(
         ui,
         &p,
         galley_pos,
-        &galley,
+        galley,
         &cursor_range.map(|x| x.rcursor),
         color,
     );

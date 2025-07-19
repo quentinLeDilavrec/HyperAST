@@ -293,7 +293,7 @@ fn checkbox_heading(
         });
 
         if ui.is_rect_visible(rect) {
-            let visuals = ui.style().interact(&response);
+            let visuals = ui.style().interact(response);
             let (small_icon_rect, big_icon_rect) = ui.spacing().icon_rectangles(rect);
             ui.painter().add(epaint::RectShape::new(
                 big_icon_rect.expand(visuals.expansion),

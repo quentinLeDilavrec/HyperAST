@@ -1,17 +1,11 @@
-use super::{
-    crdt_over_ws::{self, DocSharingState, SharedDocView},
-    types::WithDesc,
-    utils_results_batched::{self, ComputeError, RemoteResult},
-    Sharing,
-};
+use super::utils_results_batched::{self, ComputeError, RemoteResult};
+use super::{Sharing, crdt_over_ws, types::WithDesc};
 use crate::app::code_editor_automerge;
 use automerge::sync::SyncDoc;
 use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
-use std::{
-    ops::DerefMut,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex, RwLock};
 pub type SharedCodeEditors<T> = std::sync::Arc<std::sync::Mutex<T>>;
 
 // TODO allow to change user name and generate a random default
@@ -19,7 +13,6 @@ pub type SharedCodeEditors<T> = std::sync::Arc<std::sync::Mutex<T>>;
 pub(crate) const USER: &str = "web";
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) const USER: &str = "native";
-
 
 #[derive(Default, Serialize, Deserialize)]
 pub(crate) struct EditingContext<L, S> {
@@ -139,7 +132,7 @@ fn timed_updater<T: autosurgeon::Reconcile>(
 pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
     mut receiver: futures_util::stream::SplitStream<tokio_tungstenite_wasm::WebSocketStream>,
     mut sender: futures::channel::mpsc::Sender<tokio_tungstenite_wasm::Message>,
-    doc: std::sync::Arc<std::sync::RwLock<DocSharingState>>,
+    doc: std::sync::Arc<std::sync::RwLock<crdt_over_ws::DocSharingState>>,
     ctx: egui::Context,
     rt: crdt_over_ws::Rt,
     code_editors: SharedCodeEditors<T>,
@@ -231,7 +224,7 @@ pub(super) async fn db_update_handler(
     mut receiver: futures_util::stream::SplitStream<tokio_tungstenite_wasm::WebSocketStream>,
     owner: String,
     ctx: egui::Context,
-    data: Arc<RwLock<(Option<usize>, Vec<Option<SharedDocView>>)>>,
+    data: Arc<RwLock<(Option<usize>, Vec<Option<crdt_over_ws::SharedDocView>>)>>,
 ) {
     use futures_util::StreamExt;
     type User = String;
@@ -258,11 +251,13 @@ pub(super) async fn db_update_handler(
 
                 #[derive(Deserialize, Serialize, Debug, Clone)]
                 enum DbMsgFromServer {
-                    Add(SharedDocView),
+                    Add(crdt_over_ws::SharedDocView),
                     AddWriter(usize, User),
                     RmWriter(usize, User),
                     // Rename(usize, String),
-                    Reset { all: Vec<SharedDocView> },
+                    Reset {
+                        all: Vec<crdt_over_ws::SharedDocView>,
+                    },
                 }
                 let msg = serde_json::from_str(&msg).unwrap();
 
@@ -616,10 +611,15 @@ impl
 #[derive(Default)]
 pub(crate) struct HiHighlighter(egui_addon::syntax_highlighting::syntect::Highlighter);
 impl<MH: MakeHighlights>
-    egui::util::cache::ComputerMut<(&CodeTheme, FileContainer<'_, &str>, &str, MH), egui::text::LayoutJob>
-    for HiHighlighter
+    egui::util::cache::ComputerMut<
+        (&CodeTheme, FileContainer<'_, &str>, &str, MH),
+        egui::text::LayoutJob,
+    > for HiHighlighter
 {
-    fn compute(&mut self, (theme, code, lang, mh): (&CodeTheme, FileContainer<'_, &str>, &str, MH)) -> LayoutJob {
+    fn compute(
+        &mut self,
+        (theme, code, lang, mh): (&CodeTheme, FileContainer<'_, &str>, &str, MH),
+    ) -> LayoutJob {
         let mut layout_job = self.0.highlight(theme, code.1, lang); // TODO cache it separatly it takes too much time
         let sections = std::mem::take(&mut layout_job.sections);
         let mut starts = vec![];
@@ -805,7 +805,7 @@ impl<'a, 'b, MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
                     };
                     let mut rect = rect.rect;
                     rect.min.x = left; //.min(mid_rect.min.x);
-                                       // mid_rect.min.x = left.min(mid_rect.min.x);
+                    // mid_rect.min.x = left.min(mid_rect.min.x);
                     rect.max.x = rect.max.x.max(mid_rect.max.x);
                     shapes.push(rect);
                     let rect = &galley.rows[row_range[1]];

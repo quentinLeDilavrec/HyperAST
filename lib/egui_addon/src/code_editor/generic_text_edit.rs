@@ -80,11 +80,11 @@ pub struct TextEdit<'t, TB: TextBuffer> {
     clip_text: bool,
 }
 
-impl<'t, TB: TextBuffer> WidgetWithState for TextEdit<'t, TB> {
+impl<TB: TextBuffer> WidgetWithState for TextEdit<'_, TB> {
     type State = TextEditState;
 }
 
-impl<'t, TB: TextBuffer> TextEdit<'t, TB> {
+impl<TB: TextBuffer> TextEdit<'_, TB> {
     pub fn load_state(ctx: &Context, id: Id) -> Option<TextEditState> {
         TextEditState::load(ctx, id)
     }
@@ -322,13 +322,13 @@ impl<'t, TB: TextBuffer> TextEdit<'t, TB> {
 
 // ----------------------------------------------------------------------------
 
-impl<'t, TB: TextBuffer> Widget for TextEdit<'t, TB> {
+impl<TB: TextBuffer> Widget for TextEdit<'_, TB> {
     fn ui(self, ui: &mut Ui) -> Response {
         self.show(ui).response
     }
 }
 
-impl<'t, TB: TextBuffer> TextEdit<'t, TB> {
+impl<TB: TextBuffer> TextEdit<'_, TB> {
     /// Show the [`TextEdit`], returning a rich [`TextEditOutput`].
     ///
     /// ```
@@ -836,7 +836,7 @@ impl<'t, TB: TextBuffer> TextEdit<'t, TB> {
             galley,
             text_draw_pos,
             text_clip_rect,
-            state: state.into(),
+            state,
             cursor_range,
         }
     }
@@ -956,7 +956,7 @@ fn events<TB: TextBuffer>(
                 if cursor_range.is_empty() {
                     copy_if_not_password(ui, text.as_str().to_owned());
                 } else {
-                    let str: &str = selected_str(text, &cursor_range).into();
+                    let str: &str = selected_str(text, &cursor_range);
                     copy_if_not_password(ui, str.to_owned());
                 }
                 None
@@ -966,7 +966,7 @@ fn events<TB: TextBuffer>(
                     copy_if_not_password(ui, text.take());
                     Some(CCursorRange::default())
                 } else {
-                    let str: &str = selected_str(text, &cursor_range).into();
+                    let str: &str = selected_str(text, &cursor_range);
                     copy_if_not_password(ui, str.to_owned());
                     Some(CCursorRange::one(delete_selected(text, &cursor_range)))
                 }

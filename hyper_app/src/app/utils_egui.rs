@@ -326,19 +326,18 @@ pub trait MyUiExt: UiExt {
             .horizontal(|ui| {
                 let mut lower_value = *low as f32;
                 let mut upper_value = *high as f32;
-                let range = std::ops::RangeInclusive::new(
-                    *range.start() as f32,
-                    *range.end() as f32,
-                );
+                let range =
+                    std::ops::RangeInclusive::new(*range.start() as f32, *range.end() as f32);
                 let slider = egui_double_slider::DoubleSlider::new(
                     &mut lower_value,
                     &mut upper_value,
                     range,
-                ).separation_distance(1f32);
+                )
+                .separation_distance(1f32);
                 let resp = egui::Widget::ui(slider, ui);
                 *low = lower_value as usize;
                 *high = upper_value as usize;
-                ui.label(format!("{}..{}", low,high));
+                ui.label(format!("{}..{}", low, high));
                 resp
             })
             .inner

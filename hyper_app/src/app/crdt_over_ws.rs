@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 #[cfg(target_arch = "wasm32")]
 use async_executors::JoinHandle;
-use autosurgeon::{reconcile, Hydrate, Reconcile};
+use autosurgeon::{Hydrate, Reconcile, reconcile};
 use egui_addon::code_editor::generic_text_buffer::TextBuffer;
 use futures_util::{Future, SinkExt, StreamExt};
 use lazy_static::lazy_static;

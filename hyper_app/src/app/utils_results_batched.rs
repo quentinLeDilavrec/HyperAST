@@ -4,9 +4,9 @@ use crate::app::types;
 use crate::app::utils;
 use crate::app::utils::SecFmt;
 
+use super::ProjectId;
 use super::types::CommitId;
 use super::types::Resource;
-use super::ProjectId;
 
 pub(crate) trait ComputeError {
     fn head(&self) -> &str;

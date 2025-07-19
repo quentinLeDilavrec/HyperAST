@@ -160,7 +160,7 @@ pub mod web {
 mod native {
     use std::{
         sync::{Arc, Mutex},
-        thread::{spawn, JoinHandle},
+        thread::{JoinHandle, spawn},
     };
 
     pub struct TimeoutHandle(JoinHandle<()>);

@@ -324,11 +324,11 @@ pub struct MultiBuffered2<K, V2: std::marker::Send + 'static, V = V2> {
 
 //
 impl<
-        'de,
-        K: Eq + std::hash::Hash + serde::Deserialize<'de>,
-        V2: std::marker::Send + 'static,
-        V: serde::Deserialize<'de>,
-    > serde::Deserialize<'de> for MultiBuffered2<K, V2, V>
+    'de,
+    K: Eq + std::hash::Hash + serde::Deserialize<'de>,
+    V2: std::marker::Send + 'static,
+    V: serde::Deserialize<'de>,
+> serde::Deserialize<'de> for MultiBuffered2<K, V2, V>
 {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let content = HashMap::<K, V>::deserialize(d)?;
@@ -396,21 +396,21 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2
             .collect();
         b
     }
-
 }
 
 impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2<K, V2, V> {
     pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash {
+        Q: Eq + std::hash::Hash,
+    {
         self.content.get_mut(key)
     }
 
     pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash
+        Q: Eq + std::hash::Hash,
     {
         self.content.get(key)
     }
@@ -418,11 +418,10 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2
     pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash
+        Q: Eq + std::hash::Hash,
     {
         self.content.remove(key)
     }
-
 }
 
 impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2<K, V2, V> {

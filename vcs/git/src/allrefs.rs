@@ -1,32 +1,24 @@
 use std::{borrow::Borrow, fmt::Display, io::Write, path::Path, time::Instant};
 
-use hyperast::{
-    position::{
-        Position, SpHandle, StructuralPosition, StructuralPositionStore, TreePath, TreePathMut,
-        TypedTreePath,
-    },
-    store::{
-        defaults::{LabelIdentifier, NodeIdentifier},
-        nodes::legion::HashedNodeRef,
-    },
-    types::{
-        IterableChildren, LabelStore, Labeled, NodeId, TypeTrait, Typed, TypedNodeStore,
-        WithChildren,
-    },
+use hyperast::position::{
+    Position, SpHandle, StructuralPosition, StructuralPositionStore, TreePath, TreePathMut,
+    TypedTreePath,
 };
-use hyperast_gen_ts_java::{
-    impact::{
-        element::{IdentifierFormat, LabelPtr, RefPtr, RefsEnum},
-        partial_analysis::PartialAnalysis,
-        reference::DisplayRef,
-        usage::{self, remake_pkg_ref},
-    },
-    types::Type,
-    usage::declarations::IterDeclarations,
+use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::store::nodes::legion::HashedNodeRef;
+use hyperast::types::{
+    IterableChildren, LabelStore, Labeled, NodeId, TypeTrait, Typed, TypedNodeStore, WithChildren,
 };
+use hyperast_gen_ts_java::impact::{
+    element::{IdentifierFormat, LabelPtr, RefPtr, RefsEnum},
+    partial_analysis::PartialAnalysis,
+    reference::DisplayRef,
+    usage::{self, remake_pkg_ref},
+};
+use hyperast_gen_ts_java::{types::Type, usage::declarations::IterDeclarations};
 use num::ToPrimitive;
 
-use crate::{maven::IterMavenModules, preprocessed::child_by_name_with_idx, SimpleStores};
+use crate::{SimpleStores, maven::IterMavenModules, preprocessed::child_by_name_with_idx};
 
 const REFERENCES_SERIALIZATION_SUMMARY: bool = false;
 

@@ -1,4 +1,3 @@
-
 use hyperast::store::defaults::NodeIdentifier;
 
 pub fn count_matches(

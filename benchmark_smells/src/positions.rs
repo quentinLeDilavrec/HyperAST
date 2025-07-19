@@ -1,4 +1,3 @@
-
 use hyperast::store::defaults::NodeIdentifier;
 
 type Positions = Vec<String>;

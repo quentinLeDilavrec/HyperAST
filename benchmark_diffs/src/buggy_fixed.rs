@@ -14,7 +14,7 @@ pub fn buggy_fixed_dataset_roots(root: &Path, dataset: impl ToString) -> [std::p
     let datasets = root.parent().unwrap().join("datasets");
     assert!(
         datasets.exists(),
-        "you should clone the gumtree dataset:\n`cd ..; git clone git@github.com:GumTreeDiff/datasets.git gt_datasets; cd gt_datasets; git checkout 33024da8de4c519bb1c1146b19d91d6cb4c81ea6`"
+        "you should clone the gumtree dataset:\n`cd ..; git clone git@github.com:GumTreeDiff/datasets.git; cd datasets; git checkout 33024da8de4c519bb1c1146b19d91d6cb4c81ea6`"
     );
     let data_root = datasets.join(dataset.to_string());
     assert!(
@@ -1909,7 +1909,8 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
         actions: hast_actions,
         exec_data,
     } = algorithms::gumtree::diff(&stores, &src_tr.compressed_node, &dst_tr.compressed_node);
-    let gt_out = other_tools::gumtree::subprocess(
+
+    let gt_out = other_tools::gumtree::subprocess_checked(
         &stores,
         src_tr.compressed_node,
         dst_tr.compressed_node,
@@ -1917,8 +1918,7 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
         "Chawathe",
         60 * 5,
         gt_out_format,
-    )
-    .unwrap();
+    );
 
     let timings = [
         exec_data.phase1().sum::<std::time::Duration>(),
@@ -1928,6 +1928,27 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
     .map(|x| x.unwrap());
 
     dbg!(&timings);
+    let gt_out = match gt_out {
+        Ok(gt_out) => gt_out,
+        Err(err) => {
+            eprintln!("error while trying to execute gumtree binary: {err}");
+            eprintln!(
+                "If you want to compare your results with the original gumtree implementation you need to fix the previous error,"
+            );
+            eprintln!("otherwise ignore this message.");
+            return Some(format!(
+                "{},{},{},{},,,,{},{},{},,,",
+                src.to_string_lossy(),
+                buggy_s,
+                fixed_s,
+                hast_actions.unwrap().len(),
+                &timings[0].as_secs_f64(),
+                &timings[1].as_secs_f64(),
+                &timings[2].as_secs_f64(),
+            ));
+        }
+    };
+
     let res = if gt_out_format == "COMPRESSED" {
         let pp = CompressedBfPostProcess::create(&gt_out);
         let (pp, counts) = pp.counts();

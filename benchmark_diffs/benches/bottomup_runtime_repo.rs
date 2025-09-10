@@ -45,6 +45,12 @@ fn bottomup_group(c: &mut Criterion) {
             config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
             fetch: true,
         },
+        Input {
+            repo: hyperast_vcs_git::git::Forge::Github.repo("apache", "hadoop"),
+            commit: "b69ede7154d44538a4a66824c34f7ba143deef25",
+            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
+            fetch: true,
+        },
     ];
     let mut repositories = PreProcessedRepositories::default();
     for p in inputs.iter() {
@@ -385,7 +391,7 @@ fn bench_simple(
         group,
         repositories,
         p,
-        BenchmarkId::new("Simple_{}", p.repo.name()),
+        BenchmarkId::new("Simple", p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
             b.iter_batched(

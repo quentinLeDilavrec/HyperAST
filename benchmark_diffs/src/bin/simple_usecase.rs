@@ -1,5 +1,4 @@
-// window of one is just consecutive commits
-
+//! Computes structural diffs on consecutive commits.
 use hyperast_vcs_git::{multi_preprocessed::PreProcessedRepositories, processing::RepoConfig};
 use std::{
     fs::File,
@@ -132,7 +131,6 @@ fn inc(
         let lazy = hyper_diff::algorithms::gumtree_lazy::diff(&hyperast, &src_tr, &dst_tr);
         let summarized_lazy = &lazy.summarize();
         let total_lazy_t: std::time::Duration = summarized_lazy.exec_data.sum().unwrap();
-        dbg!(summarized_lazy);
         log::warn!("ed+mappings size: {}", memusage_linux() - mu);
         log::warn!("done computing diff {i}");
         if let Some(buf) = &mut buf {
@@ -151,6 +149,17 @@ fn inc(
             )
             .unwrap();
             buf.flush().unwrap();
+        } else {
+            use hyper_diff::algorithms::RuntimeMeasurement;
+            println!(
+                "topdown: {}",
+                summarized_lazy.exec_data.cdr().cdr().current.display()
+            );
+            println!(
+                "bottomup: {}",
+                summarized_lazy.exec_data.cdr().current.display()
+            );
+            println!("gen: {}", summarized_lazy.exec_data.current.display());
         }
 
         curr = oid_src.to_string();
@@ -227,7 +236,6 @@ fn whole(
             let lazy = hyper_diff::algorithms::gumtree_lazy::diff(&hyperast, &src_tr, &dst_tr);
             let summarized_lazy = &lazy.summarize();
             let total_lazy_t: std::time::Duration = summarized_lazy.exec_data.sum().unwrap();
-            dbg!(summarized_lazy);
             log::warn!("ed+mappings size: {}", memusage_linux() - mu);
             if let Some(buf) = &mut buf {
                 writeln!(
@@ -245,6 +253,9 @@ fn whole(
                 )
                 .unwrap();
                 buf.flush().unwrap();
+            } else {
+                use hyper_diff::algorithms::RuntimeMeasurement;
+                println!("gen: {}", summarized_lazy.exec_data.current.display());
             }
         }
         log::warn!("done computing diff {i}");

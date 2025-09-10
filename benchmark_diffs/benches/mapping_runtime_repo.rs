@@ -262,6 +262,55 @@ fn mapping_group(c: &mut Criterion) {
             &mut group,
             &mut repositories,
             p,
+            BenchmarkId::new("PartialLazySimpleGumtree", p.repo.name()),
+            |b, (repositories, (src, dst))| {
+                b.iter(|| {
+                    let hyperast = &repositories.processor.main_stores;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
+                    let mapper =
+                        hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
+
+                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
+                    let mappings = mapper.mapping.mappings;
+                    let mapper =
+                        hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                    let mapper = mapper.map(
+                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
+                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
+                    );
+                    use gt::simple_bottom_up_matcher3::SimpleBottomUpMatcher;
+                    let mapper_bottom_up = SimpleBottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                    black_box(mapper_bottom_up);
+                });
+            },
+        );
+        prep_bench(
+            &mut group,
+            &mut repositories,
+            p,
+            BenchmarkId::new("LazySimpleGumtree", p.repo.name()),
+            |b, (repositories, (src, dst))| {
+                b.iter(|| {
+                    let hyperast = &repositories.processor.main_stores;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
+                    let mapper =
+                        hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
+
+                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
+
+                    use gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
+                    let mapper_bottom_up =
+                        LazySimpleBottomUpMatcher::<_, _, _, M>::match_it(mapper);
+                    black_box(mapper_bottom_up);
+                });
+            },
+        );
+        prep_bench(
+            &mut group,
+            &mut repositories,
+            p,
             BenchmarkId::new("PartialLazyStableGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {

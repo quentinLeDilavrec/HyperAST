@@ -270,7 +270,7 @@ impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
                     path,
                     &mut self.stack.last_mut().unwrap().1,
                     self.filesys,
-                )
+                );
             } else {
                 log::debug!("not java source file {:?}", name);
             }
@@ -375,6 +375,26 @@ pub fn parse_dir_pair(
     dst: &Path,
 ) -> (Local, Local) {
     let mut filesys = FileSys {};
+
+    if !src.exists() && !dst.exists() {
+        panic!(
+            "no directory or file at {} and {}",
+            src.to_string_lossy(),
+            dst.to_string_lossy()
+        )
+    } else if !src.exists() {
+        panic!(
+            "cannot find directory associated to {} at path {}",
+            dst.to_string_lossy(),
+            src.to_string_lossy()
+        )
+    } else if !dst.exists() {
+        panic!(
+            "cannot find directory associated to {} at path {}",
+            src.to_string_lossy(),
+            dst.to_string_lossy()
+        )
+    }
     let src = java_gen
         .handle_java_directory(src.to_path_buf(), &mut filesys)
         .0;

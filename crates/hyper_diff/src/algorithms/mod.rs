@@ -99,8 +99,13 @@ impl<D: RuntimeMetric, P> Phased<Prepared<D::M, D>, P> {
 
 impl<P1: RuntimeMeasurement, P2: RuntimeMeasurement> Phased<P1, P2> {
     pub fn sum<T: 'static + Clone + std::ops::Add<Output = T>>(&self) -> Option<T> {
-        let (a, b) = self.current.sum::<T>().zip(self.prev.sum::<T>())?;
-        Some(a.clone() + b.clone())
+        let a = self.current.sum::<T>();
+        let b = self.prev.sum::<T>();
+        if let Some(a) = a {
+            Some(if let Some(b) = b { a + b } else { a })
+        } else {
+            b
+        }
     }
 }
 impl<P1: RuntimeMeasurement, P2: RuntimeMeasurement> RuntimeMeasurement for Phased<P1, P2> {
@@ -201,17 +206,20 @@ impl<M1: RuntimeMeasurement, M2: RuntimeMeasurement> RuntimeMeasurement for (M1,
             for DisplayTuple<'_, (M1, M2)>
         {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                self.0.0.display().fmt(f)?;
-                self.0.1.display().fmt(f)?;
-                Ok(())
+                write!(f, "({} ; {})", self.0.0.display(), self.0.1.display())
             }
         }
         DisplayTuple(self)
     }
 
     fn sum<D: 'static + Clone + std::ops::Add<Output = D>>(&self) -> Option<D> {
-        let (a, b) = self.0.sum::<D>().zip(self.0.sum::<D>())?;
-        Some(a.clone() + b.clone())
+        let a = self.0.sum::<D>();
+        let b = self.1.sum::<D>();
+        if let Some(a) = a {
+            Some(if let Some(b) = b { a + b } else { a })
+        } else {
+            b
+        }
     }
 }
 
@@ -303,7 +311,12 @@ impl RuntimeMeasurement for AllocatedMemory {
 
 impl std::fmt::Display for AllocatedMemory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} bytes", self.0)
+        let div = self.0.div_euclid(1000);
+        if div == 0 {
+            write!(f, "{div} bytes")
+        } else {
+            write!(f, "{div} Mb",)
+        }
     }
 }
 

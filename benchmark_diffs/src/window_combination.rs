@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{
     fmt::Display,
     fs::File,
@@ -9,28 +10,34 @@ use crate::other_tools;
 use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess};
 use hyper_diff::algorithms::{self, RuntimeMeasurement as _};
 use hyperast::{types::WithStats, utils::memusage_linux};
-use hyperast_vcs_git::preprocessed::PreProcessedRepository;
-use hyperast_vcs_git::{git::fetch_github_repository, no_space::as_nospaces2 as as_nospaces};
+use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
+use hyperast_vcs_git::no_space::as_nospaces2 as as_nospaces;
+use hyperast_vcs_git::processing::ConfiguredRepoHandle2;
 
 pub fn windowed_commits_compare(
     window_size: usize,
-    mut preprocessed: PreProcessedRepository,
+    mut preprocessed: PreProcessedRepositories,
+    repo: ConfiguredRepoHandle2,
     (before, after): (&str, &str),
-    dir_path: &str,
     diff_algorithm: &str,
     out: Option<(PathBuf, PathBuf)>,
 ) {
     assert!(window_size > 1);
-
-    let batch_id = format!("{}:({},{})", &preprocessed.name, before, after);
-    let mu = memusage_linux();
-    let processing_ordered_commits = preprocessed.pre_process_with_limit(
-        &mut fetch_github_repository(&preprocessed.name),
+    use hyperast_vcs_git::processing::ConfiguredRepoTrait;
+    let batch_id = format!(
+        "{}/{}:({},{})",
+        repo.spec().user(),
+        repo.spec().name(),
         before,
-        after,
-        dir_path,
-        1000,
+        after
     );
+    let mu = memusage_linux();
+
+    let repository = repo.fetch();
+    let processing_ordered_commits = preprocessed
+        .processor
+        .pre_process_with_limit(&repository, before, after, 1000)
+        .unwrap();
     let hyperast_size = memusage_linux() - mu;
     log::warn!("hyperAST size: {}", hyperast_size);
     log::warn!("batch_id: {batch_id}");
@@ -41,7 +48,7 @@ pub fn windowed_commits_compare(
     log::warn!("cache size: {mu}");
     log::warn!(
         "commits ({}): {:?}",
-        preprocessed.commits.len(),
+        processing_ordered_commits.len(),
         processing_ordered_commits
     );
     let mut i = 0;
@@ -74,13 +81,17 @@ pub fn windowed_commits_compare(
 
             let stores = &preprocessed.processor.main_stores;
 
-            let commit_src = preprocessed.commits.get_key_value(&oid_src).unwrap();
-            let src_tr = commit_src.1.ast_root;
+            let commit_src = preprocessed
+                .get_commit(&repository.config, &oid_src)
+                .unwrap();
+            let src_tr = commit_src.ast_root;
             let src_s = stores.node_store.resolve(src_tr).size();
             dbg!(src_s, stores.node_store.resolve(src_tr).size_no_spaces());
 
-            let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
-            let dst_tr = commit_dst.1.ast_root;
+            let commit_dst = preprocessed
+                .get_commit(&repository.config, oid_dst)
+                .unwrap();
+            let dst_tr = commit_dst.ast_root;
             let dst_s = stores.node_store.resolve(dst_tr).size();
             dbg!(dst_s, stores.node_store.resolve(dst_tr).size_no_spaces());
 
@@ -146,8 +157,8 @@ pub fn windowed_commits_compare(
                 dbg!(
                     &src_s,
                     &dst_s,
-                    Into::<isize>::into(&commit_src.1.memory_used()),
-                    Into::<isize>::into(&commit_dst.1.memory_used()),
+                    Into::<isize>::into(&commit_src.memory_used()),
+                    Into::<isize>::into(&commit_dst.memory_used()),
                     &summarized_lazy,
                     &not_lazy,
                     &partial_lazy,
@@ -169,8 +180,8 @@ pub fn windowed_commits_compare(
                         summarized_lazy.actions.map_or(-1, |x| x as isize),
                         &gt_counts.src_heap,
                         &gt_counts.dst_heap,
-                        Into::<isize>::into(&commit_src.1.memory_used()),
-                        Into::<isize>::into(&commit_dst.1.memory_used()),
+                        Into::<isize>::into(&commit_src.memory_used()),
+                        Into::<isize>::into(&commit_dst.memory_used()),
                         not_lazy.mappings,
                         not_lazy.actions.map_or(-1, |x| x as isize),
                         partial_lazy.mappings,
@@ -209,8 +220,8 @@ pub fn windowed_commits_compare(
                         summarized_lazy.actions.map_or(-1, |x| x as isize),
                         -1, //&gt_counts.src_heap,
                         -1, //&gt_counts.dst_heap,
-                        Into::<isize>::into(&commit_src.1.memory_used()),
-                        Into::<isize>::into(&commit_dst.1.memory_used()),
+                        Into::<isize>::into(&commit_src.memory_used()),
+                        Into::<isize>::into(&commit_dst.memory_used()),
                         not_lazy.mappings,
                         not_lazy.actions.map_or(-1, |x| x as isize),
                         partial_lazy.mappings,
@@ -258,8 +269,8 @@ pub fn windowed_commits_compare(
                     "{oid_src}/{oid_dst},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                     src_s,
                     dst_s,
-                    Into::<isize>::into(&commit_src.1.memory_used()),
-                    Into::<isize>::into(&commit_dst.1.memory_used()),
+                    Into::<isize>::into(&commit_src.memory_used()),
+                    Into::<isize>::into(&commit_dst.memory_used()),
                     sumrzd_lazy.actions.map_or(-1, |x| x as isize),
                     gt_counts.actions,
                     valid.missing_mappings,
@@ -346,28 +357,41 @@ mod test {
         },
     };
     use hyperast::types::{HyperASTShared, WithChildren};
+    use hyperast_vcs_git::preprocessed::child_by_name;
 
     use crate::postprocess::{SimpleJsonPostProcess, print_mappings};
 
     #[test]
     fn issue_mappings_pomxml_spoon_pom() {
         // INRIA/spoon 7c7f094bb22a350fa64289a94880cc3e7231468f 78d88752a9f4b5bc490f5e6fb0e31dc9c2cf4bcd "spoon-pom" "" 2
-        let preprocessed = PreProcessedRepository::new("INRIA/spoon");
+        let repo_name = "INRIA/spoon";
+        let subdir = "spoon-pom";
         let window_size = 2;
-        let mut preprocessed = preprocessed;
         let (before, after) = (
             "7c7f094bb22a350fa64289a94880cc3e7231468f",
             "78d88752a9f4b5bc490f5e6fb0e31dc9c2cf4bcd",
         );
         assert!(window_size > 1);
 
-        let processing_ordered_commits = preprocessed.pre_process_with_limit(
-            &mut fetch_github_repository(&preprocessed.name),
-            before,
-            after,
-            "spoon-pom",
-            1000,
-        );
+        let mut preprocessed = PreProcessedRepositories::default();
+        let (user, name) = repo_name.split_once("/").unwrap();
+        let repo = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let configured_repo = preprocessed.register_config(repo, config);
+        let repository = configured_repo.fetch();
+
+        todo!("need to reenable the selection of a subdir"); // here spoon-pom
+
+        let processing_ordered_commits = preprocessed
+            .processor
+            .pre_process_with_limit(
+                &repository,
+                before,
+                after,
+                // subdir,
+                1000,
+            )
+            .unwrap();
         preprocessed.processor.purge_caches();
         let c_len = processing_ordered_commits.len();
         let c = (0..c_len - 1)
@@ -377,12 +401,16 @@ mod test {
         let oid_src = &c[0];
         let oid_dst = &c[1];
 
-        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
-        let src_tr = commit_src.1.ast_root;
+        let commit_src = preprocessed
+            .get_commit(&repository.config, oid_src)
+            .unwrap();
+        let src_tr = commit_src.ast_root;
         // let src_tr = preprocessed.child_by_name(src_tr, "hadoop-common-project").unwrap();
 
-        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
-        let dst_tr = commit_dst.1.ast_root;
+        let commit_dst = preprocessed
+            .get_commit(&repository.config, oid_dst)
+            .unwrap();
+        let dst_tr = commit_dst.ast_root;
         // let dst_tr = preprocessed.child_by_name(dst_tr, "hadoop-common-project").unwrap();
         let stores = &preprocessed.processor.main_stores;
         let src = src_tr;
@@ -409,22 +437,33 @@ mod test {
         // hast, gt evolutions: 517,517,
         // missing, additional mappings: 43,10,
         // 1.089578603,2.667414915,1.76489064,1.59514709,2.984131976,35.289540009
-        let preprocessed = PreProcessedRepository::new("INRIA/spoon");
+        let repo_name = "INRIA/spoon";
+        let subdir = "spoon-pom";
         let window_size = 2;
-        let mut preprocessed = preprocessed;
         let (before, after) = (
             "76ffd3353a535b0ce6edf0bf961a05236a40d3a1",
             "74ee133f4fe25d8606e0775ade577cd8e8b5cbfd",
         );
         assert!(window_size > 1);
 
-        let processing_ordered_commits = preprocessed.pre_process_with_limit(
-            &mut fetch_github_repository(&preprocessed.name),
-            before,
-            after,
-            "spoon-pom",
-            1000,
-        );
+        let mut preprocessed = PreProcessedRepositories::default();
+        let (user, name) = repo_name.split_once("/").unwrap();
+        let repo = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let configured_repo = preprocessed.register_config(repo, config);
+        let repository = configured_repo.fetch();
+
+        todo!("need to reenable the selection of a subdir"); // here spoon-pom
+        let processing_ordered_commits = preprocessed
+            .processor
+            .pre_process_with_limit(
+                &repository,
+                before,
+                after,
+                // subdir,
+                1000,
+            )
+            .unwrap();
         preprocessed.purge_caches();
         let c_len = processing_ordered_commits.len();
         let c = (0..c_len - 1)
@@ -435,17 +474,21 @@ mod test {
         let oid_dst = &c[1];
         let stores = &preprocessed.processor.main_stores;
 
-        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
-        let src_tr = commit_src.1.ast_root;
-        let src_tr = preprocessed.child_by_name(src_tr, "spoon-pom").unwrap();
-        let src_tr = preprocessed.child_by_name(src_tr, "pom.xml").unwrap();
+        let commit_src = preprocessed
+            .get_commit(&repository.config, oid_src)
+            .unwrap();
+        let src_tr = commit_src.ast_root;
+        let src_tr = child_by_name(stores, src_tr, "spoon-pom").unwrap();
+        let src_tr = child_by_name(stores, src_tr, "pom.xml").unwrap();
         // let src_tr = stores.node_store.resolve(src_tr).get_child(&0);
         dbg!(stores.node_store.resolve(src_tr).child_count());
 
-        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
-        let dst_tr = commit_dst.1.ast_root;
-        let dst_tr = preprocessed.child_by_name(dst_tr, "spoon-pom").unwrap();
-        let dst_tr = preprocessed.child_by_name(dst_tr, "pom.xml").unwrap();
+        let commit_dst = preprocessed
+            .get_commit(&repository.config, oid_dst)
+            .unwrap();
+        let dst_tr = commit_dst.ast_root;
+        let dst_tr = child_by_name(stores, dst_tr, "spoon-pom").unwrap();
+        let dst_tr = child_by_name(stores, dst_tr, "pom.xml").unwrap();
         // let dst_tr = stores.node_store.resolve(dst_tr).get_child(&0);
 
         let src = src_tr;
@@ -495,9 +538,9 @@ mod test {
     fn issue_lazy_spark() {
         // cargo build --release && time target/release/window_combination apache/spark 14211a19f53bd0f413396582c8970e3e0a74281d 885f4733c413bdbb110946361247fbbd19f6bba9 "" validity_spark.csv perfs_spark.csv 2 Chawathe &> spark.log
         // thread 'main' panicked at 'Entity(63568) Entity(63568)', /home/quentin/rusted_gumtree3/gumtree/src/decompressed_tree_store/lazy_post_order.rs:293:17
-        let preprocessed = PreProcessedRepository::new("apache/spark");
+        let repo_name = "apache/spark";
         let window_size = 2;
-        let mut preprocessed = preprocessed;
+        let subdir = "spoon-pom";
         let (before, after) = (
             "a7f0adb2dd8449af6f9e9b5a25f11b5dcf5868f1",
             "29b9537e00d857c92378648ca7163ba0dc63da39",
@@ -506,13 +549,17 @@ mod test {
         // after a7f0adb2dd8449af6f9e9b5a25f11b5dcf5868f1
         assert!(window_size > 1);
 
-        let processing_ordered_commits = preprocessed.pre_process_with_limit(
-            &mut fetch_github_repository(&preprocessed.name),
-            before,
-            after,
-            "",
-            3,
-        );
+        let mut preprocessed = PreProcessedRepositories::default();
+        let (user, name) = repo_name.split_once("/").unwrap();
+        let repo = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let configured_repo = preprocessed.register_config(repo, config);
+        let repository = configured_repo.fetch();
+
+        let processing_ordered_commits = preprocessed
+            .processor
+            .pre_process_with_limit(&repository, before, after, 3)
+            .unwrap();
         preprocessed.purge_caches();
         let c_len = processing_ordered_commits.len();
         assert!(c_len > 0);
@@ -526,15 +573,19 @@ mod test {
         dbg!(oid_src, oid_dst);
         let stores = &preprocessed.processor.main_stores;
 
-        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
-        let src_tr = commit_src.1.ast_root;
+        let commit_src = preprocessed
+            .get_commit(&repository.config, oid_src)
+            .unwrap();
+        let src_tr = commit_src.ast_root;
         // let src_tr = preprocessed.child_by_name(src_tr, "spoon-pom").unwrap();
         // let src_tr = preprocessed.child_by_name(src_tr, "pom.xml").unwrap();
         // let src_tr = stores.node_store.resolve(src_tr).get_child(&0);
         dbg!(stores.node_store.resolve(src_tr).child_count());
 
-        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
-        let dst_tr = commit_dst.1.ast_root;
+        let commit_dst = preprocessed
+            .get_commit(&repository.config, oid_dst)
+            .unwrap();
+        let dst_tr = commit_dst.ast_root;
         // let dst_tr = preprocessed.child_by_name(dst_tr, "spoon-pom").unwrap();
         // let dst_tr = preprocessed.child_by_name(dst_tr, "pom.xml").unwrap();
         // let dst_tr = stores.node_store.resolve(dst_tr).get_child(&0);
@@ -547,22 +598,33 @@ mod test {
     fn issue_logging_log4j2_pom() {
         // cargo build --release && time target/release/window_combination apache/logging-log4j2 7e745b42bda9bf6f8ea681d38992d18036fc021e ebfc8945a5dd77b617f4667647ed4b740323acc8 "" batch2/validity_logging-log4j2.csv batch2/perfs_logging-log4j2.csv 2 Chawathe &> batch2/logging-log4j2.log
         // thread 'main' panicked at '114 55318 "reporting"', hyperast/src/tree_gen/mod.rs:414:13
-        let preprocessed = PreProcessedRepository::new("apache/logging-log4j2");
+        let repo_name = "apache/logging-log4j2";
         let window_size = 2;
-        let mut preprocessed = preprocessed;
         let (before, after) = (
             "7e745b42bda9bf6f8ea681d38992d18036fc021e",
             "ebfc8945a5dd77b617f4667647ed4b740323acc8",
         );
         assert!(window_size > 1);
 
-        preprocessed.pre_process_with_limit(
-            &mut fetch_github_repository(&preprocessed.name),
-            before,
-            after,
-            "log4j-osgi",
-            3,
-        );
+        let mut preprocessed = PreProcessedRepositories::default();
+        let (user, name) = repo_name.split_once("/").unwrap();
+        let repo = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let configured_repo = preprocessed.register_config(repo, config);
+        let repository = configured_repo.fetch();
+
+        todo!("need to reenable the selection of a subdir"); // here apache/logging-log4j2
+
+        let processing_ordered_commits = preprocessed
+            .processor
+            .pre_process_with_limit(
+                &repository,
+                before,
+                after,
+                // subdir,
+                3,
+            )
+            .unwrap();
     }
 
     #[test]
@@ -571,22 +633,25 @@ mod test {
         // hast, gt evolutions: 517,517,
         // missing, additional mappings: 43,10,
         // 1.089578603,2.667414915,1.76489064,1.59514709,2.984131976,35.289540009
-        let preprocessed = PreProcessedRepository::new("INRIA/spoon");
+        let repo_name = "INRIA/spoon";
         let window_size = 2;
-        let mut preprocessed = preprocessed;
         let (before, after) = (
             "b5806e1f42e105c223e1c6659256a4a3a4538b6c",
             "568b4526d7af83de99c65bc64a55ddcb6b6d3488",
         );
         assert!(window_size > 1);
 
-        let processing_ordered_commits = preprocessed.pre_process_with_limit(
-            &mut fetch_github_repository(&preprocessed.name),
-            before,
-            after,
-            "",
-            2,
-        );
+        let mut preprocessed = PreProcessedRepositories::default();
+        let (user, name) = repo_name.split_once("/").unwrap();
+        let repo = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let configured_repo = preprocessed.register_config(repo, config);
+        let repository = configured_repo.fetch();
+
+        let processing_ordered_commits = preprocessed
+            .processor
+            .pre_process_with_limit(&repository, before, after, 2)
+            .unwrap();
         preprocessed.purge_caches();
         let c_len = processing_ordered_commits.len();
         let c = (0..c_len - 1)
@@ -597,15 +662,19 @@ mod test {
         let oid_dst = &c[1];
         let stores = &preprocessed.processor.main_stores;
 
-        let commit_src = preprocessed.commits.get_key_value(oid_src).unwrap();
-        let src_tr = commit_src.1.ast_root;
-        let src_tr = preprocessed.child_by_name(src_tr, "pom.xml").unwrap();
+        let commit_src = preprocessed
+            .get_commit(&repository.config, oid_src)
+            .unwrap();
+        let src_tr = commit_src.ast_root;
+        let src_tr = child_by_name(stores, src_tr, "pom.xml").unwrap();
         // let src_tr = stores.node_store.resolve(src_tr).get_child(&0);
         dbg!(stores.node_store.resolve(src_tr).child_count());
 
-        let commit_dst = preprocessed.commits.get_key_value(oid_dst).unwrap();
-        let dst_tr = commit_dst.1.ast_root;
-        let dst_tr = preprocessed.child_by_name(dst_tr, "pom.xml").unwrap();
+        let commit_dst = preprocessed
+            .get_commit(&repository.config, oid_dst)
+            .unwrap();
+        let dst_tr = commit_dst.ast_root;
+        let dst_tr = child_by_name(stores, dst_tr, "pom.xml").unwrap();
         // let dst_tr = stores.node_store.resolve(dst_tr).get_child(&0);
 
         let src = &src_tr;

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::fmt::Display;
 
-use hyperast::position::structural_pos::BBB;
+use hyperast::position::structural_pos::CursorHeadMove;
 use hyperast::types;
 use hyperast::types::Childrn as _;
 use hyperast::types::HyperAST;
@@ -80,7 +80,7 @@ where
         ind: usize,
         out: &mut std::fmt::Formatter<'_>,
     ) -> Result<(), std::fmt::Error> {
-        use hyperast::position::structural_pos::AAA;
+        use hyperast::position::structural_pos::CursorHead;
         use types::{LabelStore, Labeled, NodeStore, WithChildren};
         let id = &cursor.pos.node();
         let b = self.stores.node_store().resolve(&cursor.pos.node());
@@ -298,7 +298,7 @@ where
         let Some(cid) = self.meta.capture_index_for_name("abstract") else {
             return false;
         };
-        use hyperast::position::structural_pos::AAA;
+        use hyperast::position::structural_pos::CursorHead;
         let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(c.pos.node());
         std::mem::swap(&mut pos, &mut c.pos);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);

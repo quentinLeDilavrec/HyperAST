@@ -17,7 +17,7 @@ use tree_sitter_graph::{
     graph::{NNN, NodeLender, NodeLending, NodesLending},
 };
 
-use crate::{CaptureId, hyperast_cursor::NodeR};
+use crate::{CaptureId, StatusLending, hyperast_cursor::NodeR};
 
 impl<HAST: HyperASTShared, Acc: WithLabel, Idx, P: Clone> From<Node<HAST, Acc, Idx, P>>
     for NodeR<P>
@@ -161,6 +161,21 @@ where
     type NR = Self;
 }
 
+impl<'hast, 'acc, HAST, Acc> crate::StatusLending<'_> for Node<HAST, &'acc Acc>
+where
+    HAST: HyperAST + Copy,
+    HAST::TS: ETypeStore<Ty2 = Acc::Type> + RoleStore<IdF = IdF, Role = Role>,
+    HAST::IdN: Copy,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
+    Acc: hyperast::tree_gen::WithRole<Role>,
+    Acc: hyperast::tree_gen::WithChildren<HAST::IdN>,
+    Acc: hyperast::types::Typed,
+    &'acc Acc: WithLabel,
+    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+{
+    type Status = crate::cursor_on_unbuild::CursorStatus<<Self as crate::Node>::IdF>;
+}
+
 impl<'hast, 'acc, HAST, Acc> crate::Cursor for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
@@ -204,19 +219,17 @@ where
         node.goto_parent()
     }
 
-    fn persist(&mut self) -> Self::Node {
+    fn persist(&self) -> Self::Node {
         self.clone()
     }
 
-    fn persist_parent(&mut self) -> Option<Self::Node> {
+    fn persist_parent(&self) -> Option<Self::Node> {
         let mut node = self.clone();
         node.goto_parent();
         Some(node)
     }
 
-    type Status = crate::cursor_on_unbuild::CursorStatus<<Self as crate::Node>::IdF>;
-
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         self.0.current_status()
     }
 

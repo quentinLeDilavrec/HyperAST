@@ -103,7 +103,7 @@ where
 
     type Status = steped::hyperast::CursorStatus<<Self as steped::Node>::IdF>;
 
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         self.0.current_status()
     }
 
@@ -443,9 +443,7 @@ impl<'query, 'cursor: 'query, 'tree: 'cursor, It, HAST: HyperAST<'tree>> Iterato
     for MyQMatches<'query, 'cursor, 'tree, It, HAST>
 where
     It: Iterator<
-        Item = hyperast_gen_ts_tsquery::search::steped::query_cursor::QueryMatch<
-            Node<'tree, HAST>,
-        >,
+        Item = hyperast_gen_ts_tsquery::search::steped::query_cursor::QueryMatch<Node<'tree, HAST>>,
     >,
 {
     type Item = self::MyQMatch<'cursor, 'tree, HAST>;

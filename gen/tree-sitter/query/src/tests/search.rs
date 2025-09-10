@@ -3,7 +3,7 @@ use crate::tests::cpp_tree;
 use hyperast::nodes::SyntaxSerializer;
 use hyperast::nodes::TextSerializer;
 use hyperast::{
-    position::{TreePath, structural_pos::AAA},
+    position::{TreePath, structural_pos::CursorHead},
     store::defaults::NodeIdentifier,
     types::Typed,
 };

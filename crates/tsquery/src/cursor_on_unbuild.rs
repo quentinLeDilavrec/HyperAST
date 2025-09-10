@@ -1,6 +1,6 @@
 //! TODO more difficult: make it backend agnostic, e.g., no ref to legion stuff
 
-use crate::{Cursor, Node as _, Status, Symbol, TreeCursorStep};
+use crate::{Cursor, Node as _, Status, StatusLending, Symbol, TreeCursorStep};
 use hyperast::position::TreePath;
 use hyperast::tree_gen;
 use hyperast::types::{
@@ -128,6 +128,21 @@ where
 {
     type NR = self::Node<HAST, &'acc Acc>;
 }
+
+impl<'acc, HAST, Acc> crate::StatusLending<'_> for self::TreeCursor<HAST, &'acc Acc>
+where
+    HAST: HyperAST + Clone,
+    HAST::TS:
+        EnabledTypeStore<Ty2 = Acc::Type> + hyperast::types::RoleStore<IdF = IdF, Role = Role>,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithRoles,
+    HAST::IdN: Copy,
+    Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
+    &'acc Acc: hyperast::tree_gen::WithLabel,
+    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+{
+    type Status = CursorStatus<IdF>;
+}
+
 impl<'acc, HAST, Acc> crate::Cursor for self::TreeCursor<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
@@ -287,20 +302,18 @@ where
         node.goto_parent()
     }
 
-    fn persist(&mut self) -> Self::Node {
+    fn persist(&self) -> Self::Node {
         self.clone()
     }
 
-    fn persist_parent(&mut self) -> Option<Self::Node> {
+    fn persist_parent(&self) -> Option<Self::Node> {
         let mut node = self.clone();
         node.goto_parent();
         Some(node)
     }
 
-    type Status = CursorStatus<IdF>;
-
     #[inline]
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         let (role, field_id) = self.compute_current_role();
         let mut has_later_siblings = false;
         let mut has_later_named_siblings = false;

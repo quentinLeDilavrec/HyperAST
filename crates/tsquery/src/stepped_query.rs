@@ -12,7 +12,7 @@ use tree_sitter_graph::{
     graph::{NNN, NodeLender, NodeLending, NodesLending},
 };
 
-use crate::{ArrayStr, CaptureId, hyperast_cursor::NodeR};
+use crate::{ArrayStr, CaptureId, StatusLending, hyperast_cursor::NodeR};
 
 impl<HAST: HyperASTShared, P: Clone> From<Node<'_, HAST, P>> for NodeR<P> {
     fn from(value: Node<'_, HAST, P>) -> Self {
@@ -46,8 +46,7 @@ impl<HAST: HyperAST> crate::Node for Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles + WithPrecompQueries,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
 {
     fn symbol(&self) -> crate::Symbol {
@@ -110,6 +109,16 @@ where
     type NR = Self;
 }
 
+impl<HAST: HyperAST> crate::StatusLending<'_> for Node<'_, HAST>
+where
+    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: std::fmt::Debug + Copy,
+    HAST::TS: RoleStore,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
+{
+    type Status = crate::hyperast_cursor::CursorStatus<<Self as crate::Node>::IdF>;
+}
+
 impl<HAST: HyperAST> crate::Cursor for Node<'_, HAST>
 where
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
@@ -149,19 +158,17 @@ where
         node.goto_parent()
     }
 
-    fn persist(&mut self) -> Self::Node {
+    fn persist(&self) -> Self::Node {
         self.clone()
     }
 
-    fn persist_parent(&mut self) -> Option<Self::Node> {
+    fn persist_parent(&self) -> Option<Self::Node> {
         let mut node = self.clone();
         node.goto_parent();
         Some(node)
     }
 
-    type Status = crate::hyperast_cursor::CursorStatus<<Self as crate::Node>::IdF>;
-
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         self.0.current_status()
     }
 

@@ -1278,7 +1278,7 @@ mod test_tsg_queries {
                 let name = query.capture_name(i);
                 dbg!(name);
                 use hyperast::position::TreePath;
-                use hyperast::position::structural_pos::AAA;
+                use hyperast::position::structural_pos::CursorHead;
                 let n = c.node.pos.node();
                 let n = hyperast::nodes::SyntaxSerializer::new(c.node.stores, n);
                 // let n = c.node.pos.node().unwrap();

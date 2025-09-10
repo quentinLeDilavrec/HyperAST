@@ -2,7 +2,7 @@ use crate::auto::tsq_transform;
 use crate::code2query::{self, QueryLattice};
 use hashbrown::{HashMap, HashSet};
 use hyperast::position::StructuralPosition;
-use hyperast::position::structural_pos::AAA;
+use hyperast::position::structural_pos::CursorHead;
 
 type IdN = hyperast::store::defaults::NodeIdentifier;
 type Idx = u16;

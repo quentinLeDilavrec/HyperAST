@@ -462,10 +462,7 @@ where
                 .before(o)
                 .map(|x| stores.resolve(&x).try_bytes_len().unwrap_or_default())
                 .sum();
-            let rows = cs
-                .before(o)
-                .map(|x| stores.resolve(&x).line_count())
-                .sum();
+            let rows = cs.before(o).map(|x| stores.resolve(&x).line_count()).sum();
             let mut no_s_idx = zero();
             for y in cs.before(o).iter_children() {
                 if !stores.resolve_type(&y).is_spaces() {
@@ -832,13 +829,13 @@ impl<IdN, Idx> StructuralPositionStore2<IdN, Idx> {
     }
 }
 
-pub trait AAA<IdN, Idx> {
+pub trait CursorHead<IdN, Idx> {
     fn node(&self) -> IdN;
     fn offset(&self) -> Idx;
     fn parent(&self) -> Option<IdN>;
     fn up(&mut self) -> bool;
 }
-pub trait BBB<IdN, Idx>: AAA<IdN, Idx> {
+pub trait CursorHeadMove<IdN, Idx>: CursorHead<IdN, Idx> {
     fn inc(&mut self, node: IdN);
     fn down(&mut self, node: IdN, offset: Idx);
 }
@@ -922,14 +919,14 @@ impl<IdN, Idx> CursorWithPersistence<IdN, Idx> {
         let s = Rc::new(RefCell::new(s));
         Self { s, h: Handle(0) }
     }
-    pub fn persist(&mut self) -> PersistedNode<IdN, Idx> {
+    pub fn persist(&self) -> PersistedNode<IdN, Idx> {
         self.s.borrow_mut().persist(self.h);
         PersistedNode {
             s: self.s.clone(),
             h: self.h,
         }
     }
-    pub fn persist_parent(&mut self) -> Option<PersistedNode<IdN, Idx>> {
+    pub fn persist_parent(&self) -> Option<PersistedNode<IdN, Idx>> {
         let p = self.s.borrow().parent(self.h)?;
         self.s.borrow_mut().persist(p);
         Some(PersistedNode {
@@ -952,7 +949,7 @@ impl<IdN, Idx> CursorWithPersistence<IdN, Idx> {
     }
 }
 
-impl<IdN, Idx> BBB<IdN, Idx> for CursorWithPersistence<IdN, Idx>
+impl<IdN, Idx> CursorHeadMove<IdN, Idx> for CursorWithPersistence<IdN, Idx>
 where
     IdN: Copy,
     Idx: PrimInt,
@@ -966,7 +963,7 @@ where
     }
 }
 
-impl<IdN, Idx> AAA<IdN, Idx> for CursorWithPersistence<IdN, Idx>
+impl<IdN, Idx> CursorHead<IdN, Idx> for CursorWithPersistence<IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,
@@ -1056,7 +1053,7 @@ where
     }
 }
 
-impl<IdN, Idx> AAA<IdN, Idx> for PersistedNode<IdN, Idx>
+impl<IdN, Idx> CursorHead<IdN, Idx> for PersistedNode<IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,
@@ -1135,7 +1132,7 @@ where
     }
 }
 
-impl<IdN, Idx> AAA<IdN, Idx> for RefNode<'_, IdN, Idx>
+impl<IdN, Idx> CursorHead<IdN, Idx> for RefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,
@@ -1219,7 +1216,7 @@ impl<'a, IdN, Idx> ExtRefNode<'a, IdN, Idx> {
     }
 }
 
-impl<IdN, Idx> BBB<IdN, Idx> for ExtRefNode<'_, IdN, Idx>
+impl<IdN, Idx> CursorHeadMove<IdN, Idx> for ExtRefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: PrimInt,
@@ -1246,7 +1243,7 @@ where
     }
 }
 
-impl<IdN, Idx> AAA<IdN, Idx> for ExtRefNode<'_, IdN, Idx>
+impl<IdN, Idx> CursorHead<IdN, Idx> for ExtRefNode<'_, IdN, Idx>
 where
     IdN: Copy,
     Idx: Copy,

@@ -1,10 +1,12 @@
 use super::{Cursor, Status, Symbol, TextLending, TreeCursorStep};
 use hyperast::position::TreePath;
-use hyperast::types::{HyperASTShared, HyperType, LabelStore, Labeled, NodeId, RoleStore, Tree, WithRoles};
+use hyperast::types::{HyperASTShared, HyperType, NodeId, Tree};
+use hyperast::types::{LabelStore, Labeled, RoleStore, Tree};
 use hyperast::{
     position::TreePathMut,
     types::{HyperAST, TypeStore},
 };
+
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 
 pub struct Node<'hast, HAST: HyperASTShared> {
@@ -153,7 +155,7 @@ where
     type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
 
     #[inline]
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         let (role, field_id) = self.compute_current_role();
         let mut has_later_siblings = false;
         let mut has_later_named_siblings = false;

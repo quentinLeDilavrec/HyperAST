@@ -499,6 +499,7 @@ pub struct Symbol(u16);
 
 impl Symbol {
     pub const ERROR: Symbol = Symbol(u16::MAX - 1);
+    pub const _ERROR: Symbol = Symbol(u16::MAX - 2);
     pub const NONE: Symbol = Symbol(u16::MAX);
     pub const END: Symbol = Symbol(0);
     pub const WILDCARD_SYMBOL: Symbol = Symbol(0);
@@ -508,12 +509,20 @@ impl Symbol {
         self.0 as usize
     }
     pub fn is_error(&self) -> bool {
-        self == &Self::ERROR
+        self == &Self::ERROR || self == &Self::_ERROR
     }
 }
 
 impl From<u16> for Symbol {
     fn from(value: u16) -> Self {
         Symbol(value)
+    }
+}
+
+#[cfg(feature = "hyperast")]
+impl Symbol {
+    pub fn from_type<Ty: 'static + hyperast::types::HyperType>(ty: Ty) -> Self {
+        use hyperast::types::LangRef;
+        Symbol(ty.get_lang().ts_symbol(ty))
     }
 }

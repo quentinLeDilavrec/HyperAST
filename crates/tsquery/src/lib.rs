@@ -111,18 +111,20 @@ impl Query {
         cursor: Cursor,
     ) -> QueryCursor<'_, Cursor, Node> {
         QueryCursor::<Cursor, _> {
-            halted: false,
-            ascending: false,
-            states: vec![],
-            capture_list_pool: Default::default(),
-            finished_states: Default::default(),
+            query: self,
+            exec_state: QueryExecState {
+                states: vec![],
+                capture_list_pool: Default::default(),
+                finished_states: Default::default(),
+                did_exceed_match_limit: false,
+                next_state_id: indexed::StateId::ZERO,
+            },
             max_start_depth: u32::MAX,
-            did_exceed_match_limit: false,
             depth: 0,
             on_visible_node: cursor.is_visible_at_root(),
-            query: self,
+            halted: false,
+            ascending: false,
             cursor,
-            next_state_id: indexed::StateId::ZERO,
         }
     }
 
@@ -165,9 +167,13 @@ pub struct QueryCursor<'query, Cursor, Node> {
     pub on_visible_node: bool,
     pub cursor: Cursor,
     pub query: &'query Query,
-    pub states: Vec<query_cursor::State>,
     pub depth: Depth,
     pub max_start_depth: Depth,
+    pub exec_state: QueryExecState<Node>,
+}
+
+pub struct QueryExecState<Node> {
+    pub states: Vec<query_cursor::State>,
     capture_list_pool: indexed::CaptureListPool<Node>,
     pub finished_states: VecDeque<query_cursor::State>,
     next_state_id: indexed::StateId,
@@ -220,7 +226,11 @@ pub trait CNLending<'a, __ImplBound = &'a Self>: WithField {
     type NR: Node<IdF = Self::IdF> + Clone;
 }
 
-pub trait Cursor: for<'a> CNLending<'a> {
+pub trait StatusLending<'a, __ImplBound = &'a Self>: WithField {
+    type Status: Status<IdF = Self::IdF>;
+}
+
+pub trait Cursor: for<'a> CNLending<'a> + for<'a> StatusLending<'a> {
     type Node: Clone
         + Node<IdF = <Self as WithField>::IdF>
         + for<'a> TextLending<'a, TP = <<Self as CNLending<'a>>::NR as TextLending<'a>>::TP>;
@@ -234,9 +244,7 @@ pub trait Cursor: for<'a> CNLending<'a> {
 
     fn parent_is_error(&self) -> bool;
 
-    type Status: Status<IdF = <Self::Node as Node>::IdF>;
-
-    fn current_status(&self) -> Self::Status;
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status;
 
     fn text_provider(&self) -> <Self::Node as TextLending<'_>>::TP;
 
@@ -247,8 +255,8 @@ pub trait Cursor: for<'a> CNLending<'a> {
         true
     }
     fn has_parent(&self) -> bool;
-    fn persist(&mut self) -> Self::Node;
-    fn persist_parent(&mut self) -> Option<Self::Node>;
+    fn persist(&self) -> Self::Node;
+    fn persist_parent(&self) -> Option<Self::Node>;
 }
 
 pub trait Status {
@@ -386,7 +394,7 @@ where
 
 impl<Cursor: self::Cursor> Iterator for QueryCursor<'_, Cursor, Cursor::Node>
 where
-    <Cursor::Status as Status>::IdF: Into<u16> + From<u16>,
+    for<'a> <<Cursor as StatusLending<'a>>::Status as Status>::IdF: Into<u16> + From<u16>,
 {
     type Item = QueryMatch<Cursor::Node>;
 

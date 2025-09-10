@@ -1,20 +1,22 @@
 //! # Optimized cursor
 //! nodes are only persisted when captured
 use super::{Status, Symbol, TreeCursorStep};
-use hyperast::position::structural_pos::{self, AAA, BBB};
+use crate::StatusLending;
+use hyperast::position::structural_pos;
 use hyperast::types::{Childrn, HyperAST, LangRef, LendT, NodeStore as _, TypeStore};
 use hyperast::types::{HyperASTShared, HyperType, LabelStore, Labeled, RoleStore, Tree};
 use hyperast::types::{WithChildren, WithPrecompQueries, WithRoles};
+use structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence, PersistedNode};
 
 pub struct TreeCursor<'hast, HAST: HyperASTShared> {
     pub stores: &'hast HAST,
-    pub pos: structural_pos::CursorWithPersistence<HAST::IdN, HAST::Idx>,
-    pub p: structural_pos::PersistedNode<HAST::IdN, HAST::Idx>,
+    pub pos: CursorWithPersistence<HAST::IdN, HAST::Idx>,
+    pub p: PersistedNode<HAST::IdN, HAST::Idx>,
 }
 
 pub struct Node<'hast, HAST: HyperASTShared> {
     pub stores: &'hast HAST,
-    pub pos: structural_pos::PersistedNode<HAST::IdN, HAST::Idx>,
+    pub pos: PersistedNode<HAST::IdN, HAST::Idx>,
 }
 
 pub struct NodeRef<'a, 'hast, HAST: HyperASTShared> {
@@ -66,10 +68,7 @@ where
 // }
 
 impl<'hast, HAST: HyperAST> TreeCursor<'hast, HAST> {
-    pub fn new(
-        stores: &'hast HAST,
-        mut pos: structural_pos::CursorWithPersistence<HAST::IdN, HAST::Idx>,
-    ) -> Self {
+    pub fn new(stores: &'hast HAST, mut pos: CursorWithPersistence<HAST::IdN, HAST::Idx>) -> Self {
         let p = pos.persist();
         Self { stores, pos, p }
     }
@@ -138,6 +137,13 @@ where
     type NR = self::NodeRef<'a, 'hast, HAST>;
 }
 
+impl<'a, 'hast, HAST: HyperAST> crate::StatusLending<'a> for self::TreeCursor<'hast, HAST>
+where
+    HAST::TS: RoleStore,
+{
+    type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
+}
+
 impl<'hast, HAST: HyperAST> super::Cursor for self::TreeCursor<'hast, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
@@ -179,7 +185,7 @@ where
         if !goto_parent(self.stores, &mut s) {
             return false;
         }
-        symbol(self.stores, &s) == Symbol::ERROR
+        symbol(self.stores, &s).is_error()
     }
 
     fn has_parent(&self) -> bool {
@@ -187,23 +193,21 @@ where
         goto_parent(self.stores, &mut s)
     }
 
-    fn persist(&mut self) -> Self::Node {
+    fn persist(&self) -> Self::Node {
         Node {
             stores: self.stores,
             pos: self.pos.persist(),
         }
     }
 
-    fn persist_parent(&mut self) -> Option<Self::Node> {
+    fn persist_parent(&self) -> Option<Self::Node> {
         Some(Node {
             stores: self.stores,
             pos: self.pos.persist_parent()?,
         })
     }
 
-    type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
-
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         current_status(self.stores, &self.pos)
     }
 
@@ -232,7 +236,7 @@ where
 
 pub(super) fn current_status<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: &structural_pos::CursorWithPersistence<HAST::IdN, HAST::Idx>,
+    pos: &CursorWithPersistence<HAST::IdN, HAST::Idx>,
 ) -> CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>
 where
     HAST::IdN: std::fmt::Debug + Copy,
@@ -250,20 +254,20 @@ where
     let mut has_later_siblings = false;
     let mut has_later_named_siblings = false;
     let mut can_have_later_siblings_with_this_field = false;
-    let mut s = ExtNodeRef {
+    let supertypes = SuperTypeIter {
         stores,
-        pos: pos.ext(),
+        pos: pos.ref_node(),
     };
+    let mut pos = pos.ext();
     loop {
-        if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(s.stores, &mut s.pos)
-        {
+        if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, &mut pos) {
             break;
         }
         let time = std::time::Instant::now();
-        if _role.is_some() && role(s.stores, &mut s.pos.clone()) == _role {
+        if _role.is_some() && role(stores, &mut pos.clone()) == _role {
             can_have_later_siblings_with_this_field = true;
         }
-        let k = kind(s.stores, &s.pos);
+        let k = kind(stores, &pos);
         if k.is_spaces() {
             continue;
         }
@@ -276,7 +280,7 @@ where
             // dbg!();
             has_later_named_siblings = true;
         }
-        if is_visible(s.stores, &s.pos) {
+        if is_visible(stores, &pos) {
             has_later_siblings = true;
             if k.is_named() {
                 // dbg!();
@@ -287,11 +291,7 @@ where
         let dur = time.elapsed();
         unsafe { ELAPSED_STATUS += dur };
     }
-    let supertypes = SuperTypeIter {
-        stores,
-        pos: pos.ref_node(),
-    }
-    .collect();
+    let supertypes = supertypes.collect();
     CursorStatus {
         has_later_siblings,
         has_later_named_siblings,
@@ -502,14 +502,14 @@ where
 
 pub(super) fn kind<HAST: HyperAST>(
     stores: &HAST,
-    pos: &impl AAA<HAST::IdN, HAST::Idx>,
+    pos: &impl CursorHead<HAST::IdN, HAST::Idx>,
 ) -> <HAST::TS as TypeStore>::Ty {
     stores.resolve_type(&pos.node())
 }
 
 pub(super) fn resolve<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: &impl AAA<HAST::IdN, HAST::Idx>,
+    pos: &impl CursorHead<HAST::IdN, HAST::Idx>,
 ) -> LendT<'hast, HAST> {
     let n = pos.node();
     use hyperast::types::NodeStore;
@@ -517,11 +517,11 @@ pub(super) fn resolve<'hast, HAST: HyperAST>(
     n
 }
 
-fn is_visible<HAST: HyperAST>(stores: &HAST, pos: &impl AAA<HAST::IdN, HAST::Idx>) -> bool {
+fn is_visible<HAST: HyperAST>(stores: &HAST, pos: &impl CursorHead<HAST::IdN, HAST::Idx>) -> bool {
     !kind(stores, pos).is_hidden()
 }
 
-fn symbol<HAST: HyperAST>(stores: &HAST, pos: &impl AAA<HAST::IdN, HAST::Idx>) -> Symbol {
+fn symbol<HAST: HyperAST>(stores: &HAST, pos: &impl CursorHead<HAST::IdN, HAST::Idx>) -> Symbol {
     let n = pos.node();
     let t = stores.resolve_type(&n);
     use hyperast::types::NodeStore;
@@ -532,7 +532,7 @@ fn symbol<HAST: HyperAST>(stores: &HAST, pos: &impl AAA<HAST::IdN, HAST::Idx>) -
 
 pub(super) fn text<'hast, 'l, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: &impl AAA<HAST::IdN, HAST::Idx>,
+    pos: &impl CursorHead<HAST::IdN, HAST::Idx>,
 ) -> super::BiCow<'hast, 'l, str>
 where
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
@@ -559,7 +559,7 @@ where
 
 fn role<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: &mut impl AAA<HAST::IdN, HAST::Idx>,
+    pos: &mut impl CursorHead<HAST::IdN, HAST::Idx>,
 ) -> Option<<HAST::TS as RoleStore>::Role>
 where
     HAST::TS: RoleStore,
@@ -604,7 +604,10 @@ where
     }
 }
 
-fn goto_parent<HAST: HyperAST>(stores: &HAST, pos: &mut impl AAA<HAST::IdN, HAST::Idx>) -> bool {
+fn goto_parent<HAST: HyperAST>(
+    stores: &HAST,
+    pos: &mut impl CursorHead<HAST::IdN, HAST::Idx>,
+) -> bool {
     loop {
         if !pos.up() {
             return false;
@@ -617,7 +620,7 @@ fn goto_parent<HAST: HyperAST>(stores: &HAST, pos: &mut impl AAA<HAST::IdN, HAST
 
 fn goto_next_sibling_internal<HAST: HyperAST>(
     stores: &HAST,
-    pos: &mut impl BBB<HAST::IdN, HAST::Idx>,
+    pos: &mut impl CursorHeadMove<HAST::IdN, HAST::Idx>,
 ) -> TreeCursorStep
 where
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
@@ -652,7 +655,7 @@ where
 
 fn goto_first_child_internal<HAST: HyperAST>(
     stores: &HAST,
-    pos: &mut impl BBB<HAST::IdN, HAST::Idx>,
+    pos: &mut impl CursorHeadMove<HAST::IdN, HAST::Idx>,
 ) -> TreeCursorStep
 where
     HAST::IdN: Copy,
@@ -678,7 +681,7 @@ where
 
 pub(super) fn has_child_with_field_id<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: impl BBB<HAST::IdN, HAST::Idx> + Clone + AAA<HAST::IdN, HAST::Idx>,
+    pos: impl CursorHeadMove<HAST::IdN, HAST::Idx> + Clone + CursorHead<HAST::IdN, HAST::Idx>,
     field_id: <HAST::TS as RoleStore>::IdF,
 ) -> bool
 where
@@ -707,7 +710,7 @@ where
 
 fn child_by_role<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: &mut (impl BBB<HAST::IdN, HAST::Idx> + Clone),
+    pos: &mut (impl CursorHeadMove<HAST::IdN, HAST::Idx> + Clone),
     _role: <HAST::TS as RoleStore>::Role,
 ) -> Option<()>
 where

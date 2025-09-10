@@ -1,4 +1,4 @@
-use crate::{CNLending, ffi};
+use crate::{CNLending, StatusLending, ffi};
 
 use super::{Cursor, Status, TreeCursorStep, indexed::Symbol};
 
@@ -19,6 +19,10 @@ impl crate::WithField for TreeCursor<'_> {
 
 impl<'b> CNLending<'b> for TreeCursor<'_> {
     type NR = tree_sitter::Node<'b>;
+}
+
+impl<'b> StatusLending<'b> for TreeCursor<'_> {
+    type Status = TSStatus;
 }
 
 impl<'a> Cursor for TreeCursor<'a> {
@@ -76,15 +80,13 @@ impl<'a> Cursor for TreeCursor<'a> {
         self.cursor.node().parent().is_some()
     }
 
-    fn persist(&mut self) -> Self::Node {
+    fn persist(&self) -> Self::Node {
         self.cursor.node()
     }
 
-    fn persist_parent(&mut self) -> Option<Self::Node> {
+    fn persist_parent(&self) -> Option<Self::Node> {
         self.cursor.node().parent()
     }
-
-    type Status = TSStatus;
 
     #[inline]
     fn current_status(&self) -> TSStatus {

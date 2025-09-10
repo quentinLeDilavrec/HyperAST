@@ -15,6 +15,7 @@ pub enum BuildSystem {
 }
 
 pub enum ProcessingConfig<P> {
+    Java { limit: usize, dir_path: P },
     JavaMaven { limit: usize, dir_path: P },
     CppMake { limit: usize, dir_path: P },
     TsNpm { limit: usize, dir_path: P },
@@ -25,6 +26,7 @@ pub enum ProcessingConfig<P> {
 /// where each config given the same commit should produce the same result in the hyperast
 #[derive(serde::Deserialize, Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum RepoConfig {
+    Java,
     CppMake,
     JavaMaven,
     TsNpm,
@@ -58,6 +60,10 @@ impl From<&RepoConfig> for ProcessingConfig<&'static str> {
                 dir_path: "",
             },
             RepoConfig::JavaMaven => Self::JavaMaven {
+                limit: 3,
+                dir_path: "",
+            },
+            RepoConfig::Java => Self::Java {
                 limit: 3,
                 dir_path: "",
             },

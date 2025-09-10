@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::{iter::Peekable, path::Components};
 
@@ -9,6 +11,7 @@ use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
 use hyperast_gen_ts_java::types::{TStore, Type};
 
 use crate::StackEle;
+use crate::processing::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::{
     Processor,
@@ -536,11 +539,55 @@ impl crate::processing::erased::CommitProc for JavaProc {
 
     fn prepare_processing<'repo>(
         &self,
-        _repository: &'repo git2::Repository,
-        _commit_builder: crate::preprocessed::CommitBuilder,
-        _handle: crate::processing::ParametrizedCommitProcessorHandle,
+        repository: &'repo git2::Repository,
+        commit_builder: crate::preprocessed::CommitBuilder,
+        handle: crate::processing::ParametrizedCommitProcessorHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc + 'repo> {
-        unimplemented!("required for processing java at the root of project")
+        Box::new(PreparedJavaCommitProc {
+            repository,
+            commit_builder,
+            handle,
+        })
+    }
+}
+
+struct PreparedJavaCommitProc<'repo> {
+    repository: &'repo git2::Repository,
+    commit_builder: crate::preprocessed::CommitBuilder,
+    pub(crate) handle: ParametrizedCommitProcessorHandle,
+}
+
+impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedJavaCommitProc<'repo> {
+    fn process(
+        self: Box<PreparedJavaCommitProc<'repo>>,
+        prepro: &mut RepositoryProcessor,
+    ) -> hyperast::store::defaults::NodeIdentifier {
+        let dir_path = PathBuf::from("");
+        let mut dir_path = dir_path.components().peekable();
+        let name = ObjectName::from(b"");
+        // TODO check parameter in self to know it is a recusive module search
+        let root_full_node = JavaProcessor::<JavaAcc>::new(
+            self.repository,
+            prepro,
+            &mut dir_path,
+            &name,
+            self.commit_builder.tree_oid(),
+            &crate::processing::erased::ParametrizedCommitProcessor2Handle(
+                self.handle.1,
+                PhantomData,
+            ),
+        )
+        .process();
+        let h = prepro
+            .processing_systems
+            .mut_or_default::<JavaProcessorHolder>();
+        let handle = self.handle;
+        let commit_oid = self.commit_builder.commit_oid();
+        let commit = self.commit_builder.finish(root_full_node.0.compressed_node);
+        h.with_parameters_mut(handle.1)
+            .commits
+            .insert(commit_oid, commit);
+        root_full_node.0.compressed_node
     }
 }
 

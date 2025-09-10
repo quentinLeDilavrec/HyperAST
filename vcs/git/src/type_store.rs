@@ -86,32 +86,29 @@ impl TypeStore for TStore {
         erazed: &impl hyperast::types::ErasedHolder,
         tid: std::any::TypeId,
     ) -> Self::Ty {
-        unsafe {
-            erazed.unerase_ref_unchecked::<hyperast_gen_ts_java::types::TType>(
-                std::any::TypeId::of::<hyperast_gen_ts_java::types::TType>(),
-            )
-        }
-        .map(|t| t.as_static().into())
-        .or_else(|| {
-            unsafe {
-                erazed.unerase_ref_unchecked::<hyperast_gen_ts_cpp::types::TType>(
-                    std::any::TypeId::of::<hyperast_gen_ts_cpp::types::TType>(),
-                )
-            }
+        erazed
+            .unerase_ref::<hyperast_gen_ts_java::types::TType>(std::any::TypeId::of::<
+                hyperast_gen_ts_java::types::TType,
+            >())
             .map(|t| t.as_static().into())
-        })
-        .or_else(|| {
-            unsafe {
-                erazed.unerase_ref_unchecked::<hyperast_gen_ts_xml::types::TType>(
-                    std::any::TypeId::of::<hyperast_gen_ts_xml::types::TType>(),
-                )
-            }
-            .map(|t| t.as_static().into())
-        })
-        .unwrap_or_else(|| {
-            dbg!(tid);
-            dbg!(std::any::type_name::<Self::Ty>());
-            unreachable!()
-        })
+            .or_else(|| {
+                erazed
+                    .unerase_ref::<hyperast_gen_ts_cpp::types::TType>(std::any::TypeId::of::<
+                        hyperast_gen_ts_cpp::types::TType,
+                    >())
+                    .map(|t| t.as_static().into())
+            })
+            .or_else(|| {
+                erazed
+                    .unerase_ref::<hyperast_gen_ts_xml::types::TType>(std::any::TypeId::of::<
+                        hyperast_gen_ts_xml::types::TType,
+                    >())
+                    .map(|t| t.as_static().into())
+            })
+            .unwrap_or_else(|| {
+                dbg!(tid);
+                dbg!(std::any::type_name::<Self::Ty>());
+                unreachable!()
+            })
     }
 }

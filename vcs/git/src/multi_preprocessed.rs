@@ -249,16 +249,27 @@ impl PreProcessedRepositories {
                 use crate::maven_processor::{MavenProcessorHolder, PomProcessorHolder};
                 let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
                 let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
-                let h = self
-                    .processor
-                    .processing_systems
-                    .mut_or_default::<MavenProcessorHolder>();
+                let h = processor_map.mut_or_default::<MavenProcessorHolder>();
                 ConfiguredRepoHandle2 {
                     spec: repo,
                     config: h.register_param(crate::maven_processor::Parameter {
                         java_handle,
                         pom_handle,
                     }),
+                }
+            }
+            RepoConfig::Java => {
+                let processor_map = &mut self.processor.processing_systems;
+                use crate::java_processor::JavaProcessorHolder;
+                let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
+                let t = crate::java_processor::Parameter {
+                    prepro: None,
+                    query: Some(query.into()),
+                    tsg: None,
+                };
+                ConfiguredRepoHandle2 {
+                    spec: repo,
+                    config: h_java.register_param(t),
                 }
             }
             RepoConfig::CppMake => {
@@ -341,9 +352,7 @@ impl PreProcessedRepositories {
             .by_id(&handle.0)
             .unwrap()
             .get(handle.1);
-        dbg!();
         let handle = proc.get_lang_handle(lang)?;
-        dbg!();
         let proc = self
             .processor
             .processing_systems

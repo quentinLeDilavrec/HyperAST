@@ -210,8 +210,21 @@ impl<Id, L, M> BasicDirAcc<Id, L, M> {
         let children = self.children;
         let children_names = self.children_names;
         assert_eq!(children_names.len(), children.len());
-        if !children.is_empty() {
-            use hyperast::store::nodes::compo::CS;
+        use hyperast::store::nodes::compo;
+        if children.len() == 1 {
+            dyn_builder.add(compo::CS(children_names.into_boxed_slice()));
+            let Ok(cs) = children.try_into() else {
+                unreachable!();
+            };
+            dyn_builder.add(compo::CS0::<_, 1>(cs));
+        } else if children.len() == 2 {
+            dyn_builder.add(compo::CS(children_names.into_boxed_slice()));
+            let Ok(cs) = children.try_into() else {
+                unreachable!();
+            };
+            dyn_builder.add(compo::CS0::<_, 2>(cs));
+        } else if !children.is_empty() {
+            use compo::CS;
             dyn_builder.add(CS(children_names.into_boxed_slice()));
             dyn_builder.add(CS(children.into_boxed_slice()));
         }

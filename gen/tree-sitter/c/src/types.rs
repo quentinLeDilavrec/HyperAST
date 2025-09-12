@@ -403,6 +403,10 @@ impl HyperType for Type {
         ||self == &Type::DashGt // "->",
     }
 
+    fn is_error(&self) -> bool {
+        self == &Type::ERROR || self == &Type::_ERROR
+    }
+
     fn as_shared(&self) -> hyperast::types::Shared {
         use hyperast::types::Shared;
         match self {

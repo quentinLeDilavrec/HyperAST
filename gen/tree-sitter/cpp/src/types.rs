@@ -411,6 +411,9 @@ impl HyperType for Type {
 
     fn as_shared(&self) -> hyperast::types::Shared {
         use hyperast::types::Shared;
+        if self.is_error() {
+            return Shared::Error;
+        }
         match self {
             Type::ClassSpecifier => Shared::TypeDeclaration,
             Type::EnumSpecifier => Shared::TypeDeclaration,
@@ -429,6 +432,10 @@ impl HyperType for Type {
             Type::QualifiedIdentifier => Shared::Identifier,
             _ => Shared::Other,
         }
+    }
+
+    fn is_error(&self) -> bool {
+        self == &Self::ERROR || self == &Self::_ERROR
     }
 
     fn as_abstract(&self) -> hyperast::types::Abstracts {

@@ -374,6 +374,9 @@ impl HyperType for Type {
 
     fn as_shared(&self) -> hyperast::types::Shared {
         use hyperast::types::Shared;
+        if self.is_error() {
+            return Shared::Error;
+        }
         match self {
             x if x.is_type_declaration() => Shared::TypeDeclaration,
             Type::LineComment => Shared::Comment,
@@ -384,6 +387,10 @@ impl HyperType for Type {
             x if x.is_fork() => Shared::Branch,
             _ => Shared::Other,
         }
+    }
+
+    fn is_error(&self) -> bool {
+        self == &Self::ERROR || self == &Self::_ERROR
     }
 
     fn as_abstract(&self) -> hyperast::types::Abstracts {

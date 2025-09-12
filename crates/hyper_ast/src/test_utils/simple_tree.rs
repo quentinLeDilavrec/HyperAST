@@ -708,6 +708,10 @@ impl HyperType for Ty {
         todo!()
     }
 
+    fn is_error(&self) -> bool {
+        todo!()
+    }
+
     fn get_lang(&self) -> types::LangWrapper<Self>
     where
         Self: Sized,

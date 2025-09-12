@@ -185,7 +185,7 @@ where
         if !goto_parent(self.stores, &mut s) {
             return false;
         }
-        symbol(self.stores, &s).is_error()
+        kind(self.stores, &s).is_error()
     }
 
     fn has_parent(&self) -> bool {

@@ -518,6 +518,10 @@ impl HyperType for Type {
         }
     }
 
+    fn is_error(&self) -> bool {
+        self == &Self::ERROR || self == &Self::_ERROR
+    }
+
     fn as_abstract(&self) -> hyperast::types::Abstracts {
         use hyperast::types::Abstract;
         Abstract::Expression.when(self.is_expression())

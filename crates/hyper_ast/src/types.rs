@@ -557,6 +557,8 @@ pub enum Shared {
     TypeDeclaration,
     Branch,
     Other,
+    // actually error is a concrete type
+    Error,
     // WARN do not include Abstract type/rules (should go in Abstract) ie.
     // Expression,
     // Statement,
@@ -620,6 +622,7 @@ pub trait HyperType: Display + Debug {
     fn is_hidden(&self) -> bool;
     fn is_named(&self) -> bool;
     fn is_supertype(&self) -> bool;
+    fn is_error(&self) -> bool;
     fn get_lang(&self) -> LangWrapper<Self>
     where
         Self: Sized;
@@ -683,6 +686,10 @@ impl HyperType for u8 {
     }
 
     fn is_supertype(&self) -> bool {
+        todo!()
+    }
+
+    fn is_error(&self) -> bool {
         todo!()
     }
 
@@ -1439,6 +1446,10 @@ where
         self.e().is_supertype()
     }
 
+    fn is_error(&self) -> bool {
+        self.e().is_error()
+    }
+
     fn get_lang(&self) -> LangWrapper<Self>
     where
         Self: Sized,
@@ -1668,6 +1679,10 @@ impl HyperType for AnyType {
 
     fn is_named(&self) -> bool {
         self.0.is_named()
+    }
+
+    fn is_error(&self) -> bool {
+        self.0.is_error()
     }
 
     fn get_lang(&self) -> LangWrapper<Self>

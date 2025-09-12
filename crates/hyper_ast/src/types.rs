@@ -574,6 +574,7 @@ pub trait LangRef<T> {
     fn ts_symbol(&self, t: T) -> u16;
 }
 
+#[derive(Clone, Copy)]
 pub struct LangWrapper<T: 'static + ?Sized>(&'static dyn LangRef<T>);
 
 impl<T> From<&'static (dyn LangRef<T> + 'static)> for LangWrapper<T> {

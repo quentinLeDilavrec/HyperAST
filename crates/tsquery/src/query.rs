@@ -40,6 +40,7 @@ pub(crate) struct QueryPattern {
     end_byte: u32,
     is_non_local: bool,
 }
+
 impl QueryPattern {
     pub(crate) fn adapt(mut self, offset: StepId, byte_offset: u32) -> QueryPattern {
         self.steps.offset += offset;
@@ -558,6 +559,7 @@ impl PrecomputedPatterns {
     }
 }
 
+// Considers all relevant attributes of current step
 fn hash_single_step(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
@@ -572,6 +574,7 @@ fn hash_single_step(query: &Query, stepid: StepId, hasher: &mut std::hash::Defau
     step.is_named().hash(hasher);
 }
 
+// similar to `hash_single_step`, but ignore symbol
 fn hash_single_step1(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
@@ -586,6 +589,7 @@ fn hash_single_step1(query: &Query, stepid: StepId, hasher: &mut std::hash::Defa
     step.is_named().hash(hasher);
 }
 
+// similar to `hash_single_step`, but ignores symbol
 fn hash_single_step2(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
@@ -599,6 +603,8 @@ fn hash_single_step2(query: &Query, stepid: StepId, hasher: &mut std::hash::Defa
     step.immediate_pred().hash(hasher);
     true.hash(hasher);
 }
+
+// similar to `hash_single_step`, but ignores symbol and field
 fn hash_single_step12(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
@@ -625,11 +631,9 @@ impl QueryStep {
     }
     pub(crate) fn is_pass_through(&self) -> bool {
         self.bit_field & StepFlags::is_pass_through != 0
-        //  && self.negated_field_list_id == 42 * 2
     }
     pub(crate) fn is_dead_end(&self) -> bool {
         self.bit_field & StepFlags::is_dead_end != 0
-        // && self.negated_field_list_id == 42
     }
     pub(crate) fn alternative_is_immediate(&self) -> bool {
         self.bit_field & StepFlags::alternative_is_immediate != 0

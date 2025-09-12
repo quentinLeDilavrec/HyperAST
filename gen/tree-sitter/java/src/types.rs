@@ -178,6 +178,7 @@ impl LangRef<Type> for Java {
             &S_T_L[t as usize]
         }
     }
+
     fn to_u16(&self, t: Type) -> u16 {
         t as u16
     }

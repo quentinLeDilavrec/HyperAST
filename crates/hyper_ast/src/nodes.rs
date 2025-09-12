@@ -799,13 +799,8 @@ where
         }
 
         let w_kind = |out: &mut std::fmt::Formatter<'_>| {
-            if IDS { write!(out, "{:?}", id) } else { Ok(()) }.and_then(|x| {
-                if TY {
-                    write!(out, "{}", kind)
-                } else {
-                    Ok(x)
-                }
-            })
+            if IDS { write!(out, "{:?}", id) } else { Ok(()) }
+                .and_then(|x| if TY { write!(out, "{}", kind) } else { Ok(x) })
         };
 
         match (label, children) {
@@ -900,9 +895,7 @@ pub struct IndentedSerializer<'hast, 'a, IdN, HAST, Fmt: Format = Text, const SP
     phantom: PhantomData<(&'hast (), Fmt)>,
 }
 
-impl<'b, IdN, HAST, Fmt: Format, const SPC: bool>
-    IndentedSerializer<'_, 'b, IdN, HAST, Fmt, SPC>
-{
+impl<'b, IdN, HAST, Fmt: Format, const SPC: bool> IndentedSerializer<'_, 'b, IdN, HAST, Fmt, SPC> {
     pub fn new(stores: &'b HAST, root: IdN) -> Self {
         Self {
             stores,
@@ -913,8 +906,7 @@ impl<'b, IdN, HAST, Fmt: Format, const SPC: bool>
     }
 }
 
-impl<IdN, HAST, const SPC: bool> Display
-    for IndentedSerializer<'_, '_, IdN, HAST, Text, SPC>
+impl<IdN, HAST, const SPC: bool> Display for IndentedSerializer<'_, '_, IdN, HAST, Text, SPC>
 where
     IdN: NodeId<IdN = IdN>,
     HAST: HyperAST<IdN = IdN>,
@@ -927,8 +919,7 @@ where
     }
 }
 
-impl<IdN, HAST, const SPC: bool> Display
-    for IndentedSerializer<'_, '_, IdN, HAST, Json, SPC>
+impl<IdN, HAST, const SPC: bool> Display for IndentedSerializer<'_, '_, IdN, HAST, Json, SPC>
 where
     IdN: NodeId<IdN = IdN>,
     HAST: HyperAST<IdN = IdN>,
@@ -1118,9 +1109,7 @@ pub struct IndentedSerializer2<'hast, IdN, HAST, Fmt: Format = Text, const SPC: 
     phantom: PhantomData<(&'hast (), Fmt)>,
 }
 
-impl<IdN, HAST, Fmt: Format, const SPC: bool>
-    IndentedSerializer2<'_, IdN, HAST, Fmt, SPC>
-{
+impl<IdN, HAST, Fmt: Format, const SPC: bool> IndentedSerializer2<'_, IdN, HAST, Fmt, SPC> {
     pub fn new(stores: HAST, root: IdN) -> Self {
         Self {
             stores,
@@ -1131,8 +1120,7 @@ impl<IdN, HAST, Fmt: Format, const SPC: bool>
     }
 }
 
-impl<IdN, HAST, const SPC: bool> Display
-    for IndentedSerializer2<'_, IdN, HAST, Text, SPC>
+impl<IdN, HAST, const SPC: bool> Display for IndentedSerializer2<'_, IdN, HAST, Text, SPC>
 where
     IdN: NodeId<IdN = IdN>,
     HAST: HyperAST<IdN = IdN>,
@@ -1145,8 +1133,7 @@ where
     }
 }
 
-impl<IdN, HAST, const SPC: bool> Display
-    for IndentedSerializer2<'_, IdN, HAST, Json, SPC>
+impl<IdN, HAST, const SPC: bool> Display for IndentedSerializer2<'_, IdN, HAST, Json, SPC>
 where
     IdN: NodeId<IdN = IdN>,
     HAST: HyperAST<IdN = IdN>,

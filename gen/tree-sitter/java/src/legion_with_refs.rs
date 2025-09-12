@@ -144,8 +144,8 @@ impl Local {
         if self.metrics.size_no_spaces > 0 {
             acc.no_space.push(self.compressed_node)
         }
+        let o = acc.simple.children.len();
         if let Some(role) = self.role {
-            let o = acc.simple.children.len();
             acc.role.acc(role, o);
         }
         acc.simple.push(self.compressed_node);
@@ -365,9 +365,7 @@ where
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
-        if !stack
-            .parent().is_some_and(|a| a.simple.kind.is_supertype())
-        {
+        if !stack.parent().is_some_and(|a| a.simple.kind.is_supertype()) {
             if let Some(r) = cursor.0.field_name() {
                 if let Ok(r) = r.try_into() {
                     acc.role.current = Some(r);
@@ -904,13 +902,6 @@ where
                 tree_gen::add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
             }
             if More::GRAPHING {
-                // TODO find a way of removing those 'static, probably an even lower API would work (the File<G> is really bad in the end)
-                // SAFETY: it is just an issue with associated types and invariants raising everything to 'static...
-                // let stores: SimpleStores<
-                //     TS,
-                //     &'static hyperast::store::nodes::legion::NodeStoreInner,
-                //     &'static hyperast::store::labels::LabelStore,
-                // > = unsafe { std::mem::transmute(stores.clone()) };
                 more.compute_tsg(stores, &acc, label.as_deref()).unwrap();
             }
 
@@ -984,7 +975,6 @@ where
             }
         };
 
-        
         FullNode {
             global: global.simple(),
             local,
@@ -997,8 +987,7 @@ impl<
     More: tree_gen::Prepro<SimpleStores<TS>, Scope = hyperast::scripting::Acc>
         + tree_gen::PreproTSG<SimpleStores<TS>, Acc = Acc<More::Scope>>,
     const HIDDEN_NODES: bool,
-> NodeStoreExt<HashedNode>
-    for JavaTreeGen<'_, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>
+> NodeStoreExt<HashedNode> for JavaTreeGen<'_, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>
 where
     TS::Ty: TypeTrait,
 {

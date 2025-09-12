@@ -48,8 +48,7 @@ where
     }
 }
 
-impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Typed
-    for HashedNodeRef<'_, Id>
+impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Typed for HashedNodeRef<'_, Id>
 where
     Id::Ty: Copy + Hash + Eq,
 {
@@ -128,9 +127,7 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::CLending<'a, u16, 
     type Children = crate::types::ChildrenSlice<'a, Id::IdN>;
 }
 
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren
-    for HashedNodeRef<'_, Id>
-{
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren for HashedNodeRef<'_, Id> {
     type ChildIdx = u16;
     // type Children<'b>
     //     = MySlice<<Self::TreeId as NodeId>::IdN>
@@ -148,13 +145,11 @@ impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::WithChildren
     }
 
     fn child(&self, idx: &Self::ChildIdx) -> Option<<Self::TreeId as NodeId>::IdN> {
-        self.cs()
-            .unwrap_or_else(|| {
-                log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-                panic!()
-            })
-            .0
-            .get(idx.to_usize().unwrap()).copied()
+        let Some(cs) = self.cs() else {
+            log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
+            panic!()
+        };
+        cs.0.get(idx.to_usize().unwrap()).copied()
     }
 
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<<Self::TreeId as NodeId>::IdN> {
@@ -189,8 +184,7 @@ impl<Id> crate::store::nodes::ErasedHolder for HashedNodeRef<'_, Id> {
     }
 }
 
-impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree
-    for HashedNodeRef<'_, Id>
+impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree for HashedNodeRef<'_, Id>
 where
     Id::Ty: Copy + Hash + Eq,
 {

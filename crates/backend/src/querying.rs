@@ -431,13 +431,12 @@ fn pre_query(
             .unwrap()
             .get_precomp_query(repo_config, lang)
     });
-    let query = if let Some(Some(precomputeds)) = precomputeds {
+    if let Some(Some(precomputeds)) = precomputeds {
         hyperast_tsquery::Query::with_precomputed(query, language, precomputeds).map(|x| x.1)
     } else {
         hyperast_tsquery::Query::new(query, language)
     }
-    .map_err(|e| QueryingError::ParsingError(e.to_string()))?;
-    Ok(query)
+    .map_err(|e| QueryingError::ParsingError(e.to_string()))
 }
 
 fn simple_aux(

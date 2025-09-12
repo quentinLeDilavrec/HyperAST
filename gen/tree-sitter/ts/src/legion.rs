@@ -502,6 +502,7 @@ impl<'stores, 'cache, TS: TsEnabledTypeStore> TreeGen for TsTreeGen<'stores, 'ca
                     if x != acc.no_space.len() {
                         dyn_builder.add(NoSpacesCS(acc.no_space.into_boxed_slice()));
                     }
+                    panic!("use CS0<_,1>, CS0<_,2>, and corresponding eq_node");
                 }
             }
             let compressed_node =

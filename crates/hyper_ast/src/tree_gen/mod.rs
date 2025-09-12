@@ -556,6 +556,7 @@ impl<Acc> Parents<Acc> {
     }
 }
 
+#[derive(Debug)]
 pub struct RoleAcc<R> {
     pub current: Option<R>,
     pub roles: Vec<R>,
@@ -789,7 +790,6 @@ pub mod utils_ts {
 
         fn goto_next_sibling_extended(&mut self) -> Option<Visibility> {
             if HIDDEN_NODES {
-                
                 unsafe {
                     let s = &mut self.0;
                     let s: *mut tree_sitter::ffi::TSTreeCursor = std::mem::transmute(s);
@@ -817,7 +817,6 @@ pub mod utils_ts {
             use bitvec::prelude::Lsb0;
             let mut vis = bitvec::bitvec![];
             vis.push(Visibility::Hidden == Visibility::Hidden);
-            
             Self {
                 has: super::zipped::Has::Down,
                 stack: vec![cursor.clone()],

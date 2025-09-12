@@ -598,18 +598,8 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
     }
 
     fn child(&self, idx: &Self::ChildIdx) -> Option<NodeIdentifier> {
-        self.cs()
-            .ok()?
-            // .unwrap_or_else(|x| {
-            //     log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-            //     panic!("{}", x)
-            // })
-            .0
-            .get(idx.to_usize().unwrap()).copied()
-        // .unwrap_or_else(|| {
-        //     log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-        //     panic!()
-        // })
+        let cs = self.cs().ok()?;
+        cs.0.get(idx.to_usize().unwrap()).copied()
     }
 
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<NodeIdentifier> {
@@ -650,6 +640,8 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
 impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithRoles
     for HashedNodeRef<'_, T>
 {
+    /// Actually `at` works as a structural offset when hidden children can hold fields.
+    /// NOTE cannot easily go in children to make it a proper offset then.
     fn role_at<Role: 'static + Copy + std::marker::Sync + std::marker::Send>(
         &self,
         at: Self::ChildIdx,
@@ -703,9 +695,7 @@ impl<Id> crate::store::nodes::ErasedHolder for HashedNodeRef<'_, Id> {
     }
 }
 
-impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree
-    for HashedNodeRef<'_, Id>
-{
+impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree for HashedNodeRef<'_, Id> {
     fn has_children(&self) -> bool {
         self.cs()
             .map(|x| !crate::types::Childrn::is_empty(&x))

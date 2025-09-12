@@ -99,7 +99,7 @@ impl Local {
         acc.viz_cs_count = acc
             .viz_cs_count
             .checked_add(self.viz_cs_count)
-            .expect("viz_cs_count is too small");
+            .expect("type of viz_cs_count is too small");
 
         // TODO things with this.ana
     }

@@ -392,6 +392,7 @@ impl PrecomputedPatterns {
     pub(crate) fn finish_preparation(&mut self) {
         self.intermediate_hashes.sort();
         self.intermediate_hashes.dedup();
+        self.intermediate_hashes.shrink_to_fit();
     }
 
     pub(crate) fn matches(&self, query: &Query, stepid: StepId) -> Vec<PatternId> {
@@ -416,7 +417,9 @@ impl PrecomputedPatterns {
                 }
             }
             if id != stepid {
+                // nothing to do on first step ?
                 let k = hasher.0.clone().finish();
+                // retrieve subquery pid with the right hash
                 let iter = self.map.iter().filter_map(|(h, p)| (k == *h).then_some(p));
                 res.extend(iter);
             }
@@ -429,6 +432,7 @@ impl PrecomputedPatterns {
                 continue;
             }
             if id != stepid && step.depth <= query.steps[stepid].depth {
+                // redundant outside of continue stmt
                 // should stop to avoid matching more than expected
                 let k = hasher.0.finish();
                 let iter = self.map.iter().filter_map(|(h, p)| (k == *h).then_some(p));
@@ -436,7 +440,7 @@ impl PrecomputedPatterns {
                 continue;
             }
             if id != stepid {
-                // prevents skipping first step
+                // branch for subquery starting at next step
                 let mut id = id;
                 id.inc();
                 stack.push((hasher.clone(), id));
@@ -457,7 +461,7 @@ impl PrecomputedPatterns {
                 id.inc();
                 stack.push((hasher, id));
             }
-            if step.symbol != 0 {
+            if step.field != 0 && step.symbol != 0 {
                 let mut hasher = hasher.clone();
                 hasher.1 += 1;
                 hash_single_step12(query, id, &mut hasher.0);
@@ -1821,11 +1825,50 @@ fn find_precomputed_uses(query: &mut Query, precomputeds: impl ArrayStr) {
         let mut j = slice.offset;
         let mut res = vec![];
         while j < slice.offset + slice.length {
-            let r = query
-                .precomputed_patterns
-                .as_ref()
-                .unwrap()
-                .matches(&*query, j);
+            let step = &query.steps[j];
+            if let Some(alt) = step.alternative_index() {
+                if alt < j {
+                    assert!(step.is_pass_through());
+                    assert!(step.alternative_is_immediate());
+                    // loop
+                    // We do not go through loops because additional steps are not required.
+                    // If we did consider loops, it would break our simple method in certain cases.
+                    // For example, (a (b)+) is not included in (a (b) . (b)),
+                    // because (a (b)) is accepted by the first pattern but not by the second.
+                    // NOTE it follows the same observation as optional steps.
+                    j.inc();
+                } else if step.is_dead_end() {
+                    unreachable!("should not be possible, the query compilation might have changed")
+                } else {
+                    let i = alt;
+                    let s = &query.steps[StepId::new(i.0.checked_sub(1).unwrap())];
+                    if s.is_dead_end() {
+                        // alternative
+                        // the step array should look like:
+                        //  ...
+                        //  j: (alternative: i)
+                        // ...
+                        //  i-1: (dead_end, alternative: k)
+                        //  i: ...
+                        // ...
+                        //  k: ...
+                        j = s.alternative_index().unwrap();
+                        // we completely skip the alternatives
+                        continue;
+                    }
+                    // optional
+                    // We do not consider optional steps, it would break our simple method in certain cases.
+                    // For example, (a (b)?) is not subtree-included in (b).
+                    // NOTE By subtree-included, I mean inclusion for any subtree.
+                    //   For all tree t, A is subtree-included in B iff A accepts t and B accepts t or a subtree of t.
+                    j = alt;
+                }
+                continue;
+            }
+            assert!(!step.is_pass_through()); // still don't know if fine or what to do
+            assert!(!step.is_dead_end()); // still don't know if fine or what to do
+            let precomputed_patterns = query.precomputed_patterns.as_ref().unwrap();
+            let r = precomputed_patterns.matches(&*query, j);
             res.extend(r.into_iter().map(|x| (x, j)));
             j.inc();
         }

@@ -12,6 +12,7 @@ members = [
     "hyper_app",
     "benchmark_diffs",
     "benchmark_smells",
+    "benchmark_search",
     "benchmark",
 ]
 exclude = ["crates/ref-mining-evaluation", "hyperast_wasm"]
@@ -33,7 +34,6 @@ default-members = [
     "lib/egui_addon",
     "lib/polyglote",
     "crates/tsquery",
-    "benchmark_smells",
 ]
 
 [workspace.dependencies]

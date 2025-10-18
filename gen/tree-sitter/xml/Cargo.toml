@@ -17,7 +17,7 @@ num = "0.4.0"
 
 libc = "0.2"
 
-legion = { version = "0.4.0", optional = true }
+legion = { workspace = true, optional = true }
 tuples = "=1.4.1"
 
 [dev-dependencies]

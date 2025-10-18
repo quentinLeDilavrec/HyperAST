@@ -4910,8 +4910,7 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 [[package]]
 name = "legion"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bfd53bb4690a5ab2bd6d1c683461ee52763afe0d000929743708a256d9d9b1f"
+source = "git+https://github.com/quentinLeDilavrec/legion?rev=9929c5cdd1f0b844071a00725632c7c39b6fff39#9929c5cdd1f0b844071a00725632c7c39b6fff39"
 dependencies = [
  "atomic_refcell",
  "bit-set 0.5.3",
@@ -4933,8 +4932,7 @@ dependencies = [
 [[package]]
 name = "legion_codegen"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ad5ad7a361d7b2522010335d95fa73135cb3c6816bef22cc7a5d5861587ae1b"
+source = "git+https://github.com/quentinLeDilavrec/legion?rev=9929c5cdd1f0b844071a00725632c7c39b6fff39#9929c5cdd1f0b844071a00725632c7c39b6fff39"
 dependencies = [
  "proc-macro2",
  "quote",

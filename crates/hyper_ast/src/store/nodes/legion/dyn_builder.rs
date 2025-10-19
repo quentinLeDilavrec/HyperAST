@@ -85,10 +85,15 @@
 //!
 //! ```
 
+use crate::compat::hash_map;
+// use std::collections::hash_map;
+
+use hash_map::HashMap;
+
+// use std::collections::HashMap;
 use std::{
     alloc::{Layout, alloc, dealloc},
     any::TypeId,
-    collections::HashMap,
     hash::{BuildHasher, BuildHasherDefault, Hasher},
     ptr::NonNull,
 };
@@ -328,6 +333,9 @@ impl Hasher for TypeIdHasher {
 /// faster no-op hash.
 pub(crate) type TypeIdMap<V> = HashMap<TypeId, V, BuildHasherDefault<TypeIdHasher>>;
 
+/// Associated vacant entry
+type VacantEntry<'a> = hash_map::VacantEntry<'a, TypeId, usize, BuildHasherDefault<TypeIdHasher>>;
+
 /// Metadata required to store a component.
 ///
 /// All told, this means a [`TypeId`], to be able to dynamically name/check the component type; a
@@ -463,7 +471,7 @@ impl<M> Common<M> {
     }
 
     unsafe fn add(&mut self, ptr: *mut u8, ty: TypeInfo, meta: M) {
-        use std::collections::hash_map::Entry;
+        use hash_map::Entry;
         match self.indices.entry(ty.id().type_id()) {
             Entry::Occupied(occupied) => {
                 let index = *occupied.get();
@@ -479,7 +487,7 @@ impl<M> Common<M> {
                 }
             }
             Entry::Vacant(vacant) => {
-                unsafe { self.inner.fun_name(ty, ptr, vacant, meta) };
+                unsafe { self.inner.push(ty, ptr, vacant, meta) };
             }
         }
     }
@@ -498,13 +506,7 @@ impl<M> CommonInner<M> {
         (new_storage, layout)
     }
 
-    unsafe fn fun_name(
-        &mut self,
-        ty: TypeInfo,
-        ptr: *mut u8,
-        vacant: std::collections::hash_map::VacantEntry<'_, TypeId, usize>,
-        meta: M,
-    ) {
+    unsafe fn push(&mut self, ty: TypeInfo, ptr: *mut u8, vacant: VacantEntry, meta: M) {
         let offset = align(self.cursor, ty.layout().align());
         let end = offset + ty.layout().size();
         if end > self.layout.size() || ty.layout().align() > self.layout.align() {
@@ -518,21 +520,13 @@ impl<M> CommonInner<M> {
             self.layout = new_layout;
         }
 
-        if ty.id().type_id() == TypeId::of::<(Vec<usize>,)>() {
-            let aaa = ptr as *mut (Vec<usize>,);
-            dbg!(unsafe { aaa.as_ref() });
-            // let v = unsafe { Vec::<usize>::from_raw_parts(ptr as *mut usize, 4, 4) };
-            // dbg!(&v);
-            // std::mem::forget(v);
-        }
-
-        if ty.id().type_id() == TypeId::of::<(Box<[u32]>,)>() {
-            let aaa = ptr as *mut (Box<[u32]>,);
-            dbg!(unsafe { aaa.as_ref() });
-            // let v = unsafe { Vec::<usize>::from_raw_parts(ptr as *mut usize, 4, 4) };
-            // dbg!(&v);
-            // std::mem::forget(v);
-        }
+        // if ty.id().type_id() == TypeId::of::<(Vec<usize>,)>() {
+        //     let aaa = ptr as *mut (Vec<usize>,);
+        //     dbg!(unsafe { aaa.as_ref() });
+        //     // let v = unsafe { Vec::<usize>::from_raw_parts(ptr as *mut usize, 4, 4) };
+        //     // dbg!(&v);
+        //     // std::mem::forget(v);
+        // }
 
         let addr = unsafe { self.storage.as_ptr().add(offset) };
         unsafe { std::ptr::copy_nonoverlapping(ptr, addr, ty.layout().size()) };
@@ -540,14 +534,6 @@ impl<M> CommonInner<M> {
         vacant.insert(self.info.len());
         self.info.push((ty, offset, meta));
         self.cursor = end;
-
-        if ty.id().type_id() == TypeId::of::<(Box<[u32]>,)>() {
-            let aaa = ptr as *mut (Box<[u32]>,);
-            dbg!(unsafe { aaa.as_ref() });
-            // let v = unsafe { Vec::<usize>::from_raw_parts(ptr as *mut usize, 4, 4) };
-            // dbg!(&v);
-            // std::mem::forget(v);
-        }
     }
 }
 fn align(x: usize, alignment: usize) -> usize {

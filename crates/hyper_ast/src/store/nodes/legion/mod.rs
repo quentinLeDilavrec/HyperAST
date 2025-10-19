@@ -843,14 +843,14 @@ impl CompoRegister for World {
 pub type RawHAST<'hast, 'acc, TS> =
     crate::store::SimpleStores<TS, &'hast NodeStoreInner, &'acc crate::store::labels::LabelStore>;
 
-pub fn subtree_builder<TS: crate::types::ETypeStore>(ty: TS::Ty) -> EntityBuilder
+pub fn subtree_builder<TS: crate::types::ETypeStore>(ty: TS::Ty) -> dyn_builder::EntityBuilder
 where
     <TS::Ty2 as crate::types::TypeTrait>::Lang: Component,
     TS::Ty: Component,
 {
     use crate::types::Lang;
     let l = <TS::Ty2 as crate::types::TypeTrait>::Lang::INST;
-    let mut builder = EntityBuilder::with_lang(l);
+    let mut builder = dyn_builder::EntityBuilder::with_lang(l);
     crate::store::nodes::EntityBuilder::add(&mut builder, ty);
     builder
 }

@@ -978,8 +978,6 @@ where
                 dyn_builder.add(ss);
             }
 
-            dyn_builder.check_lang::<crate::types::Lang>();
-
             let compressed_node =
                 NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
 

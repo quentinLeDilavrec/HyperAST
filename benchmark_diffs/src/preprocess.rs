@@ -340,7 +340,9 @@ fn make(
         };
     }
 
-    let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::new();
+    let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(
+        hyperast_gen_ts_java::types::Lang,
+    );
 
     let ana = None;
 
@@ -366,6 +368,7 @@ fn make(
         precomp_queries: Default::default(),
         stmt_count: 0,
         member_import_count: 0,
+        // is_named: kind.is_named(),
     }
 }
 

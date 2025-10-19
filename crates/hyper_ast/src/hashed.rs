@@ -296,6 +296,14 @@ impl<H: Hash + PrimInt, U: NodeHashs<Hash = H>, N, L, T> crate::types::ErasedHol
     }
 }
 
+impl<H: Hash + PrimInt, U: NodeHashs<Hash = H>, N, L, T> crate::store::nodes::PolyglotHolder
+    for HashedCompressedNode<U, N, L, T>
+{
+    fn lang_id(&self) -> crate::store::nodes::LangId {
+        unimplemented!()
+    }
+}
+
 impl<
     H: Hash + PrimInt,
     U: NodeHashs<Hash = H>,

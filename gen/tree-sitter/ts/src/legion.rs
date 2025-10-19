@@ -2,6 +2,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use crate::TNode;
+use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen::{PreResult, ZippedTreeGen};
 use legion::world::EntryRef;
 
@@ -482,7 +483,7 @@ impl<'stores, 'cache, TS: TsEnabledTypeStore> TreeGen for TsTreeGen<'stores, 'ca
             let hashs = hbuilder.build();
             use hyperast::store::nodes::EntityBuilder as _;
 
-            let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::new();
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(interned_kind);
             dyn_builder.add(hashs.clone());
             dyn_builder.add(compo::BytesLen(

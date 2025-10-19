@@ -262,6 +262,12 @@ impl<N, L, T> crate::types::ErasedHolder for CompressedNode<N, L, T> {
     }
 }
 
+impl<N, L, T> crate::store::nodes::PolyglotHolder for CompressedNode<N, L, T> {
+    fn lang_id(&self) -> crate::store::nodes::LangId {
+        unimplemented!()
+    }
+}
+
 impl<N: NodeId<IdN = N> + Eq + Clone, L: Eq, T: Copy + Hash + Eq + HyperType + Send + Sync>
     crate::types::Tree for CompressedNode<N, L, T>
 where

@@ -271,6 +271,12 @@ impl types::Tree for Tree {
     }
 }
 
+impl crate::store::nodes::PolyglotHolder for Tree {
+    fn lang_id(&self) -> crate::store::nodes::LangId {
+        unimplemented!()
+    }
+}
+
 impl types::ErasedHolder for Tree {
     fn unerase_ref<T: 'static + Send + Sync>(&self, tid: std::any::TypeId) -> Option<&T> {
         if tid == std::any::TypeId::of::<Ty>() {
@@ -286,6 +292,12 @@ impl types::ErasedHolder for Tree {
 impl<T: types::Tree> types::ErasedHolder for TreeRef<'_, T> {
     fn unerase_ref<TT: 'static + Send + Sync>(&self, tid: std::any::TypeId) -> Option<&TT> {
         self.0.unerase_ref(tid)
+    }
+}
+
+impl<T: types::Tree> crate::store::nodes::PolyglotHolder for TreeRef<'_, T> {
+    fn lang_id(&self) -> crate::store::nodes::LangId {
+        unimplemented!()
     }
 }
 

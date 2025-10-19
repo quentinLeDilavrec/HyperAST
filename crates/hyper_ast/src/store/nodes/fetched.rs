@@ -309,6 +309,12 @@ impl<'a, Id> super::ErasedHolder for HashedNodeRef<'a, Id> {
     }
 }
 
+impl<'a, Id> super::PolyglotHolder for HashedNodeRef<'a, Id> {
+    fn lang_id(&self) -> super::LangId {
+        unimplemented!()
+    }
+}
+
 impl<'a, T: TypedNodeId> crate::types::Tree for HashedNodeRef<'a, T> {
     fn has_children(&self) -> bool {
         match self.s_ref {

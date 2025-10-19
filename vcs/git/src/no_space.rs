@@ -118,6 +118,12 @@ impl<'a, T> types::WithSerialization for NoSpaceWrapper<'a, T> {
     }
 }
 
+impl<'a, T> types::WithPrecompQueries for NoSpaceWrapper<'a, T> {
+    fn wont_match_given_precomputed_queries(&self, queries: u16) -> bool {
+        self.0.wont_match_given_precomputed_queries(queries)
+    }
+}
+
 impl<'a, T> types::Labeled for NoSpaceWrapper<'a, T> {
     type Label = LabelIdentifier;
 
@@ -188,7 +194,7 @@ impl<'a> hyperast::types::ErasedHolder for NoSpaceWrapper<'a, MIdN<NodeIdentifie
     }
 }
 
-impl<'a> hyperast::store::nodes::ErasedHolder for NoSpaceWrapper<'a, NodeIdentifier> {
+impl hyperast::store::nodes::ErasedHolder for NoSpaceWrapper<'_, NodeIdentifier> {
     unsafe fn unerase_ref_unchecked<T: 'static + hyperast::store::nodes::Compo>(
         &self,
         tid: std::any::TypeId,
@@ -201,7 +207,13 @@ impl<'a> hyperast::store::nodes::ErasedHolder for NoSpaceWrapper<'a, NodeIdentif
     }
 }
 
-impl<'a> types::Tree for NoSpaceWrapper<'a, NodeIdentifier> {
+impl hyperast::store::nodes::PolyglotHolder for NoSpaceWrapper<'_, NodeIdentifier> {
+    fn lang_id(&self) -> hyperast::store::nodes::LangId {
+        self.0.lang_id()
+    }
+}
+
+impl types::Tree for NoSpaceWrapper<'_, NodeIdentifier> {
     fn has_children(&self) -> bool {
         self.0.has_children()
     }
@@ -211,16 +223,16 @@ impl<'a> types::Tree for NoSpaceWrapper<'a, NodeIdentifier> {
     }
 }
 
-impl<'store> types::NStore for NoSpaceNodeStoreWrapper<'store> {
+impl types::NStore for NoSpaceNodeStoreWrapper<'_> {
     type IdN = NodeIdentifier;
     type Idx = u16;
 }
 
-impl<'a, 'store> types::lending::NLending<'a, NodeIdentifier> for NoSpaceNodeStoreWrapper<'store> {
+impl<'a> types::lending::NLending<'a, NodeIdentifier> for NoSpaceNodeStoreWrapper<'_> {
     type N = NoSpaceWrapper<'a, NodeIdentifier>;
 }
 
-impl<'store> types::NodeStore<NodeIdentifier> for NoSpaceNodeStoreWrapper<'store> {
+impl types::NodeStore<NodeIdentifier> for NoSpaceNodeStoreWrapper<'_> {
     fn resolve(&self, id: &NodeIdentifier) -> types::LendN<'_, Self, NodeIdentifier> {
         NoSpaceWrapper(self.s.resolve(*id))
     }

@@ -81,34 +81,32 @@ impl<'a> hyperast::types::RoleStore for TStore {
 
 impl TypeStore for TStore {
     type Ty = AnyType;
-
     fn decompress_type(
-        erazed: &impl hyperast::types::ErasedHolder,
-        tid: std::any::TypeId,
+        erazed: &impl hyperast::store::nodes::PolyglotHolder,
+        _tid: std::any::TypeId,
     ) -> Self::Ty {
-        erazed
-            .unerase_ref::<hyperast_gen_ts_java::types::TType>(std::any::TypeId::of::<
-                hyperast_gen_ts_java::types::TType,
-            >())
-            .map(|t| t.as_static().into())
-            .or_else(|| {
-                erazed
-                    .unerase_ref::<hyperast_gen_ts_cpp::types::TType>(std::any::TypeId::of::<
-                        hyperast_gen_ts_cpp::types::TType,
-                    >())
-                    .map(|t| t.as_static().into())
-            })
-            .or_else(|| {
-                erazed
-                    .unerase_ref::<hyperast_gen_ts_xml::types::TType>(std::any::TypeId::of::<
-                        hyperast_gen_ts_xml::types::TType,
-                    >())
-                    .map(|t| t.as_static().into())
-            })
-            .unwrap_or_else(|| {
-                dbg!(tid);
-                dbg!(std::any::type_name::<Self::Ty>());
-                unreachable!()
-            })
+        use HyperType;
+        let id = erazed.lang_id();
+        macro_rules! decomp_t {
+            ($p:path) => {{
+                use $p as types;
+                if id.is::<types::Lang>() {
+                    let tid = std::any::TypeId::of::<types::TType>();
+                    return erazed
+                        .unerase_ref::<types::TType>(tid)
+                        .unwrap()
+                        .as_static()
+                        .into();
+                }
+            }};
+        }
+        decomp_t!(hyperast_gen_ts_java::types);
+        decomp_t!(hyperast_gen_ts_cpp::types);
+        decomp_t!(hyperast_gen_ts_xml::types);
+
+        #[cfg(not(debug_assertions))]
+        panic!();
+        #[cfg(debug_assertions)]
+        panic!("{} is not handled", id.name());
     }
 }

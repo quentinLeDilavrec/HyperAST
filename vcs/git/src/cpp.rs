@@ -82,15 +82,19 @@ where
     })
 }
 
+type PrecompQueries = u16;
+
 pub struct CppAcc {
     pub(crate) primary:
         BasicDirAcc<NodeIdentifier, LabelIdentifier, SubTreeMetrics<SyntaxNodeHashs<u32>>>,
+    pub(crate) precomp_queries: PrecompQueries,
 }
 
 impl CppAcc {
     pub(crate) fn new(name: String) -> Self {
         Self {
             primary: BasicDirAcc::new(name),
+            precomp_queries: 0,
         }
     }
 }
@@ -140,6 +144,7 @@ impl hyperast::tree_gen::Accumulator for CppAcc {
     fn push(&mut self, (name, (full_node,)): Self::Node) {
         self.primary
             .push(name, full_node.compressed_node, full_node.metrics);
+        self.precomp_queries |= full_node.precomp_queries;
     }
 }
 

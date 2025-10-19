@@ -695,6 +695,25 @@ impl<Id> crate::store::nodes::ErasedHolder for HashedNodeRef<'_, Id> {
     }
 }
 
+impl<Id> crate::store::nodes::PolyglotHolder for HashedNodeRef<'_, Id> {
+    fn lang_id(&self) -> crate::store::nodes::LangId {
+        let component_types = self.0.archetype().layout().component_types();
+        let lang = component_types[0];
+        // TODO add debug assert verifying that it is a valid language identifier
+        crate::store::nodes::LangId {
+            id: lang.type_id(),
+            #[cfg(debug_assertions)]
+            name: lang.name,
+        }
+    }
+}
+
+impl<Id> HashedNodeRef<'_, Id> {
+    pub fn layout(&self) -> &legion::storage::EntityLayout {
+        self.0.archetype().layout().as_ref()
+    }
+}
+
 impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree for HashedNodeRef<'_, Id> {
     fn has_children(&self) -> bool {
         self.cs()

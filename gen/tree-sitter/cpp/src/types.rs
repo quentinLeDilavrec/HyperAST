@@ -242,6 +242,7 @@ impl LangRef<TType> for Lang {
 }
 
 impl hyperast::types::Lang<Type> for Cpp {
+    const INST: Self = Lang;
     fn make(t: u16) -> &'static Type {
         Lang.make(t)
     }

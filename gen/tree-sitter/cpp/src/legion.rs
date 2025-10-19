@@ -1,7 +1,7 @@
 use crate::TNode;
 use crate::types::{CppEnabledTypeStore, Type};
 use hyperast::store::nodes::compo;
-use hyperast::store::nodes::legion::dyn_builder;
+use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{
     self, NoOpMore, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries, try_get_spacing,
@@ -51,9 +51,9 @@ pub type MDCache = HashMap<NodeIdentifier, MD>;
 // * metadata: computation results from concrete code of node and its children
 // they can be qualitative metadata .eg a hash or they can be quantitative .eg lines of code
 pub struct MD {
-    metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
-    ana: Option<PartialAnalysis>,
-    precomp_queries: PrecompQueries,
+    pub metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
+    pub ana: Option<PartialAnalysis>,
+    pub precomp_queries: PrecompQueries,
 }
 
 impl From<Local> for MD {
@@ -62,6 +62,23 @@ impl From<Local> for MD {
             metrics: x.metrics,
             ana: x.ana,
             precomp_queries: x.precomp_queries,
+        }
+    }
+}
+
+impl MD {
+    pub fn local(&self, compressed_node: NodeIdentifier) -> Local {
+        let md = self;
+        let ana = md.ana.clone();
+        let metrics = md.metrics;
+        let precomp_queries = md.precomp_queries;
+        Local {
+            compressed_node,
+            metrics,
+            ana,
+            role: None,
+            precomp_queries,
+            viz_cs_count: 0,
         }
     }
 }
@@ -271,7 +288,7 @@ where
             // dbg!(node.0.start_byte());
             // dbg!(node.0.end_byte());
             // must skip missing nodes, i.e., leafs added by tree-sitter to fix CST,
-            // needed to avoid breaking invarient, as the node has no span:
+            // needed to avoid breaking invariant, as the node has no span:
             // `is_parent_hidden && parent.end_byte() <= acc.begin_byte()`
             return PreResult::Skip;
         }
@@ -675,7 +692,7 @@ where
                 .match_precomp_queries(stores, &acc, label.as_deref());
             let children_is_empty = acc.simple.children.is_empty();
 
-            let mut dyn_builder = dyn_builder::EntityBuilder::new();
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(bytes_len);
 
             let current_role = Option::take(&mut acc.role.current);

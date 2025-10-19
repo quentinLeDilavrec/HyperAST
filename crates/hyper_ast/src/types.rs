@@ -1,9 +1,9 @@
 use std::borrow::Borrow;
-use std::fmt::Debug;
-use std::fmt::Display;
+use std::cmp::PartialEq;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::marker::{Send, Sync};
 use std::ops::Deref;
-use std::str::FromStr;
 
 use num::ToPrimitive;
 use strum_macros::AsRefStr;
@@ -13,6 +13,7 @@ use strum_macros::EnumIter;
 use strum_macros::EnumString;
 
 use crate::PrimInt;
+use crate::store::nodes::PolyglotHolder;
 
 pub trait HashKind: Copy + std::ops::Deref {
     fn structural() -> Self;
@@ -1025,7 +1026,7 @@ pub trait Labeled {
     fn get_label_unchecked(&self) -> &Self::Label;
     fn try_get_label(&self) -> Option<&Self::Label>;
 }
-pub trait Tree: Labeled + WithChildren + ErasedHolder {
+pub trait Tree: Labeled + WithChildren + PolyglotHolder {
     fn has_children(&self) -> bool;
     fn has_label(&self) -> bool;
 }
@@ -1211,8 +1212,8 @@ pub trait TypeStore {
         + Eq
         + std::hash::Hash
         + Copy
-        + std::marker::Send
-        + std::marker::Sync
+        + Send
+        + Sync
         + crate::store::nodes::Compo;
 
     fn type_to_u16(t: Self::Ty) -> TypeInternalSize {
@@ -1221,7 +1222,7 @@ pub trait TypeStore {
     fn ts_symbol(t: Self::Ty) -> TypeInternalSize {
         t.get_lang().ts_symbol(t)
     }
-    fn decompress_type(erazed: &impl ErasedHolder, tid: std::any::TypeId) -> Self::Ty {
+    fn decompress_type(erazed: &impl PolyglotHolder, tid: std::any::TypeId) -> Self::Ty {
         *unsafe { erazed.unerase_ref_unchecked::<Self::Ty>(tid) }
             .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
     }
@@ -1233,7 +1234,7 @@ pub trait TTypeStore: TypeStore {
 }
 
 pub trait ETypeStore: TypeStore + Copy {
-    type Ty2;
+    type Ty2: TypeTrait;
     fn intern(ty: Self::Ty2) -> Self::Ty;
 }
 
@@ -1274,6 +1275,7 @@ mod lang_test {
     }
 
     impl Lang<TyTest> for LLangTest {
+        const INST: Self = LLangTest;
         fn make(t: TypeInternalSize) -> &'static TyTest {
             todo!()
         }
@@ -1470,7 +1472,7 @@ pub trait SpecializedTypeStore<T: Typed>: TypeStore {}
 
 pub trait RoleStore: TypeStore {
     type IdF: 'static + Copy + Default + PartialEq;
-    type Role: 'static + Copy + PartialEq + std::marker::Sync + std::marker::Send;
+    type Role: 'static + Copy + PartialEq + Sync + Send;
     fn resolve_field(lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role;
     fn intern_role(lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF;
 }

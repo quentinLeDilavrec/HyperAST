@@ -10,7 +10,7 @@ use hyperast::store::{
     defaults::LabelIdentifier,
     nodes::{
         EntityBuilder,
-        legion::{HashedNodeRef, dyn_builder, eq_node},
+        legion::{HashedNodeRef, eq_node, subtree_builder},
     },
 };
 use hyperast::tree_gen::utils_ts::TTreeCursor;
@@ -101,10 +101,30 @@ pub type MDCache = hashbrown::HashMap<NodeIdentifier, MD>;
 // * metadata: computation results from concrete code of node and its children
 // they can be qualitative metadata .eg a hash or they can be quantitative .eg lines of code
 pub struct MD {
-    metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
-    ana: Option<PartialAnalysis>,
-    mcc: Mcc,
-    precomp_queries: PrecompQueries,
+    pub metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
+    pub ana: Option<PartialAnalysis>,
+    pub mcc: Mcc,
+    pub precomp_queries: PrecompQueries,
+}
+
+impl MD {
+    pub fn local(&self, compressed_node: NodeIdentifier) -> Local {
+        let md = self;
+        let ana = md.ana.clone();
+        let metrics = md.metrics;
+        let precomp_queries = md.precomp_queries;
+        let mcc = md.mcc.clone();
+        Local {
+            compressed_node,
+            metrics,
+            ana,
+            mcc,
+            role: None,
+            precomp_queries,
+            stmt_count: 0,
+            member_import_count: 0,
+        }
+    }
 }
 
 // Enables static reference analysis
@@ -246,7 +266,7 @@ impl<'acc> hyperast::tree_gen::WithLabel for &'acc Acc {
     type L = &'acc str;
 }
 
-impl Debug for Acc {
+impl<S> Debug for Acc<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Acc")
             .field("simple", &self.simple)
@@ -351,12 +371,16 @@ where
             return PreResult::Skip;
         };
         if should_get_hidden_nodes() {
-            if kind.is_repeat() {
-                return PreResult::Ignore;
-            } else if kind == Type::_UnannotatedType
+            if kind == Type::_UnannotatedType
                 || kind == Type::_VariableDeclaratorList
                 || kind == Type::_VariableDeclaratorId
             {
+                return PreResult::Ignore;
+            } else if kind.is_repeat() {
+                // if stack.parent().unwrap().simple.children.len() < 256 {
+                return PreResult::Ignore;
+                // }
+            } else if !kind.is_supertype() && kind.is_hidden() {
                 return PreResult::Ignore;
             }
         }
@@ -650,8 +674,9 @@ where
             id
         } else {
             let vacant = insertion.vacant();
-            let mut dyn_builder = dyn_builder::EntityBuilder::new();
-            dyn_builder.add(interned_kind);
+            // let mut dyn_builder = dyn_builder::EntityBuilder::with_lang(TS::LANG);
+            // dyn_builder.add(interned_kind);
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
             dyn_builder.add(spacing_id);
             dyn_builder.add(hashs);
@@ -671,6 +696,16 @@ where
 
             NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
         };
+        use hyperast::store::nodes::PolyglotHolder;
+        assert!(
+            self.stores
+                .node_store
+                .resolve(compressed_node)
+                .lang_id()
+                .is::<crate::types::Lang>(),
+            "{}",
+            kind
+        );
         Local {
             compressed_node,
             metrics: SubTreeMetrics {
@@ -856,19 +891,11 @@ where
 
         let local = if let Some(compressed_node) = insertion.occupied_id() {
             let md = self.md_cache.get(&compressed_node).unwrap();
-            let ana = md.ana.clone();
-            let metrics = md.metrics;
-            let precomp_queries = md.precomp_queries;
-            let mcc = md.mcc.clone();
             Local {
-                compressed_node,
-                metrics,
-                ana,
-                mcc,
                 role: acc.role.current,
-                precomp_queries,
                 stmt_count: acc.stmt_count,
                 member_import_count: acc.member_import_count,
+                ..md.local(compressed_node)
             }
         } else {
             #[cfg(feature = "impact")]
@@ -895,7 +922,7 @@ where
             }
             let children_is_empty = acc.simple.children.is_empty();
 
-            let mut dyn_builder = dyn_builder::EntityBuilder::new();
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(bytes_len);
 
             if More::ENABLED {
@@ -914,6 +941,7 @@ where
 
             let current_role = Option::take(&mut acc.role.current);
             acc.role.add_md(&mut dyn_builder);
+
             if Mcc::persist(&acc.simple.kind) {
                 dyn_builder.add(acc.mcc.clone());
             }
@@ -949,6 +977,8 @@ where
                 };
                 dyn_builder.add(ss);
             }
+
+            dyn_builder.check_lang::<crate::types::Lang>();
 
             let compressed_node =
                 NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
@@ -1135,7 +1165,7 @@ where
                 acc.precomp_queries |= self.more.match_precomp_queries(stores, &acc, label);
                 let children_is_empty = acc.simple.children.is_empty();
 
-                let mut dyn_builder = dyn_builder::EntityBuilder::new();
+                let mut dyn_builder = subtree_builder::<TS>(interned_kind);
                 dyn_builder.add(bytes_len);
 
                 let current_role = Option::take(&mut acc.role.current);

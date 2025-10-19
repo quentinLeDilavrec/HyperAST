@@ -97,6 +97,12 @@ impl WithByteRange for Acc {
     }
 }
 
+impl Debug for Acc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Acc").field("simple", &self.simple).finish()
+    }
+}
+
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct TTreeCursor<'a>(tree_sitter::TreeCursor<'a>);
@@ -546,7 +552,7 @@ fn compress<Ty: std::marker::Send + std::marker::Sync + 'static>(
             }}
         };
     }
-    let base = (interned_kind, hashs, bytes_len);
+    let base = (crate::types::Lang, interned_kind, hashs, bytes_len);
     match (label_id, 0) {
         (None, _) => children_dipatch!(base,),
         (Some(label), _) => children_dipatch!(base, (label,),),

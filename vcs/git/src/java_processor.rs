@@ -5,7 +5,7 @@ use std::{iter::Peekable, path::Components};
 
 use git2::{Oid, Repository};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
-use hyperast::store::nodes::legion::RawHAST;
+use hyperast::store::nodes::legion::{RawHAST, subtree_builder};
 use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
 use hyperast_gen_ts_java::types::{TStore, Type};
@@ -146,14 +146,13 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
         let name = &acc.primary.name;
         let key = (oid, name.as_bytes().into());
         let name = self.prepro.get_or_insert_label(name);
-        let full_node = make(acc, self.prepro.main_stores_mut().mut_with_ts());
-        self.prepro
+        let holder = self
+            .prepro
             .processing_systems
-            .mut_or_default::<JavaProcessorHolder>()
-            .with_parameters_mut(self.handle.0) //.with_parameters(self.parameters.0)
-            .cache
-            .object_map
-            .insert(key, (full_node.clone(),));
+            .mut_or_default::<JavaProcessorHolder>();
+        let java_proc = holder.with_parameters_mut(self.handle.0);
+        let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
+        java_proc.cache.object_map.insert(key, (full_node.clone(),));
         if self.stack.is_empty() {
             Some((full_node,))
         } else {
@@ -202,7 +201,11 @@ fn prep_scripting(
         .as_ref()
 }
 
-fn make(acc: JavaAcc, stores: &mut SimpleStores) -> hyperast_gen_ts_java::legion_with_refs::Local {
+fn make(
+    acc: JavaAcc,
+    stores: &mut SimpleStores,
+    java_proc: &mut JavaProc,
+) -> hyperast_gen_ts_java::legion_with_refs::Local {
     use hyperast::{
         cyclomatic::Mcc,
         store::nodes::legion::{NodeStore, eq_node},
@@ -270,31 +273,24 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores) -> hyperast_gen_ts_java::legion
             None
         }
     };
+    let md_cache = &mut java_proc.cache.md_cache;
 
     // Guard to avoid computing metadata for an already present subtree
-    if let Some(id) = insertion.occupied_id() {
+    if let Some(compressed_node) = insertion.occupied_id() {
         // TODO add (debug) assertions to detect non-local metadata
-        // TODO use the cache ?
-        // this branch should be really cold
-        let ana = compute_ana();
-        let metrics = primary
-            .metrics
-            .map_hashs(|h| MetaDataHashsBuilder::build(h));
+        // this branch should be pretty cold
+        let md = md_cache.get(&compressed_node).unwrap();
         return legion_with_refs::Local {
-            compressed_node: id,
-            metrics,
-            ana,
-            mcc: Mcc::new(&Type::Directory),
-            role: None,
-            precomp_queries: Default::default(),
             stmt_count: 0,
             member_import_count: 0,
+            // is_named: kind.is_named(),
+            ..md.local(compressed_node)
         };
     }
 
     let ana = compute_ana();
 
-    let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::new();
+    let mut dyn_builder = subtree_builder::<hyperast_gen_ts_java::types::TStore>(interned_kind);
 
     add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
     let children_is_empty = primary.children.is_empty();
@@ -323,24 +319,35 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores) -> hyperast_gen_ts_java::legion
     };
 
     let vacant = insertion.vacant();
-    let node_id = NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+    let compressed_node = NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
 
+    md_cache.insert(
+        compressed_node,
+        legion_with_refs::MD {
+            metrics,
+            ana: None,
+            mcc: Mcc::new(&kind),
+            precomp_queries: acc.precomp_queries,
+        },
+    );
     let full_node = legion_with_refs::Local {
-        compressed_node: node_id.clone(),
+        compressed_node,
         metrics,
         ana,
         mcc: Mcc::new(&kind),
         role: None,
         precomp_queries: acc.precomp_queries,
         stmt_count: 0,
-        member_import_count: 0, // TODO precise the exact semantics
+        // TODO precise the exact semantics
+        member_import_count: 0,
+        // is_named: kind.is_named(),
     };
     full_node
 }
 
 use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
     pub query: Option<hyperast_tsquery::ZeroSepArrayStr>,
     pub tsg: Option<std::sync::Arc<str>>,
@@ -966,7 +973,13 @@ mod experiments {
             let name = &acc.primary.name;
             // let key = (oid, name.as_bytes().into());
             let name = self.prepro.intern_label(name);
-            let full_node = make(acc, self.prepro.main_stores_mut().mut_with_ts());
+
+            let holder = self
+                .prepro
+                .processing_systems
+                .mut_or_default::<JavaProcessorHolder>();
+            let java_proc = holder.with_parameters_mut(self.handle.0);
+            let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
             let full_node = (full_node,);
             todo!(
               // self.prepro

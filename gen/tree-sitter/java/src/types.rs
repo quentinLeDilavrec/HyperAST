@@ -156,6 +156,7 @@ pub struct Lang;
 pub type Java = Lang;
 
 impl hyperast::types::Lang<Type> for Java {
+    const INST: Self = Lang;
     fn make(t: u16) -> &'static Type {
         Lang.make(t)
     }
@@ -188,7 +189,9 @@ impl LangRef<Type> for Java {
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        assert!(t != Type::Spaces || t != Type::Directory);
+        debug_assert_eq!(t as u16, id_for_node_kind(t.as_static_str(), t.is_named()));
+        t as u16
     }
 }
 impl LangRef<AnyType> for Java {
@@ -204,7 +207,13 @@ impl LangRef<AnyType> for Java {
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        let t: Type = *t.as_any().downcast_ref().unwrap();
+        assert!(t != Type::Spaces || t != Type::Directory);
+        debug_assert_eq!(
+            Lang.to_u16(t),
+            id_for_node_kind(t.as_static_str(), t.is_named())
+        );
+        Lang.to_u16(t)
     }
 }
 
@@ -222,7 +231,13 @@ impl LangRef<TType> for Lang {
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        let t: Type = *t.as_any().downcast_ref().unwrap();
+        assert!(t != Type::Spaces || t != Type::Directory);
+        // debug_assert_eq!(
+        //     Lang.to_u16(t),
+        //     id_for_node_kind(t.as_static_str(), t.is_named())
+        // );
+        Lang.to_u16(t)
     }
 }
 

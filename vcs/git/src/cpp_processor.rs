@@ -8,7 +8,8 @@ use crate::{
 };
 use git2::{Oid, Repository};
 use hyperast::{
-    store::nodes::legion::eq_node,
+    store::nodes::legion::{eq_node, subtree_builder},
+    tree_gen::add_md_precomp_queries,
     types::{ETypeStore as _, LabelStore},
 };
 use hyperast_gen_ts_cpp::{legion as cpp_gen, types::Type};
@@ -109,7 +110,13 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
     fn post(&mut self, oid: Oid, acc: CppAcc) -> Option<(cpp_gen::Local,)> {
         let name = acc.primary.name.clone();
         let key = (oid, name.as_bytes().into());
-        let full_node = make(acc, self.prepro.main_stores_mut().mut_with_ts());
+        let holder = self
+            .prepro
+            .processing_systems
+            .mut_or_default::<CppProcessorHolder>();
+        use crate::processing::erased::ParametrizedCommitProc2;
+        let cpp_proc = holder.with_parameters_mut(self.parameters.0);
+        let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), cpp_proc);
         self.prepro
             .processing_systems
             .mut_or_default::<CppProcessorHolder>()
@@ -414,7 +421,7 @@ impl RepositoryProcessor {
     }
 }
 
-fn make(acc: CppAcc, stores: &mut SimpleStores) -> cpp_gen::Local {
+fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_gen::Local {
     use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
@@ -429,27 +436,24 @@ fn make(acc: CppAcc, stores: &mut SimpleStores) -> cpp_gen::Local {
     let eq = eq_node(&Type::Directory, Some(&label_id), &primary.children);
     let insertion = node_store.prepare_insertion(&hashable, eq);
 
+    let md_cache = &mut cpp_proc.cache.md_cache;
+
     if let Some(id) = insertion.occupied_id() {
-        // NOTE this cituation should not happen often, due to cache based on oids, so there is no point caching md.
+        // NOTE this situation should not happen often, due to cache based on oids, so there is no point caching md.
         // If git objects are changed but ignored, then it goes through this branch.
         // TODO bench
         // TODO in the oid cache the values could be NodeIdentifiers, then current cache would be used with an indirection.
 
-        let metrics = primary.metrics.map_hashs(|h| h.build());
-        let ana = None;
-        return cpp_gen::Local {
-            compressed_node: id,
-            metrics,
-            ana,
-            role: None,
-            precomp_queries: Default::default(),
-            viz_cs_count: 0,
-        };
+        let md = md_cache.get(&id).unwrap();
+
+        return cpp_gen::Local { ..md.local(id) };
     }
 
-    let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::new();
+    let mut dyn_builder = subtree_builder::<hyperast_gen_ts_cpp::types::TStore>(interned_kind);
 
     let ana = None;
+
+    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
 
     let children_is_empty = primary.children.is_empty();
 
@@ -464,12 +468,21 @@ fn make(acc: CppAcc, stores: &mut SimpleStores) -> cpp_gen::Local {
         dyn_builder.build(),
     );
 
+    md_cache.insert(
+        node_id,
+        cpp_gen::MD {
+            metrics,
+            ana: None,
+            precomp_queries: acc.precomp_queries,
+        },
+    );
+
     let full_node = cpp_gen::Local {
         compressed_node: node_id.clone(),
         metrics,
         ana,
         role: None,
-        precomp_queries: Default::default(),
+        precomp_queries: acc.precomp_queries,
         viz_cs_count: 0,
     };
     full_node

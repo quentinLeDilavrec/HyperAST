@@ -1,29 +1,21 @@
 ///! fully compress all subtrees from a tree-sitter query CST
 use std::{collections::HashMap, fmt::Debug};
 
-use hyperast::store::nodes::legion::eq_node;
-use hyperast::types::{HyperType, WithSerialization};
-
+use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
-use hyperast::{
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    store::{
-        SimpleStores,
-        nodes::{
-            DefaultNodeStore as NodeStore, EntityBuilder,
-            legion::{HashedNodeRef, NodeIdentifier},
-        },
-    },
-    tree_gen::{
-        AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, Parents, PreResult,
-        SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-        ZippedTreeGen,
-        parser::{Node as _, TreeCursor},
-        utils_ts::TTreeCursor,
-    },
-    types::LabelStore as _,
+use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
+use hyperast::store::nodes::legion::{eq_node, subtree_builder};
+use hyperast::store::nodes::{DefaultNodeStore as NodeStore, EntityBuilder};
+use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+use hyperast::tree_gen::{
+    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, Parents, PreResult,
+    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
+    ZippedTreeGen, utils_ts::TTreeCursor,
 };
+use hyperast::types::{HyperType, WithSerialization};
+use hyperast::{full::FullNode, types::LabelStore as _};
+
 use num::ToPrimitive;
 
 use crate::types::{TsQueryEnabledTypeStore, Type};
@@ -407,7 +399,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
     ) -> Local {
         let metrics = metrics.map_hashs(|h| h.build());
 
-        let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::new();
+        let mut dyn_builder = subtree_builder::<TS>(interned_kind);
         dyn_builder.add(byte_len);
 
         let children_is_empty = acc.simple.children.is_empty();

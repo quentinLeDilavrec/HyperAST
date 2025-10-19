@@ -1305,12 +1305,6 @@ impl Query {
             find_precomputed_uses(&mut query, precomputeds);
             log::trace!("finished searching for subqueries");
         }
-        // let hasher = &mut std::hash::DefaultHasher::new();
-        // hash_single_step(&query, StepId::new(1), hasher);
-        // dbg!(hasher.finish());
-        // let hasher = &mut std::hash::DefaultHasher::new();
-        // hash_single_step(&query, StepId::new(24), hasher);
-        // dbg!(hasher.finish());
         let mut precomp = query.clone();
         for i in query
             .enabled_pattern_map
@@ -1321,7 +1315,6 @@ impl Query {
             .collect::<Vec<_>>()
         {
             let i = i as usize;
-            // dbg!(i);
             query.disable_pattern(PatternId::new(i));
         }
         for i in precomp
@@ -1333,7 +1326,6 @@ impl Query {
             .collect::<Vec<_>>()
         {
             let i = i as usize;
-            // dbg!(i);
             precomp.disable_pattern(PatternId::new(i));
         }
         log::trace!("finished query building");

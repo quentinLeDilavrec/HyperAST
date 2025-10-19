@@ -115,15 +115,29 @@ impl Debug for BuiltEntity {
     }
 }
 
-#[derive(Default)]
 pub struct EntityBuilder {
     inner: Common<fn() -> Box<dyn UnknownComponentStorage>>,
 }
 
 impl EntityBuilder {
-    pub fn new() -> Self {
-        Self::default()
+    pub(crate) fn new() -> Self {
+        Self {
+            inner: Default::default(),
+        }
     }
+    // adds a language marker to the subtree (in first position in the layout)
+    // enables faster and more predictable component accesses when dealing with polyglot ASTs.
+    #[doc(hidden)]
+    pub fn with_lang<L: Component>(l: L) -> Self {
+        assert_eq!(size_of::<L>(), 0);
+        let mut s = Self {
+            inner: Default::default(),
+        };
+        use super::super::EntityBuilder;
+        s.add(l);
+        s
+    }
+
     pub fn build(self) -> BuiltEntity {
         BuiltEntity { inner: self.inner }
     }

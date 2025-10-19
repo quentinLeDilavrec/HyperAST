@@ -184,6 +184,12 @@ impl<Id> crate::store::nodes::ErasedHolder for HashedNodeRef<'_, Id> {
     }
 }
 
+impl<Id> crate::store::nodes::PolyglotHolder for HashedNodeRef<'_, Id> {
+    fn lang_id(&self) -> crate::store::nodes::LangId {
+        unimplemented!()
+    }
+}
+
 impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree for HashedNodeRef<'_, Id>
 where
     Id::Ty: Copy + Hash + Eq,

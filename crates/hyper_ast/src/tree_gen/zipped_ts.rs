@@ -2,7 +2,7 @@
 use super::utils_ts::*;
 
 use crate::store::nodes::compo;
-use crate::store::nodes::legion::{RawHAST, dyn_builder};
+use crate::store::nodes::legion::{RawHAST, dyn_builder, subtree_builder};
 use crate::tree_gen::{self, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries};
 use crate::types::{self, HyperType};
 use crate::{
@@ -216,8 +216,7 @@ where
 {
 }
 
-impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
-    for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
+impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -285,9 +284,7 @@ where
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
-        if !stack
-            .parent().is_some_and(|a| a.simple.kind.is_supertype())
-        {
+        if !stack.parent().is_some_and(|a| a.simple.kind.is_supertype()) {
             if let Some(r) = cursor.0.field_name() {
                 if let Ok(r) = r.try_into() {
                     acc.role.current = Some(r);
@@ -363,8 +360,7 @@ where
     }
 }
 
-impl<'store, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -479,7 +475,7 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        
+
         self.make(&mut global, acc, label)
     }
 }
@@ -536,7 +532,7 @@ where
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
             let bytes_len = compo::BytesLen(byte_len);
             let vacant = insertion.vacant();
-            let mut dyn_builder = dyn_builder::EntityBuilder::new();
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             {
                 let node_store = &*vacant.1.1;
                 let stores = SimpleStores {
@@ -589,7 +585,6 @@ where
             }
         };
 
-        
         FullNode {
             global: global.simple(),
             local,

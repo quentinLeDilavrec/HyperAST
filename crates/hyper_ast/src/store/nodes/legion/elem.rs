@@ -642,10 +642,7 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithRoles
 {
     /// Actually `at` works as a structural offset when hidden children can hold fields.
     /// NOTE cannot easily go in children to make it a proper offset then.
-    fn role_at<Role: 'static + Copy + std::marker::Sync + std::marker::Send>(
-        &self,
-        at: Self::ChildIdx,
-    ) -> Option<Role> {
+    fn role_at<Role: 'static + Copy + Sync + Send>(&self, at: Self::ChildIdx) -> Option<Role> {
         let r = &self.0.get_component::<compo::Roles<Role>>().ok()?.0;
         let ro = self.0.get_component::<compo::RoleOffsets>().ok()?;
         let mut i = 0;
@@ -654,6 +651,31 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithRoles
                 return None;
             } else if ro as u16 == at {
                 return Some(r[i]);
+            }
+            i += 1;
+        }
+        None
+    }
+    fn role_at_and_has_later<Role: 'static + Copy + Sync + Send + PartialEq>(
+        &self,
+        at: Self::ChildIdx,
+    ) -> Option<(Role, bool)> {
+        let r = &self.0.get_component::<compo::Roles<Role>>().ok()?.0;
+        let ro = self.0.get_component::<compo::RoleOffsets>().ok()?;
+        let mut i = 0;
+        for &ro in ro.0.as_ref() {
+            if ro as u16 > at {
+                return None;
+            } else if ro as u16 == at {
+                let res = r[i];
+                i += 1;
+                while i < r.len() {
+                    if res == r[i] {
+                        return Some((res, true));
+                    }
+                    i += 1;
+                }
+                return Some((res, false));
             }
             i += 1;
         }

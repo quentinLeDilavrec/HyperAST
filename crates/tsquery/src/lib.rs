@@ -85,7 +85,7 @@ pub struct Query {
     pub general_predicates: predicate::GeneralPredicates,
     immediate_predicates: Vec<predicate::ImmediateTextPredicate>,
     precomputed_patterns: Option<query::PrecomputedPatterns>,
-    used_precomputed: Precomps,
+    pub used_precomputed: Precomps,
     enabled_pattern_map: Vec<u16>,
     enabled_pattern_count: u16,
 }

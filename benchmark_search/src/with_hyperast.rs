@@ -567,7 +567,49 @@ where
         let mut pos = make_pos(root);
 
         let stores = repositories.processor.main_stores.with_ts::<TS>();
-        todo!("rework no_space")
+        let stores = hyperast_vcs_git::no_space2::as_nospaces(stores);
+
+        let mut count = R::default();
+        let mut down = true;
+        // iterate over java files
+        loop {
+            use hyperast::types::WithChildren;
+            if down {
+                let id = pos.node();
+                let k = stores.resolve_type(&id);
+                let n = stores.node_store.resolve(id);
+
+                if executor.can_skip(&n) {
+                    down = false;
+                    continue;
+                }
+                if k.is_directory() {
+                    if let Some(id) = n.child(&0) {
+                        pos.down(id, 0);
+                    } else {
+                        down = false;
+                    }
+                } else if k.is_file() {
+                    pos = executor.execute(stores, pos, &mut count);
+                    down = false;
+                }
+            } else {
+                let Some(p) = pos.parent() else {
+                    break;
+                };
+                let n = stores.node_store.resolve(p);
+
+                let o = pos.offset() + 1;
+                if let Some(id) = n.child(&o) {
+                    pos.inc(id);
+                    down = true;
+                } else {
+                    pos.up();
+                }
+            }
+        }
+        let size = stores.node_store.resolve(root).size();
+        cumulative.commit_result_with_size(count, size)?;
     }
     Ok(())
 }

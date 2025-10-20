@@ -16,6 +16,7 @@ pub mod make_processor;
 pub mod maven_processor;
 pub mod multi_preprocessed;
 pub mod no_space;
+pub mod no_space2;
 /// for now only tested on maven repositories with a pom in root.
 pub mod preprocessed;
 pub mod processing;

@@ -26,8 +26,19 @@ macro_rules! role_impl {
         $( $t:ident => $s:expr, )+
     ) => {
         #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+        #[repr(u8)]
         pub enum Role {
             $( $t, )+
+        }
+        impl Role {
+            pub const fn len() -> usize {
+                Self::End as usize + 1
+            }
+        }
+        impl Into<u8> for Role {
+            fn into(self) -> u8 {
+                self as u8
+            }
         }
 
         impl<'a> TryFrom<&'a str> for Role {
@@ -179,7 +190,6 @@ role_impl!(
     Placement => "placement",
     // Scope => "scope",
     // Update => "update",
-    End => "end",
     // Type => "type",
     // Body => "body",
     DefaultValue => "default_value",
@@ -204,6 +214,7 @@ role_impl!(
     TemplateParameters => "template_parameters",
     // Operator => "operator",
     // Condition => "condition",
+    End => "end",
 );
 
 #[allow(unused)]

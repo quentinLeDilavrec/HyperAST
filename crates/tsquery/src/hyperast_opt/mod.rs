@@ -156,7 +156,7 @@ where
 
     fn goto_next_sibling_internal(&mut self) -> TreeCursorStep {
         if self.p.ref_node().eq(&self.pos.ref_node()) {
-            return TreeCursorStep::TreeCursorStepNone;
+            return TreeCursorStep::None;
         }
         goto_next_sibling_internal(self.stores, &mut self.pos)
     }
@@ -260,7 +260,7 @@ where
     };
     let mut pos = pos.ext();
     loop {
-        if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, &mut pos) {
+        if let TreeCursorStep::None = goto_next_sibling_internal(stores, &mut pos) {
             break;
         }
         let time = std::time::Instant::now();
@@ -628,7 +628,7 @@ where
 {
     use hyperast::types::NodeStore;
     let Some(p) = pos.parent() else {
-        return TreeCursorStep::TreeCursorStepNone;
+        return TreeCursorStep::None;
     };
     let n = stores.node_store().resolve(&p);
     use hyperast::types::Children;
@@ -639,7 +639,7 @@ where
             pos.up();
             return goto_next_sibling_internal(stores, pos);
         } else {
-            return TreeCursorStep::TreeCursorStepNone;
+            return TreeCursorStep::None;
         }
     };
     pos.inc(node);
@@ -647,9 +647,9 @@ where
         return goto_next_sibling_internal(stores, pos);
     }
     if is_visible(stores, pos) {
-        TreeCursorStep::TreeCursorStepVisible
+        TreeCursorStep::Visible
     } else {
-        TreeCursorStep::TreeCursorStepHidden
+        TreeCursorStep::Hidden
     }
 }
 
@@ -666,16 +666,16 @@ where
     use hyperast::types::Children;
     use hyperast::types::WithChildren;
     let Some(node) = n.child(&num::zero()) else {
-        return TreeCursorStep::TreeCursorStepNone;
+        return TreeCursorStep::None;
     };
     pos.down(node, num::zero());
     if kind(stores, pos).is_spaces() {
         return goto_next_sibling_internal(stores, pos);
     }
     if is_visible(stores, pos) {
-        TreeCursorStep::TreeCursorStepVisible
+        TreeCursorStep::Visible
     } else {
-        TreeCursorStep::TreeCursorStepHidden
+        TreeCursorStep::Hidden
     }
 }
 
@@ -700,9 +700,9 @@ where
             break;
         }
         match goto_first_child_internal(stores, &mut pos) {
-            TreeCursorStep::TreeCursorStepNone => panic!(),
-            TreeCursorStep::TreeCursorStepHidden => (),
-            TreeCursorStep::TreeCursorStepVisible => break,
+            TreeCursorStep::None => panic!(),
+            TreeCursorStep::Hidden => (),
+            TreeCursorStep::Visible => break,
         }
     }
     child_by_role(stores, &mut pos, role).is_some()
@@ -723,7 +723,7 @@ where
     // TODO what about multiple children with same role?
     // NOTE treesitter uses a bin tree for repeats
     let visible = is_visible(stores, pos);
-    if let TreeCursorStep::TreeCursorStepNone = goto_first_child_internal(stores, pos) {
+    if let TreeCursorStep::None = goto_first_child_internal(stores, pos) {
         return None;
     }
     loop {
@@ -731,8 +731,7 @@ where
             if r == _role {
                 return Some(());
             } else {
-                if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, pos)
-                {
+                if let TreeCursorStep::None = goto_next_sibling_internal(stores, pos) {
                     return None;
                 }
                 continue;
@@ -740,7 +739,7 @@ where
         }
         // do not go down
         if visible {
-            if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, pos) {
+            if let TreeCursorStep::None = goto_next_sibling_internal(stores, pos) {
                 return None;
             }
         }
@@ -749,7 +748,7 @@ where
             if child_by_role(stores, pos, _role).is_some() {
                 return Some(());
             }
-            if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, pos) {
+            if let TreeCursorStep::None = goto_next_sibling_internal(stores, pos) {
                 return None;
             }
         }

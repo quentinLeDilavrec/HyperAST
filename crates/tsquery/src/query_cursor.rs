@@ -133,14 +133,14 @@ where
                 did_match |= self.when_ascending();
                 // Leave this node by stepping to its next sibling or to its parent.
                 match self.cursor.goto_next_sibling_internal() {
-                    TreeCursorStep::TreeCursorStepVisible => {
+                    TreeCursorStep::Visible => {
                         if !self.on_visible_node {
                             self.depth += 1;
                             self.on_visible_node = true;
                         }
                         self.ascending = false;
                     }
-                    TreeCursorStep::TreeCursorStepHidden => {
+                    TreeCursorStep::Hidden => {
                         if self.on_visible_node {
                             if self.depth == 0 {
                                 return did_match;
@@ -150,7 +150,7 @@ where
                         }
                         self.ascending = false;
                     }
-                    TreeCursorStep::TreeCursorStepNone => {
+                    TreeCursorStep::None => {
                         if self.cursor.goto_parent() {
                             if self.depth == 0 {
                                 return did_match;
@@ -169,20 +169,25 @@ where
                 let (m, node_intersects_range) = self.when_entering(stop_on_definite_step);
                 did_match |= m;
                 if self.should_descend(node_intersects_range) {
-                    // dbg!(self.cursor.current_node().str_symbol());
                     match self.cursor.goto_first_child_internal() {
-                        TreeCursorStep::TreeCursorStepVisible => {
-                            // dbg!(self.cursor.current_node().str_symbol());
+                        TreeCursorStep::Visible => {
+                            #[cfg(feature = "cursor_counts")]
+                            {
+                                self.goto_count += 1;
+                            }
                             self.depth += 1;
                             self.on_visible_node = true;
                             continue;
                         }
-                        TreeCursorStep::TreeCursorStepHidden => {
-                            // dbg!(self.cursor.current_node().str_symbol());
+                        TreeCursorStep::Hidden => {
+                            #[cfg(feature = "cursor_counts")]
+                            {
+                                self.goto_count += 1;
+                            }
                             self.on_visible_node = false;
                             continue;
                         }
-                        TreeCursorStep::TreeCursorStepNone => (),
+                        TreeCursorStep::None => (),
                     }
                 }
                 self.ascending = true;

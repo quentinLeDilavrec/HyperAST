@@ -192,7 +192,7 @@ where
         let mut can_have_later_siblings_with_this_field = false;
         let mut s = self.clone();
         loop {
-            if let TreeCursorStep::TreeCursorStepNone = s.goto_next_sibling_internal() {
+            if let TreeCursorStep::None = s.goto_next_sibling_internal() {
                 break;
             }
             if role.is_some() && s.role() == role {
@@ -256,26 +256,26 @@ where
         use hyperast::types::Children;
         use hyperast::types::WithChildren;
         let Some(cs) = n.children() else {
-            return TreeCursorStep::TreeCursorStepNone;
+            return TreeCursorStep::None;
         };
         let Some(node) = cs.get(num::zero()) else {
-            return TreeCursorStep::TreeCursorStepNone;
+            return TreeCursorStep::None;
         };
         self.pos.goto(*node, num::zero());
         if self.kind().is_spaces() {
             return self._goto_next_sibling_internal();
         }
         if self.is_visible() {
-            TreeCursorStep::TreeCursorStepVisible
+            TreeCursorStep::Visible
         } else {
-            TreeCursorStep::TreeCursorStepHidden
+            TreeCursorStep::Hidden
         }
     }
 
     fn _goto_next_sibling_internal(&mut self) -> TreeCursorStep {
         use hyperast::types::NodeStore;
         let Some(p) = self.pos.parent() else {
-            return TreeCursorStep::TreeCursorStepNone;
+            return TreeCursorStep::None;
         };
         let n = self.stores.node_store().resolve(p);
         use hyperast::types::Children;
@@ -285,7 +285,7 @@ where
                 self.pos.pop();
                 return self._goto_next_sibling_internal();
             } else {
-                return TreeCursorStep::TreeCursorStepNone;
+                return TreeCursorStep::None;
             }
         };
         self.pos.inc(node);
@@ -293,9 +293,9 @@ where
             return self._goto_next_sibling_internal();
         }
         if self.is_visible() {
-            TreeCursorStep::TreeCursorStepVisible
+            TreeCursorStep::Visible
         } else {
-            TreeCursorStep::TreeCursorStepHidden
+            TreeCursorStep::Hidden
         }
     }
 }
@@ -409,9 +409,9 @@ where
         loop {
             if slf.kind().is_supertype() {
                 match slf._goto_first_child_internal() {
-                    TreeCursorStep::TreeCursorStepNone => panic!(),
-                    TreeCursorStep::TreeCursorStepHidden => (),
-                    TreeCursorStep::TreeCursorStepVisible => break,
+                    TreeCursorStep::None => panic!(),
+                    TreeCursorStep::Hidden => (),
+                    TreeCursorStep::Visible => break,
                 }
             } else {
                 break;
@@ -459,7 +459,7 @@ where
         // TODO what about multiple children with same role?
         // NOTE treesitter uses a bin tree for repeats
         let visible = self.is_visible();
-        if let TreeCursorStep::TreeCursorStepNone = self._goto_first_child_internal() {
+        if let TreeCursorStep::None = self._goto_first_child_internal() {
             return None;
         }
         loop {
@@ -467,7 +467,7 @@ where
                 if r == role {
                     return Some(());
                 } else {
-                    if let TreeCursorStep::TreeCursorStepNone = self._goto_next_sibling_internal() {
+                    if let TreeCursorStep::None = self._goto_next_sibling_internal() {
                         return None;
                     }
                     continue;
@@ -475,7 +475,7 @@ where
             }
             // do not go down
             if visible {
-                if let TreeCursorStep::TreeCursorStepNone = self._goto_next_sibling_internal() {
+                if let TreeCursorStep::None = self._goto_next_sibling_internal() {
                     return None;
                 }
             }
@@ -484,7 +484,7 @@ where
                 if self.child_by_role(role).is_some() {
                     return Some(());
                 }
-                if let TreeCursorStep::TreeCursorStepNone = self._goto_next_sibling_internal() {
+                if let TreeCursorStep::None = self._goto_next_sibling_internal() {
                     return None;
                 }
             }

@@ -210,9 +210,12 @@ pub struct QueryMatch<Node> {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub enum TreeCursorStep {
-    TreeCursorStepNone,
-    TreeCursorStepHidden,
-    TreeCursorStepVisible,
+    // TreeCursorStepHidden
+    None,
+    // TreeCursorStepHidden
+    Hidden,
+    // TreeCursorStepVisible
+    Visible,
 }
 
 // pub trait CursorLending<'a> {

@@ -38,8 +38,10 @@ impl std::str::FromStr for RepoConfig {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
+            "CppMake" => Self::CppMake,
             "Cpp" => Self::CppMake,
             "cpp" => Self::CppMake,
+            "JavaMaven" => Self::JavaMaven,
             "Java" => Self::JavaMaven,
             "java" => Self::JavaMaven,
             "typescript" => Self::TsNpm,

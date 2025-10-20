@@ -1328,6 +1328,7 @@ impl Query {
             let i = i as usize;
             precomp.disable_pattern(PatternId::new(i));
         }
+        precomp.used_precomputed = (1 << precomp_len) - 1;
         log::trace!("finished query building");
 
         // dbg!(query.wildcard_root_pattern_count);

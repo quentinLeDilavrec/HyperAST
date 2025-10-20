@@ -644,6 +644,8 @@ pub trait TsType: crate::types::HyperType + Copy {
 /// utils for generating code with tree-sitter
 #[cfg(feature = "ts")]
 pub mod utils_ts {
+    use crate::tree_gen::parser::Node;
+
     pub use super::TsEnableTS;
     pub use super::TsType;
     pub fn tree_sitter_parse(
@@ -692,6 +694,33 @@ pub mod utils_ts {
         fn ts_tree_cursor_goto_next_sibling_internal(
             self_: *mut tree_sitter::ffi::TSTreeCursor,
         ) -> TreeCursorStep;
+
+    }
+
+    // typedef struct {
+    //   const TSTree *tree;
+    //   Array(TreeCursorEntry) stack;
+    //   TSSymbol root_alias_symbol;
+    // } TreeCursor;
+    #[repr(C)]
+    struct TreeCursor {
+        pub tree: *const tree_sitter::ffi::TSTree,
+        pub stack: Array<TreeCursorEntry>,
+        pub root_alias_symbol: tree_sitter::ffi::TSSymbol,
+    }
+
+    type TreeCursorEntry = ();
+
+    // Array(T)       \
+    //   struct {             \
+    //     T *contents;       \
+    //     uint32_t size;     \
+    //     uint32_t capacity; \
+    //   }
+    struct Array<T> {
+        pub contents: *mut T,
+        pub size: u32,
+        pub capacity: u32,
     }
 
     #[repr(transparent)]
@@ -762,7 +791,38 @@ pub mod utils_ts {
         }
 
         fn goto_parent(&mut self) -> bool {
-            self.0.goto_parent()
+            self.goto_parent_extended().is_some()
+        }
+
+        fn goto_parent_extended(&mut self) -> Option<Visibility> {
+            if HIDDEN_NODES {
+                // dbg!(self.0.depth());
+                // dbg!(self.0.node().kind());
+                unsafe {
+                    let s: &mut tree_sitter::TreeCursor<'a> = &mut self.0;
+                    // let s: *mut tree_sitter::ffi::TSTreeCursor = std::mem::transmute(s);
+                    let s: *mut TreeCursor = std::mem::transmute(s);
+                    if (*s).stack.size <= 1 {
+                        TreeCursorStep::TreeCursorStepNone
+                    } else {
+                        log::trace!("prepro2 goto parent then {:?}", self.0.node().kind());
+                        // dbg!(self.0.depth());
+                        // dbg!((*s).stack.size);
+                        // dbg!(self.0.node().kind());
+                        (*s).stack.size -= 1;
+                        // dbg!(self.0.depth());
+                        // dbg!(self.0.node().kind());
+                        log::trace!("prepro2 goto parent now {:?}", self.0.node().kind());
+                        // WARN is should call ts_tree_cursor_is_entry_visible(s, ...)
+                        TreeCursorStep::TreeCursorStepHidden
+                    }
+                }
+                .ok()
+            } else if self.0.goto_parent() {
+                Some(Visibility::Visible)
+            } else {
+                None
+            }
         }
 
         fn goto_first_child(&mut self) -> bool {
@@ -778,6 +838,10 @@ pub mod utils_ts {
                 unsafe {
                     let s = &mut self.0;
                     let s: *mut tree_sitter::ffi::TSTreeCursor = std::mem::transmute(s);
+                    // // dbg!(self.0.node().kind());
+                    // let r = dbg!(ts_tree_cursor_goto_first_child_internal(s));
+                    // // dbg!(self.0.node().kind());
+                    // r
                     ts_tree_cursor_goto_first_child_internal(s)
                 }
                 .ok()
@@ -793,6 +857,10 @@ pub mod utils_ts {
                 unsafe {
                     let s = &mut self.0;
                     let s: *mut tree_sitter::ffi::TSTreeCursor = std::mem::transmute(s);
+                    // dbg!(self.0.node().kind());
+                    // let r = dbg!(ts_tree_cursor_goto_next_sibling_internal(s));
+                    // dbg!(self.0.node().kind());
+                    // r
                     ts_tree_cursor_goto_next_sibling_internal(s)
                 }
                 .ok()
@@ -805,7 +873,7 @@ pub mod utils_ts {
     }
 
     /// Guaranteed to work even when considering hidden nodes,
-    /// i.e., goto_next_cchildren() skips hidden parents...
+    /// i.e., goto_next_children() skips hidden parents...
     pub struct PrePost<C> {
         has: super::zipped::Has,
         stack: Vec<C>,
@@ -824,8 +892,8 @@ pub mod utils_ts {
             }
         }
 
-        pub fn current(&mut self) -> Option<(&C, &mut super::zipped::Has)> {
-            self.stack.last().map(|c| (c, &mut self.has))
+        pub fn current(&mut self) -> (Option<&C>, &mut super::zipped::Has) {
+            (self.stack.last(), &mut self.has)
         }
 
         pub fn next(&mut self) -> Option<Visibility> {
@@ -882,6 +950,135 @@ pub mod utils_ts {
                     };
                     Some(vis)
                 }
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Guaranteed to work even when considering hidden nodes,
+    /// now it directly uses a goto_parent_extended I implemented,
+    /// so no need to keep a stack of cursors !
+    /// NOTE from profiling it was taking about 30% of the runtime.
+    pub struct PrePost2<C> {
+        has: super::zipped::Has,
+        cursor: C,
+        pub stack: Vec<usize>,
+        vis: bitvec::vec::BitVec,
+        waiting: Option<Visibility>,
+    }
+
+    impl<'a, C: super::parser::TreeCursor + Clone> PrePost2<C> {
+        pub fn new(cursor: &C) -> Self {
+            use bitvec::prelude::Lsb0;
+            let mut vis = bitvec::bitvec![];
+            vis.push(Visibility::Visible == Visibility::Hidden);
+            let mut stack = vec![cursor.node().end_byte()];
+            stack.reserve(30);
+            Self {
+                has: super::zipped::Has::Down,
+                cursor: cursor.clone(),
+                stack,
+                vis,
+                waiting: None,
+            }
+        }
+
+        pub fn current(&mut self) -> (Option<&C>, &mut super::zipped::Has) {
+            (Some(&self.cursor), &mut self.has)
+        }
+
+        pub fn next(&mut self) -> Option<Visibility> {
+            // dbg!(self.vis.len());
+            use super::zipped::Has;
+            // use crate::tree_gen::parser::Node;
+            if self.vis.is_empty() {
+                return None;
+            };
+            assert_eq!(self.stack.len(), self.vis.len());
+            // let Some(cursor) = self.stack.last_mut() else {
+            //     return None;
+            // };
+            // let mut cursor = cursor.clone();
+            if self.has != Has::Up {
+                if let Some(visibility) = self.cursor.goto_first_child_extended() {
+                    // dbg!(visibility);
+                    let node = self.cursor.node();
+                    self.stack.push(node.end_byte());
+                    // self.stack.push(cursor);
+                    self.has = Has::Down;
+                    self.vis.push(visibility == Visibility::Hidden);
+                    return Some(visibility);
+                }
+            }
+
+            let _ = self.stack.pop().unwrap();
+            let _ = self.vis.pop().unwrap();
+            if self.has == Has::Up && self.waiting.is_some() && !self.stack.is_empty() {
+                let node = self.cursor.node();
+                if *self.stack.last().unwrap() <= node.start_byte() {
+                    self.has = Has::Up;
+                    let vis = if *self.vis.last().unwrap() {
+                        Visibility::Hidden
+                    } else {
+                        Visibility::Visible
+                    };
+                    // dbg!(vis);
+                    Some(vis)
+                } else {
+                    let vis = self.waiting.take().unwrap();
+                    self.has = Has::Right;
+                    // dbg!(vis);
+                    self.stack.push(node.end_byte());
+                    self.vis.push(vis == Visibility::Hidden);
+                    Some(vis)
+                }
+            } else if let Some(visibility) = self.cursor.goto_next_sibling_extended() {
+                let node = self.cursor.node();
+                if *self.stack.last().unwrap() <= node.start_byte() {
+                    // dbg!(&self.stack, node.start_byte());
+                    self.waiting = Some(visibility);
+                    self.has = Has::Up;
+                    let vis = if *self.vis.last().unwrap() {
+                        Visibility::Hidden
+                    } else {
+                        Visibility::Visible
+                    };
+                    // dbg!(vis);
+                    return Some(vis);
+                }
+                // dbg!(visibility);
+                self.stack.push(node.end_byte());
+                self.vis.push(visibility == Visibility::Hidden);
+                assert_eq!(self.stack.len(), self.vis.len());
+                self.has = Has::Right;
+                Some(visibility)
+            } else if let Some(_) = self.cursor.goto_parent_extended() {
+                // NOTE do not need the visibility
+                // I don't have a good way of getting the correct one anyway
+                self.has = Has::Up;
+                // if self.stack.is_empty() {
+                //     self.stack.push(c);
+                //     None
+                //     // depends on usage
+                //     // let vis = if self.vis.pop().unwrap() {
+                //     //     Visibility::Hidden
+                //     // } else {
+                //     //     Visibility::Visible
+                //     // };
+                //     // Some(vis)
+                // } else {
+                if let Some(vis) = self.vis.last() {
+                    let vis = if *vis {
+                        Visibility::Hidden
+                    } else {
+                        Visibility::Visible
+                    };
+                    Some(vis)
+                } else {
+                    None
+                }
+                // }
             } else {
                 None
             }

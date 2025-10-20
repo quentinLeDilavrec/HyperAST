@@ -192,7 +192,7 @@ where
     ) {
         let mut pre_post = PrePost::new(cursor);
         while let Some(_vis) = pre_post.next() {
-            let (cursor, has) = pre_post.current().unwrap();
+            let (cursor, has) = pre_post.current();
             if *has == Has::Up || *has == Has::Right {
                 // #post
                 if stack.len() == 0 {
@@ -215,6 +215,7 @@ where
                 // #pre
                 // self._pre(global, text, cursor, stack, has, vis);
                 global.down();
+                let cursor = cursor.unwrap();
                 match self.pre_skippable(text, cursor, stack, global) {
                     PreResult::Skip => {
                         stack.push(tree_gen::P::BothHidden);

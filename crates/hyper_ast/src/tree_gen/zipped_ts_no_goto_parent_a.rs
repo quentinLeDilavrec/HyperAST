@@ -217,8 +217,7 @@ where
     );
 }
 
-impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
-    for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
+impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -238,7 +237,7 @@ where
     ) {
         let mut pre_post = PrePost::new(cursor);
         while let Some(vis) = pre_post.next() {
-            let (cursor, has) = pre_post.current().unwrap();
+            let (cursor, has) = pre_post.current();
             if *has == Has::Up || *has == Has::Right {
                 // #post
                 if stack.len() == 0 {
@@ -247,6 +246,7 @@ where
                 self._post(stack, global, text);
             }
             if *has == Has::Down || *has == Has::Right {
+                let cursor = cursor.unwrap();
                 // #pre
                 self._pre(global, text, cursor, stack, has, vis);
             }
@@ -296,9 +296,7 @@ where
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
-        if !stack
-            .parent().is_some_and(|a| a.simple.kind.is_supertype())
-        {
+        if !stack.parent().is_some_and(|a| a.simple.kind.is_supertype()) {
             if let Some(r) = cursor.0.field_name() {
                 match TryInto::<crate::types::Role>::try_into(r) {
                     Ok(r) => {
@@ -369,8 +367,7 @@ where
     }
 }
 
-impl<'store, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -470,7 +467,7 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        
+
         self.make(&mut global, acc, label)
     }
 
@@ -641,12 +638,7 @@ where
             let compressed_node =
                 NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
 
-            self.md_cache.insert(
-                compressed_node,
-                DD {
-                    metrics,
-                },
-            );
+            self.md_cache.insert(compressed_node, DD { metrics });
             Local {
                 compressed_node,
                 metrics,
@@ -654,7 +646,6 @@ where
             }
         };
 
-        
         FullNode {
             global: global.simple(),
             local,

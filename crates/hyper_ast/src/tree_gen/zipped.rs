@@ -78,9 +78,9 @@ where
         cursor: &mut Self::TreeCursor<'_>,
         global: &mut Self::Global,
     ) {
-        let mut pre_post = super::utils_ts::PrePost::new(cursor);
+        let mut pre_post = super::utils_ts::PrePost2::new(cursor);
         while let Some(visibility) = pre_post.next() {
-            let (cursor, has) = pre_post.current().unwrap();
+            let (cursor, has) = pre_post.current();
             if *has == Has::Up || *has == Has::Right {
                 // #post
                 if stack.len() == 0 {
@@ -113,7 +113,8 @@ where
                         if !acc.has_children() {
                             global.set_sum_byte_length(acc.end_byte());
                         }
-                        if is_parent_hidden && parent.end_byte() <= acc.begin_byte() {
+                        if is_parent_hidden && parent.end_byte() < acc.begin_byte() {
+                            dbg!(parent.end_byte(), acc.begin_byte());
                             panic!()
                         }
                         global.up();
@@ -148,6 +149,7 @@ where
                 }
             }
             if *has == Has::Down || *has == Has::Right {
+                let cursor = cursor.unwrap();
                 // #pre
                 // self._pre(global, text, cursor, stack, has, vis);
                 global.down();
@@ -183,6 +185,7 @@ where
                     }
                 }
             }
+            assert_eq!(stack.len(), pre_post.stack.len());
         }
     }
 }

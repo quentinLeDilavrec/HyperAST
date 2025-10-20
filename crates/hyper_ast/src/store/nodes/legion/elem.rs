@@ -1,4 +1,10 @@
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref};
+use std::{
+    cmp::PartialEq,
+    fmt::Debug,
+    hash::Hash,
+    marker::{PhantomData, Send, Sync},
+    ops::Deref,
+};
 
 use legion::{
     storage::{Archetype, Component},

@@ -1365,10 +1365,19 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                                 return Default::default();
                             }
                             let (repo, mut c) = self.data.selected_code_data.get_mut(pid).unwrap();
+                            let language = &self.data.queries[qid].lang;
                             let query = self.data.queries[qid].query.as_ref().to_string();
                             wasm_rs_dbg::dbg!(&query);
-                            let config = types::Config::MakeCpp;
-                            let language = config.language().to_string();
+                            let config = if language == "Cpp" {
+                                types::Config::MakeCpp
+                            } else if language == "Java" {
+                                types::Config::MavenJava
+                            } else {
+                                wasm_rs_dbg::dbg!(&language);
+                                types::Config::MavenJava
+                            };
+                            // let language = config.language().to_string();
+                            let language = language.to_string();
                             let commits = 2;
                             let baseline = Commit {
                                 repo: repo.clone(),

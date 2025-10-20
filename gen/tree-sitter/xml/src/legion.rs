@@ -321,7 +321,14 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
             let bytes_len = compo::BytesLen(bytes_len.try_into().unwrap());
             NodeStore::insert_after_prepare(
                 vacant,
-                (interned_kind, spacing_id, bytes_len, hashs, BloomSize::None),
+                (
+                    crate::types::Lang,
+                    interned_kind,
+                    spacing_id,
+                    bytes_len,
+                    hashs,
+                    BloomSize::None,
+                ),
             )
         };
         Local {

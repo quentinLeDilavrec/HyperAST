@@ -822,10 +822,12 @@ pub trait WithChildren:
 }
 
 pub trait WithRoles: WithChildren {
-    fn role_at<Role: 'static + Copy + std::marker::Sync + std::marker::Send>(
+    fn role_at<Role: 'static + Copy + Sync + Send>(&self, at: Self::ChildIdx) -> Option<Role>;
+
+    fn role_at_and_has_later<Role: 'static + Copy + Sync + Send + PartialEq>(
         &self,
         at: Self::ChildIdx,
-    ) -> Option<Role>;
+    ) -> Option<(Role, bool)>;
 }
 
 pub trait WithPrecompQueries {

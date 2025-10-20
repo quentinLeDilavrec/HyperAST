@@ -232,10 +232,12 @@ impl LangRef<AnyType> for Xml {
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
         let t: Type = *t.as_any().downcast_ref().unwrap();
-        assert!(t != Type::Spaces || t != Type::Directory);
+        assert!(t != Type::Spaces && t != Type::Directory && t != Type::MavenDirectory);
         debug_assert_eq!(
             Lang.to_u16(t),
-            id_for_node_kind(t.as_static_str(), t.is_named())
+            id_for_node_kind(t.as_static_str(), t.is_named()),
+            "{}",
+            t.as_static_str()
         );
         Lang.to_u16(t)
     }

@@ -1,6 +1,6 @@
 use crate::{CNLending, StatusLending};
 
-use super::{Cursor, Node as _, Status, Symbol, TreeCursorStep};
+use crate::{Cursor, Node as _, Status, Symbol, TreeCursorStep};
 use hyperast::position::TreePath;
 use hyperast::types::{
     HyperASTShared, HyperType, LabelStore, Labeled, NodeStore, RoleStore, Tree, WithPrecompQueries,
@@ -10,6 +10,13 @@ use hyperast::{
     position::TreePathMut,
     types::{HyperAST, TypeStore},
 };
+
+pub struct _TreeCursor<'hast, HAST, P, S> {
+    pub stores: &'hast HAST,
+    pub pos: P,
+    pub p: S,
+}
+
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 
 pub struct Node<
@@ -120,7 +127,7 @@ where
     type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
 }
 
-impl<'hast, HAST: HyperAST> super::Cursor for self::TreeCursor<'hast, HAST>
+impl<'hast, HAST: HyperAST> crate::Cursor for self::TreeCursor<'hast, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -204,7 +211,7 @@ where
             }
             if s.is_visible() {
                 has_later_siblings = true;
-                use super::Node;
+                use crate::Node;
                 if s.is_named() {
                     has_later_named_siblings = true;
                     break;
@@ -224,7 +231,7 @@ where
         }
     }
 
-    fn text_provider(&self) -> <Self::Node as super::TextLending<'_>>::TP {
+    fn text_provider(&self) -> <Self::Node as crate::TextLending<'_>>::TP {
         self.stores.label_store()
     }
 
@@ -317,7 +324,7 @@ where
         // TODO Might create efficiency issues, is it compiling well ?
         let mut result = vec![];
         loop {
-            use super::Node;
+            use crate::Node;
             self.pos.pop();
             if self.pos.offset().is_none() {
                 return result;
@@ -364,11 +371,11 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> super::TextLending<'_> for self::Node<'hast, HAST> {
+impl<'hast, HAST: HyperAST> crate::TextLending<'_> for self::Node<'hast, HAST> {
     type TP = &'hast <HAST as HyperAST>::LS;
 }
 
-impl<HAST: HyperAST> super::Node for self::Node<'_, HAST>
+impl<HAST: HyperAST> crate::Node for self::Node<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -379,11 +386,9 @@ where
         // TODO make something more efficient
         let n = self.pos.node().unwrap();
         let t = self.stores.resolve_type(n);
-        if t.is_directory() {
-            return 0.into();
-        }
+        let n = self.stores.node_store().resolve(n);
         use hyperast::types::LangRef;
-        let id = t.get_lang().ts_symbol(t);
+        let id = self.stores.resolve_lang(&n).ts_symbol(t);
         id.into()
     }
 
@@ -422,7 +427,7 @@ where
         slf.child_by_role(role).is_some()
     }
 
-    fn equal(&self, other: &Self, _text_provider: <Self as super::TextLending<'_>>::TP) -> bool {
+    fn equal(&self, other: &Self, _text_provider: <Self as crate::TextLending<'_>>::TP) -> bool {
         self.pos.node() == other.pos.node()
     }
 
@@ -432,21 +437,21 @@ where
 
     fn text<'s, 'l>(
         &'s self,
-        text_provider: <Self as super::TextLending<'l>>::TP,
-    ) -> super::BiCow<'s, 'l, str> {
+        text_provider: <Self as crate::TextLending<'l>>::TP,
+    ) -> crate::BiCow<'s, 'l, str> {
         let id = self.pos.node().unwrap();
         use hyperast::types::NodeStore;
         let n = self.stores.node_store().resolve(id);
         if n.has_children() {
             let r = hyperast::nodes::TextSerializer::new(self.stores, *id).to_string();
-            return super::BiCow::Owned(r);
+            return crate::BiCow::Owned(r);
         }
         if let Some(l) = n.try_get_label() {
             let l = self.stores.label_store().resolve(l);
             // todo!()
-            return super::BiCow::A(l);
+            return crate::BiCow::A(l);
         }
-        super::BiCow::B("") // TODO check if it is the right behavior
+        crate::BiCow::B("") // TODO check if it is the right behavior
     }
 }
 

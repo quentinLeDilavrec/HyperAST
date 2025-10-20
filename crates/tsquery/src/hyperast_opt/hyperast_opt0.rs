@@ -1,44 +1,26 @@
 //! # Optimized cursor
 //! nodes are only persisted when captured
-use super::{Status, Symbol, TreeCursorStep};
+//! * optimizes current_status
+use super::CursorStatus;
+use super::{has_child_with_field_id, text};
 use crate::StatusLending;
-use hyperast::position::structural_pos;
-use hyperast::types::{Childrn, HyperAST, LangRef, LendT, NodeStore as _, TypeStore};
+use crate::{Status, Symbol, TreeCursorStep};
+use hyperast::position::structural_pos::{
+    self, CursorHead, CursorHeadMove, CursorWithPersistence, PersistedNode,
+};
+use hyperast::types::{Childrn, HyperAST, LangRef, NodeStore as _, TypeStore};
 use hyperast::types::{HyperASTShared, HyperType, LabelStore, Labeled, RoleStore, Tree};
+use hyperast::types::{LendT, NodeId};
 use hyperast::types::{WithChildren, WithPrecompQueries, WithRoles};
-use structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence, PersistedNode};
 
-#[cfg(feature = "hyperast")]
-pub mod no_opt;
-
-// #[cfg(feature = "hyperast")]
-// pub mod hyperast_opt10;
-// #[cfg(feature = "hyperast")]
-// pub mod hyperast_opt0;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt1;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt2;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt3;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt4;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt5;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt6;
-#[cfg(feature = "hyperast")]
-pub mod hyperast_opt7;
-// #[cfg(feature = "hyperast")]
-// pub mod hyperast_opt8;
-// #[cfg(feature = "hyperast")]
-// pub mod hyperast_opt9;
-
-pub struct TreeCursor<'hast, HAST: HyperASTShared> {
+pub struct _TreeCursor<'hast, HAST: HyperASTShared, S> {
     pub stores: &'hast HAST,
-    pub pos: CursorWithPersistence<HAST::IdN, HAST::Idx>,
-    pub p: PersistedNode<HAST::IdN, HAST::Idx>,
+    pub pos: structural_pos::CursorWithPersistence<HAST::IdN, HAST::Idx>,
+    pub p: S,
 }
+
+pub type TreeCursor<'hast, HAST: HyperASTShared> =
+    _TreeCursor<'hast, HAST, PersistedNode<HAST::IdN, HAST::Idx>>;
 
 pub struct Node<'hast, HAST: HyperASTShared> {
     pub stores: &'hast HAST,
@@ -118,14 +100,6 @@ impl<HAST: HyperAST> Clone for Node<'_, HAST> {
     }
 }
 
-pub struct CursorStatus<IdF> {
-    pub has_later_siblings: bool,
-    pub has_later_named_siblings: bool,
-    pub can_have_later_siblings_with_this_field: bool,
-    pub field_id: IdF,
-    pub supertypes: Vec<Symbol>,
-}
-
 impl<IdF: Copy> Status for CursorStatus<IdF> {
     type IdF = IdF;
 
@@ -191,7 +165,7 @@ where
 
     fn goto_next_sibling_internal(&mut self) -> TreeCursorStep {
         if self.p.ref_node().eq(&self.pos.ref_node()) {
-            return TreeCursorStep::None;
+            return TreeCursorStep::TreeCursorStepNone;
         }
         goto_next_sibling_internal(self.stores, &mut self.pos)
     }
@@ -295,7 +269,7 @@ where
     };
     let mut pos = pos.ext();
     loop {
-        if let TreeCursorStep::None = goto_next_sibling_internal(stores, &mut pos) {
+        if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, &mut pos) {
             break;
         }
         let time = std::time::Instant::now();
@@ -663,7 +637,7 @@ where
 {
     use hyperast::types::NodeStore;
     let Some(p) = pos.parent() else {
-        return TreeCursorStep::None;
+        return TreeCursorStep::TreeCursorStepNone;
     };
     let n = stores.node_store().resolve(&p);
     use hyperast::types::Children;
@@ -674,7 +648,7 @@ where
             pos.up();
             return goto_next_sibling_internal(stores, pos);
         } else {
-            return TreeCursorStep::None;
+            return TreeCursorStep::TreeCursorStepNone;
         }
     };
     pos.inc(node);
@@ -682,9 +656,9 @@ where
         return goto_next_sibling_internal(stores, pos);
     }
     if is_visible(stores, pos) {
-        TreeCursorStep::Visible
+        TreeCursorStep::TreeCursorStepVisible
     } else {
-        TreeCursorStep::Hidden
+        TreeCursorStep::TreeCursorStepHidden
     }
 }
 
@@ -701,16 +675,16 @@ where
     use hyperast::types::Children;
     use hyperast::types::WithChildren;
     let Some(node) = n.child(&num::zero()) else {
-        return TreeCursorStep::None;
+        return TreeCursorStep::TreeCursorStepNone;
     };
     pos.down(node, num::zero());
     if kind(stores, pos).is_spaces() {
         return goto_next_sibling_internal(stores, pos);
     }
     if is_visible(stores, pos) {
-        TreeCursorStep::Visible
+        TreeCursorStep::TreeCursorStepVisible
     } else {
-        TreeCursorStep::Hidden
+        TreeCursorStep::TreeCursorStepHidden
     }
 }
 
@@ -735,9 +709,9 @@ where
             break;
         }
         match goto_first_child_internal(stores, &mut pos) {
-            TreeCursorStep::None => panic!(),
-            TreeCursorStep::Hidden => (),
-            TreeCursorStep::Visible => break,
+            TreeCursorStep::TreeCursorStepNone => panic!(),
+            TreeCursorStep::TreeCursorStepHidden => (),
+            TreeCursorStep::TreeCursorStepVisible => break,
         }
     }
     child_by_role(stores, &mut pos, role).is_some()
@@ -758,7 +732,7 @@ where
     // TODO what about multiple children with same role?
     // NOTE treesitter uses a bin tree for repeats
     let visible = is_visible(stores, pos);
-    if let TreeCursorStep::None = goto_first_child_internal(stores, pos) {
+    if let TreeCursorStep::TreeCursorStepNone = goto_first_child_internal(stores, pos) {
         return None;
     }
     loop {
@@ -766,7 +740,8 @@ where
             if r == _role {
                 return Some(());
             } else {
-                if let TreeCursorStep::None = goto_next_sibling_internal(stores, pos) {
+                if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, pos)
+                {
                     return None;
                 }
                 continue;
@@ -774,7 +749,7 @@ where
         }
         // do not go down
         if visible {
-            if let TreeCursorStep::None = goto_next_sibling_internal(stores, pos) {
+            if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, pos) {
                 return None;
             }
         }
@@ -783,7 +758,7 @@ where
             if child_by_role(stores, pos, _role).is_some() {
                 return Some(());
             }
-            if let TreeCursorStep::None = goto_next_sibling_internal(stores, pos) {
+            if let TreeCursorStep::TreeCursorStepNone = goto_next_sibling_internal(stores, pos) {
                 return None;
             }
         }

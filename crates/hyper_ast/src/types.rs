@@ -15,7 +15,7 @@ use strum_macros::EnumString;
 use crate::PrimInt;
 use crate::store::nodes::PolyglotHolder;
 
-pub trait HashKind: Copy + std::ops::Deref {
+pub trait HashKind: Copy + Deref {
     fn structural() -> Self;
     fn label() -> Self;
 }
@@ -217,322 +217,6 @@ role_impl!(
     End => "end",
 );
 
-#[allow(unused)]
-mod exp {
-    use super::*;
-
-    // keywords (leaves with a specific unique serialized form)
-    // and concrete types (concrete rules) should definitely be stored.
-    // But hidden nodes are can either be supertypes or nodes that are just deemed uninteresting (but still useful to for example the treesitter internal repr.)
-    // The real important difference is the (max) number of children (btw an it cannot be a leaf (at least one child)),
-    // indeed, with a single child it is possible to easily implement optimization that effectively reduce the number of nodes.
-    // - a supertype should only have a single child
-    // - in tree-sitter repeats (star and plus patterns) are binary nodes (sure balanced?)
-    // - in tree-sitter other nodes can be hidden (even when they have fields), it can be espetially useful to add more structure without breaking existing queries !
-    // Anyway lets wait for better type generation, this way it should be possible to explicitely/completely handle optimizable cases (supertypes,...)
-
-    #[repr(transparent)]
-    pub struct T(u16);
-
-    #[repr(u16)]
-    pub enum T2 {
-        Java(u16),
-        Cpp(u16),
-    }
-
-    // pub trait Lang {
-    //     type Factory;
-    //     type Type;
-    // }
-
-    trait TypeFactory {
-        fn new() -> Self
-        where
-            Self: Sized;
-    }
-
-    mod polyglote {
-        /// has statements
-        struct Block;
-        /// has a name
-        struct Member;
-    }
-
-    // WARN order of fields matter in java for instantiation
-    // stuff where order does not matter should be sorted before erasing anything
-
-    pub enum TypeMapElement<Concrete, Abstract> {
-        Keyword(Keyword),
-        Concrete(Concrete),
-        Abstract(Abstract),
-    }
-
-    pub enum ConvertResult<Concrete, Abstract> {
-        Keyword(Keyword),
-        Concrete(Concrete),
-        Abstract(Abstract),
-        Missing,
-    }
-
-    trait KeywordProvider: Sized {
-        fn parse(&self, s: &str) -> Option<Self>;
-        fn as_str(&'static self) -> &'static str;
-        fn len(&self) -> usize;
-    }
-
-    /// only contains keywords such as
-    #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
-    #[strum(serialize_all = "snake_case")]
-    #[derive(Hash, Clone, Copy, PartialEq, Eq)]
-    pub enum Keyword {
-        // While,
-        // For,
-        // #[strum(serialize = ";")]
-        // SemiColon,
-        // #[strum(serialize = ".")]
-        // Dot,
-        // #[strum(serialize = "{")]
-        // LeftCurly,
-        // #[strum(serialize = "}")]
-        // RightCurly,
-    }
-
-    impl KeywordProvider for Keyword {
-        fn parse(&self, s: &str) -> Option<Self> {
-            Keyword::from_str(s).ok()
-        }
-
-        fn as_str(&'static self) -> &'static str {
-            Keyword::as_ref(self)
-        }
-
-        fn len(&self) -> usize {
-            <Keyword as strum::EnumCount>::COUNT
-        }
-    }
-
-    mod macro_test {
-        macro_rules! parse_unitary_variants {
-        (@as_expr $e:expr) => {$e};
-        (@as_item $($i:item)+) => {$($i)+};
-
-        // Exit rules.
-        (
-            @collect_unitary_variants ($callback:ident ( $($args:tt)* )),
-            ($(,)*) -> ($($var_names:ident,)*)
-        ) => {
-            parse_unitary_variants! {
-                @as_expr
-                $callback!{ $($args)* ($($var_names),*) }
-            }
-        };
-
-        (
-            @collect_unitary_variants ($callback:ident { $($args:tt)* }),
-            ($(,)*) -> ($($var_names:ident,)*)
-        ) => {
-            parse_unitary_variants! {
-                @as_item
-                $callback!{ $($args)* ($($var_names),*) }
-            }
-        };
-
-        // Consume an attribute.
-        (
-            @collect_unitary_variants $fixed:tt,
-            (#[$_attr:meta] $($tail:tt)*) -> ($($var_names:tt)*)
-        ) => {
-            parse_unitary_variants! {
-                @collect_unitary_variants $fixed,
-                ($($tail)*) -> ($($var_names)*)
-            }
-        };
-
-        // Handle a variant, optionally with an initializer.
-        (
-            @collect_unitary_variants $fixed:tt,
-            ($var:ident $(= $_val:expr)*, $($tail:tt)*) -> ($($var_names:tt)*)
-        ) => {
-            parse_unitary_variants! {
-                @collect_unitary_variants $fixed,
-                ($($tail)*) -> ($($var_names)* $var,)
-            }
-        };
-
-        // Abort on variant with a payload.
-        (
-            @collect_unitary_variants $fixed:tt,
-            ($var:ident $_struct:tt, $($tail:tt)*) -> ($($var_names:tt)*)
-        ) => {
-            const _error: () = "cannot parse unitary variants from enum with non-unitary variants";
-        };
-
-        // Entry rule.
-        (enum $name:ident {$($body:tt)*} => $callback:ident $arg:tt) => {
-            parse_unitary_variants! {
-                @collect_unitary_variants
-                ($callback $arg), ($($body)*,) -> ()
-            }
-        };
-    }
-
-        macro_rules! coucou {
-            ( f(C, D)) => {
-                struct B {}
-            };
-        }
-        parse_unitary_variants! {
-            enum A {
-                C,D,
-            } => coucou{ f}
-        }
-    }
-
-    macro_rules! make_type {
-        (
-            Keyword {$(
-                $(#[$km:meta])*
-                $ka:ident
-            ),* $(,)?}
-            Concrete {$(
-                $(#[$cm:meta])*
-                $ca:ident$({$($cl:expr),+ $(,)*})?$(($($co:ident),+ $(,)*))?$([$($cx:ident),+ $(,)*])?
-            ),* $(,)?}
-            WithFields {$(
-                $(#[$wm:meta])*
-                $wa:ident{$($wb:tt)*}
-            ),* $(,)?}
-            Abstract {$(
-                $(#[$am:meta])*
-                $aa:ident($($ab:ident),* $(,)?)
-            ),* $(,)?}
-        ) => {
-            #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
-            #[strum(serialize_all = "snake_case")]
-            #[derive(Hash, Clone, Copy, PartialEq, Eq)]
-            pub enum Type {
-                // Keywords
-            $(
-                $( #[$km] )*
-                $ka,
-            )*
-                // Concrete
-            $(
-                $ca,
-            )*
-                // WithFields
-            $(
-                $( #[$wm] )*
-                $wa,
-            )*
-            }
-            enum Abstract {
-                $(
-                    $aa,
-                )*
-            }
-
-            pub struct Factory {
-                map: Box<[u16]>,
-            }
-
-            pub struct Language;
-        };
-    }
-
-    macro_rules! make_type_store {
-    ($kw:ty, $sh:ty, $($a:ident($l:ty)),* $(,)?) => {
-
-        #[repr(u16)]
-        pub enum CustomTypeStore {$(
-            $a(u16),
-        )*}
-
-        impl CustomTypeStore {
-            // fn lang<L: Lang>(&self) -> Option<L> {
-            //     todo!()
-            // }
-            fn eq_keyword(kw: &$kw) -> bool {
-                todo!()
-            }
-            fn eq_shared(kw: &$sh) -> bool {
-                todo!()
-            }
-        }
-    };
-}
-
-    make_type_store!(Keyword, Shared, Java(java::Language), Cpp(cpp::Language),);
-
-    pub mod java {
-        use super::*;
-
-        pub enum Field {
-            Name,
-            Body,
-            Expression,
-            Condition,
-            Then,
-            Else,
-            Block,
-            Type,
-        }
-
-        make_type! {
-            Keyword{
-                While,
-                For,
-                Public,
-                Private,
-                Protected,
-                #[strum(serialize = ";")]
-                SemiColon,
-                #[strum(serialize = ".")]
-                Dot,
-                #[strum(serialize = "{")]
-                LeftCurly,
-                #[strum(serialize = "}")]
-                RightCurly,
-                #[strum(serialize = "(")]
-                LeftParen,
-                #[strum(serialize = ")")]
-                RightParen,
-                #[strum(serialize = "[")]
-                LeftBracket,
-                #[strum(serialize = "]")]
-                RightBracket,
-            }
-            Concrete {
-                Comment{r"//.\*$",r"/\*.*\*/"},
-                Identifier{r"[a-zA-Z].*"},
-                ExpressionStatement(Statement, Semicolon),
-                ReturnStatement(Return, Expression, Semicolon),
-                TryStatement(Try, Paren, Block),
-            }
-            WithFields {
-                Class {
-                    name(Identifier),
-                    body(ClassBody),
-                },
-                Interface {
-                    name(Identifier),
-                    body(InterfaceBody),
-                },
-            }
-            Abstract {
-                Statement(
-                    StatementExpression,
-                    TryStatement,
-                ),
-                Expression(
-                    BinaryExpression,
-                    UnaryExpression,
-                ),
-            }
-        }
-    }
-}
-
 /// set of possible abstract type of nodes
 pub type Abstracts = enumset::EnumSet<Abstract>;
 
@@ -576,7 +260,8 @@ pub enum Shared {
     // Statement,
 }
 
-pub trait Lang<T>: LangRef<T> {
+pub trait Lang<T>: LangRef<T> + 'static + Send + Sync {
+    const INST: Self;
     fn make(t: TypeInternalSize) -> &'static T;
     fn to_u16(t: T) -> TypeInternalSize;
 }
@@ -1031,7 +716,7 @@ pub trait WithSerialization {
 pub trait WithHashs {
     type HK: HashKind;
     type HP: PrimInt + PartialEq + Eq;
-    fn hash(&self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP;
+    fn hash(&self, kind: impl Deref<Target = Self::HK>) -> Self::HP;
 }
 
 pub trait Labeled {
@@ -1713,5 +1398,321 @@ impl HyperType for AnyType {
 
     fn lang_ref(&self) -> LangWrapper<AnyType> {
         self.0.lang_ref()
+    }
+}
+
+#[allow(unused)]
+mod exp {
+    use super::*;
+    use std::str::FromStr;
+
+    // keywords (leaves with a specific unique serialized form)
+    // and concrete types (concrete rules) should definitely be stored.
+    // But hidden nodes are can either be supertypes or nodes that are just deemed uninteresting (but still useful to, for example, the treesitter internal repr.)
+    // The real important difference is the (max) number of children (btw it cannot be a leaf (at least one child)),
+    // indeed, with a single child it is possible to easily implement optimization that effectively reduce the number of nodes.
+    // - a supertype should only have a single child
+    // - in tree-sitter repeats (star and plus patterns) are binary nodes (sure balanced?)
+    // - in tree-sitter other nodes can be hidden (even when they have fields), it can be espetially useful to add more structure without breaking existing queries !
+    // Anyway lets wait for better type generation, this way it should be possible to explicitely/completely handle optimizable cases (supertypes,...)
+
+    #[repr(transparent)]
+    pub struct T(u16);
+
+    #[repr(u16)]
+    pub enum T2 {
+        Java(u16),
+        Cpp(u16),
+    }
+
+    // pub trait Lang {
+    //     type Factory;
+    //     type Type;
+    // }
+
+    trait TypeFactory {
+        fn new() -> Self
+        where
+            Self: Sized;
+    }
+
+    mod polyglote {
+        /// has statements
+        struct Block;
+        /// has a name
+        struct Member;
+    }
+
+    // WARN order of fields matter in java for instantiation
+    // stuff where order does not matter should be sorted before erasing anything
+
+    pub enum TypeMapElement<Concrete, Abstract> {
+        Keyword(Keyword),
+        Concrete(Concrete),
+        Abstract(Abstract),
+    }
+
+    pub enum ConvertResult<Concrete, Abstract> {
+        Keyword(Keyword),
+        Concrete(Concrete),
+        Abstract(Abstract),
+        Missing,
+    }
+
+    trait KeywordProvider: Sized {
+        fn parse(&self, s: &str) -> Option<Self>;
+        fn as_str(&'static self) -> &'static str;
+        fn len(&self) -> usize;
+    }
+
+    /// only contains keywords such as
+    #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
+    #[strum(serialize_all = "snake_case")]
+    #[derive(Hash, Clone, Copy, PartialEq, Eq)]
+    pub enum Keyword {
+        // While,
+        // For,
+        // #[strum(serialize = ";")]
+        // SemiColon,
+        // #[strum(serialize = ".")]
+        // Dot,
+        // #[strum(serialize = "{")]
+        // LeftCurly,
+        // #[strum(serialize = "}")]
+        // RightCurly,
+    }
+
+    impl KeywordProvider for Keyword {
+        fn parse(&self, s: &str) -> Option<Self> {
+            Keyword::from_str(s).ok()
+        }
+
+        fn as_str(&'static self) -> &'static str {
+            Keyword::as_ref(self)
+        }
+
+        fn len(&self) -> usize {
+            <Keyword as strum::EnumCount>::COUNT
+        }
+    }
+
+    mod macro_test {
+        macro_rules! parse_unitary_variants {
+        (@as_expr $e:expr) => {$e};
+        (@as_item $($i:item)+) => {$($i)+};
+
+        // Exit rules.
+        (
+            @collect_unitary_variants ($callback:ident ( $($args:tt)* )),
+            ($(,)*) -> ($($var_names:ident,)*)
+        ) => {
+            parse_unitary_variants! {
+                @as_expr
+                $callback!{ $($args)* ($($var_names),*) }
+            }
+        };
+
+        (
+            @collect_unitary_variants ($callback:ident { $($args:tt)* }),
+            ($(,)*) -> ($($var_names:ident,)*)
+        ) => {
+            parse_unitary_variants! {
+                @as_item
+                $callback!{ $($args)* ($($var_names),*) }
+            }
+        };
+
+        // Consume an attribute.
+        (
+            @collect_unitary_variants $fixed:tt,
+            (#[$_attr:meta] $($tail:tt)*) -> ($($var_names:tt)*)
+        ) => {
+            parse_unitary_variants! {
+                @collect_unitary_variants $fixed,
+                ($($tail)*) -> ($($var_names)*)
+            }
+        };
+
+        // Handle a variant, optionally with an initializer.
+        (
+            @collect_unitary_variants $fixed:tt,
+            ($var:ident $(= $_val:expr)*, $($tail:tt)*) -> ($($var_names:tt)*)
+        ) => {
+            parse_unitary_variants! {
+                @collect_unitary_variants $fixed,
+                ($($tail)*) -> ($($var_names)* $var,)
+            }
+        };
+
+        // Abort on variant with a payload.
+        (
+            @collect_unitary_variants $fixed:tt,
+            ($var:ident $_struct:tt, $($tail:tt)*) -> ($($var_names:tt)*)
+        ) => {
+            const _error: () = "cannot parse unitary variants from enum with non-unitary variants";
+        };
+
+        // Entry rule.
+        (enum $name:ident {$($body:tt)*} => $callback:ident $arg:tt) => {
+            parse_unitary_variants! {
+                @collect_unitary_variants
+                ($callback $arg), ($($body)*,) -> ()
+            }
+        };
+    }
+
+        macro_rules! coucou {
+            ( f(C, D)) => {
+                struct B {}
+            };
+        }
+        parse_unitary_variants! {
+            enum A {
+                C,D,
+            } => coucou{ f}
+        }
+    }
+
+    macro_rules! make_type {
+        (
+            Keyword {$(
+                $(#[$km:meta])*
+                $ka:ident
+            ),* $(,)?}
+            Concrete {$(
+                $(#[$cm:meta])*
+                $ca:ident$({$($cl:expr),+ $(,)*})?$(($($co:ident),+ $(,)*))?$([$($cx:ident),+ $(,)*])?
+            ),* $(,)?}
+            WithFields {$(
+                $(#[$wm:meta])*
+                $wa:ident{$($wb:tt)*}
+            ),* $(,)?}
+            Abstract {$(
+                $(#[$am:meta])*
+                $aa:ident($($ab:ident),* $(,)?)
+            ),* $(,)?}
+        ) => {
+            #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
+            #[strum(serialize_all = "snake_case")]
+            #[derive(Hash, Clone, Copy, PartialEq, Eq)]
+            pub enum Type {
+                // Keywords
+            $(
+                $( #[$km] )*
+                $ka,
+            )*
+                // Concrete
+            $(
+                $ca,
+            )*
+                // WithFields
+            $(
+                $( #[$wm] )*
+                $wa,
+            )*
+            }
+            enum Abstract {
+                $(
+                    $aa,
+                )*
+            }
+
+            pub struct Factory {
+                map: Box<[u16]>,
+            }
+
+            pub struct Language;
+        };
+    }
+
+    macro_rules! make_type_store {
+    ($kw:ty, $sh:ty, $($a:ident($l:ty)),* $(,)?) => {
+            #[repr(u16)]
+            pub enum CustomTypeStore {$(
+                $a(u16),
+            )*}
+
+            impl CustomTypeStore {
+                // fn lang<L: Lang>(&self) -> Option<L> {
+                //     todo!()
+                // }
+                fn eq_keyword(kw: &$kw) -> bool {
+                    todo!()
+                }
+                fn eq_shared(kw: &$sh) -> bool {
+                    todo!()
+                }
+            }
+        };
+    }
+
+    make_type_store!(Keyword, Shared, Java(java::Language), Cpp(cpp::Language),);
+
+    pub mod java {
+        use super::*;
+
+        pub enum Field {
+            Name,
+            Body,
+            Expression,
+            Condition,
+            Then,
+            Else,
+            Block,
+            Type,
+        }
+
+        make_type! {
+            Keyword{
+                While,
+                For,
+                Public,
+                Private,
+                Protected,
+                #[strum(serialize = ";")]
+                SemiColon,
+                #[strum(serialize = ".")]
+                Dot,
+                #[strum(serialize = "{")]
+                LeftCurly,
+                #[strum(serialize = "}")]
+                RightCurly,
+                #[strum(serialize = "(")]
+                LeftParen,
+                #[strum(serialize = ")")]
+                RightParen,
+                #[strum(serialize = "[")]
+                LeftBracket,
+                #[strum(serialize = "]")]
+                RightBracket,
+            }
+            Concrete {
+                Comment{r"//.\*$",r"/\*.*\*/"},
+                Identifier{r"[a-zA-Z].*"},
+                ExpressionStatement(Statement, Semicolon),
+                ReturnStatement(Return, Expression, Semicolon),
+                TryStatement(Try, Paren, Block),
+            }
+            WithFields {
+                Class {
+                    name(Identifier),
+                    body(ClassBody),
+                },
+                Interface {
+                    name(Identifier),
+                    body(InterfaceBody),
+                },
+            }
+            Abstract {
+                Statement(
+                    StatementExpression,
+                    TryStatement,
+                ),
+                Expression(
+                    BinaryExpression,
+                    UnaryExpression,
+                ),
+            }
+        }
     }
 }

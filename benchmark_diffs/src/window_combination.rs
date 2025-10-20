@@ -11,7 +11,7 @@ use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess};
 use hyper_diff::algorithms::{self, RuntimeMeasurement as _};
 use hyperast::{types::WithStats, utils::memusage_linux};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
-use hyperast_vcs_git::no_space::as_nospaces2 as as_nospaces;
+use hyperast_vcs_git::no_space::as_nospaces;
 use hyperast_vcs_git::processing::ConfiguredRepoHandle2;
 
 pub fn windowed_commits_compare(

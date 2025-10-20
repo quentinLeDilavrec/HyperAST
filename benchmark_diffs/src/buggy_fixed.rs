@@ -186,7 +186,7 @@ fn test_increasing_ed() {
     let mut md_cache = Default::default();
     print!("{:?} len={}: ", buggy_path, buggy.len());
     let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, &fixed, &buggy);
-    let stores = hyperast_vcs_git::no_space::as_nospaces2(&stores);
+    let stores = hyperast_vcs_git::no_space::as_nospaces(&stores);
     let res = algorithms::gumtree::diff_100(
         &stores,
         &src_tr.local.compressed_node,
@@ -591,7 +591,7 @@ mod test {
         let dst = dst_tr.local.compressed_node;
         // let dst = tree_gen.stores.node_store.resolve(dst).get_child(&0);
 
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
 
         // print_tree_syntax_with_ids(
         //     |id: &NodeIdentifier| -> _ {
@@ -835,7 +835,7 @@ mod test {
         // let label_store = &tree_gen.stores.label_store;
         // let node_store = &tree_gen.stores.node_store;
         // let node_store = &NoSpaceNodeStoreWrapper::from(node_store);
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
 
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -1159,7 +1159,7 @@ mod test {
         // let label_store = &tree_gen.stores.label_store;
         // let node_store = &tree_gen.stores.node_store;
         // let node_store = &NoSpaceNodeStoreWrapper::from(node_store);
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
         let mappings = VecStore::default();
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -1259,7 +1259,7 @@ mod test {
         // let label_store = &tree_gen.stores.label_store;
         // let node_store = &tree_gen.stores.node_store;
         // let node_store = &NoSpaceNodeStoreWrapper::from(node_store);
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
         let mappings = VecStore::default();
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -1894,7 +1894,7 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
     let (src_tr, dst_tr) = parse_dir_pair(&mut java_gen, src, dst);
     let parse_t = now.elapsed().as_secs_f64();
 
-    let stores = hyperast_vcs_git::no_space::as_nospaces2(&java_gen.main_stores);
+    let stores = hyperast_vcs_git::no_space::as_nospaces(&java_gen.main_stores);
 
     dbg!(&parse_t);
     dbg!(&src_tr.metrics.size);

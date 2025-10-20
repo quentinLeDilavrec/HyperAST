@@ -102,7 +102,7 @@ fn removed_tracking(
     eprintln!("computing matches of {oids:?}");
 
     let stores = &preprocessed.processor.main_stores;
-    let nospace = &hyperast_vcs_git::no_space::as_nospaces2(stores);
+    let nospace = &hyperast_vcs_git::no_space::as_nospaces(stores);
 
     if CSV_FORMATING {
         println!("commit_sha, ast_size, memory_used, processing_time, matches_count");

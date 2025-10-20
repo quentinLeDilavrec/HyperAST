@@ -99,7 +99,7 @@ pub(crate) fn diff(
         .unwrap();
     let dst_tr = commit_dst.ast_root;
     let with_spaces_stores = &repositories.processor.main_stores;
-    let stores = &hyperast_vcs_git::no_space::as_nospaces2(with_spaces_stores);
+    let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
 
     if src_tr == dst_tr {
         return Ok(Diff {

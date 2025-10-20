@@ -694,7 +694,7 @@ pub fn differential(
     let repositories = state.repositories.read().unwrap();
     let stores = &repositories.processor.main_stores;
 
-    let hyperast = &hyperast_vcs_git::no_space::as_nospaces2(stores);
+    let hyperast = &hyperast_vcs_git::no_space::as_nospaces(stores);
     let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &current_tr, &other_tr);
     let mut locked = binding.lock();
     let (src_tree, dst_tree) = locked.as_mut(hyperast);

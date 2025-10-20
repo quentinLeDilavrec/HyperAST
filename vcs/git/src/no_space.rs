@@ -8,7 +8,7 @@ use hyperast::{
     types::{self, AAAA, Children, NodeId},
 };
 
-pub fn as_nospaces2<'a, TS>(
+pub fn as_nospaces<'a, TS>(
     stores: &'a hyperast::store::SimpleStores<TS>,
 ) -> hyperast::store::SimpleStores<
     TS,

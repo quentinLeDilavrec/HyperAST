@@ -64,7 +64,7 @@ where
     // );
     let with_spaces_stores = &repositories.processor.main_stores;
     let tracker_nospace = MappingTracker {
-        stores: &hyperast_vcs_git::no_space::as_nospaces2(with_spaces_stores),
+        stores: &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores),
     };
 
     let current_tr = target.root();
@@ -97,7 +97,7 @@ where
             return MappingResult::Direct { src, matches };
         }
     }
-    let stores = &no_space::as_nospaces2(with_spaces_stores);
+    let stores = &no_space::as_nospaces(with_spaces_stores);
     let binding = crate::utils::bind_tree_pair(partial_decomps, &current_tr, &other_tr);
     let mut locked = binding.lock();
     let (src_tree, dst_tree) = locked.as_mut(stores);
@@ -467,7 +467,7 @@ where
     assert_eq!(current_tr, src_tree.original(&src_tree.root()));
     let node_store = &stores.node_store;
     let tracker_nospace = MappingTracker {
-        stores: &hyperast_vcs_git::no_space::as_nospaces2(with_spaces_stores),
+        stores: &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores),
     };
     let mut curr = src_tree.root();
     let path = target.iter_offsets_nospaces().copied().collect::<Vec<_>>();

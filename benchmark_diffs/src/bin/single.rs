@@ -106,7 +106,7 @@ fn single(
     let dst_tr = commit_dst.ast_root;
     let dst_s = stores.node_store.resolve(dst_tr).size();
 
-    let hyperast = hyperast_vcs_git::no_space::as_nospaces2(stores);
+    let hyperast = hyperast_vcs_git::no_space::as_nospaces(stores);
 
     let mu = memusage_linux();
     let lazy =

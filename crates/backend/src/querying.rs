@@ -779,7 +779,7 @@ fn differential_aux(
     let mut results = vec![];
     let rrr = query
         .capture_index_for_name("root")
-        .expect("@root at the en of query pattern");
+        .expect("@root at the end of query pattern");
     for m in qcursor {
         let i = m.pattern_index;
         let i = query.enabled_pattern_index(i).unwrap();
@@ -787,7 +787,7 @@ fn differential_aux(
         let node = m
             .nodes_for_capture_index(rrr)
             .next()
-            .expect("@root at the en of query pattern");
+            .expect("@root at the end of query pattern");
         results.push(node.pos.clone());
         let compute_time = now.elapsed();
         // if compute_time >= timeout {

@@ -61,6 +61,21 @@ mod impls {
         }
     }
 
+    // static dynamically initialized once association table between Role and tree_sitter_java Fields
+    static ROLE2FIELD: std::sync::LazyLock<Box<[u16]>> = std::sync::LazyLock::new(|| {
+        (0..hyperast::types::Role::len())
+            .map(|i| {
+                let i = i as u8;
+                let role: hyperast::types::Role = unsafe { std::mem::transmute(i) };
+                let field_name = role.to_string();
+                // dbg!(&field_name);
+                crate::language()
+                    .field_id_for_name(field_name)
+                    .map_or(u16::MAX, |x| x.into())
+            })
+            .collect()
+    });
+
     impl RoleStore for TStore {
         type IdF = u16;
 
@@ -75,11 +90,9 @@ mod impls {
         }
 
         fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
-            let field_name = role.to_string();
-            crate::language()
-                .field_id_for_name(field_name)
-                .unwrap()
-                .into()
+            let r = ROLE2FIELD[role as usize];
+            assert!(r <= u16::MAX);
+            r.into()
         }
     }
 }

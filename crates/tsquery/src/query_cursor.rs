@@ -134,6 +134,10 @@ where
                 // Leave this node by stepping to its next sibling or to its parent.
                 match self.cursor.goto_next_sibling_internal() {
                     TreeCursorStep::Visible => {
+                        #[cfg(feature = "cursor_counts")]
+                        {
+                            self.goto_count += 1;
+                        }
                         if !self.on_visible_node {
                             self.depth += 1;
                             self.on_visible_node = true;
@@ -141,6 +145,10 @@ where
                         self.ascending = false;
                     }
                     TreeCursorStep::Hidden => {
+                        #[cfg(feature = "cursor_counts")]
+                        {
+                            self.goto_count += 1;
+                        }
                         if self.on_visible_node {
                             if self.depth == 0 {
                                 return did_match;
@@ -152,6 +160,10 @@ where
                     }
                     TreeCursorStep::None => {
                         if self.cursor.goto_parent() {
+                            #[cfg(feature = "cursor_counts")]
+                            {
+                                self.goto_count += 1;
+                            }
                             if self.depth == 0 {
                                 return did_match;
                             }
@@ -280,6 +292,10 @@ where
             let symbol = node.symbol();
             let is_named = node.is_named();
             let status = self.cursor.current_status();
+            #[cfg(feature = "cursor_counts")]
+            {
+                self.status_count += 1;
+            }
             log::trace!(
                 "enter node. depth:{}, type:{}, field:{}, row:{} state_count:{}, finished_state_count:{}",
                 self.depth,

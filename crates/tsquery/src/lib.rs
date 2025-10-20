@@ -125,6 +125,10 @@ impl Query {
             halted: false,
             ascending: false,
             cursor,
+            #[cfg(feature = "cursor_counts")]
+            status_count: 0,
+            #[cfg(feature = "cursor_counts")]
+            goto_count: 0,
         }
     }
 
@@ -170,6 +174,16 @@ pub struct QueryCursor<'query, Cursor, Node> {
     pub depth: Depth,
     pub max_start_depth: Depth,
     pub exec_state: QueryExecState<Node>,
+
+    #[cfg(feature = "cursor_counts")]
+    #[doc(hidden)]
+    /// once per call to `hyperast_tsquery::Cursor::current_status()`
+    pub status_count: usize,
+
+    #[cfg(feature = "cursor_counts")]
+    #[doc(hidden)]
+    /// once per successful `hyperast_tsquery::Cursor::goto_*()`
+    pub goto_count: usize,
 }
 
 pub struct QueryExecState<Node> {
@@ -225,6 +239,7 @@ pub enum TreeCursorStep {
 pub trait WithField {
     type IdF;
 }
+
 pub trait CNLending<'a, __ImplBound = &'a Self>: WithField {
     type NR: Node<IdF = Self::IdF> + Clone;
 }

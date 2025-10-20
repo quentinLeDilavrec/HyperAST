@@ -7,6 +7,7 @@ use git2::{Oid, Repository};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::nodes::legion::{RawHAST, subtree_builder};
 use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::types::{HyperAST, HyperType, Labeled, WithChildren};
 use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
 use hyperast_gen_ts_java::types::{TStore, Type};
 
@@ -226,7 +227,21 @@ fn make(
 
     let eq = eq_node(&interned_kind, Some(&label_id), &primary.children);
 
-    let insertion = node_store.prepare_insertion(&hashable, eq);
+    let md_cache = &mut java_proc.cache.md_cache;
+    let mut alt_dedup = java_proc.query.is_some() || java_proc.parameter.prepro.is_some();
+    #[cfg(feature = "tsg")]
+    {
+        alt_dedup |= java_proc.tsg.is_some();
+    }
+    let dedup_cache = if alt_dedup {
+        &mut java_proc.cache.dedup.0
+    } else {
+        &mut node_store.dedup
+    };
+    // java_proc.query
+    let insertion = node_store
+        .inner
+        .prepare_insertion(dedup_cache, &hashable, eq);
 
     let compute_ana = || {
         #[cfg(feature = "impact")]
@@ -273,7 +288,6 @@ fn make(
             None
         }
     };
-    let md_cache = &mut java_proc.cache.md_cache;
 
     // Guard to avoid computing metadata for an already present subtree
     if let Some(compressed_node) = insertion.occupied_id() {

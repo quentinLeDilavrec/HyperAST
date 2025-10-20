@@ -434,9 +434,11 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
         .map_metrics(|m| m.finalize(&interned_kind, &label_id, 0));
     let hashable = primary.metrics.hashs.most_discriminating();
     let eq = eq_node(&Type::Directory, Some(&label_id), &primary.children);
-    let insertion = node_store.prepare_insertion(&hashable, eq);
-
     let md_cache = &mut cpp_proc.cache.md_cache;
+    let dedup_cache = &mut cpp_proc.cache.dedup.0;
+    let insertion = node_store
+        .inner
+        .prepare_insertion(dedup_cache, &hashable, eq);
 
     if let Some(id) = insertion.occupied_id() {
         // NOTE this situation should not happen often, due to cache based on oids, so there is no point caching md.

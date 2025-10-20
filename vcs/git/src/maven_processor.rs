@@ -421,7 +421,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
     log::info!("make mm {} {}", &primary.name, primary.children.len());
     assert_eq!(primary.children_names.len(), primary.children.len());
     let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(
-        hyperast_gen_ts_java::types::Lang,
+        hyperast_gen_ts_xml::types::Lang,
     );
     let children_is_empty = primary.children.is_empty();
     if !acc.status.is_empty() {

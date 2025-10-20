@@ -379,7 +379,7 @@ impl PrecomputedPatterns {
                 // - forward is a ? or * quant
                 // - backward is a + or * quant
             } else {
-                hash_single_step(query, id, &mut hasher.0);
+                hash_single_step(query, id, false, false, &mut hasher.0);
                 hasher.1 += 1;
                 // dbg!(hasher.0.clone().finish());
             }
@@ -445,31 +445,59 @@ impl PrecomputedPatterns {
                 id.inc();
                 stack.push((hasher.clone(), id));
             }
-            if step.field != 0 {
-                let mut hasher = hasher.clone();
-                hasher.1 += 1;
-                hash_single_step1(query, id, &mut hasher.0);
-                let mut id = id;
-                id.inc();
-                stack.push((hasher, id));
+            macro_rules! hsh {
+                () => {
+                    hsh!([false, false]);
+                    hsh!(last_child);
+                    hsh!(immediate);
+                    if step.is_immediate() && step.is_last_child() {
+                        hsh!([true, true]);
+                        hsh!(hash_single_step, true, true);
+                    }
+                };
+                (field, $imm:expr, $last:expr) => {
+                    if step.field != 0 {
+                        hsh!(hash_single_step1, $imm, $last);
+                    }
+                };
+                (symbol, $imm:expr, $last:expr) => {
+                    if step.symbol != 0 {
+                        hsh!(hash_single_step2, $imm, $last);
+                    }
+                };
+                (field & symbol, $imm:expr, $last:expr) => {
+                    if step.field != 0 && step.symbol != 0 {
+                        hsh!(hash_single_step12, $imm, $last);
+                    }
+                };
+                (last_child) => {
+                    if step.is_last_child() {
+                        hsh!([false, true]);
+                        hsh!(hash_single_step, false, true);
+                    }
+                };
+                (immediate) => {
+                    if step.is_immediate() {
+                        hsh!([true, false]);
+                        hsh!(hash_single_step, true, false);
+                    }
+                };
+                ([$imm:expr, $last:expr]) => {
+                    hsh!(field, $imm, $last);
+                    hsh!(symbol, $imm, $last);
+                    hsh!(field & symbol, $imm, $last);
+                };
+                ($f:ident, $imm:expr, $last:expr) => {
+                    let mut hasher = hasher.clone();
+                    hasher.1 += 1;
+                    $f(query, id, $imm, $last, &mut hasher.0);
+                    let mut id = id;
+                    id.inc();
+                    stack.push((hasher, id));
+                };
             }
-            if step.symbol != 0 {
-                let mut hasher = hasher.clone();
-                hasher.1 += 1;
-                hash_single_step2(query, id, &mut hasher.0);
-                let mut id = id;
-                id.inc();
-                stack.push((hasher, id));
-            }
-            if step.field != 0 && step.symbol != 0 {
-                let mut hasher = hasher.clone();
-                hasher.1 += 1;
-                hash_single_step12(query, id, &mut hasher.0);
-                let mut id = id;
-                id.inc();
-                stack.push((hasher, id));
-            }
-            hash_single_step(query, id, &mut hasher.0);
+            hsh!();
+            hash_single_step(query, id, false, false, &mut hasher.0);
             let mut id = id;
             id.inc();
             stack.push((hasher, id));
@@ -537,26 +565,29 @@ impl PrecomputedPatterns {
                 }
                 if step.field != 0 {
                     let mut hasher = hasher.div();
-                    hash_single_step1(query, id, &mut hasher.0);
+                    hash_single_step1(query, id, false, false, &mut hasher.0);
                     let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
                 if step.symbol != 0 {
                     let mut hasher = hasher.div();
-                    hash_single_step2(query, id, &mut hasher.0);
+                    hash_single_step2(query, id, false, false, &mut hasher.0);
                     let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
                 if step.symbol != 0 {
                     let mut hasher = hasher.div();
-                    hash_single_step12(query, id, &mut hasher.0);
+                    hash_single_step12(query, id, false, false, &mut hasher.0);
                     let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
-                hash_single_step(query, id, &mut hasher.0);
+                if step.is_immediate() {
+                    todo!()
+                }
+                hash_single_step(query, id, false, false, &mut hasher.0);
             }
             id.inc();
         }
@@ -564,12 +595,18 @@ impl PrecomputedPatterns {
 }
 
 // Considers all relevant attributes of current step
-fn hash_single_step(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
+fn hash_single_step(
+    query: &Query,
+    stepid: StepId,
+    imm: bool,
+    last: bool,
+    hasher: &mut std::hash::DefaultHasher,
+) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
-    step.is_immediate().hash(hasher);
+    if !imm { step.is_immediate() } else { false }.hash(hasher);
     step.is_pass_through().hash(hasher);
-    step.is_last_child().hash(hasher);
+    if !last { step.is_last_child() } else { false }.hash(hasher);
     step.field().hash(hasher);
     step.normed_alternative_index(stepid).hash(hasher);
     step.supertype_symbol().hash(hasher);
@@ -579,12 +616,18 @@ fn hash_single_step(query: &Query, stepid: StepId, hasher: &mut std::hash::Defau
 }
 
 // similar to `hash_single_step`, but ignore symbol
-fn hash_single_step1(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
+fn hash_single_step1(
+    query: &Query,
+    stepid: StepId,
+    imm: bool,
+    last: bool,
+    hasher: &mut std::hash::DefaultHasher,
+) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
-    step.is_immediate().hash(hasher);
+    if !imm { step.is_immediate() } else { false }.hash(hasher);
     step.is_pass_through().hash(hasher);
-    step.is_last_child().hash(hasher);
+    if !last { step.is_last_child() } else { false }.hash(hasher);
     0u16.hash(hasher);
     step.normed_alternative_index(stepid).hash(hasher);
     step.supertype_symbol().hash(hasher);
@@ -594,12 +637,18 @@ fn hash_single_step1(query: &Query, stepid: StepId, hasher: &mut std::hash::Defa
 }
 
 // similar to `hash_single_step`, but ignores symbol
-fn hash_single_step2(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
+fn hash_single_step2(
+    query: &Query,
+    stepid: StepId,
+    imm: bool,
+    last: bool,
+    hasher: &mut std::hash::DefaultHasher,
+) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
-    step.is_immediate().hash(hasher);
+    if !imm { step.is_immediate() } else { false }.hash(hasher);
     step.is_pass_through().hash(hasher);
-    step.is_last_child().hash(hasher);
+    if !last { step.is_last_child() } else { false }.hash(hasher);
     step.field().hash(hasher);
     step.normed_alternative_index(stepid).hash(hasher);
     step.supertype_symbol().hash(hasher);
@@ -609,12 +658,18 @@ fn hash_single_step2(query: &Query, stepid: StepId, hasher: &mut std::hash::Defa
 }
 
 // similar to `hash_single_step`, but ignores symbol and field
-fn hash_single_step12(query: &Query, stepid: StepId, hasher: &mut std::hash::DefaultHasher) {
+fn hash_single_step12(
+    query: &Query,
+    stepid: StepId,
+    imm: bool,
+    last: bool,
+    hasher: &mut std::hash::DefaultHasher,
+) {
     let step = &query.steps[stepid];
     step.is_dead_end().hash(hasher);
-    step.is_immediate().hash(hasher);
+    if !imm { step.is_immediate() } else { false }.hash(hasher);
     step.is_pass_through().hash(hasher);
-    step.is_last_child().hash(hasher);
+    if !last { step.is_last_child() } else { false }.hash(hasher);
     0u16.hash(hasher);
     step.normed_alternative_index(stepid).hash(hasher);
     step.supertype_symbol().hash(hasher);

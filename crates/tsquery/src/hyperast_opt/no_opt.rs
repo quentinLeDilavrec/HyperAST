@@ -1,21 +1,13 @@
 use crate::{CNLending, StatusLending};
-
 use crate::{Cursor, Node as _, Status, Symbol, TreeCursorStep};
-use hyperast::position::TreePath;
-use hyperast::types::{
-    HyperASTShared, HyperType, LabelStore, Labeled, NodeStore, RoleStore, Tree, WithPrecompQueries,
-    WithRoles,
-};
-use hyperast::{
-    position::TreePathMut,
-    types::{HyperAST, TypeStore},
-};
 
-pub struct _TreeCursor<'hast, HAST, P, S> {
-    pub stores: &'hast HAST,
-    pub pos: P,
-    pub p: S,
-}
+use hyperast::position::{TreePath, TreePathMut};
+use hyperast::types::{HyperAST, HyperASTShared};
+use hyperast::types::{HyperType as _, LabelStore as _, Labeled as _, Tree as _};
+use hyperast::types::{NodeStore, RoleStore, TypeStore};
+use hyperast::types::{WithPrecompQueries, WithRoles};
+
+use super::CursorStatus;
 
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 
@@ -59,42 +51,6 @@ impl<HAST: HyperAST> Clone for Node<'_, HAST> {
             stores: self.stores,
             pos: self.pos.clone(),
         }
-    }
-}
-
-pub struct CursorStatus<IdF> {
-    pub has_later_siblings: bool,
-    pub has_later_named_siblings: bool,
-    pub can_have_later_siblings_with_this_field: bool,
-    pub field_id: IdF,
-    pub supertypes: Vec<Symbol>,
-}
-
-impl<IdF: Copy> Status for CursorStatus<IdF> {
-    type IdF = IdF;
-
-    fn has_later_siblings(&self) -> bool {
-        self.has_later_siblings
-    }
-
-    fn has_later_named_siblings(&self) -> bool {
-        self.has_later_named_siblings
-    }
-
-    fn can_have_later_siblings_with_this_field(&self) -> bool {
-        self.can_have_later_siblings_with_this_field
-    }
-
-    fn field_id(&self) -> Self::IdF {
-        self.field_id
-    }
-
-    fn has_supertypes(&self) -> bool {
-        !self.supertypes.is_empty()
-    }
-
-    fn contains_supertype(&self, sym: Symbol) -> bool {
-        self.supertypes.contains(&sym)
     }
 }
 
@@ -383,13 +339,7 @@ where
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
 {
     fn symbol(&self) -> Symbol {
-        // TODO make something more efficient
-        let n = self.pos.node().unwrap();
-        let t = self.stores.resolve_type(n);
-        let n = self.stores.node_store().resolve(n);
-        use hyperast::types::LangRef;
-        let id = self.stores.resolve_lang(&n).ts_symbol(t);
-        id.into()
+        super::symbol(self.stores, *self.pos.node().unwrap())
     }
 
     fn is_named(&self) -> bool {

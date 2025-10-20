@@ -387,7 +387,7 @@ fn run_prepro(query: &str, subqueries: &[&str], text: &[u8]) -> usize {
     let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     // let pos = hyperast::position::StructuralPosition::new(code);
     use hyperast::position::structural_pos::CursorHead;
-    use hyperast_tsquery::hyperast_opt2::opt9_parent_types::TreeCursor;
+    use hyperast_tsquery::hyperast_opt::TreeCursor;
     // use hyperast_tsquery::hyperast_cursor::TreeCursor;
     let cursor = TreeCursor::new(&stores, pos);
     let matches = query.matches(cursor);

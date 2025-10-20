@@ -300,7 +300,7 @@ where
         };
         use hyperast::position::structural_pos::CursorHead;
         let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(c.pos.node());
-        std::mem::swap(&mut pos, &mut c.pos);
+        std::mem::swap(&mut pos, &mut c.pos.pos);
         let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(self.stores, pos);
         let mut matches = self.meta.matches_immediate(cursor);
         let r = loop {
@@ -312,7 +312,7 @@ where
             }
         };
         assert_eq!(matches.cursor.pos.node(), c.pos.node());
-        std::mem::swap(&mut matches.cursor.pos, &mut c.pos);
+        std::mem::swap(&mut matches.cursor.pos.pos, &mut c.pos.pos);
         r
     }
 }

@@ -248,16 +248,18 @@ pub trait StatusLending<'a, __ImplBound = &'a Self>: WithField {
     type Status: Status<IdF = Self::IdF>;
 }
 
+/// Cursor Interface for tree-sitter query executor
 pub trait Cursor: for<'a> CNLending<'a> + for<'a> StatusLending<'a> {
     type Node: Clone
         + Node<IdF = <Self as WithField>::IdF>
         + for<'a> TextLending<'a, TP = <<Self as CNLending<'a>>::NR as TextLending<'a>>::TP>;
-
+    /// move to next sibling
     fn goto_next_sibling_internal(&mut self) -> TreeCursorStep;
-
+    /// move to first child
     fn goto_first_child_internal(&mut self) -> TreeCursorStep;
-
+    /// move to parent
     fn goto_parent(&mut self) -> bool;
+
     fn current_node(&self) -> <Self as CNLending<'_>>::NR;
 
     fn parent_is_error(&self) -> bool;
@@ -429,6 +431,9 @@ where
         }
     }
 }
+
+#[doc(hidden)]
+pub static mut ELAPSED_STATUS: std::time::Duration = std::time::Duration::ZERO;
 
 impl<Node: self::Node> QueryMatch<Node> {
     pub(crate) fn satisfies_text_predicates<'a, 'b, 's: 'l, 'l, T: 'a + AsRef<str>>(

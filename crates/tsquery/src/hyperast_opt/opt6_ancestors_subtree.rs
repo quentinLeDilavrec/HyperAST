@@ -6,57 +6,50 @@
 //! * remove unnecessary TreeCursorStep related instructions
 //! * memorization of ancestors subtree in cursor
 //! * stack of subtrees
-use super::CursorStatus;
-use super::hyperast_opt5::has_child_with_field_id;
-use super::kind;
-use super::resolve;
-use super::text;
-use crate::StatusLending;
-use crate::{Status, Symbol, TreeCursorStep};
-use hyperast::position::structural_pos;
-use hyperast::types::{Childrn, HyperAST, LangRef, NodeStore as _, TypeStore};
-use hyperast::types::{HyperASTShared, HyperType, LabelStore, Labeled, RoleStore, Tree};
-use hyperast::types::{LendT, NodeId};
-use hyperast::types::{WithChildren, WithPrecompQueries, WithRoles};
-use structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence, PersistedNode};
 
-pub struct TreeCursor<'hast, HAST: HyperAST> {
-    pub stores: &'hast HAST,
+use hyperast::position::structural_pos;
+use hyperast::types;
+
+use types::{Childrn, HyperAST, LangRef, NodeStore as _, TypeStore};
+use types::{HyperASTShared, HyperType, LabelStore, Labeled, RoleStore, Tree};
+use types::{LendT, NodeId};
+use types::{WithChildren, WithPrecompQueries, WithRoles};
+
+use structural_pos::{CursorHead, CursorHeadMove};
+use structural_pos::{CursorWithPersistence, PersistedNode};
+
+use super::CursorStatus;
+use crate::{Symbol, TreeCursorStep};
+
+use crate::StatusLending;
+
+use super::cursor_utils;
+use cursor_utils::kind;
+
+pub struct PersistCursor<'hast, HAST: HyperAST> {
     pub pos: CursorWithPersistence<HAST::IdN, HAST::Idx>,
     pub p: PersistedNode<HAST::IdN, HAST::Idx>,
-    /// stack of subtrees
+    /// stack of ancestors' subtrees
     stack: Vec<LendT<'hast, HAST>>,
 }
 
-macro_rules! decomp_t {
-    ($T:ty, $n:expr) => {
-        <$T as TypeStore>::decompress_type($n, std::any::TypeId::of::<<$T as TypeStore>::Ty>())
-    };
-}
+#[allow(type_alias_bounds)]
+pub type TreeCursor<'hast, HAST: HyperAST> =
+    super::TreeCursor<'hast, HAST, PersistCursor<'hast, HAST>>;
 
-impl<'hast, HAST: HyperAST> TreeCursor<'hast, HAST> {
-    pub fn new(stores: &'hast HAST, mut pos: CursorWithPersistence<HAST::IdN, HAST::Idx>) -> Self
-    where
-        HAST::IdN: Copy,
-    {
-        let p = pos.persist();
-        let n = stores.node_store().resolve(&pos.node());
-        let mut stack = vec![n];
-        stack.reserve(30);
-        Self {
-            stores,
-            pos,
-            p,
-            stack,
-        }
-    }
-}
-
-impl<HAST: HyperAST> crate::WithField for self::TreeCursor<'_, HAST>
+pub fn tree_cursor<'hast, HAST: HyperAST>(
+    stores: &'hast HAST,
+    mut pos: CursorWithPersistence<HAST::IdN, HAST::Idx>,
+) -> TreeCursor<'hast, HAST>
 where
-    HAST::TS: RoleStore,
+    HAST::IdN: Copy,
 {
-    type IdF = <HAST::TS as RoleStore>::IdF;
+    let p = pos.persist();
+    let n = stores.node_store().resolve(&pos.node());
+    let mut stack = vec![n];
+    stack.reserve(30);
+    let pos = PersistCursor { pos, p, stack };
+    TreeCursor::bind(pos, stores)
 }
 
 impl<'a, 'hast, HAST: HyperAST> crate::CNLending<'a> for self::TreeCursor<'hast, HAST>
@@ -64,10 +57,9 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
-    for<'t> LendT<'t, HAST>: WithPrecompQueries,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type NR = super::hyperast_opt4::NodeRef<'a, 'hast, HAST>;
+    type NR = super::NodeRefK<'a, 'hast, HAST>;
 }
 
 impl<'a, 'hast, HAST: HyperAST> crate::StatusLending<'a> for self::TreeCursor<'hast, HAST>
@@ -85,18 +77,17 @@ where
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type Node = super::hyperast_opt4::Node<'hast, HAST>;
+    type Node = super::Node<'hast, HAST>;
 
     fn goto_next_sibling_internal(&mut self) -> TreeCursorStep {
-        if self.p.ref_node().eq(&self.pos.ref_node()) {
+        if self.pos.p.ref_node().eq(&self.pos.pos.ref_node()) {
             return TreeCursorStep::None;
         }
-        if !goto_next_sibling_internal(self.stores, &mut self.stack, &mut self.pos) {
+        if !goto_next_sibling_internal(self.stores, &mut self.pos.stack, &mut self.pos.pos) {
             return TreeCursorStep::None;
         }
-        // self.n = self.stores.node_store().resolve(&self.pos.node());
-        let n = self.stack.last().unwrap();
-        debug_assert_eq!(decomp_t!(HAST::TS, n), kind(self.stores, &self.pos));
+        let n = self.pos.stack.last().unwrap();
+        debug_assert_eq!(decomp_t!(HAST::TS, n), kind(self.stores, &self.pos.pos));
         let k = decomp_t!(HAST::TS, n);
         if !k.is_hidden() {
             TreeCursorStep::Visible
@@ -107,12 +98,11 @@ where
 
     #[inline(always)]
     fn goto_first_child_internal(&mut self) -> TreeCursorStep {
-        if !goto_first_child_internal(self.stores, &mut self.stack, &mut self.pos) {
+        if !goto_first_child_internal(self.stores, &mut self.pos.stack, &mut self.pos.pos) {
             return TreeCursorStep::None;
         }
-        // self.n = self.stores.node_store().resolve(&self.pos.node());
-        let n = self.stack.last().unwrap();
-        debug_assert_eq!(decomp_t!(HAST::TS, n), kind(self.stores, &self.pos));
+        let n = self.pos.stack.last().unwrap();
+        debug_assert_eq!(decomp_t!(HAST::TS, n), kind(self.stores, &self.pos.pos));
         let k = decomp_t!(HAST::TS, n);
         if !k.is_hidden() {
             TreeCursorStep::Visible
@@ -122,24 +112,23 @@ where
     }
 
     fn goto_parent(&mut self) -> bool {
-        if self.p.ref_node().eq(&self.pos.ref_node()) {
+        if self.pos.p.ref_node().eq(&self.pos.pos.ref_node()) {
             return false;
         }
-        if !goto_parent(self.stores, &mut self.stack, &mut self.pos) {
+        if !goto_parent(self.stores, &mut self.pos.stack, &mut self.pos.pos) {
             return false;
         }
-        // self.n = self.stores.node_store().resolve(&self.pos.node());
-        let n = self.stack.last().unwrap();
-        debug_assert_eq!(decomp_t!(HAST::TS, n), kind(self.stores, &self.pos));
+        let n = self.pos.stack.last().unwrap();
+        debug_assert_eq!(decomp_t!(HAST::TS, n), kind(self.stores, &self.pos.pos));
         true
     }
 
     fn current_node(&self) -> <Self as crate::CNLending<'_>>::NR {
-        let pos = self.pos.ref_node();
+        let pos = self.pos.pos.ref_node();
         use hyperast::types::NodeStore;
-        let n = self.stack.last().unwrap();
+        let n = self.pos.stack.last().unwrap();
         let kind = decomp_t!(HAST::TS, n);
-        super::hyperast_opt4::NodeRef {
+        super::NodeRefK {
             stores: self.stores,
             pos,
             kind,
@@ -147,12 +136,12 @@ where
     }
 
     fn parent_is_error(&self) -> bool {
-        if self.stack.len() == 1 {
+        if self.pos.stack.len() == 1 {
             return false;
         }
-        let mut s = self.pos.ref_node();
-        let n = self.stack.last().unwrap();
-        let Some(stack) = goto_parent_virt(self.stores, &*self.stack, &mut s) else {
+        let mut s = self.pos.pos.ref_node();
+        let n = self.pos.stack.last().unwrap();
+        let Some(stack) = goto_parent_virt(self.stores, &*self.pos.stack, &mut s) else {
             return false;
         };
         let n = stack.last().unwrap();
@@ -161,21 +150,21 @@ where
     }
 
     fn has_parent(&self) -> bool {
-        let mut s = self.pos.ref_node();
-        super::hyperast_opt5::goto_parent(self.stores, &mut s)
+        let mut s = self.pos.pos.ref_node();
+        super::cursor_utils3::goto_parent(self.stores, &mut s)
     }
 
     fn persist(&self) -> Self::Node {
-        let pos = self.pos.persist();
-        super::hyperast_opt4::Node {
+        let pos = self.pos.pos.persist();
+        super::Node {
             stores: self.stores,
             pos,
         }
     }
 
     fn persist_parent(&self) -> Option<Self::Node> {
-        let pos = self.pos.persist_parent()?;
-        Some(super::hyperast_opt4::Node {
+        let pos = self.pos.pos.persist_parent()?;
+        Some(super::Node {
             stores: self.stores,
             pos,
         })
@@ -183,45 +172,8 @@ where
 
     #[inline(always)]
     fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
-        let n = self.stack.last().unwrap();
-        if cfg!(not(debug_assertions)) {
-            return current_status(self.stores, n, &self.pos);
-        }
-        // let old = crate::current_status(self.stores, &self.pos);
-        let new = current_status(self.stores, n, &self.pos);
-        // if old.has_later_siblings != new.has_later_siblings
-        //     || old.has_later_named_siblings != new.has_later_named_siblings
-        //     || (old.can_have_later_siblings_with_this_field
-        //         && !new.can_have_later_siblings_with_this_field)
-        //     || old.field_id != new.field_id
-        // {
-        //     dbg!(old.has_later_siblings, new.has_later_siblings);
-        //     dbg!(old.has_later_named_siblings, new.has_later_named_siblings);
-        //     dbg!(
-        //         old.can_have_later_siblings_with_this_field,
-        //         new.can_have_later_siblings_with_this_field
-        //     );
-        //     let lang = kind(self.stores, &self.pos).get_lang();
-        //     dbg!(old.field_id != new.field_id);
-        //     // dbg!(
-        //     //     HAST::TS::resolve_field(lang.clone(), old.field_id).,
-        //     //     HAST::TS::resolve_field(lang.clone(), new.field_id)
-        //     // );
-        //     // let old_f: u16 = unsafe { std::mem::transmute(old.field_id) };
-        //     // dbg!(old_f);
-        //     // let new_f: u16 = unsafe { std::mem::transmute(new.field_id) };
-        //     // dbg!(new_f);
-        //     for t in old.supertypes {
-        //         let old: u16 = unsafe { std::mem::transmute(t) };
-        //         dbg!(old);
-        //     }
-        //     for t in new.supertypes {
-        //         let new: u16 = unsafe { std::mem::transmute(t) };
-        //         dbg!(new);
-        //     }
-        //     panic!()
-        // }
-        new
+        let n = self.pos.stack.last().unwrap();
+        current_status(self.stores, n, &self.pos.pos)
     }
 
     fn text_provider(&self) -> <Self::Node as crate::TextLending<'_>>::TP {
@@ -229,11 +181,11 @@ where
     }
 
     fn is_visible_at_root(&self) -> bool {
-        // assert!(self.pos.ref_parent().is_none());
-        if self.pos.ref_parent().is_none() {
+        // assert!(self.pos.pos.ref_parent().is_none());
+        if self.pos.pos.ref_parent().is_none() {
             return true;
         }
-        let n = self.stack.last().unwrap();
+        let n = self.pos.stack.last().unwrap();
         let t = decomp_t!(HAST::TS, n);
         !t.is_hidden()
     }
@@ -243,8 +195,8 @@ where
             return false;
         }
         use hyperast::types::NodeStore;
-        let id = self.pos.node();
-        let n = self.stack.last().unwrap();
+        let id = self.pos.pos.node();
+        let n = self.pos.stack.last().unwrap();
         n.wont_match_given_precomputed_queries(needed)
     }
 }
@@ -279,7 +231,7 @@ where
         if !pos.up() {
             break;
         };
-        let n = resolve(stores, &pos);
+        let n = cursor_utils::resolve(stores, &pos);
         let k = decomp_t!(HAST::TS, &n);
         // dbg!(k);
         // dbg!(o);

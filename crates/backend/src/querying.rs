@@ -2,6 +2,7 @@ use crate::{SharedState, smells::globalize};
 use axum::{Json, response::IntoResponse};
 use http::{HeaderMap, StatusCode};
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
+use hyper_diff::matchers::mapping_store::MappingStore;
 use hyper_diff::matchers::{Decompressible, mapping_store::MultiMappingStore};
 use hyperast::position::position_accessors::WithPreOrderOffsets;
 use hyperast::store::defaults::NodeIdentifier;
@@ -446,49 +447,110 @@ fn simple_aux(
     timeout: std::time::Duration,
     max_matches: u64,
 ) -> Result<ComputeResult, MatchingError<ComputeResult>> {
-    let pos = hyperast::position::StructuralPosition::new(code);
-    let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(stores, pos);
-    let qcursor = query.matches(cursor);
-    let now = Instant::now();
+    let height = stores.node_store.resolve(code).height();
+    log::trace!("Queried tree height: {}", height);
     let mut result = vec![0; query.enabled_pattern_count()];
-    for m in qcursor {
-        let i = m.pattern_index;
-        let i = query.enabled_pattern_index(i).unwrap();
-        result[i as usize] += 1;
+    let now = Instant::now();
+    let ex = |i| {
+        result[i] += 1;
         let compute_time = now.elapsed();
         if compute_time >= timeout {
-            let compute_time = now.elapsed().as_secs_f64();
+            return Some(MatchingError::TimeOut(compute_time));
+        } else if result[i] > max_matches {
+            // TODO disable the pattern, return the new query
+            return Some(MatchingError::MaxMatches(compute_time));
+        }
+        None
+    };
+    log::info!("Starting query on tree with height {}", height);
+    let r = if height < 128 {
+        aux_opt128(stores, code, query, ex)
+    } else if height < 512 {
+        aux_opt(stores, code, query, ex)
+    } else {
+        aux_opt(stores, code, query, ex)
+        // aux_default(stores, code, query, ex)
+    };
+    match r {
+        Some(MatchingError::TimeOut(compute_time)) => {
             return Err(MatchingError::TimeOut(ComputeResult {
                 result,
-                compute_time,
-            }));
-        } else if result[i as usize] > max_matches {
-            // TODO disable the pattern, return the new query
-            let compute_time = now.elapsed().as_secs_f64();
-            return Err(MatchingError::MaxMatches(ComputeResult {
-                result,
-                compute_time,
+                compute_time: compute_time.as_secs_f64(),
             }));
         }
+        Some(MatchingError::MaxMatches(compute_time)) => {
+            return Err(MatchingError::MaxMatches(ComputeResult {
+                result,
+                compute_time: compute_time.as_secs_f64(),
+            }));
+        }
+        _ => (),
+    };
 
-        // dbg!(m.pattern_index);
-        // dbg!(m.captures.len());
-        // for c in &m.captures {
-        //     let i = c.index;
-        //     dbg!(i);
-        //     let name = query.capture_name(i);
-        //     dbg!(name);
-        //     use hyperast::position::TreePath;
-        //     let n = c.node.pos.node().unwrap();
-        //     let n = hyperast::nodes::SyntaxSerializer::new(c.node.stores, *n);
-        //     dbg!(n.to_string());
-        // }
-    }
     let compute_time = now.elapsed().as_secs_f64();
     Ok(ComputeResult {
         result,
         compute_time,
     })
+}
+
+fn aux_opt<T>(
+    stores: &hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+    code: NodeIdentifier,
+    query: &hyperast_tsquery::Query,
+    mut ex: impl FnMut(usize) -> Option<T>,
+) -> Option<T> {
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
+    let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(stores, pos);
+    let qcursor = query.matches(cursor);
+    for m in qcursor {
+        let i = m.pattern_index;
+        let i = query.enabled_pattern_index(i).unwrap();
+        if let Some(value) = ex(i as usize) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn aux_opt128<T>(
+    stores: &hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+    code: NodeIdentifier,
+    query: &hyperast_tsquery::Query,
+    mut ex: impl FnMut(usize) -> Option<T>,
+) -> Option<T> {
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
+    use hyperast_opt::opt9_parent_types::PersistCursor;
+    use hyperast_tsquery::hyperast_opt;
+    let cursor = hyperast_opt::TreeCursor::new(stores, pos);
+    let qcursor = query.matches(cursor);
+    for m in qcursor {
+        let i = m.pattern_index;
+        let i = query.enabled_pattern_index(i).unwrap();
+        if let Some(value) = ex(i as usize) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn aux_default<T>(
+    stores: &hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+    code: NodeIdentifier,
+    query: &hyperast_tsquery::Query,
+    mut ex: impl FnMut(usize) -> Option<T>,
+) -> Option<T> {
+    let pos = hyperast::position::StructuralPosition::new(code);
+    let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(stores, pos);
+    let qcursor = query.matches(cursor);
+    for m in qcursor {
+        let i = m.pattern_index;
+        let i = query.enabled_pattern_index(i).unwrap();
+        if let Some(value) = ex(i as usize) {
+            return Some(value);
+        }
+    }
+    None
 }
 
 #[derive(Serialize)]
@@ -619,11 +681,10 @@ pub fn differential(
             .map_err(QueryingError::MatchingError)?
     };
     log::info!(
-        "done querying of {commit:?} and {baseline:?} in  {}",
+        "done querying of {commit:?} and {baseline:?} in {}",
         repo.spec
     );
-    results.len();
-    baseline_results.len();
+
     log::info!(
         "lengths results/baseline_results: {}/{}",
         results.len(),
@@ -656,6 +717,11 @@ pub fn differential(
         },
     };
 
+    log::info!(
+        "starting top_down mapping {} to {}",
+        mapper.mapping.src_arena.len(),
+        mapper.mapping.dst_arena.len()
+    );
     let subtree_mappings = {
         crate::matching::top_down(
             hyperast,
@@ -664,7 +730,11 @@ pub fn differential(
         )
     };
 
-    log::info!("done top_down mapping");
+    log::info!(
+        "done top_down mapping {} with {} results",
+        subtree_mappings.len(),
+        baseline_results.len()
+    );
 
     let baseline_results: Vec<_> = baseline_results
         .iter()
@@ -725,9 +795,9 @@ pub fn differential(
             subtree_mappings.get_dsts(&src).is_empty()
         })
         .collect();
-    log::info!("done filtering evolutions");
+    log::info!("done filtering to {} evolutions", baseline_results.len());
 
-    let results = baseline_results
+    let results: Vec<(_, _)> = baseline_results
         .into_iter()
         .map(|p| {
             log::debug!("globalizing");
@@ -747,7 +817,8 @@ pub fn differential(
         .collect();
 
     log::info!(
-        "done finding evolutions of {commit:?} and {baseline:?} in  {}",
+        "done finding {} evolutions from {baseline:?} to {commit:?} in {}",
+        results.len(),
         repo.spec
     );
 

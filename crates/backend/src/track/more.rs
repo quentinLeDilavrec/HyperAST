@@ -22,8 +22,8 @@ fn lazy_mapping<'a>(
 > {
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
     use hyper_diff::matchers::heuristic::gt::{
-        lazy2_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
-        lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher,
+        lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
+        lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher,
     };
     use hyper_diff::matchers::mapping_store::DefaultMultiMappingStore;
     use hyper_diff::matchers::mapping_store::MappingStore;
@@ -104,7 +104,7 @@ fn lazy_subtree_mapping<'a, 'b>(
 > {
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
     use hyper_diff::matchers::Mapping;
-    use hyper_diff::matchers::heuristic::gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+    use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
     use hyper_diff::matchers::mapping_store::DefaultMultiMappingStore;
     use hyper_diff::matchers::mapping_store::MappingStore;
     use hyper_diff::matchers::mapping_store::VecStore;

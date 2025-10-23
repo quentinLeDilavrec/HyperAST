@@ -118,7 +118,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
                     let mappings = mapper.mapping.mappings;
                     let mapper =
@@ -170,7 +170,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
                     let mappings = mapper.mapping.mappings;
                     let mapper =
@@ -198,10 +198,10 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
 
-                    use gt::lazy2_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
+                    use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
                     let mapper_bottom_up =
                         LazyGreedyBottomUpMatcher::<_, _, _, M, M, 200>::match_it(mapper);
                     black_box(mapper_bottom_up);
@@ -220,7 +220,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
                     let mappings = mapper.mapping.mappings;
                     let mapper =
@@ -248,7 +248,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
 
                     use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
@@ -270,7 +270,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
                     let mappings = mapper.mapping.mappings;
                     let mapper =
@@ -297,7 +297,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
 
                     use gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
@@ -319,7 +319,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
                     let mappings = mapper.mapping.mappings;
                     let mapper =
@@ -347,7 +347,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper =
                         hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
 
-                    use gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
 
                     use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;

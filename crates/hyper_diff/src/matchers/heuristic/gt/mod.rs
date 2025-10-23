@@ -8,8 +8,6 @@ pub mod marriage_bottom_up_matcher;
 pub mod simple_bottom_up_matcher3;
 
 // lazy versions, that do not decompress directly subtrees
-pub mod lazy2_greedy_bottom_up_matcher;
-pub mod lazy2_greedy_subtree_matcher;
 pub mod lazy_bottom_up_matcher;
 pub mod lazy_greedy_bottom_up_matcher;
 pub mod lazy_greedy_subtree_matcher;

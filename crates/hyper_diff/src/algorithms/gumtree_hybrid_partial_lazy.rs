@@ -14,7 +14,7 @@ use hyperast::types::{self, HyperAST, NodeId};
 use super::DS;
 
 use crate::matchers::heuristic::gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
-use crate::matchers::heuristic::gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+use crate::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 
 type M = VecStore<u32>;
 type MM = DefaultMultiMappingStore<u32>;

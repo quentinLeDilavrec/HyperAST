@@ -506,7 +506,7 @@ mod test {
         let mappings = VecStore::default();
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
-        let mapper = GreedySubtreeMatcher::<DS<_>, DS<_>, _, _>::matchh::<
+        let mapper = GreedySubtreeMatcher::<DS<_>, DS<_>, _, _>::match_it::<
             DefaultMultiMappingStore<_>,
         >(hyper_diff::matchers::Mapper {
             hyperast: stores,
@@ -727,13 +727,13 @@ mod test {
             DefaultMultiMappingStore<_>,
         >(&mut mapper);
         dbg!();
-        use hyper_diff::matchers::heuristic::gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+        use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
         LazyGreedySubtreeMatcher::<_, _, _, VecStore<_>, 10>::filter_mappings(&mut mapper, &mm);
         // TODO do something with the multi mappings
         // modify filter_mappings to extract redundant mappings
         // the store it alongside other mappings
         dbg!();
-        use hyper_diff::matchers::heuristic::gt::lazy2_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
+        use hyper_diff::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
         LazyGreedyBottomUpMatcher::<_, _, _, _, VecStore<_>>::execute(&mut mapper);
         // This one matches everingthing as it should but it is much slower
         // GreedyBottomUpMatcher::<_, _, _, _, VecStore<_>, 10_000, 1, 2>::execute(

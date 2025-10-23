@@ -12,8 +12,8 @@ use crate::{
         Decompressible, Mapper, Mapping,
         heuristic::gt::{
             greedy_bottom_up_matcher::GreedyBottomUpMatcher,
+            lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
             lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher,
-            lazy2_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
             marriage_bottom_up_matcher::MarriageBottomUpMatcher,
         },
         mapping_store::{DefaultMappingStore, MappingStore, VecStore},

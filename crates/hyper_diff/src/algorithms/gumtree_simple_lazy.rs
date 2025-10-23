@@ -13,8 +13,8 @@ use hyperast::types::{self, HyperAST, NodeId};
 // use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use super::DS;
 
+use crate::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 use crate::matchers::heuristic::gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
-use crate::matchers::heuristic::gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 
 type M = VecStore<u32>;
 type MM = DefaultMultiMappingStore<u32>;

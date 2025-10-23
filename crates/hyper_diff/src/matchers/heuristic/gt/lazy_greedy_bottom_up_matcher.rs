@@ -2,24 +2,26 @@
 //! - [ ] first make post order iterator lazy
 //!
 use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent,
-    LazyDecompressedTreeStore, LazyPOBorrowSlice, PostOrder, PostOrderIterable, Shallow,
-    ShallowDecompressedTreeStore,
+    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, LazyDecompressed,
+    LazyDecompressedTreeStore, LazyPOBorrowSlice, PostOrder, PostOrderIterable, PostOrderKeyRoots,
+    Shallow, ShallowDecompressedTreeStore,
 };
-use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
+use crate::matchers::{Decompressible, Mapper};
 use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
 use hyperast::PrimInt;
 use hyperast::types::{
-    DecompressedSubtree, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs, WithStats,
+    DecompressedFrom, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs, WithStats,
 };
 use num_traits::{cast, one};
 use std::{fmt::Debug, marker::PhantomData};
 
-pub struct GreedyBottomUpMatcher<
+use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
+
+pub struct LazyGreedyBottomUpMatcher<
     Dsrc,
     Ddst,
-    HAST,
+    HAST: HyperAST + Copy,
     M: MonoMappingStore,
     MZs: MonoMappingStore = M,
     const SIZE_THRESHOLD: usize = 1000,
@@ -30,33 +32,20 @@ pub struct GreedyBottomUpMatcher<
     _phantom: PhantomData<*const MZs>,
 }
 
+/// Enable using a slice instead of recreating a ZsTree for each call to ZsMatch, see last_chance_match
+const SLICE: bool = true;
+
 impl<
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + DecompressedWithParent<HAST, Dsrc::IdD>
-        + PostOrder<HAST, Dsrc::IdD, M::Src>
-        + PostOrderIterable<HAST, Dsrc::IdD, M::Src>
-        + DecompressedSubtree<HAST>
-        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
-        + LazyPOBorrowSlice<HAST, Dsrc::IdD, M::Src>
-        + ShallowDecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + DecompressedWithParent<HAST, Ddst::IdD>
-        + PostOrder<HAST, Ddst::IdD, M::Dst>
-        + PostOrderIterable<HAST, Ddst::IdD, M::Dst>
-        + DecompressedSubtree<HAST>
-        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
-        + LazyPOBorrowSlice<HAST, Ddst::IdD, M::Dst>
-        + ShallowDecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + LazyDecompressedTreeStore<HAST, M::Dst>,
-    HAST: HyperAST + Copy,
-    M: MonoMappingStore,
-    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
+    Dsrc: LazyDecompressed<M::Src>,
+    Ddst: LazyDecompressed<M::Dst>,
+    HAST,
+    M,
+    MZs,
     const SIZE_THRESHOLD: usize,
     const SIM_THRESHOLD_NUM: u64,
     const SIM_THRESHOLD_DEN: u64,
 >
-    GreedyBottomUpMatcher<
+    LazyGreedyBottomUpMatcher<
         Dsrc,
         Ddst,
         HAST,
@@ -67,21 +56,39 @@ impl<
         SIM_THRESHOLD_DEN,
     >
 where
+    for<'t> LendT<'t, HAST>: Tree + WithHashs + WithStats,
+    HAST::IdN: Clone + Eq + Debug,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
+    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore,
+    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
+        + DecompressedWithParent<HAST, Dsrc::IdD>
+        + PostOrder<HAST, Dsrc::IdD, M::Src>
+        + PostOrderIterable<HAST, Dsrc::IdD, M::Src>
+        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
+        + LazyPOBorrowSlice<HAST, Dsrc::IdD, M::Src>
+        + ShallowDecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
+        + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
+        + DecompressedWithParent<HAST, Ddst::IdD>
+        + PostOrder<HAST, Ddst::IdD, M::Dst>
+        + PostOrderIterable<HAST, Ddst::IdD, M::Dst>
+        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
+        + LazyPOBorrowSlice<HAST, Ddst::IdD, M::Dst>
+        + ShallowDecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
+        + LazyDecompressedTreeStore<HAST, M::Dst>
+        + LazyDecompressed<M::Dst>,
     HAST::Label: Eq,
     HAST::IdN: Debug,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
-    ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
-    where
-        M: Default,
-    {
+    ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
         mapper.mapping.mappings.topit(
             mapper.mapping.src_arena.len(),
             mapper.mapping.dst_arena.len(),
@@ -90,27 +97,18 @@ where
         mapper
     }
 
-    pub fn execute<'b>(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>)
-    where
-        M: Default,
-    {
+    pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert_eq!(
             // TODO move it inside the arena ...
             mapper.src_arena.root(),
             cast::<_, M::Src>(mapper.src_arena.len()).unwrap() - one()
         );
         assert!(mapper.src_arena.len() > 0);
-        // println!("mappings={}", mapper.mappings.len());
-        // // WARN it is in postorder and it depends on decomp store
-        // // -1 as root is handled after forloop
         for a in mapper.src_arena.iter_df_post::<false>() {
-            // if mapper.src_arena.parent(&a).is_none() {
-            //     break;
-            // }
             if mapper.mappings.is_src(&a) {
                 continue;
             }
-            let a = mapper.src_arena.decompress_to(&a);
+            let a = mapper.mapping.src_arena.decompress_to(&a);
             if Self::src_has_children(mapper, a) {
                 let candidates = mapper.get_dst_candidates_lazily(&a);
                 let mut best = None;
@@ -139,26 +137,23 @@ where
             mapper.mapping.src_arena.root(),
             mapper.mapping.dst_arena.root(),
         );
-        Self::last_chance_match_zs(
-            mapper,
-            mapper.src_arena.starter(),
-            mapper.dst_arena.starter(),
-        );
-        // println!("nodes:{}", c);
-        // println!("nodes:{}", c2);
+        let src = mapper.src_arena.starter();
+        let dst = mapper.dst_arena.starter();
+        Self::last_chance_match_zs(mapper, src, dst);
     }
 
-    fn src_has_children(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: Dsrc::IdD) -> bool {
+    fn src_has_children(mapper: &Mapper<HAST, Dsrc, Ddst, M>, src: Dsrc::IdD) -> bool {
         let o = mapper.src_arena.original(&src);
         let r = mapper.hyperast.node_store().resolve(&o).has_children();
-        use num_traits::ToPrimitive;
-        debug_assert_eq!(
-            r,
-            mapper.src_arena.lld(&src) < *src.shallow(),
-            "{:?} {:?}",
-            mapper.src_arena.lld(&src),
-            src.to_usize()
-        );
+
+        // TODO put it back
+        // debug_assert_eq!(
+        //     r,
+        //     internal.src_arena.lld(&src) < *src.shallow(),
+        //     "{:?} {:?}",
+        //     internal.src_arena.lld(&src),
+        //     src.to_usize()
+        // );
         r
     }
 
@@ -166,44 +161,91 @@ where
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
-    ) where
-        M: Default,
-    {
+    ) {
+        let stores = mapper.hyperast;
+        // allow using another internal mapping store
         // WIP https://blog.rust-lang.org/2022/10/28/gats-stabilization.html#implied-static-requirement-from-higher-ranked-trait-bounds
-        let src_s = mapper.src_arena.descendants_count(&src);
-        let dst_s = mapper.dst_arena.descendants_count(&dst);
+        let mapping = &mut mapper.mapping;
+        let src_arena = &mut mapping.src_arena;
+        let dst_arena = &mut mapping.dst_arena;
+        let src_s = src_arena.descendants_count(&src);
+        let dst_s = dst_arena.descendants_count(&dst);
         if !(src_s < cast(SIZE_THRESHOLD).unwrap() || dst_s < cast(SIZE_THRESHOLD).unwrap()) {
             return;
         }
-        let stores = mapper.hyperast;
         let src_offset;
         let dst_offset;
-        let mappings: MZs = {
-            let src_arena = mapper.mapping.src_arena.slice_po(&src);
+        let zs_mappings: MZs = if SLICE {
+            let src_arena = src_arena.slice_po(&src);
             src_offset = src - src_arena.root();
-            let dst_arena = mapper.mapping.dst_arena.slice_po(&dst);
+            let dst_arena = dst_arena.slice_po(&dst);
             dst_offset = dst - dst_arena.root();
-            ZsMatcher::match_with(stores, src_arena, dst_arena)
+            ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena)
+        } else {
+            let o_src = src_arena.original(&src);
+            let o_dst = dst_arena.original(&dst);
+            let src_arena = ZsTree::<HAST::IdN, Dsrc::IdD>::decompress(mapper.hyperast, &o_src);
+            let src_arena = Decompressible {
+                hyperast: stores,
+                decomp: src_arena,
+            };
+            src_offset = src - src_arena.root();
+            if cfg!(debug_assertions) {
+                let src_arena_z = mapping.src_arena.slice_po(&src);
+                for i in src_arena.iter_df_post::<true>() {
+                    assert_eq!(src_arena.tree(&i), src_arena_z.tree(&i));
+                    assert_eq!(src_arena.lld(&i), src_arena_z.lld(&i));
+                }
+                let mut last = src_arena_z.root();
+                for k in src_arena_z.iter_kr() {
+                    assert!(src_arena.kr[k.to_usize().unwrap()]);
+                    last = k;
+                }
+                assert!(src_arena.kr[src_arena.kr.len() - 1]);
+                dbg!(last == src_arena_z.root());
+            }
+            let dst_arena = ZsTree::<HAST::IdN, Ddst::IdD>::decompress(mapper.hyperast, &o_dst);
+            let dst_arena = Decompressible {
+                hyperast: stores,
+                decomp: dst_arena,
+            };
+            dst_offset = dst - dst_arena.root();
+            if cfg!(debug_assertions) {
+                let dst_arena_z = mapping.dst_arena.slice_po(&dst);
+                for i in dst_arena.iter_df_post::<true>() {
+                    assert_eq!(dst_arena.tree(&i), dst_arena_z.tree(&i));
+                    assert_eq!(dst_arena.lld(&i), dst_arena_z.lld(&i));
+                }
+                let mut last = dst_arena_z.root();
+                for k in dst_arena_z.iter_kr() {
+                    assert!(dst_arena.kr[k.to_usize().unwrap()]);
+                    last = k;
+                }
+                assert!(dst_arena.kr[dst_arena.kr.len() - 1]);
+                dbg!(last == dst_arena_z.root());
+            }
+            ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena)
         };
         use num_traits::ToPrimitive;
         assert_eq!(
-            mapper.src_arena.first_descendant(&src).to_usize(),
+            mapping.src_arena.first_descendant(&src).to_usize(),
             src_offset.to_usize()
         );
-        for (i, t) in mappings.iter() {
+        let mappings = &mut mapping.mappings;
+        for (i, t) in zs_mappings.iter() {
             //remapping
             let src: Dsrc::IdD = src_offset + cast(i).unwrap();
             let dst: Ddst::IdD = dst_offset + cast(t).unwrap();
             // use it
-            if !mapper.mappings.is_src(src.shallow()) && !mapper.mappings.is_dst(dst.shallow()) {
+            if !mappings.is_src(src.shallow()) && !mappings.is_dst(dst.shallow()) {
                 let tsrc = mapper
                     .hyperast
-                    .resolve_type(&mapper.src_arena.original(&src));
+                    .resolve_type(&mapping.src_arena.original(&src));
                 let tdst = mapper
                     .hyperast
-                    .resolve_type(&mapper.dst_arena.original(&dst));
+                    .resolve_type(&mapping.dst_arena.original(&dst));
                 if tsrc == tdst {
-                    mapper.mappings.link(*src.shallow(), *dst.shallow());
+                    mappings.link(*src.shallow(), *dst.shallow());
                 }
             }
         }

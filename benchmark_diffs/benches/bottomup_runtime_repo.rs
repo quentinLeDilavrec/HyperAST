@@ -207,7 +207,7 @@ fn bench_lazy_greedy<const MAX_SIZE: usize>(
                             mapper.mapping.dst_arena.as_mut(),
                         ),
                     );
-                    use gt::lazy2_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
+                    use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
                     let mapper_bottom_up =
                         LazyGreedyBottomUpMatcher::<_, _, _, M, M, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
@@ -475,7 +475,7 @@ fn prep_bench_gt_subtree<Mea: Measurement>(
             ));
             let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
             let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
-            use hyper_diff::matchers::heuristic::gt::lazy2_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+            use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
             let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
             let mappings = mapper.mapping.mappings.clone();
             ((mapper_owned.0.decomp, mapper_owned.1.decomp), mappings)

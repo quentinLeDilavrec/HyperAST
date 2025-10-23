@@ -419,15 +419,25 @@ mod test {
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
         // type DS<'a> = CompletePostOrder<HashedNodeRef<'a>, u32>;
-        let mapper = GreedySubtreeMatcher::<DS<_>, DS<_>, _, _>::matchh::<
+        let mapper = GreedySubtreeMatcher::<DS<_>, DS<_>, _, _>::match_it::<
             DefaultMultiMappingStore<_>,
-        >(stores, src, dst, mappings);
-        let SubtreeMatcher {
+        >(hyper_diff::matchers::Mapper {
+            hyperast: stores,
+            mapping: hyper_diff::matchers::Mapping {
+                mappings,
+                src_arena: <DS<_> as hyperast::types::DecompressedFrom<_>>::decompress(
+                    stores, &src,
+                ),
+                dst_arena: <DS<_> as hyperast::types::DecompressedFrom<_>>::decompress(
+                    stores, &dst,
+                ),
+            },
+        });
+        let hyper_diff::matchers::Mapping {
             src_arena,
             dst_arena,
             mappings,
-            ..
-        } = mapper.into();
+        } = mapper.mapping.into();
         print_mappings(&dst_arena, &src_arena, stores, &mappings);
     }
 
@@ -498,13 +508,24 @@ mod test {
         type DS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
         let mapper = GreedySubtreeMatcher::<DS<_>, DS<_>, _, _>::matchh::<
             DefaultMultiMappingStore<_>,
-        >(stores, src, dst, mappings);
-        let SubtreeMatcher {
+        >(hyper_diff::matchers::Mapper {
+            hyperast: stores,
+            mapping: hyper_diff::matchers::Mapping {
+                mappings,
+                src_arena: <DS<_> as hyperast::types::DecompressedFrom<_>>::decompress(
+                    stores, &src,
+                ),
+                dst_arena: <DS<_> as hyperast::types::DecompressedFrom<_>>::decompress(
+                    stores, &dst,
+                ),
+            },
+        });
+        let hyper_diff::matchers::Mapping {
             src_arena,
             dst_arena,
             mappings,
             ..
-        } = mapper.into();
+        } = mapper.mapping.into();
         print_mappings(&dst_arena, &src_arena, stores, &mappings);
 
         let gt_out_format = "JSON";

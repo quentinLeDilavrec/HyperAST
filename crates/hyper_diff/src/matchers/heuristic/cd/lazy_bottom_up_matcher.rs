@@ -7,7 +7,7 @@ use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::{HyperAST, NodeId, Tree, WithHashs, WithMetaData, WithStats};
+use hyperast::types::{HyperAST, LendT, NodeId, Tree, WithHashs, WithMetaData, WithStats};
 use num_traits::ToPrimitive as _;
 use std::fmt::Debug;
 
@@ -50,8 +50,7 @@ impl<
         SIM_THRESHOLD2_DEN,
     >
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: Tree + WithHashs + WithStats,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithStats,
+    for<'t> LendT<'t, HAST>: Tree + WithHashs + WithStats,
     HAST::IdN: Clone + Eq + Debug,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
@@ -77,9 +76,8 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithMetaData<compo::StmtCount>,
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
-            WithMetaData<compo::MemberImportCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
         let mut matcher = Self { internal: mapping };
         matcher.internal.mapping.mappings.topit(

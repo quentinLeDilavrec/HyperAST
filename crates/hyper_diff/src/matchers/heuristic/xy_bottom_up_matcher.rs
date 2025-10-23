@@ -6,7 +6,7 @@ use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
-use hyperast::types::{HyperAST, NodeId, NodeStore, Tree, WithHashs};
+use hyperast::types::{HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -18,7 +18,7 @@ pub struct XYBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    internal: Mapper<HAST, Dsrc, Ddst, M>,
+    mapper: Mapper<HAST, Dsrc, Ddst, M>,
 }
 
 impl<
@@ -38,7 +38,7 @@ impl<
     const SIM_THRESHOLD_DEN: u64,
 > XYBottomUpMatcher<Dsrc, Ddst, HAST, M, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,
     M::Dst: PrimInt,
     HAST::Label: Eq,
@@ -46,35 +46,27 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        let mut matcher = Self { internal: mapping };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher);
-        crate::matchers::Mapper {
-            hyperast: matcher.internal.hyperast,
-            mapping: crate::matchers::Mapping {
-                src_arena: matcher.internal.mapping.src_arena,
-                dst_arena: matcher.internal.mapping.dst_arena,
-                mappings: matcher.internal.mapping.mappings,
-            },
-        }
+        Self::execute(&mut mapper);
+        mapper
     }
 
-    pub fn execute(&mut self) {
-        for a in self.internal.src_arena.iter_df_post::<false>() {
-            if !(self.internal.mappings.is_src(&a) || !self.src_has_children(a)) {
-                let candidates = self.internal.get_dst_candidates(&a);
+    pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
+        for a in mapper.src_arena.iter_df_post::<false>() {
+            if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {
+                let candidates = mapper.get_dst_candidates(&a);
                 let mut best = None;
                 let mut max: f64 = -1.;
                 for cand in candidates {
                     let sim = similarity_metrics::SimilarityMeasure::range(
-                        &self.internal.src_arena.descendants_range(&a),
-                        &self.internal.dst_arena.descendants_range(&cand),
-                        &self.internal.mappings,
+                        &mapper.src_arena.descendants_range(&a),
+                        &mapper.dst_arena.descendants_range(&cand),
+                        &mapper.mappings,
                     )
                     .jaccard();
                     if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
@@ -84,52 +76,48 @@ where
                 }
 
                 if let Some(best) = best {
-                    self.last_chance_match(a, best);
-                    self.internal.mappings.link(a, best);
+                    Self::last_chance_match(mapper, a, best);
+                    mapper.mappings.link(a, best);
                 }
             }
         }
         // for root
-        self.internal.mapping.mappings.link(
-            self.internal.mapping.src_arena.root(),
-            self.internal.mapping.dst_arena.root(),
+        mapper.mapping.mappings.link(
+            mapper.mapping.src_arena.root(),
+            mapper.mapping.dst_arena.root(),
         );
-        self.last_chance_match(
-            self.internal.src_arena.root(),
-            self.internal.dst_arena.root(),
-        );
+        Self::last_chance_match(mapper, mapper.src_arena.root(), mapper.dst_arena.root());
     }
 
-    fn src_has_children(&mut self, src: M::Src) -> bool {
+    fn src_has_children(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src) -> bool {
         use num_traits::ToPrimitive;
-        let r = self
-            .internal
+        let r = mapper
             .hyperast
             .node_store()
-            .resolve(&self.internal.src_arena.original(&src))
+            .resolve(&mapper.src_arena.original(&src))
             .has_children();
         debug_assert_eq!(
             r,
-            self.internal.src_arena.lld(&src) < src,
+            mapper.src_arena.lld(&src) < src,
             "{:?} {:?}",
-            self.internal.src_arena.lld(&src),
+            mapper.src_arena.lld(&src),
             src.to_usize()
         );
         r
     }
-    fn last_chance_match(&mut self, src: M::Src, dst: M::Dst) {
+    fn last_chance_match(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src, dst: M::Dst) {
         let mut src_types: HashMap<_, Vec<M::Src>> = HashMap::new();
         let mut dst_types: HashMap<_, Vec<M::Dst>> = HashMap::new();
 
-        for src_child in self.internal.src_arena.children(&src) {
-            let original = self.internal.src_arena.original(&src_child);
-            let src_type = self.internal.hyperast.resolve_type(&original);
+        for src_child in mapper.src_arena.children(&src) {
+            let original = mapper.src_arena.original(&src_child);
+            let src_type = mapper.hyperast.resolve_type(&original);
             src_types.entry(src_type).or_default().push(src_child);
         }
 
-        for dst_child in self.internal.dst_arena.children(&dst) {
-            let original = self.internal.dst_arena.original(&dst_child);
-            let dst_type = self.internal.hyperast.resolve_type(&original);
+        for dst_child in mapper.dst_arena.children(&dst) {
+            let original = mapper.dst_arena.original(&dst_child);
+            let dst_type = mapper.hyperast.resolve_type(&original);
             dst_types.entry(dst_type).or_default().push(dst_child);
         }
 
@@ -138,10 +126,10 @@ where
             if src_list.len() == 1 {
                 if let Some(dst_list) = dst_types.get(src_type) {
                     if dst_list.len() == 1
-                        && !self.internal.mappings.is_src(&src_list[0])
-                        && !self.internal.mappings.is_dst(&dst_list[0])
+                        && !mapper.mappings.is_src(&src_list[0])
+                        && !mapper.mappings.is_dst(&dst_list[0])
                     {
-                        self.internal.mappings.link(src_list[0], dst_list[0]);
+                        mapper.mappings.link(src_list[0], dst_list[0]);
                     }
                 }
             }

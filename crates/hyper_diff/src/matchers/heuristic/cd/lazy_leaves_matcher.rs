@@ -7,7 +7,7 @@ use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::{HashKind, HyperAST, NodeId, NodeStore, WithHashs, WithMetaData};
+use hyperast::types::{HashKind, HyperAST, LendT, NodeId, NodeStore, WithHashs, WithMetaData};
 use num_traits::one;
 use std::fmt::Debug;
 
@@ -43,13 +43,13 @@ where
     HAST::Label: Eq,
     HAST::IdN: Debug,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub fn match_it(
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+        for<'t> LendT<'t, HAST>:
             WithMetaData<compo::StmtCount> + WithMetaData<compo::MemberImportCount>,
     {
         let mut matcher = Self {
@@ -70,7 +70,7 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithMetaData<compo::StmtCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
     {
         let mut matcher = Self {
             internal: mapping,
@@ -116,8 +116,7 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
-            WithMetaData<compo::MemberImportCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
         let mut matcher = Self {
             internal: mapping,

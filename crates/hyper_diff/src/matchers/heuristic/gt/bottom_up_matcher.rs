@@ -2,7 +2,7 @@ use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithPare
 use crate::matchers::{Mapper, mapping_store::MonoMappingStore};
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 use hyperast::PrimInt;
-use hyperast::types::{self, HyperAST, NodeId, NodeStore, TypeStore, WithHashs};
+use hyperast::types::{self, HyperAST, LendT, NodeId, NodeStore, TypeStore, WithHashs};
 use num_traits::ToPrimitive;
 use std::{collections::HashMap, hash::Hash};
 use types::Tree;
@@ -93,7 +93,7 @@ where
     <HAST::TS as TypeStore>::Ty: Copy + Send + Sync + Eq + Hash,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    for<'t> <HAST as types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
     HAST::Label: Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {

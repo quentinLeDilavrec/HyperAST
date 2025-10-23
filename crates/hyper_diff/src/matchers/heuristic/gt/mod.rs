@@ -1,4 +1,4 @@
-use hyperast::types::{Childrn, NodeId, NodeStore, WithChildren};
+use hyperast::types::{Childrn, LendT, NodeId, NodeStore, WithChildren};
 
 pub mod bottom_up_matcher;
 pub mod greedy_bottom_up_matcher;
@@ -62,7 +62,7 @@ pub(crate) fn isomorphic<HAST, const HASH: bool, const STRUCTURAL: bool>(
 ) -> bool
 where
     HAST: hyperast::types::HyperAST + Copy,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithHashs,
+    for<'t> LendT<'t, HAST>: hyperast::types::WithHashs,
     HAST::IdN: Clone + Eq,
     HAST::Label: Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,

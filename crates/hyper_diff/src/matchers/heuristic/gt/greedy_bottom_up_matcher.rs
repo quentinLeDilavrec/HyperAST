@@ -7,7 +7,7 @@ use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Decompressible, Mapper, Mapping};
 use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
 use hyperast::PrimInt;
-use hyperast::types::{DecompressedFrom, HyperAST, NodeId, NodeStore, Tree, WithHashs};
+use hyperast::types::{DecompressedFrom, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
 use num_traits::{cast, one};
 use std::fmt::Debug;
 
@@ -54,7 +54,7 @@ impl<
     const SIM_THRESHOLD_DEN: u64,
 > GreedyBottomUpMatcher<Dsrc, Ddst, HAST, M, SIZE_THRESHOLD, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,
     M::Dst: PrimInt,
     HAST::Label: Eq,

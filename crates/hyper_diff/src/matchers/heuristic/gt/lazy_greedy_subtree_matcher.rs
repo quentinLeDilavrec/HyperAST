@@ -7,8 +7,8 @@ use crate::utils::sequence_algorithms::longest_common_subsequence;
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
 use hyperast::types::{
-    Childrn, DecompressedFrom, HashKind, HyperAST, Labeled, NodeId, NodeStore, Tree, WithChildren,
-    WithHashs, WithStats,
+    Childrn, DecompressedFrom, HashKind, HyperAST, Labeled, LendT, NodeId, NodeStore, Tree,
+    WithChildren, WithHashs, WithStats,
 };
 use logging_timer::time;
 use num_traits::ToPrimitive;
@@ -30,7 +30,7 @@ impl<
     const MIN_HEIGHT: usize, // = 2
 > LazyGreedySubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs + WithStats + Labeled,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats + Labeled,
     Dsrc::IdD: PrimInt + Hash,
     Ddst::IdD: PrimInt + Hash,
     M::Src: PrimInt + Hash,
@@ -121,7 +121,7 @@ impl<
     const MIN_HEIGHT: usize, // = 2
 > LazyGreedySubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs + WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     Dsrc::IdD: PrimInt + Hash,
     Ddst::IdD: PrimInt + Hash,
     M::Src: PrimInt + Hash,
@@ -379,7 +379,7 @@ impl<
     const MIN_HEIGHT: usize,
 > SubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs + WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     Dsrc::IdD: Clone,
     Ddst::IdD: Clone,
     M::Src: Debug + Copy,
@@ -565,7 +565,7 @@ where
     D::IdD: Clone,
     D: LazyDecompressedTreeStore<HAST, IdD>,
     HAST: HyperAST + Copy,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithStats,
+    for<'t> LendT<'t, HAST>: WithStats,
 {
     pub(super) fn new(store: HAST, tree: D::IdD, arena: &'b mut D) -> Self {
         let id = arena.original(&tree);

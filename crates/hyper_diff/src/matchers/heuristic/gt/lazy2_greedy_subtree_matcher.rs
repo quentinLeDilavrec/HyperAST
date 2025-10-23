@@ -8,13 +8,13 @@ use crate::matchers::{mapping_store::MultiMappingStore, similarity_metrics};
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
-use hyperast::types::{HyperAST, Labeled, NodeId, NodeStore, WithHashs, WithStats};
+use hyperast::types::{HyperAST, Labeled, LendT, NodeId, NodeStore, WithHashs, WithStats};
 use num_traits::ToPrimitive;
 use std::fmt::Debug;
 use std::hash::Hash;
 
 pub struct LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, const MIN_HEIGHT: usize = 1> {
-    internal: Mapper<HAST, Dsrc, Ddst, M>,
+    mapper: Mapper<HAST, Dsrc, Ddst, M>,
 }
 
 impl<
@@ -25,7 +25,7 @@ impl<
     const MIN_HEIGHT: usize, // = 2
 > LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, MIN_HEIGHT>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs + WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     HAST::IdN: Clone + Eq,
     HAST::Label: Clone + Eq,
     Dsrc::IdD: PrimInt + Hash,
@@ -41,18 +41,17 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it<MM>(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     {
-        let mut matcher = Self { internal: mapping };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute::<MM>(&mut matcher);
-        matcher.internal
+        Self::execute::<MM>(&mut mapper);
+        mapper
     }
 
     // [2022-12-19T17:00:02.948Z WARN] considering_stats(), Elapsed=383.306235ms
@@ -63,22 +62,24 @@ where
     // with WithStats to get height through metadata
     // [2022-12-19T17:11:48.121Z WARN] matchh_to_be_filtered(), Elapsed=16.639973ms
 
-    pub fn execute<MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default>(&mut self) {
-        let mm: MM = Self::compute_multi_mapping(&mut self.internal);
-        Self::filter_mappings(&mut self.internal, &mm);
+    pub fn execute<MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default>(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+    ) {
+        let mm: MM = Self::compute_multi_mapping(mapper);
+        Self::filter_mappings(mapper, &mm);
     }
 
     pub fn compute_multi_mapping<
         MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     >(
-        internal: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
     ) -> MM {
         let mut mm: MM = Default::default();
-        mm.topit(internal.src_arena.len(), internal.dst_arena.len());
+        mm.topit(mapper.src_arena.len(), mapper.dst_arena.len());
         Mapper::<HAST, Dsrc, Ddst, M>::compute_multimapping::<_, MIN_HEIGHT>(
-            internal.hyperast,
-            &mut internal.mapping.src_arena,
-            &mut internal.mapping.dst_arena,
+            mapper.hyperast,
+            &mut mapper.mapping.src_arena,
+            &mut mapper.mapping.dst_arena,
             &mut mm,
         );
         mm
@@ -93,7 +94,7 @@ impl<
     const MIN_HEIGHT: usize, // = 2
 > LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, MIN_HEIGHT>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs + WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::IdN: Clone,
     HAST::Label: Clone + Eq,
@@ -336,7 +337,7 @@ impl<
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs + WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     HAST::IdN: Clone + Eq,
     HAST::Label: Eq,
     Dsrc::IdD: Clone,

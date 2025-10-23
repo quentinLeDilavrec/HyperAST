@@ -6,7 +6,7 @@ use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Mapper, Mapping};
 use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
 use hyperast::PrimInt;
-use hyperast::types::{DecompressedFrom, HyperAST, NodeId, NodeStore, Tree, WithHashs};
+use hyperast::types::{DecompressedFrom, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
 use num_traits::cast;
 use std::fmt::Debug;
 
@@ -20,7 +20,7 @@ pub struct MarriageBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    pub(crate) internal: Mapper<HAST, Dsrc, Ddst, M>,
+    pub(crate) mapper: Mapper<HAST, Dsrc, Ddst, M>,
     _phantom: std::marker::PhantomData<*const MZs>,
 }
 
@@ -58,67 +58,28 @@ impl<
         SIM_THRESHOLD_DEN,
     >
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,
     M::Dst: PrimInt,
     HAST::Label: Eq,
     HAST::IdN: Debug,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    pub fn new(stores: HAST, src_arena: Dsrc, dst_arena: Ddst, mappings: M) -> Self {
-        Self {
-            internal: Mapper {
-                hyperast: stores,
-                mapping: Mapping {
-                    src_arena,
-                    dst_arena,
-                    mappings,
-                },
-            },
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        let mut matcher = mapping;
-        matcher.mapping.mappings.topit(
-            matcher.mapping.src_arena.len(),
-            matcher.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        let mut matcher = Self {
-            internal: matcher,
-            _phantom: std::marker::PhantomData,
-        };
-        Self::execute(&mut matcher.internal);
-        matcher.internal
-    }
-
-    pub fn matchh(store: HAST, src: &'a HAST::IdN, dst: &'a HAST::IdN, mappings: M) -> Self {
-        let mut matcher = Self::new(
-            store,
-            Dsrc::decompress(store, src),
-            Ddst::decompress(store, dst),
-            mappings,
-        );
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
-        );
-        Self::execute(&mut matcher.internal);
-        matcher
+        Self::execute(&mut mapper);
+        mapper
     }
 
     pub fn execute<'b>(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert!(mapper.src_arena.len() > 0);
-        // // WARN it is in postorder and it depends on decomp store
-        // // -1 as root is handled after forloop
-        for a in mapper.src_arena.iter_df_post::<true>() {
-            if mapper.src_arena.parent(&a).is_none() {
-                // TODO remove and flip const param of iter_df_post
-                break;
-            } else if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {
+        for a in mapper.src_arena.iter_df_post::<false>() {
+            if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {
                 if let Some(best_dst) = Self::best_dst_candidate(mapper, &a) {
                     if Self::best_src_candidate(mapper, &best_dst) == Some(a) {
                         Self::last_chance_match_zs(mapper, a, best_dst);

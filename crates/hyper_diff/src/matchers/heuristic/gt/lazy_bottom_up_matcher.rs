@@ -6,7 +6,7 @@ use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
-use hyperast::types::{HyperAST, NodeId, NodeStore as _, WithHashs};
+use hyperast::types::{HyperAST, LendT, NodeId, NodeStore as _, WithHashs};
 use num_traits::ToPrimitive;
 
 impl<
@@ -16,7 +16,7 @@ impl<
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
@@ -247,7 +247,7 @@ where
         + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST::Label: Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub fn last_chance_match_histogram_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
         self.lcs_equal_matching_lazy(src, dst);

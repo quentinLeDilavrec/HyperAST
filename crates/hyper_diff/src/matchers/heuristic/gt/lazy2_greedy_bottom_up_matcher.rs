@@ -10,7 +10,9 @@ use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Decompressible, Mapper};
 use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
 use hyperast::PrimInt;
-use hyperast::types::{DecompressedFrom, HyperAST, NodeId, NodeStore, Tree, WithHashs, WithStats};
+use hyperast::types::{
+    DecompressedFrom, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs, WithStats,
+};
 use num_traits::{cast, one};
 use std::{fmt::Debug, marker::PhantomData};
 
@@ -59,14 +61,13 @@ impl<
         SIM_THRESHOLD_DEN,
     >
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: Tree + WithHashs + WithStats,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithStats,
+    for<'t> LendT<'t, HAST>: Tree + WithHashs + WithStats,
     HAST::IdN: Clone + Eq + Debug,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = <Ddst as LazyDecompressed<M::Dst>>::IdD> + Default,
+    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
@@ -105,32 +106,32 @@ where
         matcher.internal
     }
 
-    pub fn execute(internal: &mut Mapper<HAST, Dsrc, Ddst, M>) {
+    pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert_eq!(
             // TODO move it inside the arena ...
-            internal.src_arena.root(),
-            cast::<_, M::Src>(internal.src_arena.len()).unwrap() - one()
+            mapper.src_arena.root(),
+            cast::<_, M::Src>(mapper.src_arena.len()).unwrap() - one()
         );
-        assert!(internal.src_arena.len() > 0);
+        assert!(mapper.src_arena.len() > 0);
         // // WARN it is in postorder and it depends on decomp store
         // // -1 as root is handled after forloop
-        for a in internal.src_arena.iter_df_post::<false>() {
+        for a in mapper.src_arena.iter_df_post::<false>() {
             // if internal.src_arena.parent(&a).is_none() {
             //     break;
             // }
-            if internal.mappings.is_src(&a) {
+            if mapper.mappings.is_src(&a) {
                 continue;
             }
-            let a = internal.mapping.src_arena.decompress_to(&a);
-            if Self::src_has_children(internal, a) {
-                let candidates = internal.get_dst_candidates_lazily(&a);
+            let a = mapper.mapping.src_arena.decompress_to(&a);
+            if Self::src_has_children(mapper, a) {
+                let candidates = mapper.get_dst_candidates_lazily(&a);
                 let mut best = None;
                 let mut max: f64 = -1.;
                 for cand in candidates {
                     let sim = similarity_metrics::SimilarityMeasure::range(
-                        &internal.src_arena.descendants_range(&a),
-                        &internal.dst_arena.descendants_range(&cand),
-                        &internal.mappings,
+                        &mapper.src_arena.descendants_range(&a),
+                        &mapper.dst_arena.descendants_range(&cand),
+                        &mapper.mappings,
                     )
                     .dice();
                     if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
@@ -140,19 +141,19 @@ where
                 }
 
                 if let Some(best) = best {
-                    Self::last_chance_match_zs(internal, a, best);
-                    internal.mappings.link(*a.shallow(), *best.shallow());
+                    Self::last_chance_match_zs(mapper, a, best);
+                    mapper.mappings.link(*a.shallow(), *best.shallow());
                 }
             }
         }
         // for root
-        internal.mapping.mappings.link(
-            internal.mapping.src_arena.root(),
-            internal.mapping.dst_arena.root(),
+        mapper.mapping.mappings.link(
+            mapper.mapping.src_arena.root(),
+            mapper.mapping.dst_arena.root(),
         );
-        let src = internal.src_arena.starter();
-        let dst = internal.dst_arena.starter();
-        Self::last_chance_match_zs(internal, src, dst);
+        let src = mapper.src_arena.starter();
+        let dst = mapper.dst_arena.starter();
+        Self::last_chance_match_zs(mapper, src, dst);
     }
 
     fn src_has_children(internal: &Mapper<HAST, Dsrc, Ddst, M>, src: Dsrc::IdD) -> bool {

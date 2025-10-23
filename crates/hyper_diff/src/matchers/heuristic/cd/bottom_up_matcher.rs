@@ -7,7 +7,7 @@ use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::{DecompressedFrom, HyperAST, NodeId, WithHashs, WithMetaData};
+use hyperast::types::{DecompressedFrom, HyperAST, LendT, NodeId, WithHashs, WithMetaData};
 use num_traits::ToPrimitive;
 use std::fmt::Debug;
 
@@ -59,7 +59,7 @@ impl<
         SIM_THRESHOLD2_DEN,
     >
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithHashs,
+    for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,
     M::Dst: PrimInt,
     HAST::Label: Eq,
@@ -70,9 +70,8 @@ where
         mut matcher: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithMetaData<compo::StmtCount>,
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
-            WithMetaData<compo::MemberImportCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
         matcher.mapping.mappings.topit(
             matcher.mapping.src_arena.len(),

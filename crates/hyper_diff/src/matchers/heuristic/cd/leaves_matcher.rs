@@ -6,7 +6,7 @@ use crate::decompressed_tree_store::{
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Mapper, Mapping};
 use hyperast::store::nodes::compo;
-use hyperast::types::{HyperAST, NodeId, NodeStore as _, WithMetaData};
+use hyperast::types::{HyperAST, LendT, NodeId, NodeStore as _, WithMetaData};
 use hyperast::{PrimInt, types};
 use std::fmt::Debug;
 
@@ -45,9 +45,9 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as types::AstLending<'t>>::RT: WithMetaData<compo::StmtCount>,
-        for<'t> <HAST as types::AstLending<'t>>::RT: WithMetaData<compo::MemberImportCount>,
-        for<'t> <HAST as types::AstLending<'t>>::RT: hyperast::types::WithHashs,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
+        for<'t> LendT<'t, HAST>: hyperast::types::WithHashs,
         M::Src: Shallow<M::Src>,
         M::Dst: Shallow<M::Dst>,
     {
@@ -70,7 +70,7 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as types::AstLending<'t>>::RT: types::WithHashs,
+        for<'t> LendT<'t, HAST>: types::WithHashs,
     {
         let mut matcher = Self {
             internal: mapping,
@@ -88,8 +88,8 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> <HAST as types::AstLending<'t>>::RT: WithMetaData<compo::StmtCount>,
-        for<'t> <HAST as types::AstLending<'t>>::RT: types::WithHashs,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
+        for<'t> LendT<'t, HAST>: types::WithHashs,
     {
         let mut matcher = Self {
             internal: mapping,
@@ -108,7 +108,7 @@ where
     where
         M::Src: Shallow<M::Src>,
         M::Dst: Shallow<M::Dst>,
-        for<'t> <HAST as types::AstLending<'t>>::RT: types::WithHashs,
+        for<'t> LendT<'t, HAST>: types::WithHashs,
     {
         let mut matcher = Self {
             internal: mapping,
@@ -127,7 +127,7 @@ where
         is_leaf_src: fn(HAST, &Dsrc, M::Src) -> bool,
         is_leaf_dst: fn(HAST, &Ddst, M::Dst) -> bool,
     ) where
-        for<'t> <HAST as types::AstLending<'t>>::RT: types::WithHashs,
+        for<'t> LendT<'t, HAST>: types::WithHashs,
     {
         let hyperast = internal.hyperast;
         let mut leaves_mappings = vec![];

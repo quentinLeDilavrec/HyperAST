@@ -15,7 +15,7 @@ use num_traits::ToPrimitive;
 use std::fmt::Debug;
 use std::hash::Hash;
 pub struct LazyGreedySubtreeMatcher<Dsrc, Ddst, HAST, M, const MIN_HEIGHT: usize = 1> {
-    internal: SubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>,
+    mapper: SubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>,
 }
 
 impl<
@@ -45,24 +45,24 @@ where
         MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     {
         let mut matcher = Self {
-            internal: SubtreeMatcher {
+            mapper: SubtreeMatcher {
                 stores: mapping.hyperast,
                 src_arena: mapping.mapping.src_arena,
                 dst_arena: mapping.mapping.dst_arena,
                 mappings: mapping.mapping.mappings,
             },
         };
-        matcher.internal.mappings.topit(
-            matcher.internal.src_arena.len(),
-            matcher.internal.dst_arena.len(),
+        matcher.mapper.mappings.topit(
+            matcher.mapper.src_arena.len(),
+            matcher.mapper.dst_arena.len(),
         );
         Self::execute::<MM>(&mut matcher);
         crate::matchers::Mapper {
             hyperast: mapping.hyperast,
             mapping: crate::matchers::Mapping {
-                src_arena: matcher.internal.src_arena,
-                dst_arena: matcher.internal.dst_arena,
-                mappings: matcher.internal.mappings,
+                src_arena: matcher.mapper.src_arena,
+                dst_arena: matcher.mapper.dst_arena,
+                mappings: matcher.mapper.mappings,
             },
         }
     }
@@ -103,8 +103,8 @@ where
         &mut self,
     ) -> MM {
         let mut mm: MM = Default::default();
-        mm.topit(self.internal.src_arena.len(), self.internal.dst_arena.len());
-        self.internal.matchh_to_be_filtered(&mut mm);
+        mm.topit(self.mapper.src_arena.len(), self.mapper.dst_arena.len());
+        self.mapper.matchh_to_be_filtered(&mut mm);
         mm
     }
 }
@@ -136,16 +136,16 @@ where
         mappings: M,
     ) -> LazyGreedySubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT> {
         let mut matcher = LazyGreedySubtreeMatcher {
-            internal: SubtreeMatcher {
+            mapper: SubtreeMatcher {
                 stores,
                 src_arena,
                 dst_arena,
                 mappings,
             },
         };
-        matcher.internal.mappings.topit(
-            matcher.internal.src_arena.len() + 1,
-            matcher.internal.dst_arena.len() + 1,
+        matcher.mapper.mappings.topit(
+            matcher.mapper.src_arena.len() + 1,
+            matcher.mapper.dst_arena.len() + 1,
         );
         matcher
     }
@@ -157,15 +157,15 @@ where
     ) {
         // Select unique mappings first and extract ambiguous mappings.
         let mut ambiguous_list: Vec<(Dsrc::IdD, Ddst::IdD)> = vec![];
-        let mut ignored = bitvec::bitbox![0;self.internal.src_arena.len()];
-        let mut src_ignored = bitvec::bitbox![0;self.internal.src_arena.len()];
-        let mut dst_ignored = bitvec::bitbox![0;self.internal.dst_arena.len()];
+        let mut ignored = bitvec::bitbox![0;self.mapper.src_arena.len()];
+        let mut src_ignored = bitvec::bitbox![0;self.mapper.src_arena.len()];
+        let mut dst_ignored = bitvec::bitbox![0;self.mapper.dst_arena.len()];
         for src in multi_mappings.all_mapped_srcs() {
             let mut is_mapping_unique = false;
             if multi_mappings.is_src_unique(&src) {
                 let dst = multi_mappings.get_dsts(&src)[0];
                 if multi_mappings.is_dst_unique(&dst) {
-                    self.internal.add_mapping_recursively(&src, &dst); // TODO subtree opti, do not do explicitly
+                    self.mapper.add_mapping_recursively(&src, &dst); // TODO subtree opti, do not do explicitly
                     is_mapping_unique = true;
                 }
             }
@@ -194,15 +194,15 @@ where
             let src_i = src.shallow().to_usize().unwrap();
             let dst_i = dst.shallow().to_usize().unwrap();
             if !(src_ignored[src_i] || dst_ignored[dst_i]) {
-                self.internal.add_mapping_recursively(&src, &dst);
+                self.mapper.add_mapping_recursively(&src, &dst);
                 src_ignored.set(src_i, true);
-                self.internal
+                self.mapper
                     .src_arena
                     .descendants(&src)
                     .iter()
                     .for_each(|src| src_ignored.set(src.to_usize().unwrap(), true));
                 dst_ignored.set(dst_i, true);
-                self.internal
+                self.mapper
                     .dst_arena
                     .descendants(&dst)
                     .iter()
@@ -259,34 +259,34 @@ where
     fn coef_sib(&self, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
         let (p_src, p_dst) = self.parents(l);
         similarity_metrics::SimilarityMeasure::range(
-            &self.internal.src_arena.descendants_range(&p_src), //descendants
-            &self.internal.dst_arena.descendants_range(&p_dst),
-            &self.internal.mappings,
+            &self.mapper.src_arena.descendants_range(&p_src), //descendants
+            &self.mapper.dst_arena.descendants_range(&p_dst),
+            &self.mapper.mappings,
         )
         .dice()
     }
 
     fn parents(&self, l: &(Dsrc::IdD, Ddst::IdD)) -> (Dsrc::IdD, Ddst::IdD) {
-        let p_src = self.internal.src_arena.parent(&l.0).unwrap();
-        let p_dst = self.internal.dst_arena.parent(&l.1).unwrap();
+        let p_src = self.mapper.src_arena.parent(&l.0).unwrap();
+        let p_dst = self.mapper.dst_arena.parent(&l.1).unwrap();
         (p_src, p_dst)
     }
 
     fn coef_parent(&self, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
-        let s1: Vec<_> = Dsrc::parents(&self.internal.src_arena, l.0).collect();
-        let s2: Vec<_> = Ddst::parents(&self.internal.dst_arena, l.1).collect();
+        let s1: Vec<_> = Dsrc::parents(&self.mapper.src_arena, l.0).collect();
+        let s2: Vec<_> = Ddst::parents(&self.mapper.dst_arena, l.1).collect();
         let common = longest_common_subsequence::<_, _, usize, _>(&s1, &s2, |a, b| {
             let (t, l) = {
-                let o = self.internal.src_arena.original(a);
-                let n = self.internal.stores.node_store().resolve(&o);
+                let o = self.mapper.src_arena.original(a);
+                let n = self.mapper.stores.node_store().resolve(&o);
                 (
-                    self.internal.stores.resolve_type(&o),
+                    self.mapper.stores.resolve_type(&o),
                     n.try_get_label().cloned(),
                 )
             };
-            let o = self.internal.dst_arena.original(b);
-            let n = self.internal.stores.node_store().resolve(&o);
-            t == self.internal.stores.resolve_type(&o) && l.as_ref() == n.try_get_label()
+            let o = self.mapper.dst_arena.original(b);
+            let n = self.mapper.stores.node_store().resolve(&o);
+            t == self.mapper.stores.resolve_type(&o) && l.as_ref() == n.try_get_label()
         });
         (2 * common.len()).to_f64().unwrap() / (s1.len() + s2.len()).to_f64().unwrap()
     }
@@ -294,30 +294,30 @@ where
     fn coef_pos_in_parent(&self, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
         let srcs = vec![l.0]
             .into_iter()
-            .chain(self.internal.src_arena.parents(l.0))
+            .chain(self.mapper.src_arena.parents(l.0))
             .filter_map(|x| {
-                self.internal.src_arena.parent(&x).map(|p| {
-                    self.internal
+                self.mapper.src_arena.parent(&x).map(|p| {
+                    self.mapper
                         .src_arena
                         .position_in_parent::<usize>(&x)
                         .unwrap()
                         .to_f64()
                         .unwrap()
-                        / self.internal.src_arena.children(&p).len().to_f64().unwrap()
+                        / self.mapper.src_arena.children(&p).len().to_f64().unwrap()
                 })
             });
         let dsts = vec![l.1]
             .into_iter()
-            .chain(self.internal.dst_arena.parents(l.1))
+            .chain(self.mapper.dst_arena.parents(l.1))
             .filter_map(|x| {
-                self.internal.dst_arena.parent(&x).map(|p| {
-                    self.internal
+                self.mapper.dst_arena.parent(&x).map(|p| {
+                    self.mapper
                         .dst_arena
                         .position_in_parent::<usize>(&x)
                         .unwrap()
                         .to_f64()
                         .unwrap()
-                        / self.internal.dst_arena.children(&p).len().to_f64().unwrap()
+                        / self.mapper.dst_arena.children(&p).len().to_f64().unwrap()
                 })
             });
         srcs.zip(dsts)
@@ -337,8 +337,8 @@ where
         l: &(Dsrc::IdD, Ddst::IdD),
     ) -> (Option<Dsrc::IdD>, Option<Ddst::IdD>) {
         (
-            self.internal.src_arena.parent(&l.0),
-            self.internal.dst_arena.parent(&l.1),
+            self.mapper.src_arena.parent(&l.0),
+            self.mapper.dst_arena.parent(&l.1),
         )
     }
 

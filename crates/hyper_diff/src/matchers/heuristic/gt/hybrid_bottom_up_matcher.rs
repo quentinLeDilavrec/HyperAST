@@ -83,8 +83,6 @@ where
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         for t in mapper.mapping.src_arena.iter_df_post::<true>() {
-            // let path = internal.src_arena.path::<usize>(&internal.src_arena.root(), &t);
-            // dbg!(path);
             if mapper.mapping.src_arena.parent(&t).is_none() {
                 mapper.mapping.mappings.link(
                     mapper.mapping.src_arena.root(),

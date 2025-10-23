@@ -24,7 +24,7 @@ pub struct GreedyBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    pub(crate) internal: Mapper<HAST, Dsrc, Ddst, M>,
+    pub(crate) mapper: Mapper<HAST, Dsrc, Ddst, M>,
 }
 
 /// Enable using a slice instead of recreating a ZsTree for each call to ZsMatch, see last_chance_match
@@ -61,45 +61,15 @@ where
     HAST::IdN: Debug,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    pub fn new(stores: HAST, src_arena: Dsrc, dst_arena: Ddst, mappings: M) -> Self {
-        Self {
-            internal: Mapper {
-                hyperast: stores,
-                mapping: Mapping {
-                    src_arena,
-                    dst_arena,
-                    mappings,
-                },
-            },
-        }
-    }
-
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        let mut matcher = mapping;
-        matcher.mapping.mappings.topit(
-            matcher.mapping.src_arena.len(),
-            matcher.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        let mut matcher = Self { internal: matcher };
-        Self::execute(&mut matcher.internal);
-        matcher.internal
-    }
-
-    pub fn matchh(store: HAST, src: &'a HAST::IdN, dst: &'a HAST::IdN, mappings: M) -> Self {
-        let mut matcher = Self::new(
-            store,
-            Dsrc::decompress(store, src),
-            Ddst::decompress(store, dst),
-            mappings,
-        );
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
-        );
-        Self::execute(&mut matcher.internal);
-        matcher
+        Self::execute(&mut mapper);
+        mapper
     }
 
     pub fn execute<'b>(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {

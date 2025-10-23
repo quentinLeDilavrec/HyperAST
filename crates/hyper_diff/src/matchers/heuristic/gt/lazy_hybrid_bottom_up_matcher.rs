@@ -81,10 +81,6 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(mut mapper: Mapper<HAST, Dsrc, Ddst, M>) -> Mapper<HAST, Dsrc, Ddst, M> {
-        // let mut matcher = Self {
-        //     internal: mapper,
-        //     _phantom: Default::default(),
-        // };
         (mapper.mapping.mappings).topit(mapper.src_arena.len(), mapper.dst_arena.len());
         Self::execute(&mut mapper);
         mapper

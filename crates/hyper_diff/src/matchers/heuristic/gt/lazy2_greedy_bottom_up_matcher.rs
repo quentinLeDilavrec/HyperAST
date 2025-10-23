@@ -32,7 +32,7 @@ pub struct LazyGreedyBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    internal: Mapper<HAST, Dsrc, Ddst, M>,
+    mapper: Mapper<HAST, Dsrc, Ddst, M>,
     _phantom: PhantomData<*const MZs>,
 }
 
@@ -92,18 +92,14 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        let mut matcher = Self {
-            internal: mapping,
-            _phantom: PhantomData,
-        };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal);
-        matcher.internal
+        Self::execute(&mut mapper);
+        mapper
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
@@ -113,12 +109,7 @@ where
             cast::<_, M::Src>(mapper.src_arena.len()).unwrap() - one()
         );
         assert!(mapper.src_arena.len() > 0);
-        // // WARN it is in postorder and it depends on decomp store
-        // // -1 as root is handled after forloop
         for a in mapper.src_arena.iter_df_post::<false>() {
-            // if internal.src_arena.parent(&a).is_none() {
-            //     break;
-            // }
             if mapper.mappings.is_src(&a) {
                 continue;
             }
@@ -156,9 +147,9 @@ where
         Self::last_chance_match_zs(mapper, src, dst);
     }
 
-    fn src_has_children(internal: &Mapper<HAST, Dsrc, Ddst, M>, src: Dsrc::IdD) -> bool {
-        let o = internal.src_arena.original(&src);
-        let r = internal.hyperast.node_store().resolve(&o).has_children();
+    fn src_has_children(mapper: &Mapper<HAST, Dsrc, Ddst, M>, src: Dsrc::IdD) -> bool {
+        let o = mapper.src_arena.original(&src);
+        let r = mapper.hyperast.node_store().resolve(&o).has_children();
 
         // TODO put it back
         // debug_assert_eq!(
@@ -172,14 +163,14 @@ where
     }
 
     pub(crate) fn last_chance_match_zs(
-        internal: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
     ) {
-        let stores = internal.hyperast;
+        let stores = mapper.hyperast;
         // allow using another internal mapping store
         // WIP https://blog.rust-lang.org/2022/10/28/gats-stabilization.html#implied-static-requirement-from-higher-ranked-trait-bounds
-        let mapping = &mut internal.mapping;
+        let mapping = &mut mapper.mapping;
         let src_arena = &mut mapping.src_arena;
         let dst_arena = &mut mapping.dst_arena;
         let src_s = src_arena.descendants_count(&src);
@@ -194,11 +185,11 @@ where
             src_offset = src - src_arena.root();
             let dst_arena = dst_arena.slice_po(&dst);
             dst_offset = dst - dst_arena.root();
-            ZsMatcher::match_with(internal.hyperast, src_arena, dst_arena)
+            ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena)
         } else {
             let o_src = src_arena.original(&src);
             let o_dst = dst_arena.original(&dst);
-            let src_arena = ZsTree::<HAST::IdN, Dsrc::IdD>::decompress(internal.hyperast, &o_src);
+            let src_arena = ZsTree::<HAST::IdN, Dsrc::IdD>::decompress(mapper.hyperast, &o_src);
             let src_arena = Decompressible {
                 hyperast: stores,
                 decomp: src_arena,
@@ -218,7 +209,7 @@ where
                 assert!(src_arena.kr[src_arena.kr.len() - 1]);
                 dbg!(last == src_arena_z.root());
             }
-            let dst_arena = ZsTree::<HAST::IdN, Ddst::IdD>::decompress(internal.hyperast, &o_dst);
+            let dst_arena = ZsTree::<HAST::IdN, Ddst::IdD>::decompress(mapper.hyperast, &o_dst);
             let dst_arena = Decompressible {
                 hyperast: stores,
                 decomp: dst_arena,
@@ -238,7 +229,7 @@ where
                 assert!(dst_arena.kr[dst_arena.kr.len() - 1]);
                 dbg!(last == dst_arena_z.root());
             }
-            ZsMatcher::match_with(internal.hyperast, src_arena, dst_arena)
+            ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena)
         };
         use num_traits::ToPrimitive;
         assert_eq!(
@@ -252,10 +243,10 @@ where
             let dst: Ddst::IdD = dst_offset + cast(t).unwrap();
             // use it
             if !mappings.is_src(src.shallow()) && !mappings.is_dst(dst.shallow()) {
-                let tsrc = internal
+                let tsrc = mapper
                     .hyperast
                     .resolve_type(&mapping.src_arena.original(&src));
-                let tdst = internal
+                let tdst = mapper
                     .hyperast
                     .resolve_type(&mapping.dst_arena.original(&dst));
                 if tsrc == tdst {

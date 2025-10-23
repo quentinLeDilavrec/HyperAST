@@ -19,7 +19,7 @@ pub struct LazyMarriageBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    internal: Mapper<HAST, Dsrc, Ddst, M>,
+    mapper: Mapper<HAST, Dsrc, Ddst, M>,
     _phantom: PhantomData<*const MZs>,
 }
 
@@ -64,15 +64,15 @@ where
         mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
         let mut matcher = Self {
-            internal: mapping,
+            mapper: mapping,
             _phantom: PhantomData,
         };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        matcher.mapper.mapping.mappings.topit(
+            matcher.mapper.mapping.src_arena.len(),
+            matcher.mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal);
-        matcher.internal
+        Self::execute(&mut matcher.mapper);
+        matcher.mapper
     }
 
     pub fn execute(internal: &mut Mapper<HAST, Dsrc, Ddst, M>) {
@@ -144,17 +144,17 @@ where
     }
 
     fn best_src_candidate_lazy(
-        internal: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         dst: &Ddst::IdD,
     ) -> Option<Dsrc::IdD> {
-        let candidates = internal.get_src_candidates_lazily(dst);
+        let candidates = mapper.get_src_candidates_lazily(dst);
         let mut best = None;
         let mut max: f64 = -1.;
         for cand in candidates {
             let sim = similarity_metrics::SimilarityMeasure::range(
-                &internal.src_arena.descendants_range(&cand),
-                &internal.dst_arena.descendants_range(dst),
-                &internal.mappings,
+                &mapper.src_arena.descendants_range(&cand),
+                &mapper.dst_arena.descendants_range(dst),
+                &mapper.mappings,
             )
             .chawathe();
             if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
@@ -166,20 +166,20 @@ where
     }
 
     pub(crate) fn last_chance_match(
-        internal: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
     ) {
-        Self::last_chance_match_zs(internal, src, dst);
-        //internal.last_chance_match_histogram(src, dst);
+        Self::last_chance_match_zs(mapper, src, dst);
+        // mapper.last_chance_match_histogram_lazy(src, dst);
     }
 
     pub(crate) fn last_chance_match_zs(
-        internal: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
     ) {
-        let mapping = &mut internal.mapping;
+        let mapping = &mut mapper.mapping;
         let src_arena = &mut mapping.src_arena;
         let dst_arena = &mut mapping.dst_arena;
         let src_s = src_arena.descendants_count(&src);
@@ -195,7 +195,7 @@ where
             src_offset = src - src_arena.root();
             let dst_arena = dst_arena.slice_po(&dst);
             dst_offset = dst - dst_arena.root();
-            ZsMatcher::match_with(internal.hyperast, src_arena, dst_arena)
+            ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena)
         };
         use num_traits::ToPrimitive;
         assert_eq!(
@@ -209,10 +209,10 @@ where
             let dst: Ddst::IdD = dst_offset + cast(t).unwrap();
             // use it
             if !mappings.is_src(src.shallow()) && !mappings.is_dst(dst.shallow()) {
-                let tsrc = internal
+                let tsrc = mapper
                     .hyperast
                     .resolve_type(&mapping.src_arena.original(&src));
-                let tdst = internal
+                let tdst = mapper
                     .hyperast
                     .resolve_type(&mapping.dst_arena.original(&dst));
                 if tsrc == tdst {

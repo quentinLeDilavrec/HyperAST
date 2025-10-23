@@ -22,6 +22,7 @@ impl TsEnableTS for TStore {
         if (LEN..TStore::LOWEST_RESERVED).contains(&k) {
             return None;
         }
+        #[cfg(feature = "impl_intern")]
         debug_assert_eq!(
             crate::language().node_kind_for_id(k).unwrap(),
             Type::from_u16(k).to_str()
@@ -44,6 +45,14 @@ impl TypeStore for TStore {
     type Ty = TypeU16<Cpp>;
 }
 
+impl<'a> hyperast::types::ETypeStore for TStore {
+    type Ty2 = Type;
+
+    fn intern(ty: Self::Ty2) -> Self::Ty {
+        TType::new(ty)
+    }
+}
+
 #[cfg(feature = "impl_intern")]
 mod legion_impls {
 
@@ -54,14 +63,6 @@ mod legion_impls {
     impl<'a> CppEnabledTypeStore for TStore {
         fn resolve(t: Self::Ty) -> Type {
             t.e()
-        }
-    }
-
-    impl<'a> hyperast::types::ETypeStore for TStore {
-        type Ty2 = Type;
-
-        fn intern(ty: Self::Ty2) -> Self::Ty {
-            TType::new(ty)
         }
     }
 

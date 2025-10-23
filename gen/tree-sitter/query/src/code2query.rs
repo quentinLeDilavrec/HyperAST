@@ -1611,7 +1611,7 @@ fn try_simp_uniq<'a>(
     let m = if let Some(cid) = meta_simp.capture_index_for_name("uniq") {
         find_matches(query_store, query, meta_simp, cid)
     } else {
-        vec![]
+        vec![vec![]]
     };
     let already = if m.len() == 1 { vec![query] } else { vec![] };
     let candidates = if m.len() == 1 { 0..0 } else { 0..m.len() };

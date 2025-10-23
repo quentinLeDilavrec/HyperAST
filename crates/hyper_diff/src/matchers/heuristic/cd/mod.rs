@@ -7,6 +7,8 @@ use str_distance::DistanceMetric;
 use types::{HyperAST, NodeId, WithMetaData};
 use types::{HyperType as _, LabelStore as _, NodeStore as _};
 
+use super::factorized_bounds;
+
 pub mod bottom_up_matcher;
 pub mod lazy_bottom_up_matcher;
 pub mod lazy_leaves_matcher;

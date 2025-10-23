@@ -1,4 +1,4 @@
-use crate::decompressed_tree_store::{LazyDecompressed, Shallow};
+use crate::decompressed_tree_store::Shallow;
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
@@ -7,7 +7,7 @@ use hyperast::types::{HyperAST, NodeId, NodeStore, Tree, WithHashs, WithStats};
 use num_traits::{cast, one};
 use std::{fmt::Debug, marker::PhantomData};
 
-use super::factorized_bounds::LazyDecompressedTreeBounds;
+use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazyMarriageBottomUpMatcher<
     Dsrc,
@@ -24,8 +24,8 @@ pub struct LazyMarriageBottomUpMatcher<
 }
 
 impl<
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
+    Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     HAST,
     M,
     MZs,
@@ -51,11 +51,9 @@ where
     Ddst::IdD: PrimInt,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = <Ddst as LazyDecompressed<M::Dst>>::IdD> + Default,
+    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
-    Dsrc: LazyDecompressedTreeBounds<HAST, M::Src>,
-    Ddst: LazyDecompressedTreeBounds<HAST, M::Dst>,
     HAST::Label: Eq,
     HAST::IdN: Debug,
     HAST::IdN: NodeId<IdN = HAST::IdN>,

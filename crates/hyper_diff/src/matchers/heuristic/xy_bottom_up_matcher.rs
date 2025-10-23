@@ -1,7 +1,3 @@
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-    PostOrderIterable,
-};
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
@@ -9,6 +5,8 @@ use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
 use std::collections::HashMap;
 use std::fmt::Debug;
+
+use super::factorized_bounds::DecompTreeBounds;
 
 pub struct XYBottomUpMatcher<
     Dsrc,
@@ -22,16 +20,8 @@ pub struct XYBottomUpMatcher<
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src>
-        + DecompressedWithParent<HAST, M::Src>
-        + PostOrder<HAST, M::Src>
-        + PostOrderIterable<HAST, M::Src>
-        + ContiguousDescendants<HAST, M::Src>, // descendants_range
-    Ddst: DecompressedTreeStore<HAST, M::Dst>
-        + DecompressedWithParent<HAST, M::Dst>
-        + PostOrder<HAST, M::Dst>
-        + PostOrderIterable<HAST, M::Dst>
-        + ContiguousDescendants<HAST, M::Dst>, // descendants_range
+    Dsrc: DecompTreeBounds<HAST, M::Src>,
+    Ddst: DecompTreeBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const SIM_THRESHOLD_NUM: u64,

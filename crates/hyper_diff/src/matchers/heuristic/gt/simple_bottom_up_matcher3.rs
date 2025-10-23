@@ -1,12 +1,11 @@
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-    PostOrderIterable,
-};
+use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrderIterable};
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Mapper, similarity_metrics};
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, WithHashs};
 use std::fmt::Debug;
+
+use super::factorized_bounds::DecompTreeBounds;
 
 pub struct SimpleBottomUpMatcher<
     Dsrc,
@@ -21,16 +20,8 @@ pub struct SimpleBottomUpMatcher<
 
 impl<
     'a,
-    Dsrc: DecompressedTreeStore<HAST, M::Src>
-        + DecompressedWithParent<HAST, M::Src>
-        + PostOrder<HAST, M::Src>
-        + PostOrderIterable<HAST, M::Src>
-        + ContiguousDescendants<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst>
-        + DecompressedWithParent<HAST, M::Dst>
-        + PostOrder<HAST, M::Dst>
-        + PostOrderIterable<HAST, M::Dst>
-        + ContiguousDescendants<HAST, M::Dst>,
+    Dsrc: DecompTreeBounds<HAST, M::Src>,
+    Ddst: DecompTreeBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Default,
     const SIMILARITY_THRESHOLD_NUM: u64, // 1

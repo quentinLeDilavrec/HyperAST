@@ -1,5 +1,7 @@
 use hyperast::types::{Childrn, LendT, NodeId, NodeStore, WithChildren};
 
+use super::factorized_bounds;
+
 pub mod bottom_up_matcher;
 pub mod greedy_bottom_up_matcher;
 pub mod greedy_subtree_matcher;
@@ -119,45 +121,5 @@ where
             }
         }
         _ => false,
-    }
-}
-
-mod factorized_bounds {
-    use crate::decompressed_tree_store::{
-        ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, LazyDecompressed,
-        LazyDecompressedTreeStore, LazyPOBorrowSlice, PostOrder, PostOrderIterable,
-        ShallowDecompressedTreeStore,
-    };
-
-    use hyperast::types::HyperAST;
-
-    pub trait LazyDecompressedTreeBounds<HAST, IdS>:
-        LazyDecompressed<IdS>
-        + DecompressedTreeStore<HAST, Self::IdD, IdS>
-        + DecompressedWithParent<HAST, Self::IdD>
-        + PostOrder<HAST, Self::IdD, IdS>
-        + PostOrderIterable<HAST, Self::IdD, IdS>
-        + ContiguousDescendants<HAST, Self::IdD, IdS>
-        + LazyPOBorrowSlice<HAST, Self::IdD, IdS>
-        + ShallowDecompressedTreeStore<HAST, Self::IdD, IdS>
-        + LazyDecompressedTreeStore<HAST, IdS>
-    where
-        HAST: HyperAST + Copy,
-    {
-    }
-
-    impl<HAST, IdS, T> LazyDecompressedTreeBounds<HAST, IdS> for T
-    where
-        HAST: HyperAST + Copy,
-        T: LazyDecompressed<IdS>
-            + DecompressedTreeStore<HAST, Self::IdD, IdS>
-            + DecompressedWithParent<HAST, Self::IdD>
-            + PostOrder<HAST, Self::IdD, IdS>
-            + PostOrderIterable<HAST, Self::IdD, IdS>
-            + ContiguousDescendants<HAST, Self::IdD, IdS>
-            + LazyPOBorrowSlice<HAST, Self::IdD, IdS>
-            + ShallowDecompressedTreeStore<HAST, Self::IdD, IdS>
-            + LazyDecompressedTreeStore<HAST, IdS>,
-    {
     }
 }

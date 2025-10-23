@@ -134,8 +134,8 @@ where
 
 impl<
     HAST: HyperAST + Copy,
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: DecompressedWithParent<HAST, Dsrc::IdD> + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: DecompressedWithParent<HAST, Ddst::IdD> + LazyDecompressedTreeStore<HAST, M::Dst>,
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
 where
@@ -143,12 +143,6 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + DecompressedWithParent<HAST, Dsrc::IdD>
-        + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + DecompressedWithParent<HAST, Ddst::IdD>
-        + LazyDecompressedTreeStore<HAST, M::Dst>,
 {
     pub(super) fn get_src_candidates_lazily(&mut self, dst: &Ddst::IdD) -> Vec<Dsrc::IdD> {
         let src_arena = &mut self.mapping.src_arena;

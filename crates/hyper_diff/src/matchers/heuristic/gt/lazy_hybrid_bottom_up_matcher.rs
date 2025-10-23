@@ -15,6 +15,8 @@ use num_traits::cast;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use super::factorized_bounds::LazyDecompTreeBorrowBounds;
+
 /// TODO wait for `#![feature(adt_const_params)]` #95174 to be improved
 ///
 /// it will allow to make use complex types as const generics
@@ -35,24 +37,8 @@ pub struct LazyHybridBottomUpMatcher<
 
 impl<
     'a,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + DecompressedWithParent<HAST, Dsrc::IdD>
-        + PostOrder<HAST, Dsrc::IdD, M::Src>
-        + PostOrderIterable<HAST, Dsrc::IdD, M::Src>
-        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
-        + LazyPOBorrowSlice<HAST, Dsrc::IdD, M::Src>
-        + ShallowDecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + LazyDecompressedTreeStore<HAST, M::Src>
-        + LazyDecompressed<M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + DecompressedWithParent<HAST, Ddst::IdD>
-        + PostOrder<HAST, Ddst::IdD, M::Dst>
-        + PostOrderIterable<HAST, Ddst::IdD, M::Dst>
-        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
-        + LazyPOBorrowSlice<HAST, Ddst::IdD, M::Dst>
-        + ShallowDecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + LazyDecompressedTreeStore<HAST, M::Dst>
-        + LazyDecompressed<M::Dst>,
+    Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
+    Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Default,

@@ -25,8 +25,8 @@ pub struct LazyLeavesMatcher<
 }
 
 impl<
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Debug,
     S: Similarity<HAST = HAST, IdN = HAST::IdN>,
@@ -36,8 +36,6 @@ impl<
 where
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
     Ddst::IdD: Eq + Debug + Copy + PrimInt,
     Dsrc::IdD: Eq + Debug + Copy + PrimInt,
     HAST::Label: Eq,

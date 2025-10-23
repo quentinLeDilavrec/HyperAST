@@ -1,15 +1,16 @@
 use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
 use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, POBorrowSlice, PostOrder,
-    PostOrderIterable, PostOrderKeyRoots,
+    POBorrowSlice, PostOrder, PostOrderIterable, PostOrderKeyRoots,
 };
 use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::{Decompressible, Mapper, Mapping};
+use crate::matchers::{Decompressible, Mapper};
 use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
 use hyperast::PrimInt;
 use hyperast::types::{DecompressedFrom, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
 use num_traits::{cast, one};
 use std::fmt::Debug;
+
+use super::factorized_bounds::DecompTreeBounds;
 
 /// TODO wait for `#![feature(adt_const_params)]` #95174 to be improved
 ///
@@ -33,20 +34,8 @@ const SLICE: bool = true;
 /// TODO PostOrder might not be necessary
 impl<
     'a,
-    Dsrc: DecompressedTreeStore<HAST, M::Src>
-        + DecompressedWithParent<HAST, M::Src>
-        + PostOrder<HAST, M::Src>
-        + PostOrderIterable<HAST, M::Src>
-        + DecompressedFrom<HAST, Out = Dsrc>
-        + ContiguousDescendants<HAST, M::Src>
-        + POBorrowSlice<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst>
-        + DecompressedWithParent<HAST, M::Dst>
-        + PostOrder<HAST, M::Dst>
-        + PostOrderIterable<HAST, M::Dst>
-        + DecompressedFrom<HAST, Out = Ddst>
-        + ContiguousDescendants<HAST, M::Dst>
-        + POBorrowSlice<HAST, M::Dst>,
+    Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
+    Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Default,
     const SIZE_THRESHOLD: usize,

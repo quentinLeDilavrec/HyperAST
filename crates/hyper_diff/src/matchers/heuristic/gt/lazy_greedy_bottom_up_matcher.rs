@@ -2,9 +2,7 @@
 //! - [ ] first make post order iterator lazy
 //!
 use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, LazyDecompressed,
-    LazyDecompressedTreeStore, LazyPOBorrowSlice, PostOrder, PostOrderIterable, PostOrderKeyRoots,
-    Shallow, ShallowDecompressedTreeStore,
+    PostOrder, PostOrderIterable, PostOrderKeyRoots, Shallow, ShallowDecompressedTreeStore,
 };
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Decompressible, Mapper};
@@ -17,6 +15,8 @@ use num_traits::{cast, one};
 use std::{fmt::Debug, marker::PhantomData};
 
 use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
+
+use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazyGreedyBottomUpMatcher<
     Dsrc,
@@ -36,8 +36,8 @@ pub struct LazyGreedyBottomUpMatcher<
 const SLICE: bool = true;
 
 impl<
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
+    Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     HAST,
     M,
     MZs,
@@ -65,23 +65,6 @@ where
     MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + DecompressedWithParent<HAST, Dsrc::IdD>
-        + PostOrder<HAST, Dsrc::IdD, M::Src>
-        + PostOrderIterable<HAST, Dsrc::IdD, M::Src>
-        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
-        + LazyPOBorrowSlice<HAST, Dsrc::IdD, M::Src>
-        + ShallowDecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + DecompressedWithParent<HAST, Ddst::IdD>
-        + PostOrder<HAST, Ddst::IdD, M::Dst>
-        + PostOrderIterable<HAST, Ddst::IdD, M::Dst>
-        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
-        + LazyPOBorrowSlice<HAST, Ddst::IdD, M::Dst>
-        + ShallowDecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + LazyDecompressedTreeStore<HAST, M::Dst>
-        + LazyDecompressed<M::Dst>,
     HAST::Label: Eq,
     HAST::IdN: Debug,
     HAST::IdN: NodeId<IdN = HAST::IdN>,

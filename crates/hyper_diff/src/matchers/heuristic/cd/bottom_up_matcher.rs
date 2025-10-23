@@ -1,13 +1,11 @@
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-    PostOrderIterable,
-};
+use crate::decompressed_tree_store::DecompressedTreeStore;
 use crate::matchers::Mapper;
+use crate::matchers::heuristic::factorized_bounds::DecompTreeBounds;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::{DecompressedFrom, HyperAST, LendT, NodeId, WithHashs, WithMetaData};
+use hyperast::types::{HyperAST, LendT, NodeId, WithHashs, WithMetaData};
 use num_traits::ToPrimitive;
 use std::fmt::Debug;
 
@@ -29,16 +27,8 @@ pub struct BottomUpMatcher<
 
 impl<
     'a,
-    Dsrc: DecompressedWithParent<HAST, M::Src>
-        + PostOrder<HAST, M::Src>
-        + PostOrderIterable<HAST, M::Src>
-        + DecompressedFrom<HAST, Out = Dsrc>
-        + ContiguousDescendants<HAST, M::Src>,
-    Ddst: DecompressedWithParent<HAST, M::Dst>
-        + PostOrder<HAST, M::Dst>
-        + PostOrderIterable<HAST, M::Dst>
-        + DecompressedFrom<HAST, Out = Ddst>
-        + ContiguousDescendants<HAST, M::Dst>,
+    Dsrc: DecompTreeBounds<HAST, M::Src>,
+    Ddst: DecompTreeBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Default,
     const SIZE_THRESHOLD: usize,   // = 1000,

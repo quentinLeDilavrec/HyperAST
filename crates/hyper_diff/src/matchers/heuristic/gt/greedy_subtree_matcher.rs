@@ -7,8 +7,7 @@ use crate::utils::sequence_algorithms::longest_common_subsequence;
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
 use hyperast::types::{
-    Childrn, DecompressedFrom, HashKind, HyperAST, Labeled, LendT, NodeId, NodeStore, Tree,
-    WithChildren, WithHashs,
+    Childrn, HashKind, HyperAST, Labeled, LendT, NodeId, NodeStore, Tree, WithChildren, WithHashs,
 };
 use num_traits::{ToPrimitive, one, zero};
 use std::hash::Hash;
@@ -18,14 +17,8 @@ pub struct GreedySubtreeMatcher<Dsrc, Ddst, HAST, M, const MIN_HEIGHT: usize = 1
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src>
-        + DecompressedWithParent<HAST, M::Src>
-        + DecompressedFrom<HAST, Out = Dsrc>
-        + ContiguousDescendants<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst>
-        + DecompressedWithParent<HAST, M::Dst>
-        + DecompressedFrom<HAST, Out = Ddst>
-        + ContiguousDescendants<HAST, M::Dst>,
+    Dsrc: DecompressedWithParent<HAST, M::Src> + ContiguousDescendants<HAST, M::Src>,
+    Ddst: DecompressedWithParent<HAST, M::Dst> + ContiguousDescendants<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
@@ -121,11 +114,9 @@ where
 impl<
     Dsrc: DecompressedTreeStore<HAST, M::Src>
         + DecompressedWithParent<HAST, M::Src>
-        + DecompressedFrom<HAST, Out = Dsrc>
         + ContiguousDescendants<HAST, M::Src>,
     Ddst: DecompressedTreeStore<HAST, M::Dst>
         + DecompressedWithParent<HAST, M::Dst>
-        + DecompressedFrom<HAST, Out = Ddst>
         + ContiguousDescendants<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
@@ -300,20 +291,6 @@ where
     HAST::Label: Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    pub(crate) fn add_mapping_recursively(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
-        src: &M::Src,
-        dst: &M::Dst,
-    ) {
-        mapper.mappings.link(*src, *dst);
-        mapper
-            .src_arena
-            .descendants(src)
-            .iter()
-            .zip(mapper.dst_arena.descendants(dst).iter())
-            .for_each(|(src, dst)| mapper.mappings.link(*src, *dst));
-    }
-
     fn pop_larger<'b>(
         src_trees: &mut PriorityTreeList<'b, Dsrc, M::Src, HAST, MIN_HEIGHT>,
         dst_trees: &mut PriorityTreeList<'b, Ddst, M::Dst, HAST, MIN_HEIGHT>,

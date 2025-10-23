@@ -1,12 +1,11 @@
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedTreeStore, DecompressedWithParent, LazyDecompressed,
-    LazyDecompressedTreeStore, PostOrder, PostOrderIterable, Shallow, ShallowDecompressedTreeStore,
-};
+use crate::decompressed_tree_store::Shallow;
 use crate::matchers::Mapper;
 use crate::matchers::{mapping_store::MonoMappingStore, similarity_metrics};
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, WithHashs};
 use std::fmt::Debug;
+
+use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazySimpleBottomUpMatcher<
     Dsrc,
@@ -21,22 +20,8 @@ pub struct LazySimpleBottomUpMatcher<
 
 impl<
     'a,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + DecompressedWithParent<HAST, Dsrc::IdD>
-        + PostOrder<HAST, Dsrc::IdD, M::Src>
-        + PostOrderIterable<HAST, Dsrc::IdD, M::Src>
-        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
-        + ShallowDecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + LazyDecompressedTreeStore<HAST, M::Src>
-        + LazyDecompressed<M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + DecompressedWithParent<HAST, Ddst::IdD>
-        + PostOrder<HAST, Ddst::IdD, M::Dst>
-        + PostOrderIterable<HAST, Ddst::IdD, M::Dst>
-        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
-        + ShallowDecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + LazyDecompressedTreeStore<HAST, M::Dst>
-        + LazyDecompressed<M::Dst>,
+    Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
+    Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Default,
     const SIMILARITY_THRESHOLD_NUM: u64, // 1

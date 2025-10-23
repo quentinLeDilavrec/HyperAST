@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-// use crate::legion as qgen; // includes identation, such as spaces and new lines
+// use crate::legion as qgen; // includes indentation, such as spaces and new lines
 use crate::no_fmt_legion as qgen; // ignores spaces, new lines,...
 
 type QStore = hyperast::store::SimpleStores<crate::types::TStore>;
@@ -295,7 +295,7 @@ impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
 
     /// Similar to with_examples,
     /// but processes queries from the biggest to the smallest,
-    /// thus we can use a kind of vec of maps and paralelize inserts in the maps.
+    /// thus we can use a kind of vec of maps and parallelize inserts in the maps.
     #[cfg(feature = "synth_par")]
     pub fn with_examples_by_size<TS, TIdN>(
         stores: &hyperast::store::SimpleStores<TS>,
@@ -992,6 +992,7 @@ where
         ) = ParallelIterator::partition_map(rms, |x| x);
         log::info!("remains: {}", remains.len());
         log::info!("uniqs: {}", rms.len());
+        log::info!("already: {}", already.len());
 
         rms.extend(remains.into_iter().filter_map(|(query, mut curr, paths)| {
             // dbg!(&paths);

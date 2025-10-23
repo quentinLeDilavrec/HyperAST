@@ -168,7 +168,6 @@ where
         let mut sib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
         let mut psib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
         let mut p_in_p_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
-        // dbg!(&ambiguous_mappings.len());
         ambiguous_mappings.sort_by(|a, b| {
             let cached_coef_sib = |l: &(Dsrc::IdD, Ddst::IdD)| {
                 *sib_sim
@@ -203,8 +202,8 @@ where
         });
     }
 
-    fn cached_compare<I, F: FnMut(&I) -> O, O: PartialOrd>(
-        mut cached: F,
+    fn cached_compare<I, O: PartialOrd>(
+        mut cached: impl FnMut(&I) -> O,
         a: &I,
         b: &I,
     ) -> std::cmp::Ordering {
@@ -236,6 +235,7 @@ where
         let s1: Vec<_> = Dsrc::parents(&mapper.src_arena, l.0).collect();
         let s2: Vec<_> = Ddst::parents(&mapper.dst_arena, l.1).collect();
         let common = longest_common_subsequence::<_, _, usize, _>(&s1, &s2, |a, b| {
+            // TODO directly do the kind+label comparison in hyperast to avoid some conversions
             let (t, l) = {
                 let o = mapper.src_arena.original(a);
                 let n = mapper.hyperast.node_store().resolve(&o);
@@ -256,13 +256,9 @@ where
             .chain(mapper.src_arena.parents(l.0))
             .filter_map(|x| {
                 mapper.src_arena.parent(&x).map(|p| {
-                    mapper
-                        .src_arena
-                        .position_in_parent::<usize>(&x)
-                        .unwrap()
-                        .to_f64()
-                        .unwrap()
-                        / mapper.src_arena.children(&p).len().to_f64().unwrap()
+                    let pos = mapper.src_arena.position_in_parent::<usize>(&x).unwrap();
+                    let len = mapper.src_arena.children(&p).len();
+                    pos.to_f64().unwrap() / len.to_f64().unwrap()
                 })
             });
         let dsts = vec![l.1]
@@ -270,13 +266,9 @@ where
             .chain(mapper.dst_arena.parents(l.1))
             .filter_map(|x| {
                 mapper.dst_arena.parent(&x).map(|p| {
-                    mapper
-                        .dst_arena
-                        .position_in_parent::<usize>(&x)
-                        .unwrap()
-                        .to_f64()
-                        .unwrap()
-                        / mapper.dst_arena.children(&p).len().to_f64().unwrap()
+                    let pos = mapper.dst_arena.position_in_parent::<usize>(&x).unwrap();
+                    let len = mapper.dst_arena.children(&p).len();
+                    pos.to_f64().unwrap() / len.to_f64().unwrap()
                 })
             });
         srcs.zip(dsts)
@@ -306,18 +298,10 @@ where
         alink: &(Dsrc::IdD, Ddst::IdD),
         blink: &(Dsrc::IdD, Ddst::IdD),
     ) -> std::cmp::Ordering {
-        (alink
-            .0
-            .shallow()
-            .to_usize()
-            .unwrap()
-            .abs_diff(alink.1.shallow().to_usize().unwrap()))
-        .cmp(
-            &blink
-                .0
-                .shallow()
-                .to_usize()
-                .unwrap()
+        usize::cmp(
+            &(alink.0.shallow().to_usize().unwrap())
+                .abs_diff(alink.1.shallow().to_usize().unwrap()),
+            &(blink.0.shallow().to_usize().unwrap())
                 .abs_diff(blink.1.shallow().to_usize().unwrap()),
         )
     }

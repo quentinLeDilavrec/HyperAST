@@ -1,11 +1,9 @@
 use crate::decompressed_tree_store::POBorrowSlice;
-use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
+use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
-use num_traits::cast;
 use std::fmt::Debug;
 
 use super::factorized_bounds::DecompTreeBounds;
@@ -69,6 +67,13 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
+        Self::with_recovery(mapper, Self::last_chance_match_hybrid);
+    }
+
+    pub fn with_recovery(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        recovery: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, M::Src, M::Dst),
+    ) {
         for t in mapper.mapping.src_arena.iter_df_post::<true>() {
             if mapper.mapping.src_arena.parent(&t).is_none() {
                 mapper.mapping.mappings.link(
@@ -77,8 +82,8 @@ where
                 );
                 Self::last_chance_match_hybrid(
                     mapper,
-                    &mapper.mapping.src_arena.root(),
-                    &mapper.mapping.dst_arena.root(),
+                    mapper.mapping.src_arena.root(),
+                    mapper.mapping.dst_arena.root(),
                 );
                 break;
             } else if !(mapper.mappings.is_src(&t) || !Self::src_has_children(mapper, t)) {
@@ -103,13 +108,13 @@ where
                     }
                 }
                 if let Some(best) = best {
-                    Self::last_chance_match_hybrid(mapper, &t, &best);
+                    recovery(mapper, t, best);
                     mapper.mappings.link(t, best);
                 }
             } else if mapper.mappings.is_src(&t) && mapper.has_unmapped_src_children(&t) {
                 if let Some(dst) = mapper.mappings.get_dst(&t) {
                     if mapper.has_unmapped_dst_children(&dst) {
-                        Self::last_chance_match_hybrid(mapper, &t, &dst);
+                        recovery(mapper, t, dst);
                     }
                 }
             }
@@ -118,47 +123,15 @@ where
 
     fn last_chance_match_hybrid(
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
-        src: &M::Src,
-        dst: &M::Dst,
+        src: M::Src,
+        dst: M::Dst,
     ) {
-        if mapper.src_arena.descendants_count(src) < SIZE_THRESHOLD
-            && mapper.dst_arena.descendants_count(dst) < SIZE_THRESHOLD
+        if mapper.src_arena.descendants_count(&src) < SIZE_THRESHOLD
+            && mapper.dst_arena.descendants_count(&dst) < SIZE_THRESHOLD
         {
-            Self::last_chance_match_optimal(mapper, src, dst);
+            mapper.last_chance_match_zs_slice::<MZs>(src, dst);
         } else {
-            mapper.last_chance_match_histogram(src, dst);
-        }
-    }
-
-    fn last_chance_match_optimal(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
-        src: &M::Src,
-        dst: &M::Dst,
-    ) {
-        let src_arena = mapper.src_arena.slice_po(src);
-        let dst_arena = mapper.dst_arena.slice_po(dst);
-
-        let src_offset: M::Src = *src - src_arena.root();
-        let dst_offset: M::Dst = mapper.dst_arena.first_descendant(dst);
-
-        let mappings: MZs = ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena);
-
-        for (i, t) in mappings.iter() {
-            //remapping
-            let src: M::Src = src_offset + cast(i).unwrap();
-            let dst: M::Dst = dst_offset + cast(t).unwrap();
-            // use it
-            if !mapper.mappings.is_src(&src) && !mapper.mappings.is_dst(&dst) {
-                let tsrc = mapper
-                    .hyperast
-                    .resolve_type(&mapper.src_arena.original(&src));
-                let tdst = mapper
-                    .hyperast
-                    .resolve_type(&mapper.dst_arena.original(&dst));
-                if tsrc == tdst {
-                    mapper.mappings.link(src, dst);
-                }
-            }
+            mapper.last_chance_match_histogram(&src, &dst);
         }
     }
 

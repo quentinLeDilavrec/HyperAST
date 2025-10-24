@@ -270,4 +270,26 @@ where
             }
         }
     }
+
+    pub(crate) fn apply_mappings<MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default>(
+        &mut self,
+        src_offset: M::Src,
+        dst_offset: M::Dst,
+        mappings: MZs,
+    ) {
+        for (i, t) in mappings.iter() {
+            use num_traits::cast;
+            //remapping
+            let src: M::Src = src_offset + cast(i).unwrap();
+            let dst: M::Dst = dst_offset + cast(t).unwrap();
+            // use it
+            if !self.mappings.is_src(&src) && !self.mappings.is_dst(&dst) {
+                let tsrc = self.hyperast.resolve_type(&self.src_arena.original(&src));
+                let tdst = self.hyperast.resolve_type(&self.dst_arena.original(&dst));
+                if tsrc == tdst {
+                    self.mappings.link(src, dst);
+                }
+            }
+        }
+    }
 }

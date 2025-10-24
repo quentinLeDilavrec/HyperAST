@@ -1,6 +1,6 @@
-use crate::decompressed_tree_store::Shallow;
 use crate::matchers::Mapper;
-use crate::matchers::{mapping_store::MonoMappingStore, similarity_metrics};
+use crate::matchers::mapping_store::MonoMappingStore;
+use crate::matchers::similarity_metrics::SimilarityMeasure;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, WithHashs};
 use std::fmt::Debug;
@@ -23,10 +23,10 @@ impl<
     Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
     Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
-    M: MonoMappingStore + Default,
-    const SIMILARITY_THRESHOLD_NUM: u64, // 1
-    const SIMILARITY_THRESHOLD_DEN: u64, // 2
-> LazySimpleBottomUpMatcher<Dsrc, Ddst, HAST, M, SIMILARITY_THRESHOLD_NUM, SIMILARITY_THRESHOLD_DEN>
+    M: MonoMappingStore,
+    const SIM_THRESHOLD_NUM: u64, // 1
+    const SIM_THRESHOLD_DEN: u64, // 2
+> LazySimpleBottomUpMatcher<Dsrc, Ddst, HAST, M, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
 where
     for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,
@@ -45,61 +45,11 @@ where
         mapper
     }
 
-    pub fn execute(mapper: &mut crate::matchers::Mapper<HAST, Dsrc, Ddst, M>) {
-        assert!(mapper.mapping.src_arena.len() > 0);
-        for node in mapper.mapping.src_arena.iter_df_post::<false>() {
-            let decomp = mapper.mapping.src_arena.decompress_to(&node);
-            if !mapper.mapping.mappings.is_src(&node) && mapper.src_has_children_lazy(decomp) {
-                let candidates = mapper.get_dst_candidates_lazily(&decomp);
-                let mut best_candidate = None;
-                let mut max_similarity: f64 = -1.;
-
-                for candidate in candidates {
-                    let t_descendents = (mapper.mapping.src_arena).descendants_range(&decomp);
-                    let candidate_descendents =
-                        mapper.mapping.dst_arena.descendants_range(&candidate);
-                    let similarity = similarity_metrics::SimilarityMeasure::range(
-                        &t_descendents,
-                        &candidate_descendents,
-                        &mapper.mapping.mappings,
-                    )
-                    .chawathe();
-
-                    if similarity
-                        >= SIMILARITY_THRESHOLD_NUM as f64 / SIMILARITY_THRESHOLD_DEN as f64
-                        && similarity > max_similarity
-                    {
-                        max_similarity = similarity;
-                        best_candidate = Some(candidate);
-                    }
-                }
-
-                if let Some(best_candidate) = best_candidate {
-                    mapper.last_chance_match_histogram_lazy(decomp, best_candidate);
-                    mapper
-                        .mapping
-                        .mappings
-                        .link(*decomp.shallow(), *best_candidate.shallow());
-                }
-            } else if mapper.mapping.mappings.is_src(&node)
-                && mapper.has_unmapped_src_children_lazy(&decomp)
-            {
-                if let Some(dst) = mapper.mapping.mappings.get_dst(&node) {
-                    let dst = mapper.mapping.dst_arena.decompress_to(&dst);
-                    if mapper.has_unmapped_dst_children_lazy(&dst) {
-                        mapper.last_chance_match_histogram_lazy(decomp, dst);
-                    }
-                }
-            }
-        }
-
-        mapper.mapping.mappings.link(
-            mapper.mapping.src_arena.root(),
-            mapper.mapping.dst_arena.root(),
-        );
-        mapper.last_chance_match_histogram_lazy(
-            mapper.mapping.src_arena.starter(),
-            mapper.mapping.dst_arena.starter(),
+    pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
+        mapper.bottom_up_with_similarity_threshold_and_recovery(
+            |_, _, _| SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64,
+            SimilarityMeasure::chawathe,
+            Mapper::last_chance_match_histogram_lazy,
         );
     }
 }

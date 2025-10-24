@@ -1,7 +1,7 @@
 use crate::decompressed_tree_store::POBorrowSlice;
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
+use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
 use num_traits::cast;
@@ -177,38 +177,11 @@ where
         src: M::Src,
         dst: M::Dst,
     ) {
-        // WIP https://blog.rust-lang.org/2022/10/28/gats-stabilization.html#implied-static-requirement-from-higher-ranked-trait-bounds
         let src_s = mapper.src_arena.descendants_count(&src);
         let dst_s = mapper.dst_arena.descendants_count(&dst);
-        if !(src_s < cast(SIZE_THRESHOLD).unwrap() || dst_s < cast(SIZE_THRESHOLD).unwrap()) {
+        if !(src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD) {
             return;
         }
-        let src_offset;
-        use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
-        let mappings: MZs = {
-            let src_arena = mapper.mapping.src_arena.slice_po(&src);
-            src_offset = src - src_arena.root();
-            let dst_arena = mapper.mapping.dst_arena.slice_po(&dst);
-            ZsMatcher::match_with(mapper.hyperast, src_arena, dst_arena)
-        };
-        let dst_offset = mapper.dst_arena.first_descendant(&dst);
-        assert_eq!(mapper.src_arena.first_descendant(&src), src_offset);
-        for (i, t) in mappings.iter() {
-            //remapping
-            let src: M::Src = src_offset + cast(i).unwrap();
-            let dst: M::Dst = dst_offset + cast(t).unwrap();
-            // use it
-            if !mapper.mappings.is_src(&src) && !mapper.mappings.is_dst(&dst) {
-                let tsrc = mapper
-                    .hyperast
-                    .resolve_type(&mapper.src_arena.original(&src));
-                let tdst = mapper
-                    .hyperast
-                    .resolve_type(&mapper.dst_arena.original(&dst));
-                if tsrc == tdst {
-                    mapper.mappings.link(src, dst);
-                }
-            }
-        }
+        mapper.last_chance_match_zs::<M>(src, dst);
     }
 }

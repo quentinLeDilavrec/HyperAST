@@ -1,4 +1,3 @@
-use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrderIterable};
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Mapper, similarity_metrics};
 use hyperast::PrimInt;

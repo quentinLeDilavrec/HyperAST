@@ -14,6 +14,7 @@ pub mod lazy_bottom_up_matcher;
 pub mod lazy_greedy_bottom_up_matcher;
 pub mod lazy_greedy_subtree_matcher;
 pub mod lazy_hybrid_bottom_up_matcher;
+pub mod lazy_hybrid_marriage_bottom_up_matcher;
 pub mod lazy_marriage_bottom_up_matcher;
 pub mod lazy_simple_bottom_up_matcher;
 pub mod lazy_simple_marriage_bottom_up_matcher;

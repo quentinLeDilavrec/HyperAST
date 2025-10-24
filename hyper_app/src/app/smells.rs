@@ -812,18 +812,18 @@ pub fn hash<T: ?Sized + Hash>(x: &T) -> u64 {
 
 fn delete_color(ui: &mut egui::Ui) -> egui::Rgba {
     if ui.visuals().dark_mode {
-        egui::Color32::from_rgb(255, 50, 50).gamma_multiply(0.01)
+        egui::Color32::from_rgb(255, 50, 50).gamma_multiply(0.1)
     } else {
-        egui::Color32::from_rgb(240, 20, 20).gamma_multiply(0.03)
+        egui::Color32::from_rgb(240, 20, 20).gamma_multiply(0.3)
     }
     .into()
 }
 
 fn insert_color(ui: &mut egui::Ui) -> egui::Rgba {
     if ui.visuals().dark_mode {
-        egui::Color32::from_rgb(40, 235, 40).gamma_multiply(0.01)
+        egui::Color32::from_rgb(40, 235, 40).gamma_multiply(0.1)
     } else {
-        egui::Color32::from_rgb(20, 235, 20).gamma_multiply(0.03)
+        egui::Color32::from_rgb(20, 235, 20).gamma_multiply(0.3)
     }
     .into()
 }

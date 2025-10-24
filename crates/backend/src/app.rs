@@ -165,7 +165,7 @@ async fn querying_differential(
     axum::extract::Json(script): axum::extract::Json<querying::Content>,
 ) -> axum::response::Result<Json<querying::ComputeResultsDifferential>> {
     let r = querying::differential(script, state, path)?;
-    Ok(r)
+    Ok(r.into())
 }
 
 pub fn querying_app(_st: SharedState) -> Router<SharedState> {
@@ -251,7 +251,7 @@ async fn smells(
     axum::extract::Json(examples): axum::extract::Json<smells::Examples>,
 ) -> axum::response::Result<Json<smells::SearchResults>> {
     let r = smells::smells(examples, state, path)?;
-    Ok(r)
+    Ok(r.into())
 }
 
 async fn smells_ex_from_diffs(

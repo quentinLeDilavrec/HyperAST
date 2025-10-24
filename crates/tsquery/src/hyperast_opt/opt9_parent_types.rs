@@ -60,7 +60,18 @@ where
     let mut types = vec![decomp_t!(HAST::TS, &n)];
     types.reserve(30);
     // root node must be visible
-    debug_assert!(!decomp_t!(HAST::TS, &n).is_hidden());
+    // NOTE might not be necessary, let's see.
+    // with supertypes we could just descend
+    // debug_assert!(
+    //     !decomp_t!(HAST::TS, &n).is_supertype(),
+    //     "{}",
+    //     decomp_t!(HAST::TS, &n).as_static_str()
+    // );
+    // debug_assert!(
+    //     !decomp_t!(HAST::TS, &n).is_hidden(),
+    //     "{}",
+    //     decomp_t!(HAST::TS, &n).as_static_str()
+    // );
     let hiddens = MiscS::default();
     let errors = MiscS::default();
     let mut stack = vec![n];

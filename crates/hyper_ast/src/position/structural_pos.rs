@@ -426,7 +426,6 @@ where
         use top_down::ReceiveIdx;
         use top_down::ReceiveParent;
         loop {
-            dbg!(stores.resolve_type(&x));
             if stores.resolve_type(&x).is_file() {
                 break;
             }
@@ -444,15 +443,12 @@ where
             builder = builder.push(parent).push(idx).push(dir_name);
         }
         let n = stores.resolve(&x);
-        dbg!(stores.resolve_type(&x));
         let file_name = stores.label_store().resolve(n.get_label_unchecked());
         let mut builder = builder.set_file_name(file_name);
 
         loop {
             let Some(o) = it.next() else { break };
-            dbg!(o);
             let n = stores.resolve(&x);
-            dbg!(stores.resolve_type(&x));
             let cs = n.children().unwrap();
             let c = cs.get(o).unwrap();
             let parent = x;

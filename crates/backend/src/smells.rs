@@ -3,14 +3,10 @@ use std::ops::Range;
 use axum::Json;
 use hashbrown::HashSet;
 use hyper_diff::actions::Actions;
+use hyperast::position::TreePathMut;
 use hyperast::position::position_accessors::SolvedPosition;
-use hyperast::{
-    position::{
-        TreePathMut,
-        position_accessors::{RootedPosition, WithPreOrderOffsets},
-    },
-    types::Children,
-};
+use hyperast::position::position_accessors::{RootedPosition, WithPreOrderOffsets};
+use hyperast::types::Children;
 use hyperast_gen_ts_tsquery::code2query::QueryLattice;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
@@ -113,7 +109,7 @@ pub(crate) fn smells(
     examples: Examples,
     state: SharedState,
     path: Param,
-) -> Result<Json<SearchResults>, String> {
+) -> Result<SearchResults, String> {
     let now = Instant::now();
     let Param {
         user,
@@ -206,6 +202,7 @@ pub(crate) fn smells(
     let bad: Vec<_> = query_lattice
         .iter_pretty()
         .filter(|x| 5 < x.1.len() && x.1.len() * 2 < ex_map.len())
+        .take(10000)
         .collect();
     dbg!(bad.len());
     let matches = if simple_matching {
@@ -267,13 +264,13 @@ pub(crate) fn smells(
         cmp
     });
     let search_time = now.elapsed().as_secs_f64();
-    Ok(Json::from(SearchResults {
+    Ok(SearchResults {
         prepare_time,
         search_time,
         bad,
         good: vec![],
         additional: vec![],
-    }))
+    })
 }
 
 pub(crate) fn smells_ex_from_diffs(
@@ -400,3 +397,72 @@ type Pos = (
     hyperast::position::file_and_offset::Position<std::path::PathBuf, usize>,
     Vec<Idx>,
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[ignore]
+    #[test_log::test]
+    fn test_finding_smels_gson_try_fail_catch()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let user = "Marcono1234";
+        let name = "gson";
+        let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let commit = "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde";
+        let language = "Java";
+
+        let state = crate::AppState::default();
+        state
+            .repositories
+            .write()
+            .unwrap()
+            .register_config(repo_spec.clone(), config);
+        let repo = state
+            .repositories
+            .read()
+            .unwrap()
+            .get_config(repo_spec)
+            .ok_or_else(|| "missing config for repository".to_string())?;
+        let state = std::sync::Arc::new(state);
+        let param = Diffs {
+            user: user.to_string(),
+            name: name.to_string(),
+            commit: commit.to_string(),
+            len: 1,
+        };
+        let examples = smells_ex_from_diffs(state.clone(), param)?;
+        let examples = examples.0;
+        let param = Param {
+            user: user.to_string(),
+            name: name.to_string(),
+            commit: commit.to_string(),
+            len: 1,
+        };
+        let examples = Examples {
+            simple_matching: true,
+            prepro_matching: true,
+            meta_gen:
+                r#"(identifier) @label ["{" ";" "." "try" "(" ")" "}" "catch" "import"] @skip"#
+                    .into(),
+            meta_simp: r#"
+                (named_node
+                    (identifier) (#EQ? "try_statement")
+                ) @uniq
+                (_
+                    (named_node
+                        (identifier) (#EQ? "expression_statement")
+                    ) @rm
+                )"#
+            .into(),
+            examples: examples.examples,
+        };
+        let res = smells(examples, state, param)?;
+        for x in res.bad {
+            eprintln!();
+            eprintln!("{}", x.query);
+        }
+        Ok(())
+    }
+}

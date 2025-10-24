@@ -14,8 +14,13 @@ pub(crate) fn matches_default<'a>(
             format!("{}\n\n", x)
         })
         .collect::<String>();
-    let qqq = hyperast_tsquery::Query::new(&collect, hyperast_gen_ts_java::language())
-        .map_err(|e| e.to_string())?;
+    let qqq =
+        hyperast_tsquery::Query::new(&collect, hyperast_gen_ts_java::language()).map_err(|e| {
+            format!(
+                "{e}\n----{len}-----\n{}",
+                collect.chars().take(500).collect::<String>()
+            )
+        })?;
     if qqq.enabled_pattern_count() != len {
         dbg!(qqq.enabled_pattern_count(), len);
         let mut count = 0;

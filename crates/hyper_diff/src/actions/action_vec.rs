@@ -2,7 +2,9 @@ use std::fmt::Debug;
 
 use hyperast::{
     position::compute_range,
-    types::{HyperAST, LabelStore, Labeled, NodeId, NodeStore, NodeStoreExt, WithChildren},
+    types::{
+        HyperAST, HyperType, LabelStore, Labeled, NodeId, NodeStore, NodeStoreExt, WithChildren,
+    },
 };
 
 use crate::tree::tree_path::TreePath;
@@ -137,16 +139,27 @@ where
             //     .with_stores(&stores)
             //     .compute_pos_pre_order::<_, hyperast::position::CompoundPositionPreparer<Pos, Pos2<HAST::IdN, HAST::Idx>>>();
             use hyperast::position::position_accessors::SolvedPosition;
-            let i = p2.node();
+            let mut fmtd_ty = String::new();
+            let mut n = p2.node();
+            loop {
+                let t = stores.resolve_type(&n);
+                if !t.is_supertype() {
+                    fmtd_ty.push_str(t.as_static_str());
+                    break;
+                }
+                fmtd_ty.push_str(t.as_static_str());
+                fmtd_ty.push_str("/");
+                n = stores.resolve(&n).child(&num_traits::zero()).unwrap();
+            }
             let r = p.range();
             let l = stores
-                .resolve(&i)
+                .resolve(&n)
                 .try_get_label()
                 .map_or(Default::default(), |l| stores.label_store().resolve(l));
             writeln!(
                 f,
                 "Del {} file=\"{}\" line {} to {} {:?}",
-                stores.resolve_type(&i),
+                fmtd_ty,
                 p.file().to_string_lossy(),
                 r.start,
                 r.end,
@@ -167,7 +180,7 @@ where
         ),
         Act::Move { from } => writeln!(
             f,
-            "Mov {:?} {:?} {}",
+            "Mov {} {:?} {}",
             {
                 let mut e = ori;
                 let mut node = stores.node_store().resolve(&ori);
@@ -175,7 +188,23 @@ where
                     e = node.child(&x).unwrap();
                     node = stores.node_store().resolve(&e);
                 }
-                stores.resolve_type(&e).to_string()
+                // stores.resolve_type(&e).to_string()
+                let mut fmtd_ty = String::new();
+                loop {
+                    let t = stores.resolve_type(&e);
+                    if !t.is_supertype() {
+                        fmtd_ty.push_str(t.as_static_str());
+                        break;
+                    }
+                    fmtd_ty.push_str(t.as_static_str());
+                    fmtd_ty.push_str("/");
+                    e = stores
+                        .node_store()
+                        .resolve(&e)
+                        .child(&num_traits::zero())
+                        .unwrap();
+                }
+                fmtd_ty
             },
             compute_range(ori, &mut from.ori.iter(), stores),
             format_action_pos(ori, stores, a)

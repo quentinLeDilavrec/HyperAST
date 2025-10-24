@@ -7,6 +7,7 @@ use hyper_diff::actions::action_vec::ActionsVec;
 use hyper_diff::actions::script_generator2::Act;
 use hyper_diff::actions::script_generator2::ScriptGenerator;
 use hyper_diff::actions::script_generator2::SimpleAction;
+use hyper_diff::algorithms::DiffResult;
 use hyper_diff::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use hyper_diff::decompressed_tree_store::complete_post_order_ref;
 use hyper_diff::matchers::Decompressible;
@@ -98,8 +99,6 @@ pub(crate) fn diff(
         .get_commit(repo_handle.config(), &dst_oid)
         .unwrap();
     let dst_tr = commit_dst.ast_root;
-    let with_spaces_stores = &repositories.processor.main_stores;
-    let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
 
     if src_tr == dst_tr {
         return Ok(Diff {
@@ -110,8 +109,79 @@ pub(crate) fn diff(
         });
     }
 
-    let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &src_tr, &dst_tr);
+    let with_spaces_stores = &repositories.processor.main_stores;
+    let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
 
+    let actions = hyper_diff::algorithms::gumtree_stable_hybrid_lazy::diff(
+        // hyper_diff::algorithms::gumtree_stable_lazy::diff(
+        stores, &src_tr, &dst_tr,
+    )
+    .actions
+    .unwrap();
+    // let actions = _diff(&state, src_tr, dst_tr, with_spaces_stores, stores)?
+    //     .actions
+    //     .unwrap();
+    dbg!(&actions.len());
+
+    enum Choice {
+        Del,
+        Mov,
+        Mov2,
+        Ins,
+        Upd,
+        Mov2Del,
+    }
+    let choice = Choice::Mov2Del;
+    let mut focuses = vec![];
+    let mut deletes = vec![];
+    let mut inserts = vec![];
+    let moves = if let Choice::Del = choice {
+        extract_deletes(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
+    } else if let Choice::Ins = choice {
+        extract_inserts(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
+    } else if let Choice::Upd = choice {
+        extract_updates(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
+    } else if let Choice::Mov = choice {
+        extract_moves(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
+    } else if let Choice::Mov2 = choice {
+        extract_moves2(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
+    } else if let Choice::Mov2Del = choice {
+        let foc = extract_focuses(with_spaces_stores, stores, src_tr, dst_tr, &actions);
+        focuses = foc.collect();
+        let dels = extract_deletes(with_spaces_stores, stores, src_tr, dst_tr, &actions);
+        deletes = dels.map(|x| x.0).collect();
+        let ins = extract_inserts(with_spaces_stores, stores, src_tr, dst_tr, &actions);
+        inserts = ins.map(|x| x.1).collect();
+        let movs = extract_moves2(with_spaces_stores, stores, src_tr, dst_tr, &actions);
+        movs.collect()
+    } else {
+        unreachable!()
+    };
+
+    Ok(Diff {
+        focuses,
+        deletes,
+        inserts,
+        moves,
+    })
+}
+
+fn _diff(
+    state: &crate::AppState,
+    src_tr: NodeIdentifier,
+    dst_tr: NodeIdentifier,
+    with_spaces_stores: &hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+    stores: &hyperast::store::SimpleStores<
+        hyperast_vcs_git::TStore,
+        hyperast_vcs_git::no_space::NoSpaceNodeStoreWrapper<'_>,
+        &LabelStore,
+    >,
+) -> Result<
+    DiffResult<SimpleAction<LabelIdentifier, CompressedTreePath<u16>, NodeIdentifier>, (), ()>,
+    // ActionsVec<SimpleAction<LabelIdentifier, CompressedTreePath<u16>, NodeIdentifier>>,
+    String,
+> {
+    let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &src_tr, &dst_tr);
     use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
     use hyperast::types::WithStats;
     let mapped = {
@@ -203,61 +273,16 @@ pub(crate) fn diff(
         dst_arena,
         mappings: ms.clone(),
     };
-    let actions = {
-        let mapping = &mapping;
-        let store = stores;
 
-        let mut this = ScriptGenerator::new(store, &mapping.src_arena, &mapping.dst_arena)
-            .init_cpy(&mapping.mappings);
-        this.auxilary_ins_mov_upd(&|w, x| {
-            assert_eq!(stores.resolve_type(w), stores.resolve_type(x))
-        })?;
-        this.del();
-        this.actions
-    };
+    let mut this = ScriptGenerator::new(stores, &mapping.src_arena, &mapping.dst_arena)
+        .init_cpy(&mapping.mappings);
+    this.auxilary_ins_mov_upd(&|w, x| assert_eq!(stores.resolve_type(w), stores.resolve_type(x)))?;
+    this.del();
 
-    dbg!(&actions.len());
-
-    enum Choice {
-        Del,
-        Mov,
-        Mov2,
-        Ins,
-        Upd,
-        Mov2Del,
-    }
-    let choice = Choice::Mov2Del;
-    let mut focuses = vec![];
-    let mut deletes = vec![];
-    let mut inserts = vec![];
-    let moves = if let Choice::Del = choice {
-        extract_deletes(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
-    } else if let Choice::Ins = choice {
-        extract_inserts(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
-    } else if let Choice::Upd = choice {
-        extract_updates(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
-    } else if let Choice::Mov = choice {
-        extract_moves(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
-    } else if let Choice::Mov2 = choice {
-        extract_moves2(with_spaces_stores, stores, src_tr, dst_tr, &actions).collect()
-    } else if let Choice::Mov2Del = choice {
-        let foc = extract_focuses(with_spaces_stores, stores, src_tr, dst_tr, &actions);
-        focuses = foc.collect();
-        let dels = extract_deletes(with_spaces_stores, stores, src_tr, dst_tr, &actions);
-        deletes = dels.map(|x| x.0).collect();
-        let ins = extract_inserts(with_spaces_stores, stores, src_tr, dst_tr, &actions);
-        inserts = ins.map(|x| x.1).collect();
-        let movs = extract_moves2(with_spaces_stores, stores, src_tr, dst_tr, &actions);
-        movs.collect()
-    } else {
-        unreachable!()
-    };
-
-    Ok(Diff {
-        focuses,
-        deletes,
-        inserts,
-        moves,
+    Ok(DiffResult {
+        mapper: (),
+        actions: Some(this.actions),
+        exec_data: (),
     })
 }
 
@@ -467,6 +492,66 @@ pub(crate) fn extract_updates<'a>(
         })
         .map(|x| (x.clone(), x))
 }
+pub(crate) fn extract_updates2<'a>(
+    with_spaces_stores: &'a hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+    stores: &'a Stores,
+    src_tr: NodeIdentifier,
+    dst_tr: NodeIdentifier,
+    actions: &'a ActionsVec<A>,
+) -> impl Iterator<Item = (Pos, Pos)> + 'a {
+    actions.0.iter().filter_map(move |a| {
+        let from = match &a.action {
+            Act::Update { .. } => (),
+            _ => return None,
+        };
+        let (from_path, w) = hyperast::position::path_with_spaces(
+            src_tr,
+            &mut a.path.ori.iter(),
+            with_spaces_stores,
+        );
+        let t = hyperast::types::HyperAST::resolve_type(stores, &w);
+        use hyperast::types::HyperType;
+        if t.is_file() || t.is_directory() {
+            return None;
+        }
+        // if t.is_hidden() || !t.is_named() || {
+        //     dbg!(t.as_static_str());
+        //     return None;
+        // }
+        // if t.as_static_str() != "method_declaration" && t.as_static_str() != "_method_header" {
+        //     dbg!(t.as_static_str());
+        //     return None;
+        // }
+        let (to_path, x) = hyperast::position::path_with_spaces(
+            dst_tr,
+            &mut a.path.ori.iter(),
+            with_spaces_stores,
+        );
+        let (from, _from) = hyperast::position::compute_position(
+            src_tr,
+            &mut from_path.iter().copied(),
+            with_spaces_stores,
+        );
+        assert_eq!(w, _from);
+
+        let (to, _to) = hyperast::position::compute_position(
+            dst_tr,
+            &mut to_path.iter().copied(),
+            with_spaces_stores,
+        );
+        // dbg!(_to);
+        assert_eq!(x, _to);
+
+        let t_f = hyperast::types::HyperAST::resolve_type(stores, &_from);
+        let t_t = hyperast::types::HyperAST::resolve_type(stores, &_to);
+        if t_f != t_t {
+            dbg!(t_f.as_static_str(), t_t.as_static_str());
+            return None;
+        }
+        // dbg!(t_f.as_static_str());
+        Some(((to, to_path), (from, from_path)))
+    })
+}
 
 pub(crate) fn extract_inserts<'a>(
     with_spaces_stores: &'a hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
@@ -489,8 +574,6 @@ pub(crate) fn extract_inserts<'a>(
         &a_tree.atomics,
         hyperast::position::StructuralPosition::new(dst_tr),
         &mut |p, nn, n, id| {
-            let t = stores.resolve_type(&id);
-            // dbg!(t.as_static_str(), p);
             result.push(p.clone());
             false
         },
@@ -529,6 +612,15 @@ pub(crate) fn extract_deletes<'a>(
     let mut a_tree = ActionsTree::new();
     for a in actions.0.iter().rev() {
         if let Act::Delete { .. } = &a.action {
+            let (to_path, x) = hyperast::position::path_with_spaces(
+                src_tr,
+                &mut a.path.ori.iter(),
+                with_spaces_stores,
+            );
+            let t = with_spaces_stores.resolve_type(&x);
+            dbg!(t);
+            let del = hyperast::nodes::TextSerializer::new(with_spaces_stores, x).to_string();
+            println!("ddel: {}", del);
             a_tree.merge_ori(a);
         }
     }
@@ -540,22 +632,11 @@ pub(crate) fn extract_deletes<'a>(
         hyperast::position::StructuralPosition::new(src_tr),
         &mut |p, nn, n, id| {
             let t = stores.resolve_type(&id);
-            if !t.is_hidden() {
-                result.push(p.clone());
-            }
+            dbg!(t);
+            let del = hyperast::nodes::TextSerializer::new(with_spaces_stores, id);
+            println!("del : {}", del);
+            result.push(p.clone());
             false
-            // let t = stores.resolve_type(id);
-            // if t.as_static_str() == "try_statement" {
-            //     dbg!(t.as_static_str(), p);
-            //     result.push(p.clone());
-            //     true
-            // } else if t.as_static_str() == "import_declaration" {
-            //     dbg!(t.as_static_str(), p);
-            //     result.push(p.clone());
-            //     true
-            // } else {
-            //     false
-            // }
         },
     );
 
@@ -602,13 +683,10 @@ pub(crate) fn extract_focuses<'a>(
         &a_tree.atomics, // , &mapping
         hyperast::position::StructuralPosition::new(src_tr),
         &mut |p, nn, n, id| {
-            let t = stores.resolve_type(&id);
-            if t.as_static_str() == "try_statement" {
-                // dbg!(t.as_static_str(), p);
-                result.push(p.clone());
-                true
-            } else if t.as_static_str() == "import_declaration" {
-                // dbg!(t.as_static_str(), p);
+            if let Act::Delete { .. } = n.action.action {
+                if with_spaces_stores.resolve_type(&id).is_syntax() {
+                    return false;
+                };
                 result.push(p.clone());
                 true
             } else {
@@ -653,25 +731,12 @@ pub(crate) type N = hyper_diff::actions::action_tree::Node<
 
 pub(crate) type P = hyperast::position::StructuralPosition;
 
-pub(crate) fn go_to_files<F>(
-    stores: &Stores,
-    cs: &[N],
-    // mapping: _,
-    path: P,
-    result: &mut F,
-) where
+pub(crate) fn go_to_files<F>(stores: &Stores, cs: &[N], path: P, result: &mut F)
+where
     F: FnMut(&P, &NoSpaceWrapper<NodeIdentifier>, &N, NodeIdentifier) -> bool,
 {
     't: for n in cs {
-        // n.action;
         let mut path = path.clone();
-        // use hyperast::types::TypeStore;
-        // let t = stores.resolve_type(nn);
-        // if t.is_file() {
-        //     dbg!();
-        //     continue;
-        // }
-        // dbg!(&n.action.path.ori);
         let mut p_it = n.action.path.ori.iter();
         loop {
             let Some(p) = p_it.next() else {
@@ -712,14 +777,6 @@ pub(crate) fn got_through<F>(
     let mut id = path.node();
     let mut nn = stores.node_store.resolve(id);
     loop {
-        if result(&path, &nn, n, id) {
-            return;
-        }
-        // if t.as_static_str() == "try_statement" {
-        //     dbg!(d, t.as_static_str(), &path);
-        //     result.push(path);
-        //     return;
-        // }
         use hyperast::types::WithChildren;
         let Some(cs) = nn.children() else {
             return; // NOTE should not happen
@@ -747,5 +804,136 @@ pub(crate) fn got_through<F>(
         // always at least one element in an action path
         let p = p_it.next().unwrap();
         got_through(stores, n, path.clone(), p, p_it, d, result);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hyperast_vcs_git::preprocessed::child_by_name_with_idx;
+
+    use super::*;
+
+    #[ignore]
+    #[test_log::test]
+    fn test_finding_smels_gson_try_fail_catch()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let user = "Marcono1234";
+        let name = "gson";
+        let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let commit = "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde";
+        let language = "Java";
+
+        let state = crate::AppState::default();
+        state
+            .repositories
+            .write()
+            .unwrap()
+            .register_config(repo_spec.clone(), config);
+        let state = std::sync::Arc::new(state);
+
+        let repo_handle = state
+            .repositories
+            .write()
+            .unwrap()
+            .get_config(repo_spec)
+            .ok_or_else(|| "missing config for repository".to_string())?;
+        let mut repository = repo_handle.fetch();
+        log::warn!("done cloning {}", repository.spec);
+
+        let commits = state
+            .repositories
+            .write()
+            .unwrap()
+            .pre_process_with_limit(&mut repository, "", &commit, 4)
+            .map_err(|e| e.to_string())?;
+        let now = Instant::now();
+        log::warn!(
+            "done construction of {commits:?} in {}",
+            repository.spec.user()
+        );
+        let src_oid = commits[0];
+        let dst_oid = commits[1];
+        // let diff = diff(state, &repository, dst_oid, src_oid).map_err(|e| e.to_string())?;
+
+        let repositories = state.repositories.read().unwrap();
+        let commit_src = repositories
+            .get_commit(&repository.config, &src_oid)
+            .unwrap();
+        let src_tr = commit_src.ast_root;
+        let commit_dst = repositories
+            .get_commit(&repository.config, &dst_oid)
+            .unwrap();
+        let dst_tr = commit_dst.ast_root;
+
+        let stores = &repositories.processor.main_stores;
+
+        let src_tr = child_by_name_with_idx(stores, src_tr, "gson").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "gson").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "src").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "src").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "test").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "test").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "java").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "java").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "com").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "com").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "google").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "google").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "gson").unwrap().0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "gson").unwrap().0;
+        let src_tr = child_by_name_with_idx(stores, src_tr, "ToNumberPolicyTest.java")
+            .unwrap()
+            .0;
+        let dst_tr = child_by_name_with_idx(stores, dst_tr, "ToNumberPolicyTest.java")
+            .unwrap()
+            .0;
+
+        // gson/src/test/java/com/google/gson/ToNumberPolicyTest.java
+
+        let with_spaces_stores = &repositories.processor.main_stores;
+        let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
+
+        // let diff = hyper_diff::algorithms::gumtree_hybrid_lazy::diff(stores, &src_tr, &dst_tr);
+        let diff = hyper_diff::algorithms::gumtree_hybrid_partial_lazy::diff_with_hyperparameters::<
+            _,
+            3,
+            300,
+            1,
+            2,
+        >(stores, &src_tr, &dst_tr);
+
+        // let diff = _diff(&state, src_tr, dst_tr, with_spaces_stores, stores).unwrap();
+        println!("Diff: {diff}");
+
+        use hyper_diff::decompressed_tree_store::PostOrderIterable;
+
+        for x in diff.mapper.mapping.src_arena.iter_df_post::<true>() {
+            use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
+            use hyper_diff::matchers::mapping_store::MappingStore;
+            let s = diff.mapper.mapping.src_arena.original(&x);
+            // let t = stores.resolve_type(&s);
+
+            let mut fmtd_ty = String::new();
+            let mut n = s;
+            loop {
+                let t = stores.resolve_type(&n);
+                if !t.is_supertype() {
+                    fmtd_ty.push_str(t.as_static_str());
+                    break;
+                }
+                fmtd_ty.push_str(t.as_static_str());
+                fmtd_ty.push_str("/");
+                use hyperast::types::WithChildren;
+                n = stores.resolve(&n).child(&0).unwrap();
+            }
+            use hyperast::types::HyperType;
+            if diff.mapper.mappings.is_src(&x) {
+                println!("mapped {}", fmtd_ty);
+            } else {
+                println!("unmapped {}", fmtd_ty);
+            }
+        }
+        Ok(())
     }
 }

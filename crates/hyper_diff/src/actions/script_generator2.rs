@@ -54,6 +54,18 @@ pub enum Act<L, P, I> {
     Insert { sub: I },
 }
 
+impl<L, Idx, I> Debug for Act<L, Idx, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Delete {} => f.write_str("Delete"),
+            Self::Update { new } => f.write_str("Update"),
+            Self::Move { from } => f.write_str("Move"),
+            Self::MovUpd { from, new } => f.write_str("MovUpd"),
+            Self::Insert { sub } => f.write_str("Insert"),
+        }
+    }
+}
+
 impl<L: PartialEq, Idx: PartialEq, I: PartialEq> PartialEq for Act<L, Idx, I> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

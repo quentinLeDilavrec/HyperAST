@@ -91,13 +91,12 @@ where
                 let mut best = None;
                 let mut max_sim = -1f64;
                 for candidate in candidates {
-                    let t_descendents = &mapper.src_arena.descendants(&t);
-                    let candidate_descendents = &mapper.dst_arena.descendants(&candidate);
-                    let sim = similarity_metrics::chawathe_similarity(
-                        t_descendents,
-                        candidate_descendents,
+                    let sim = similarity_metrics::SimilarityMeasure::range(
+                        &mapper.src_arena.descendants_range(&t),
+                        &mapper.dst_arena.descendants_range(&candidate),
                         &mapper.mappings,
-                    );
+                    )
+                    .chawathe();
                     let threshold = Mapper::adaptive_threshold(mapper, t, candidate);
                     // SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64;
                     if sim > max_sim && sim >= threshold {

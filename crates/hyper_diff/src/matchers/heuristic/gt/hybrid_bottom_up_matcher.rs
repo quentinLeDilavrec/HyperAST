@@ -98,9 +98,7 @@ where
                         candidate_descendents,
                         &mapper.mappings,
                     );
-                    let threshold = 1f64
-                        / (1f64
-                            + ((candidate_descendents.len() + t_descendents.len()) as f64).ln());
+                    let threshold = Mapper::adaptive_threshold(mapper, t, candidate);
                     // SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64;
                     if sim > max_sim && sim >= threshold {
                         max_sim = sim;
@@ -150,5 +148,21 @@ where
             src.to_usize()
         );
         r
+    }
+}
+
+impl<HAST: HyperAST + Copy, M, Dsrc, Ddst> Mapper<HAST, Dsrc, Ddst, M> {
+    pub fn adaptive_threshold<SrcIdS, DstIdS, SrcIdD, DstIdD>(
+        mapper: &Mapper<HAST, Dsrc, Ddst, M>,
+        a: SrcIdD,
+        cand: DstIdD,
+    ) -> f64
+    where
+        Dsrc: crate::decompressed_tree_store::ContiguousDescendants<HAST, SrcIdD, SrcIdS>,
+        Ddst: crate::decompressed_tree_store::ContiguousDescendants<HAST, DstIdD, DstIdS>,
+    {
+        let a = mapper.mapping.src_arena.descendants_count(&a) as f64;
+        let cand = mapper.mapping.dst_arena.descendants_count(&cand) as f64;
+        1f64 / (1f64 + (a + cand).ln())
     }
 }

@@ -65,11 +65,7 @@ where
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
-            |mapper, a, cand| {
-                let a = mapper.mapping.src_arena.descendants_count(&a) as f64;
-                let cand = mapper.mapping.dst_arena.descendants_count(&cand) as f64;
-                1f64 / (1f64 + ((a + cand) as f64).ln())
-            },
+            Mapper::adaptive_threshold,
             SimilarityMeasure::chawathe,
             super::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher::<
                 _,

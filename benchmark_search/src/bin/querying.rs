@@ -232,7 +232,7 @@ fn main() {
                 per_blob(repo, &sub, commit, depth, &language, queries, timeout);
             } else if c == RepoConfig::JavaMaven {
                 assert!(!cached);
-                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
+                let language = hyperast_vcs_git::resolve_language("Java").unwrap();
                 with_hyperast::polyglot(repo, &sub, commit, depth, &language, queries, timeout);
                 // } else if language == RepoConfig::Cpp {
                 //     todo!();

@@ -636,8 +636,7 @@ mod test {
                 mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         // >(&stores, &src, &dst, mappings);
         let mappings = mapper.mapping.mappings;
         let src_arena = mapper.mapping.src_arena;
@@ -761,8 +760,7 @@ mod test {
                 mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
         let src_arena = mapper.mapping.src_arena;
         let dst_arena = mapper.mapping.dst_arena;
@@ -852,8 +850,7 @@ mod test {
                 mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
         // print_mappings(
         //     &dst_arena,
@@ -1053,8 +1050,7 @@ mod test {
                 mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
 
         let src_arena = _src_arena.decomp.complete(&stores);
@@ -1175,8 +1171,7 @@ mod test {
                 mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
 
         let src_arena = _src_arena.decomp.complete(&stores);
@@ -1290,7 +1285,7 @@ mod test {
             //     &stores, src_arena, dst_arena, mappings,
             // );
             // LazyGreedySubtreeMatcher::execute::<DefaultMultiMappingStore<_>>(&mut matcher);
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper)
+            LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper)
         };
         // let SubtreeMatcher {
         //     src_arena,

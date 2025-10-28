@@ -51,14 +51,13 @@ fn lazy_mapping<'a>(
         };
         let subtree_prepare_t = now.elapsed().as_secs_f64();
         let now = Instant::now();
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let subtree_matcher_t = now.elapsed().as_secs_f64();
         let subtree_mappings_s = mapper.mappings().len();
         dbg!(&subtree_matcher_t, &subtree_mappings_s);
         let bottomup_prepare_t = 0.;
         let now = Instant::now();
-        let mapper = LazyGreedyBottomUpMatcher::<_, _, _, _, VecStore<_>>::match_it(mapper);
+        let mapper = LazyGreedyBottomUpMatcher::<_, VecStore<_>>::match_it(mapper);
         dbg!(&now.elapsed().as_secs_f64());
         let bottomup_matcher_t = now.elapsed().as_secs_f64();
         let bottomup_mappings_s = mapper.mappings().len();
@@ -174,9 +173,9 @@ fn lazy_subtree_mapping<'a, 'b>(
     );
     dbg!();
 
-    let mm = LazyGreedySubtreeMatcher::<_, _, _, VecStore<_>>::compute_multi_mapping::<
-        DefaultMultiMappingStore<_>,
-    >(&mut mapper);
+    let mm = LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<DefaultMultiMappingStore<_>>(
+        &mut mapper,
+    );
     dbg!();
 
     hyper_diff::matchers::Mapping {

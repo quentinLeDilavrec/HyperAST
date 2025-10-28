@@ -8,14 +8,11 @@ use std::fmt::Debug;
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazySimpleBottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M: MonoMappingStore,
+    Mpr,
     const SIMILARITY_THRESHOLD_NUM: u64 = 1,
     const SIMILARITY_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
+    _phantom: std::marker::PhantomData<*const Mpr>,
 }
 
 impl<
@@ -26,7 +23,7 @@ impl<
     M: MonoMappingStore,
     const SIM_THRESHOLD_NUM: u64, // 1
     const SIM_THRESHOLD_DEN: u64, // 2
-> LazySimpleBottomUpMatcher<Dsrc, Ddst, HAST, M, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
+> LazySimpleBottomUpMatcher<Mapper<HAST, Dsrc, Ddst, M>, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
 where
     for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,

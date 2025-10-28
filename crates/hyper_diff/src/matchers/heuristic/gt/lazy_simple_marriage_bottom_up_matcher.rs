@@ -8,15 +8,12 @@ use std::{fmt::Debug, marker::PhantomData};
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazySimpleMarriageBottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M: MonoMappingStore,
-    MZs: MonoMappingStore = M,
+    Mpr: crate::matchers::WithMappings,
+    MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: PhantomData<*const (Mapper<HAST, Dsrc, Ddst, M>, MZs)>,
+    _phantom: PhantomData<*const (Mpr, MZs)>,
 }
 
 impl<
@@ -27,7 +24,13 @@ impl<
     MZs,
     const SIM_THRESHOLD_NUM: u64,
     const SIM_THRESHOLD_DEN: u64,
-> LazySimpleMarriageBottomUpMatcher<Dsrc, Ddst, HAST, M, MZs, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
+>
+    LazySimpleMarriageBottomUpMatcher<
+        Mapper<HAST, Dsrc, Ddst, M>,
+        MZs,
+        SIM_THRESHOLD_NUM,
+        SIM_THRESHOLD_DEN,
+    >
 where
     for<'t> LendT<'t, HAST>: Tree + WithHashs + WithStats,
     HAST::IdN: Clone + Eq + Debug,

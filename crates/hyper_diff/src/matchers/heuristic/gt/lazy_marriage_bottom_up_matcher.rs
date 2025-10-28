@@ -8,17 +8,13 @@ use std::{fmt::Debug, marker::PhantomData};
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazyMarriageBottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M: MonoMappingStore,
-    MZs: MonoMappingStore = M,
+    Mpr: crate::matchers::WithMappings,
+    MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIZE_THRESHOLD: usize = 1000,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    mapper: Mapper<HAST, Dsrc, Ddst, M>,
-    _phantom: PhantomData<*const MZs>,
+    _phantom: PhantomData<*const (Mpr, MZs)>,
 }
 
 impl<
@@ -32,10 +28,7 @@ impl<
     const SIM_THRESHOLD_DEN: u64,
 >
     LazyMarriageBottomUpMatcher<
-        Dsrc,
-        Ddst,
-        HAST,
-        M,
+        Mapper<HAST, Dsrc, Ddst, M>,
         MZs,
         SIZE_THRESHOLD,
         SIM_THRESHOLD_NUM,
@@ -56,18 +49,14 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        let mut matcher = Self {
-            mapper: mapping,
-            _phantom: PhantomData,
-        };
-        matcher.mapper.mapping.mappings.topit(
-            matcher.mapper.mapping.src_arena.len(),
-            matcher.mapper.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.mapper);
-        matcher.mapper
+        Self::execute(&mut mapper);
+        mapper
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {

@@ -965,11 +965,7 @@ pub fn differential(
                 .mapping
                 .mappings
                 .topit(mapper.src_arena.len(), mapper.dst_arena.len());
-            hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher::<
-                _,
-                _,
-                _,
-                hyper_diff::matchers::mapping_store::VecStore<_>,
+            hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher::<_,
                 1,
             >::filter_mappings(&mut mapper, &subtree_mappings);
 

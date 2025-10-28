@@ -38,7 +38,7 @@ where
 {
     let measure = super::DefaultMetricSetup::prepare();
     let mut mapper_owned: (DS<HAST>, DS<HAST>) = hyperast.decompress_pair(src, dst).1;
-    let mapper = Mapper::with_mut_decompressible(&mut mapper_owned);
+    let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
     let measure = measure.start();
 
     let mapper = LazyLeavesMatcher::<_, _, _, M>::match_it(mapper);

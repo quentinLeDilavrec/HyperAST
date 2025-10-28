@@ -105,12 +105,20 @@ impl<HAST: Copy, D> Decompressible<HAST, D> {
     }
 }
 
+pub trait WithMappings {
+    type M;
+}
+
 #[derive(Clone)]
 pub struct Mapper<HAST, Dsrc, Ddst, M> {
     /// the hyperAST to whom mappings are coming
     pub hyperast: HAST,
     /// the decompressed subtrees coming from hyperAST and their mappings
     pub mapping: Mapping<Dsrc, Ddst, M>,
+}
+
+impl<HAST, Dsrc, Ddst, M> WithMappings for Mapper<HAST, Dsrc, Ddst, M> {
+    type M = M;
 }
 
 impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
@@ -134,6 +142,7 @@ impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
 
     pub fn with_mut_decompressible(
         owned: &mut (Decompressible<HAST, Dsrc>, Decompressible<HAST, Ddst>),
+        mappings: M,
     ) -> Mapper<HAST, Decompressible<HAST, &mut Dsrc>, Decompressible<HAST, &mut Ddst>, M>
     where
         M: Default,
@@ -143,7 +152,7 @@ impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
             mapping: crate::matchers::Mapping {
                 src_arena: owned.0.as_mut(),
                 dst_arena: owned.1.as_mut(),
-                mappings: Default::default(),
+                mappings,
             },
         }
     }

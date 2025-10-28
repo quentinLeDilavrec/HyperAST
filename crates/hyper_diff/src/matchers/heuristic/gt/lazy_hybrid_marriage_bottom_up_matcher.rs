@@ -8,16 +8,13 @@ use std::{fmt::Debug, marker::PhantomData};
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazyHybridMarriageBottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M: MonoMappingStore,
-    MZs: MonoMappingStore = M,
+    Mpr: crate::matchers::WithMappings,
+    MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIZE_THRESHOLD: usize = 1000,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: PhantomData<*const (Mapper<HAST, Dsrc, Ddst, M>, MZs)>,
+    _phantom: PhantomData<*const (Mpr, MZs)>,
 }
 
 impl<
@@ -31,10 +28,7 @@ impl<
     const SIM_THRESHOLD_DEN: u64,
 >
     LazyHybridMarriageBottomUpMatcher<
-        Dsrc,
-        Ddst,
-        HAST,
-        M,
+        Mapper<HAST, Dsrc, Ddst, M>,
         MZs,
         SIZE_THRESHOLD,
         SIM_THRESHOLD_NUM,
@@ -67,9 +61,6 @@ where
             Mapper::adaptive_threshold,
             SimilarityMeasure::chawathe,
             super::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher::<
-                _,
-                _,
-                _,
                 _,
                 MZs,
                 SIZE_THRESHOLD,

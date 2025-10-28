@@ -7,14 +7,11 @@ use std::fmt::Debug;
 use super::factorized_bounds::DecompTreeBounds;
 
 pub struct SimpleBottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M: MonoMappingStore,
+    Mpr,
     const SIMILARITY_THRESHOLD_NUM: u64 = 1,
     const SIMILARITY_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
+    _phantom: std::marker::PhantomData<*const Mpr>,
 }
 
 impl<
@@ -25,7 +22,12 @@ impl<
     M: MonoMappingStore + Default,
     const SIMILARITY_THRESHOLD_NUM: u64, // 1
     const SIMILARITY_THRESHOLD_DEN: u64, // 2
-> SimpleBottomUpMatcher<Dsrc, Ddst, HAST, M, SIMILARITY_THRESHOLD_NUM, SIMILARITY_THRESHOLD_DEN>
+>
+    SimpleBottomUpMatcher<
+        Mapper<HAST, Dsrc, Ddst, M>,
+        SIMILARITY_THRESHOLD_NUM,
+        SIMILARITY_THRESHOLD_DEN,
+    >
 where
     for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,

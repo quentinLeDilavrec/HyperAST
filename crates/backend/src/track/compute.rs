@@ -416,7 +416,7 @@ fn compute_mappings_full<'store, 'alone, 'trees, 'mapper, 'rest, 's: 'trees>(
                 );
 
                 let now = std::time::Instant::now();
-                let mm = matching::LazyGreedySubtreeMatcher::<_, _, _, VecStore<_>>::compute_multi_mapping::<
+                let mm = matching::LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<
                     mapping_store::DefaultMultiMappingStore<_>,
                 >(mapper);
                 let compute_multi_mapping_t = now.elapsed().as_secs_f64();

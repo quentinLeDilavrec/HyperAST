@@ -14,8 +14,8 @@ use num_traits::ToPrimitive;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-pub struct LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, const MIN_HEIGHT: usize = 1> {
-    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
+pub struct LazyGreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
+    _phantom: std::marker::PhantomData<*const Mpr>,
 }
 
 impl<
@@ -24,7 +24,7 @@ impl<
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
-> LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, MIN_HEIGHT>
+> LazyGreedySubtreeMatcher<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>
 where
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     HAST::IdN: Clone + Eq,
@@ -85,7 +85,7 @@ impl<
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
-> LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, MIN_HEIGHT>
+> LazyGreedySubtreeMatcher<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>
 where
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
     HAST::IdN: NodeId<IdN = HAST::IdN>,

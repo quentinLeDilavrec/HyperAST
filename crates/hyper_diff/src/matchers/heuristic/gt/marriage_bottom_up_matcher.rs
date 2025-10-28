@@ -9,16 +9,13 @@ use std::fmt::Debug;
 use super::factorized_bounds::DecompTreeBounds;
 
 pub struct MarriageBottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M: MonoMappingStore,
-    MZs: MonoMappingStore = M,
+    Mpr: crate::matchers::WithMappings,
+    MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIZE_THRESHOLD: usize = 1000,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: std::marker::PhantomData<*const (Mapper<HAST, Dsrc, Ddst, M>, MZs)>,
+    _phantom: std::marker::PhantomData<*const (Mpr, MZs)>,
 }
 
 impl<
@@ -33,10 +30,7 @@ impl<
     const SIM_THRESHOLD_DEN: u64,
 >
     MarriageBottomUpMatcher<
-        Dsrc,
-        Ddst,
-        HAST,
-        M,
+        Mapper<HAST, Dsrc, Ddst, M>,
         MZs,
         SIZE_THRESHOLD,
         SIM_THRESHOLD_NUM,

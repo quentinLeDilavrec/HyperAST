@@ -174,7 +174,7 @@ fn bench_xy(
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
                     );
                     use xy_bottom_up_matcher::XYBottomUpMatcher;
-                    let mapper_bottom_up = XYBottomUpMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -209,7 +209,7 @@ fn bench_lazy_greedy<const MAX_SIZE: usize>(
                     );
                     use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
                     let mapper_bottom_up =
-                        LazyGreedyBottomUpMatcher::<_, _, _, M, M, MAX_SIZE>::match_it(mapper);
+                        LazyGreedyBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -239,8 +239,7 @@ fn bench_greedy<const MAX_SIZE: usize>(
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
                     );
                     use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
-                    let mapper_bottom_up =
-                        GreedyBottomUpMatcher::<_, _, _, _, MAX_SIZE>::match_it(mapper);
+                    let mapper_bottom_up = GreedyBottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -271,7 +270,7 @@ fn bench_hybrid<const MAX_SIZE: usize>(
                     );
                     use gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
                     let mapper_bottom_up =
-                        HybridBottomUpMatcher::<_, _, _, _, M, MAX_SIZE>::match_it(mapper);
+                        HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -337,7 +336,7 @@ fn bench_stable<const MAX_SIZE: usize>(
                     );
                     use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
                     let mapper_bottom_up =
-                        MarriageBottomUpMatcher::<_, _, _, _, M, MAX_SIZE>::match_it(mapper);
+                        MarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -402,7 +401,7 @@ fn bench_simple(
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
                     );
                     use gt::simple_bottom_up_matcher3::SimpleBottomUpMatcher;
-                    let mapper_bottom_up = SimpleBottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                    let mapper_bottom_up = SimpleBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -474,9 +473,9 @@ fn prep_bench_gt_subtree<Mea: Measurement>(
                 .div_ceil(2) as u64,
             ));
             let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
-            let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
+            let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
             use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
-            let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
+            let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
             let mappings = mapper.mapping.mappings.clone();
             ((mapper_owned.0.decomp, mapper_owned.1.decomp), mappings)
         },
@@ -503,7 +502,10 @@ fn prep_bench_cd_subtree<Mea: Measurement>(
                 .div_ceil(2) as u64,
             ));
             let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
-            let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(&mut mapper_owned);
+            let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
+                &mut mapper_owned,
+                M::default(),
+            );
 
             use cd::lazy_leaves_matcher::LazyLeavesMatcher;
             use hyper_diff::matchers::heuristic::cd;

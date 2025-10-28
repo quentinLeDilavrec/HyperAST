@@ -32,14 +32,13 @@ where
         hyperast.decompress_pair(src, dst).into();
     let measure = measure.start();
 
-    let mapper =
-        GreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+    let mapper = GreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
     let subtree_mappings_s = mapper.mappings().len();
     tr!(subtree_mappings_s);
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = MarriageBottomUpMatcher::<_, _, _, _, M, 300>::match_it(mapper);
+    let mapper = MarriageBottomUpMatcher::<_, M, 300>::match_it(mapper);
     let bottomup_mappings_s = mapper.mappings().len();
     tr!(bottomup_mappings_s);
 

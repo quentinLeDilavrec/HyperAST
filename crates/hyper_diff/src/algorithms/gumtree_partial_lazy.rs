@@ -34,10 +34,10 @@ where
 {
     let measure = super::DefaultMetricSetup::prepare();
     let mut mapper_owned: (DS<HAST>, DS<HAST>) = hyperast.decompress_pair(src, dst).1;
-    let mapper = Mapper::with_mut_decompressible(&mut mapper_owned);
+    let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
     let measure = measure.start();
 
-    let mapper = LazyGreedySubtreeMatcher::<_, _, _, M>::match_it::<MM>(mapper);
+    let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
     let subtree_mappings_s = mapper.mappings().len();
     tr!(subtree_mappings_s);
 
@@ -51,7 +51,7 @@ where
     );
     let measure = measure.start();
 
-    let mapper = GreedyBottomUpMatcher::<_, _, _, _>::match_it(mapper);
+    let mapper = GreedyBottomUpMatcher::<_>::match_it(mapper);
     let bottomup_mappings_s = mapper.mappings().len();
 
     tr!(bottomup_mappings_s);

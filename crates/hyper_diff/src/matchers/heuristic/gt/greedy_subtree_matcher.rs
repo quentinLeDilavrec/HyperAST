@@ -12,8 +12,8 @@ use hyperast::types::{
 use num_traits::{ToPrimitive, one, zero};
 use std::hash::Hash;
 
-pub struct GreedySubtreeMatcher<Dsrc, Ddst, HAST, M, const MIN_HEIGHT: usize = 1> {
-    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
+pub struct GreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
+    _phantom: std::marker::PhantomData<*const Mpr>,
 }
 
 impl<
@@ -22,7 +22,7 @@ impl<
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
-> GreedySubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>
+> GreedySubtreeMatcher<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>
 where
     M::Src: PrimInt + Hash,
     M::Dst: PrimInt + Hash,
@@ -49,7 +49,9 @@ where
     ) {
         let mut mm: MM = Default::default();
         mm.topit(mapper.src_arena.len(), mapper.dst_arena.len());
-        SubtreeMatcher::<Dsrc, Ddst, HAST, M, MIN_HEIGHT>::matchh_to_be_filtered(mapper, &mut mm);
+        SubtreeMatcher::<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>::matchh_to_be_filtered(
+            mapper, &mut mm,
+        );
         Self::filter_mappings(mapper, &mm);
     }
 
@@ -271,8 +273,8 @@ where
     }
 }
 
-pub struct SubtreeMatcher<Dsrc, Ddst, HAST, M, const MIN_HEIGHT: usize> {
-    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
+pub struct SubtreeMatcher<Mpr, const MIN_HEIGHT: usize> {
+    _phantom: std::marker::PhantomData<*const Mpr>,
 }
 
 impl<
@@ -282,7 +284,7 @@ impl<
     HAST,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize,
-> SubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>
+> SubtreeMatcher<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>
 where
     HAST: HyperAST + Copy,
     M::Src: PrimInt,

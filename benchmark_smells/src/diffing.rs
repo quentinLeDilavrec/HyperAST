@@ -20,10 +20,9 @@ fn _top_down<HAST: HyperAST + Copy>(
     HAST::Idx: Debug,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
 {
-    let mm = LazyGreedySubtreeMatcher::<_, _, _, VecStore<_>>::compute_multi_mapping::<
-        DefaultMultiMappingStore<_>,
-    >(mapper);
-    LazyGreedySubtreeMatcher::<_, _, _, VecStore<_>>::filter_mappings(mapper, &mm);
+    let mm =
+        LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<DefaultMultiMappingStore<_>>(mapper);
+    LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
 }
 
 pub fn top_down<'a, HAST: HyperAST + Copy>(

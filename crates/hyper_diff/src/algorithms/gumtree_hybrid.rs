@@ -59,25 +59,18 @@ where
     }
     let measure = measure.start();
 
-    let mapper = GreedySubtreeMatcher::<_, _, _, _, MIN_HEIGHT>::match_it::<
-        DefaultMultiMappingStore<_>,
-    >(mapper);
+    let mapper =
+        GreedySubtreeMatcher::<_, MIN_HEIGHT>::match_it::<DefaultMultiMappingStore<_>>(mapper);
     let subtree_mappings_s = mapper.mappings().len();
 
     tr!(subtree_mappings_s);
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = HybridBottomUpMatcher::<
-        _,
-        _,
-        _,
-        _,
-        M,
-        SIZE_THRESHOLD,
-        SIM_THRESHOLD_NUM,
-        SIM_THRESHOLD_DEN,
-    >::match_it(mapper);
+    let mapper =
+        HybridBottomUpMatcher::<_,M, SIZE_THRESHOLD, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>::match_it(
+            mapper,
+        );
 
     let bottomup_mappings_s = mapper.mappings().len();
 

@@ -4,7 +4,6 @@ use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
-use num_traits::cast;
 use std::fmt::Debug;
 
 use super::factorized_bounds::DecompTreeBounds;

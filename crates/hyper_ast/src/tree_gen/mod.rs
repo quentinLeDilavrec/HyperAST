@@ -717,6 +717,7 @@ pub mod utils_ts {
     //     uint32_t size;     \
     //     uint32_t capacity; \
     //   }
+    #[repr(C)]
     struct Array<T> {
         pub contents: *mut T,
         pub size: u32,

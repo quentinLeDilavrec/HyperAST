@@ -704,6 +704,7 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs_memo<
     Ok(())
 }
 
+#[expect(unused)]
 fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs<'a, R: Default>(
     cumulative: &mut impl ResultLogger<R>,
     cache: &mut HashMap<FileId, (tree_sitter::Tree, git2::Blob<'a>)>,
@@ -814,6 +815,7 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs<'a, R: Default>(
     Ok(())
 }
 
+#[allow(unused)]
 fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs2<'a, R: Default>(
     cumulative: &mut impl ResultLogger<R>,
     cache: &mut HashMap<FileId, (tree_sitter::Tree, git2::Blob<'a>)>,
@@ -884,6 +886,7 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs2<'a, R: Default>(
     Ok(())
 }
 
+#[expect(unused)]
 fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp<'a, R: Default>(
     cumulative: &mut impl ResultLogger<R>,
     cache: &mut HashMap<FileId, (tree_sitter::Tree, git2::Blob<'a>, Precomp)>,

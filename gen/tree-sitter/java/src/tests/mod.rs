@@ -130,7 +130,7 @@ mod structure {
 
     #[test]
     fn invalid_class_test() {
-        let text = r#"public class InvalidClass {
+        let _text = r#"public class InvalidClass {
             "#
         .as_bytes();
         let text = r#"public class Cp1251 {

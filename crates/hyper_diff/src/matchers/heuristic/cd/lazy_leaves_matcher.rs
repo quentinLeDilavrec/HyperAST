@@ -1,8 +1,6 @@
 #![allow(unexpected_cfgs)]
 use super::{Similarity, TextSimilarity, is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, LazyDecompressed, LazyDecompressedTreeStore, Shallow,
-};
+use crate::decompressed_tree_store::{ContiguousDescendants, LazyDecompressedTreeStore, Shallow};
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use hyperast::PrimInt;

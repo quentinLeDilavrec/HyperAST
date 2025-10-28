@@ -93,7 +93,7 @@ fn test_to_much_matches() {
   (catch_clause)
 ) @root"#;
     let prepro = ["(try_statement)"];
-    let text = r#"
+    let _text = r#"
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -402,7 +402,6 @@ fn run_prepro(query: &str, subqueries: &[&str], text: &[u8]) -> usize {
             dbg!(i);
             let name = query.capture_name(i);
             dbg!(name);
-            use hyperast::position::TreePath;
             let n = c.node.pos.node();
             // let n = *c.node.pos.node().unwrap();
             let n = hyperast::nodes::SyntaxSerializer::new(c.node.stores, n);

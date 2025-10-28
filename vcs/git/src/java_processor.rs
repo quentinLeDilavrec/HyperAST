@@ -7,7 +7,6 @@ use git2::{Oid, Repository};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::nodes::legion::{RawHAST, subtree_builder};
 use hyperast::tree_gen::add_md_precomp_queries;
-use hyperast::types::{HyperAST, HyperType, Labeled, WithChildren};
 use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
 use hyperast_gen_ts_java::types::{TStore, Type};
 

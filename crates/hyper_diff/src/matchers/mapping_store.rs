@@ -1,7 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
-    ops::{Range, RangeInclusive},
+    ops::Range,
 };
 
 use hyperast::compat::HashMap;

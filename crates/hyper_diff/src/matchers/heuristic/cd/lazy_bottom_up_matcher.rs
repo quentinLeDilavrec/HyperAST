@@ -1,6 +1,4 @@
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, LazyDecompressed, LazyDecompressedTreeStore, Shallow,
-};
+use crate::decompressed_tree_store::{ContiguousDescendants, LazyDecompressedTreeStore, Shallow};
 use crate::matchers::Mapper;
 use crate::matchers::heuristic::factorized_bounds::LazyDecompTreeBounds;
 use crate::matchers::mapping_store::MonoMappingStore;

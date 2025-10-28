@@ -393,7 +393,7 @@ pub(crate) struct Diff {
     inserts: Vec<Pos>,
     moves: Vec<(Pos, Pos)>,
 }
-type Pos = (
+pub(crate) type Pos = (
     hyperast::position::file_and_offset::Position<std::path::PathBuf, usize>,
     Vec<Idx>,
 );

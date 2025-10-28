@@ -2,11 +2,20 @@ use crate::{SharedState, smells::globalize};
 use axum::{Json, response::IntoResponse};
 use http::{HeaderMap, StatusCode};
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
-use hyper_diff::matchers::mapping_store::MappingStore;
+use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+use hyper_diff::matchers::mapping_store::{MappingStore, VecStore};
+use hyper_diff::matchers::similarity_metrics::SimilarityMeasure;
 use hyper_diff::matchers::{Decompressible, mapping_store::MultiMappingStore};
-use hyperast::position::position_accessors::WithPreOrderOffsets;
+use hyper_diff::matchers::{Mapper, Mapping};
+use hyperast::nodes::TextSerializer;
+use hyperast::position::StructuralPosition;
+use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
+use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{Children, Childrn, HyperAST, Typed, WithChildren, WithStats};
+use hyperast::types::{
+    Children, Childrn, HyperAST, HyperType, Labeled, Typed, WithChildren, WithStats,
+};
+use hyperast_vcs_git::TStore;
 use hyperast_vcs_git::git::Oid;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -33,6 +42,13 @@ pub struct Content {
     /// checked each match (in milli seconds)
     #[serde(default = "default_timeout")]
     pub timeout: u64,
+}
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ContentDifferential {
+    #[serde(flatten)]
+    pub content: Content,
+    #[serde(default)]
+    pub full_diff: bool,
 }
 
 fn default_max_matches() -> u64 {
@@ -567,10 +583,10 @@ pub struct ParamDifferential {
 }
 
 pub fn differential(
-    query: Content,
+    query: ContentDifferential,
     state: SharedState,
     path: ParamDifferential,
-) -> Result<Json<ComputeResultsDifferential>, QueryingError> {
+) -> Result<ComputeResultsDifferential, QueryingError> {
     let now = Instant::now();
     let ParamDifferential {
         user,
@@ -578,13 +594,17 @@ pub fn differential(
         commit,
         baseline,
     } = path.clone();
-    let Content {
-        language,
-        query,
-        precomp,
-        max_matches,
-        timeout,
-        ..
+    let ContentDifferential {
+        content:
+            Content {
+                language,
+                query,
+                precomp,
+                max_matches,
+                timeout,
+                ..
+            },
+        full_diff,
     } = query;
     let timeout = std::time::Duration::from_millis(timeout);
     let config = if language == "Java" {
@@ -646,6 +666,8 @@ pub fn differential(
         QueryingError::ParsingError("exactly one enabled pattern is expected".to_string())
     })?;
 
+    let mut named = hashbrown::HashMap::<Vec<NodeIdentifier>, (usize, usize)>::default();
+
     log::info!("done query construction");
     let prepare_time = now.elapsed().as_secs_f64();
     let current_tr;
@@ -660,13 +682,18 @@ pub fn differential(
         current_tr = code;
         let stores = &repositories.processor.main_stores;
 
-        // (p.make_position(stores), p.iter_offsets().collect())
-
-        differential_aux(stores, code, &query, timeout, max_matches)
-            .map_err(QueryingError::MatchingError)?
+        let (r, names) = differential_aux(stores, code, &query, timeout, max_matches)
+            .map_err(QueryingError::MatchingError)?;
+        for (i, names) in names.into_iter().enumerate() {
+            if names.is_empty() {
+                continue;
+            }
+            named.insert(names, (i, usize::MAX));
+        }
+        r
     };
     let other_tr;
-    let results: Vec<_> = {
+    let other_results: Vec<_> = {
         let commit_oid = &commit;
         let mut oid = commit_oid.to_string();
         oid.truncate(6);
@@ -677,8 +704,22 @@ pub fn differential(
         other_tr = code;
         let stores = &repositories.processor.main_stores;
 
-        differential_aux(stores, code, &query, timeout, max_matches)
-            .map_err(QueryingError::MatchingError)?
+        let (r, names) = differential_aux(stores, code, &query, timeout, max_matches)
+            .map_err(QueryingError::MatchingError)?;
+        for (i, names) in names.into_iter().enumerate() {
+            if names.is_empty() {
+                continue;
+            }
+            print!("other:");
+            for name in &names {
+                print!("{},", TextSerializer::new(stores, *name))
+            }
+            println!();
+            (named.entry(names))
+                .and_modify(|x| x.1 = i)
+                .or_insert((usize::MAX, i));
+        }
+        r
     };
     log::info!(
         "done querying of {commit:?} and {baseline:?} in {}",
@@ -687,12 +728,57 @@ pub fn differential(
 
     log::info!(
         "lengths results/baseline_results: {}/{}",
-        results.len(),
+        other_results.len(),
         baseline_results.len()
     );
 
     let repositories = state.repositories.read().unwrap();
     let stores = &repositories.processor.main_stores;
+
+    let (baseline_results, other_results) = if named.is_empty() {
+        (baseline_results, other_results)
+    } else {
+        let mut baseline_idx: Vec<usize> = vec![];
+        let mut other_idx: Vec<usize> = vec![];
+        for (names, (baseline, other)) in named.into_iter() {
+            if baseline != usize::MAX && other != usize::MAX {
+                continue; // matching
+            }
+            if baseline != usize::MAX {
+                for name in &names {
+                    println!("{}", TextSerializer::new(stores, *name));
+                }
+                println!("bl: {}", baseline);
+                baseline_idx.push(baseline);
+            }
+            if other != usize::MAX {
+                for name in names {
+                    println!("{}", TextSerializer::new(stores, name));
+                }
+                println!("ot: {}", other);
+                other_idx.push(other);
+            }
+        }
+        baseline_idx.sort();
+        other_idx.sort();
+        let mut baseline_results = baseline_results
+            .into_iter()
+            .map(|x| Some(x))
+            .collect::<Vec<_>>();
+        let mut other_results = other_results
+            .into_iter()
+            .map(|x| Some(x))
+            .collect::<Vec<_>>();
+        let baseline_results = baseline_idx
+            .into_iter()
+            .map(|idx| baseline_results[idx].take().unwrap())
+            .collect::<Vec<_>>();
+        let other_results = other_idx
+            .into_iter()
+            .map(|idx| other_results[idx].take().unwrap())
+            .collect::<Vec<_>>();
+        (baseline_results, other_results)
+    };
 
     let hyperast = &hyperast_vcs_git::no_space::as_nospaces(stores);
     let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &current_tr, &other_tr);
@@ -708,12 +794,12 @@ pub fn differential(
         decomp: dst_tree,
     };
 
-    let mut mapper = hyper_diff::matchers::Mapper {
+    let mut mapper = Mapper {
         hyperast,
-        mapping: hyper_diff::matchers::Mapping {
+        mapping: Mapping {
             src_arena: src_tree,
             dst_arena: dst_tree,
-            mappings: hyper_diff::matchers::mapping_store::VecStore::<u16>::default(),
+            mappings: VecStore::<u32>::default(),
         },
     };
 
@@ -722,6 +808,7 @@ pub fn differential(
         mapper.mapping.src_arena.len(),
         mapper.mapping.dst_arena.len()
     );
+
     let subtree_mappings = {
         crate::matching::top_down(
             hyperast,
@@ -735,41 +822,194 @@ pub fn differential(
         subtree_mappings.len(),
         baseline_results.len()
     );
+    let (baseline_results, other_results) = if full_diff {
+        mapper
+            .mapping
+            .mappings
+            .topit(mapper.src_arena.len(), mapper.dst_arena.len());
 
+        hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher::<
+            _,
+            _,
+            _,
+            hyper_diff::matchers::mapping_store::VecStore<_>,
+            1,
+        >::filter_mappings(&mut mapper, &subtree_mappings);
+
+        Mapper::bottom_up_stable_with_similarity_threshold_and_recovery(
+            &mut mapper,
+            Mapper::adaptive_threshold,
+            SimilarityMeasure::chawathe,
+            |_, _, _| {},
+        );
+        diferential_filter(
+            &repo,
+            baseline,
+            commit,
+            current_tr,
+            other_tr,
+            stores,
+            hyperast,
+            baseline_results,
+            other_results,
+            subtree_mappings,
+            mapper,
+        )
+    } else {
+        let mut mapper = Mapper {
+            hyperast,
+            mapping: Mapping {
+                src_arena: mapper.mapping.src_arena,
+                dst_arena: mapper.mapping.dst_arena,
+                mappings: subtree_mappings.clone(),
+            },
+        };
+        diferential_filter(
+            &repo,
+            baseline,
+            commit,
+            current_tr,
+            other_tr,
+            stores,
+            hyperast,
+            baseline_results,
+            other_results,
+            subtree_mappings,
+            mapper,
+        )
+    };
+
+    let baseline_results = baseline_results.into_iter().map(|p| {
+        log::trace!("globalizing");
+        let baseline_pos = p.make_position(stores);
+        let mut pos = baseline_pos.clone();
+        pos.set_len(1);
+        (
+            globalize(&repo, baseline, (baseline_pos, p.iter_offsets().collect())),
+            globalize(&repo, commit, (pos, p.iter_offsets().collect())),
+        )
+    });
+    let other_results = other_results.into_iter().map(|p| {
+        log::trace!("globalizing");
+        let other_pos = p.make_position(stores);
+        let mut pos = other_pos.clone();
+        pos.set_len(1);
+        (
+            globalize(&repo, baseline, (pos, p.iter_offsets().collect())),
+            globalize(&repo, commit, (other_pos, p.iter_offsets().collect())),
+        )
+    });
+    let results: Vec<(_, _)> = baseline_results.chain(other_results).collect();
+
+    log::info!(
+        "done finding {} evolutions from {baseline:?} to {commit:?} in {}",
+        results.len(),
+        repo.spec
+    );
+
+    Ok(ComputeResultsDifferential {
+        prepare_time,
+        results,
+    })
+}
+
+fn remap(
+    stores: &SimpleStores<TStore>,
+    x: &StructuralPosition<IdN, u16>,
+    arena: &mut Decompressible<
+        &hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+        &mut LazyPostOrder<IdN, u32>,
+    >,
+    tr: IdN,
+) -> u32 {
+    let (_, _, no_spaces_path_to_target) =
+        hyperast::position::compute_position_with_no_spaces(tr, &mut x.iter_offsets(), stores);
+    let mut src = arena.root();
+    dbg!(&no_spaces_path_to_target);
+    for i in no_spaces_path_to_target {
+        use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore;
+        let cs = arena.decompress_children(&src);
+        dbg!(i, src, cs.len());
+        let Some(s) = cs.get(i as usize) else {
+            return src;
+        };
+        src = *s;
+    }
+    src
+}
+
+type IdN = NodeIdentifier;
+
+type NoS<'a> = hyperast::store::SimpleStores<
+    hyperast_vcs_git::TStore,
+    hyperast_vcs_git::no_space::NoSpaceNodeStoreWrapper<'a>,
+    &'a hyperast::store::labels::LabelStore,
+>;
+
+fn diferential_filter(
+    repo: &hyperast_vcs_git::processing::ConfiguredRepo2,
+    baseline: Oid,
+    commit: Oid,
+    current_tr: IdN,
+    other_tr: IdN,
+    stores: &SimpleStores<hyperast_vcs_git::TStore>,
+    hyperast: &NoS,
+    baseline_results: Vec<StructuralPosition<IdN, u16>>,
+    other_results: Vec<StructuralPosition<IdN, u16>>,
+    subtree_mappings: hyper_diff::matchers::mapping_store::MultiVecStore<u32>,
+    mut mapper: Mapper<
+        &NoS,
+        Decompressible<&NoS, &mut LazyPostOrder<IdN, u32>>,
+        Decompressible<&NoS, &mut LazyPostOrder<IdN, u32>>,
+        impl MappingStore<Src = u32, Dst = u32>,
+    >,
+) -> (
+    Vec<StructuralPosition<IdN, u16>>,
+    Vec<StructuralPosition<IdN, u16>>,
+) {
     let baseline_results: Vec<_> = baseline_results
-        .iter()
+        .into_iter()
         .filter(|x| {
-            log::debug!("filtering");
-            let (_, _, no_spaces_path_to_target) =
+            log::trace!("filtering");
+            let (_, _x, no_spaces_path_to_target) =
                 hyperast::position::compute_position_with_no_spaces(
                     current_tr,
                     &mut x.iter_offsets(),
                     stores,
                 );
+            assert_eq!(
+                _x,
+                x.node(),
+                "{:?} != {:?} for {} vs {}",
+                x.node(),
+                _x,
+                hyperast.resolve_type(&x.node()).as_static_str(),
+                hyperast.resolve_type(&_x).as_static_str()
+            );
 
             let mut src = mapper.src_arena.root();
             for i in no_spaces_path_to_target {
-                if subtree_mappings.get_dsts(&src).is_empty() {
-                } else {
+                if subtree_mappings.is_src(&src) {
                     let a = globalize(
-                        &repo,
+                        repo,
                         baseline,
                         (x.make_position(stores), x.iter_offsets().collect()),
                     );
-                    log::debug!("mapped: {a:?}");
+                    log::trace!("mapped: {a:?}");
                     return false;
                 }
                 use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore;
                 let cs = mapper.src_arena.decompress_children(&src);
                 if cs.is_empty() {
-                    log::debug!("empty");
+                    let ty = hyperast.resolve_type(&mapper.src_arena.original(&src));
+                    log::debug!("empty {}", ty.as_static_str());
                     return true;
                 }
                 // Gracefully handling possibly wrong param
                 // before: // src = cs[i as usize];
                 let Some(s) = cs.get(i as usize) else {
                     let a = globalize(
-                        &repo,
+                        repo,
                         baseline,
                         (x.make_position(stores), x.iter_offsets().collect()),
                     );
@@ -781,7 +1021,7 @@ pub fn differential(
                             &mut x.iter_offsets(),
                             stores,
                         );
-                    log::error!(
+                    log::warn!(
                         "no such child: {a:?} {t:?} {} {} {:?}",
                         cs.len(),
                         i,
@@ -791,41 +1031,89 @@ pub fn differential(
                 };
                 src = *s;
             }
-            log::debug!("mapped = {}", subtree_mappings.get_dsts(&src).is_empty());
-            subtree_mappings.get_dsts(&src).is_empty()
+            let mappings = &mapper.mapping.mappings;
+            log::debug!("mapped = {}", mappings.is_src(&src));
+            !(mappings.is_src(&src) || subtree_mappings.is_src(&src))
         })
         .collect();
-    log::info!("done filtering to {} evolutions", baseline_results.len());
-
-    let results: Vec<(_, _)> = baseline_results
+    log::debug!("filtering other");
+    let arena = &mut mapper.mapping.dst_arena;
+    let tr = other_tr;
+    let is_subtree_mapped = |node| subtree_mappings.is_dst(&node);
+    let is_mapped = |node| mapper.mapping.mappings.is_dst(&node);
+    let other_results: Vec<_> = other_results
         .into_iter()
-        .map(|p| {
-            log::debug!("globalizing");
-            (
-                globalize(
-                    &repo,
-                    baseline,
-                    (p.make_position(stores), p.iter_offsets().collect()),
-                ),
-                globalize(
-                    &repo,
-                    commit,
-                    (p.make_position(stores), p.iter_offsets().collect()),
-                ),
-            )
+        .filter(|x| {
+            log::trace!("filtering");
+            let (_, _x, no_spaces_path_to_target) =
+                hyperast::position::compute_position_with_no_spaces(
+                    tr,
+                    &mut x.iter_offsets(),
+                    stores,
+                );
+            assert_eq!(
+                _x,
+                x.node(),
+                "{:?} != {:?} for {} vs {}",
+                x.node(),
+                _x,
+                hyperast.resolve_type(&x.node()).as_static_str(),
+                hyperast.resolve_type(&_x).as_static_str()
+            );
+
+            let mut target = arena.root();
+            for i in no_spaces_path_to_target {
+                if subtree_mappings.is_dst(&target) {
+                    let a = globalize(
+                        repo,
+                        commit,
+                        (x.make_position(stores), x.iter_offsets().collect()),
+                    );
+                    log::trace!("mapped: {a:?}");
+                    return false;
+                }
+                use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore;
+                let cs = arena.decompress_children(&target);
+                if cs.is_empty() {
+                    let ty = hyperast.resolve_type(&arena.original(&target));
+                    log::debug!("empty {}", ty.as_static_str());
+                    return true;
+                }
+                let Some(s) = cs.get(i as usize) else {
+                    let a = globalize(
+                        repo,
+                        commit,
+                        (x.make_position(stores), x.iter_offsets().collect()),
+                    );
+                    let id = arena.original(&target);
+                    let t = hyperast.resolve_type(&id);
+                    let (_, _, no_spaces_path_to_target) =
+                        hyperast::position::compute_position_with_no_spaces(
+                            tr,
+                            &mut x.iter_offsets(),
+                            stores,
+                        );
+                    log::warn!(
+                        "no such child: {a:?} {t:?} {} {} {:?}",
+                        cs.len(),
+                        i,
+                        no_spaces_path_to_target
+                    );
+                    return true;
+                };
+                target = *s;
+            }
+            let mappings = &mapper.mapping.mappings;
+            log::debug!("mapped = {}", mappings.is_dst(&target));
+            !(mappings.is_dst(&target) || subtree_mappings.is_dst(&target))
         })
         .collect();
-
     log::info!(
-        "done finding {} evolutions from {baseline:?} to {commit:?} in {}",
-        results.len(),
-        repo.spec
+        "done filtering to {}+{} evolutions",
+        baseline_results.len(),
+        other_results.len()
     );
-
-    Ok(Json(ComputeResultsDifferential {
-        prepare_time,
-        results,
-    }))
+    (baseline_results, other_results)
 }
 
 fn differential_aux(
@@ -835,7 +1123,10 @@ fn differential_aux(
     _timeout: std::time::Duration,
     _max_matches: u64,
 ) -> Result<
-    Vec<hyperast::position::StructuralPosition<NodeIdentifier, u16>>,
+    (
+        Vec<hyperast::position::StructuralPosition<NodeIdentifier, u16>>,
+        Vec<Vec<NodeIdentifier>>,
+    ),
     MatchingError<ComputeResult>,
 > {
     let pos = hyperast::position::StructuralPosition::new(code);
@@ -848,9 +1139,11 @@ fn differential_aux(
         "details on a single pattern"
     );
     let mut results = vec![];
+    let mut result_names = vec![];
     let rrr = query
         .capture_index_for_name("root")
         .expect("@root at the end of query pattern");
+    let name_cid = query.capture_index_for_name("name");
     for m in qcursor {
         let i = m.pattern_index;
         let i = query.enabled_pattern_index(i).unwrap();
@@ -859,36 +1152,18 @@ fn differential_aux(
             .nodes_for_capture_index(rrr)
             .next()
             .expect("@root at the end of query pattern");
-        results.push(node.pos.clone());
+        let pos = node.pos.clone();
+        let names = name_cid
+            .iter()
+            .flat_map(|name_cid| {
+                m.nodes_for_capture_index(*name_cid)
+                    .map(|node| node.pos.node())
+            })
+            .collect::<Vec<_>>();
+        results.push(pos);
+        result_names.push(names);
         let compute_time = now.elapsed();
-        // if compute_time >= timeout {
-        //     let compute_time = now.elapsed().as_secs_f64();
-        //     return Err(MatchingError::TimeOut(ComputeResult {
-        //         result,
-        //         compute_time,
-        //     }));
-        // } else if result[i as usize] > max_matches {
-        //     // TODO disable the pattern, return the new query
-        //     let compute_time = now.elapsed().as_secs_f64();
-        //     return Err(MatchingError::MaxMatches(ComputeResult {
-        //         result,
-        //         compute_time,
-        //     }));
-        // }
-
-        // dbg!(m.pattern_index);
-        // dbg!(m.captures.len());
-        // for c in &m.captures {
-        //     let i = c.index;
-        //     dbg!(i);
-        //     let name = query.capture_name(i);
-        //     dbg!(name);
-        //     use hyperast::position::TreePath;
-        //     let n = c.node.pos.node().unwrap();
-        //     let n = hyperast::nodes::SyntaxSerializer::new(c.node.stores, *n);
-        //     dbg!(n.to_string());
-        // }
     }
     let compute_time = now.elapsed().as_secs_f64();
-    Ok(results)
+    Ok((results, result_names))
 }

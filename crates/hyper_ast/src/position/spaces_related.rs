@@ -169,7 +169,7 @@ where
 {
     let (pos, mut path_ids, no_spaces) =
         compute_position_and_nodes_with_no_spaces(root, offsets, stores);
-    (pos, path_ids.remove(path_ids.len() - 1), no_spaces)
+    (pos, path_ids.pop().unwrap(), no_spaces)
 }
 
 pub fn compute_position_and_nodes_with_no_spaces<'store, HAST, It>(
@@ -249,7 +249,6 @@ where
         0
     };
     let file = PathBuf::from_iter(path.iter());
-    path_ids.reverse();
     (Position::new(file, offset, len), path_ids, no_spaces)
 }
 

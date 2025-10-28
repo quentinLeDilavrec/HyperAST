@@ -162,7 +162,7 @@ async fn querying_streamed(
 async fn querying_differential(
     axum::extract::Path(path): axum::extract::Path<querying::ParamDifferential>,
     axum::extract::State(state): axum::extract::State<SharedState>,
-    axum::extract::Json(script): axum::extract::Json<querying::Content>,
+    axum::extract::Json(script): axum::extract::Json<querying::ContentDifferential>,
 ) -> axum::response::Result<Json<querying::ComputeResultsDifferential>> {
     let r = querying::differential(script, state, path)?;
     Ok(r.into())

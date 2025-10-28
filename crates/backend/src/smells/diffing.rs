@@ -895,7 +895,7 @@ mod tests {
         let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
 
         // let diff = hyper_diff::algorithms::gumtree_hybrid_lazy::diff(stores, &src_tr, &dst_tr);
-        let diff = hyper_diff::algorithms::gumtree_hybrid_partial_lazy::diff_with_hyperparameters::<
+        let diff = hyper_diff::algorithms::gumtree_hybrid_lazy::diff_with_hyperparameters::<
             _,
             3,
             300,

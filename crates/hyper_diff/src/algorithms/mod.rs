@@ -9,7 +9,6 @@ pub mod change_distiller_partial_lazy;
 pub mod gumtree;
 pub mod gumtree_hybrid;
 pub mod gumtree_hybrid_lazy;
-pub mod gumtree_hybrid_partial_lazy;
 pub mod gumtree_lazy;
 pub mod gumtree_partial_lazy;
 pub mod gumtree_simple;

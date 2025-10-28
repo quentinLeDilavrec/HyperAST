@@ -101,7 +101,7 @@ fn mapping_group(c: &mut Criterion) {
                     use gt::greedy_subtree_matcher::GreedySubtreeMatcher;
                     let mapper = GreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                     use hyper_diff::matchers::heuristic::xy_bottom_up_matcher::XYBottomUpMatcher;
-                    let mapper_bottom_up = XYBottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                    let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },
@@ -115,10 +115,10 @@ fn mapping_group(c: &mut Criterion) {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
                     let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                    let mapper =
-                        hyper_diff::matchers::Mapper::<_, _, _, M>::with_mut_decompressible(
-                            &mut mapper_owned,
-                        );
+                    let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
+                        &mut mapper_owned,
+                        M::default(),
+                    );
 
                     use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -130,7 +130,7 @@ fn mapping_group(c: &mut Criterion) {
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
                     );
                     use hyper_diff::matchers::heuristic::xy_bottom_up_matcher::XYBottomUpMatcher;
-                    let mapper_bottom_up = XYBottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                    let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },
@@ -168,10 +168,10 @@ fn mapping_group(c: &mut Criterion) {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
                     let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                    let mapper =
-                        hyper_diff::matchers::Mapper::<_, _, _, M>::with_mut_decompressible(
-                            &mut mapper_owned,
-                        );
+                    let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
+                        &mut mapper_owned,
+                        M::default(),
+                    );
 
                     use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -220,10 +220,10 @@ fn mapping_group(c: &mut Criterion) {
                 b.iter(|| {
                     let hyperast = &repositories.processor.main_stores;
                     let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                    let mapper =
-                        hyper_diff::matchers::Mapper::<_, _, _, M>::with_mut_decompressible(
-                            &mut mapper_owned,
-                        );
+                    let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
+                        &mut mapper_owned,
+                        M::default(),
+                    );
 
                     use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                     let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -235,8 +235,7 @@ fn mapping_group(c: &mut Criterion) {
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
                     );
                     use gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
-                    let mapper_bottom_up =
-                        HybridBottomUpMatcher::<_, _, _, _, M, 200>::match_it(mapper);
+                    let mapper_bottom_up = HybridBottomUpMatcher::<_, M, 200>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },
@@ -311,8 +310,7 @@ fn mapping_group(c: &mut Criterion) {
                     let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
 
                     use gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazySimpleBottomUpMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper_bottom_up = LazySimpleBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },
@@ -387,9 +385,9 @@ fn mapping_group(c: &mut Criterion) {
                     );
 
                     use cd::leaves_matcher::LeavesMatcher;
-                    let mapper = LeavesMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper = LeavesMatcher::<_>::match_it(mapper);
                     use cd::bottom_up_matcher::BottomUpMatcher;
-                    let mapper_bottom_up = BottomUpMatcher::<_, _, _, _, 200>::match_it(mapper);
+                    let mapper_bottom_up = BottomUpMatcher::<_, 200>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },
@@ -408,7 +406,7 @@ fn mapping_group(c: &mut Criterion) {
                         M::default(),
                     );
                     use cd::lazy_leaves_matcher::LazyLeavesMatcher;
-                    let mapper = LazyLeavesMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
                     let mappings = mapper.mapping.mappings;
                     let mapper =
                         hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
@@ -417,7 +415,7 @@ fn mapping_group(c: &mut Criterion) {
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
                     );
                     use cd::bottom_up_matcher::BottomUpMatcher;
-                    let mapper_bottom_up = BottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                    let mapper_bottom_up = BottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },
@@ -436,10 +434,10 @@ fn mapping_group(c: &mut Criterion) {
                         M::default(),
                     );
                     use cd::lazy_leaves_matcher::LazyLeavesMatcher;
-                    let mapper = LazyLeavesMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
 
                     use cd::lazy_bottom_up_matcher::BottomUpMatcher;
-                    let mapper_bottom_up = BottomUpMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper_bottom_up = BottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });
             },

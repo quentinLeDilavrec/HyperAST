@@ -107,7 +107,7 @@ fn bottomup_group(c: &mut Criterion) {
                             |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
                         );
                         use cd::bottom_up_matcher::BottomUpMatcher;
-                        let mapper = BottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                        let mapper = BottomUpMatcher::<_>::match_it(mapper);
                         dbg!(mapper.mappings.len(), mapper.mappings.capacity());
                         black_box(mapper);
                     },
@@ -141,7 +141,7 @@ fn bottomup_group(c: &mut Criterion) {
                             ),
                         );
                         use cd::lazy_bottom_up_matcher::BottomUpMatcher;
-                        let mapper = BottomUpMatcher::<_, _, _, _>::match_it(mapper);
+                        let mapper = BottomUpMatcher::<_>::match_it(mapper);
                         dbg!(mapper.mappings.len(), mapper.mappings.capacity());
                         black_box(mapper);
                     },
@@ -305,7 +305,7 @@ fn bench_lazy_hybrid<const MAX_SIZE: usize>(
                     );
                     use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
                     let mapper_bottom_up =
-                        LazyHybridBottomUpMatcher::<_, _, _, _, M, MAX_SIZE>::match_it(mapper);
+                        LazyHybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -371,7 +371,7 @@ fn bench_lazy_stable<const MAX_SIZE: usize>(
                     );
                     use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;
                     let mapper_bottom_up =
-                        LazyMarriageBottomUpMatcher::<_, _, _, _, M, MAX_SIZE>::match_it(mapper);
+                        LazyMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -435,8 +435,7 @@ fn bench_lazy_simple(
                         ),
                     );
                     use gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazySimpleBottomUpMatcher::<_, _, _, M>::match_it(mapper);
+                    let mapper_bottom_up = LazySimpleBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,
@@ -510,7 +509,7 @@ fn prep_bench_cd_subtree<Mea: Measurement>(
             use cd::lazy_leaves_matcher::LazyLeavesMatcher;
             use hyper_diff::matchers::heuristic::cd;
             dbg!();
-            let mapper = LazyLeavesMatcher::<_, _, _, M>::match_it(mapper);
+            let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
             dbg!();
             let mappings = mapper.mapping.mappings;
             ((mapper_owned.0.decomp, mapper_owned.1.decomp), mappings)

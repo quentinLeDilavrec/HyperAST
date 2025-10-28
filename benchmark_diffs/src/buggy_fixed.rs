@@ -1281,7 +1281,7 @@ mod test {
                 },
             };
 
-            // let mut matcher = LazyGreedySubtreeMatcher::<_, _, _, _, _, 1>::new(
+            // let mut matcher = LazyGreedySubtreeMatcher::<_, _, 1>::new(
             //     &stores, src_arena, dst_arena, mappings,
             // );
             // LazyGreedySubtreeMatcher::execute::<DefaultMultiMappingStore<_>>(&mut matcher);

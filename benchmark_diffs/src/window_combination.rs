@@ -736,7 +736,7 @@ mod test {
         use hyper_diff::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
         LazyGreedyBottomUpMatcher::<_, VecStore<_>>::execute(&mut mapper);
         // This one matches everingthing as it should but it is much slower
-        // GreedyBottomUpMatcher::<_, _, _, _, VecStore<_>, 10_000, 1, 2>::execute(
+        // GreedyBottomUpMatcher::<_, VecStore<_>, 10_000, 1, 2>::execute(
         //     &mut mapper,
         //     &stores.label_store,
         // );

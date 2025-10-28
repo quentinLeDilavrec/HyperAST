@@ -85,7 +85,7 @@ fn configure_logging(debug_level: log::Level) {
 #[cfg(feature = "rerun")]
 fn configure_logging(debug_level: log::Level) {
     rerun::external::re_log::setup_logging();
-    let rec = rerun::RecordingStreamBuilder::new("HyperAST").connect();
+    let rec = rerun::RecordingStreamBuilder::new("HyperAST").connect_grpc();
     let rec = match rec {
         Ok(rec) => rec,
         Err(e) => {

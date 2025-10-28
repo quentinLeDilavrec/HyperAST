@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use num_traits::{PrimInt, ToPrimitive, cast};
 
-use crate::matchers::mapping_store::MappingStore;
+use crate::{decompressed_tree_store::Shallow, matchers::mapping_store::MappingStore};
 
 use super::mapping_store::{MonoMappingStore, VecStore};
 
@@ -32,6 +32,24 @@ impl SimilarityMeasure {
     ) -> Self {
         Self {
             ncd: mappings.number_of_common_descendants_ranges(src, dst),
+            src_l: (src.end - src.start).to_usize().unwrap(),
+            dst_l: (dst.end - dst.start).to_usize().unwrap(),
+        }
+    }
+
+    pub fn range_multimap<
+        Id1: PrimInt + Shallow<Src>,
+        Id2: PrimInt + Shallow<Dst>,
+        Src: PrimInt,
+        Dst: PrimInt,
+        Store: super::mapping_store::MultiRangeMappingStore<Src, Dst, Src = Id1, Dst = Id2>,
+    >(
+        src: &Range<Id1>,
+        dst: &Range<Id2>,
+        mappings: &Store,
+    ) -> Self {
+        Self {
+            ncd: number_of_common_descendants_ranges_multimap(src, dst, mappings),
             src_l: (src.end - src.start).to_usize().unwrap(),
             dst_l: (dst.end - dst.start).to_usize().unwrap(),
         }
@@ -157,6 +175,45 @@ pub fn number_of_common_descendants_ranges<
         .count()
         .try_into()
         .unwrap()
+}
+
+pub fn number_of_common_descendants_ranges_multimap<
+    Id1: PrimInt + Shallow<Src>,
+    Id2: PrimInt + Shallow<Dst>,
+    Src: PrimInt,
+    Dst: PrimInt,
+    Store: super::mapping_store::MultiRangeMappingStore<Src, Dst, Src = Id1, Dst = Id2>,
+>(
+    src: &Range<Id1>,
+    dst: &Range<Id2>,
+    mappings: &Store,
+) -> u32 {
+    (src.start.to_usize().unwrap()..src.end.to_usize().unwrap())
+        .filter(|t| mappings.is_src(&cast(*t).unwrap()))
+        .filter(|t| {
+            mappings.get_dst_ranges(&cast(*t).unwrap()).any(|y| {
+                intersection(
+                    &Range {
+                        start: dst.start.to_shallow(),
+                        end: dst.end.to_shallow(),
+                    },
+                    &y,
+                ) > num_traits::zero()
+            })
+        })
+        .count()
+        .try_into()
+        .unwrap()
+}
+
+fn intersection<Id: PrimInt>(src: &Range<Id>, dst: &Range<Id>) -> Id {
+    let start = src.start.max(dst.start);
+    let end = src.end.min(dst.end);
+    if start < end {
+        end - start
+    } else {
+        num_traits::zero()
+    }
 }
 
 pub fn number_of_common_descendants_ranges_par(

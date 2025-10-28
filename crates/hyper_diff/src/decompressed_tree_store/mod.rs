@@ -64,7 +64,7 @@ pub trait FullyDecompressedTreeStore<HAST: HyperAST + Copy, IdD>:
 pub trait ShallowDecompressedTreeStore<HAST: HyperAST + Copy, IdD, IdS = IdD> {
     fn len(&self) -> usize;
     fn original(&self, id: &IdD) -> HAST::IdN;
-    fn root(&self) -> IdS;
+    fn root(&self) -> IdD;
     fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdS;
     fn children(&self, x: &IdD) -> Vec<IdS>;
 }
@@ -212,6 +212,10 @@ pub trait BreadthFirstContiguousSiblings<HAST: HyperAST + Copy, IdD>:
 {
     fn has_children(&self, id: &IdD) -> bool;
     fn first_child(&self, id: &IdD) -> Option<IdD>;
+}
+
+pub trait RawContiguousDescendants<IdD, IdS> {
+    fn range(&self, id: &IdD) -> std::ops::Range<IdS>;
 }
 
 pub trait PostOrder<HAST: HyperAST + Copy, IdD, IdS = IdD>:

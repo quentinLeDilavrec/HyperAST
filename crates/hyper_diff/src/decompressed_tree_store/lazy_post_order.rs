@@ -367,6 +367,22 @@ impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
     }
 }
 
+impl<IdN, IdD: PrimInt + Shallow<IdS>, IdS> super::RawContiguousDescendants<IdD, IdS>
+    for LazyPostOrder<IdN, IdD>
+{
+    fn range(&self, id: &IdD) -> std::ops::Range<IdS> {
+        self.llds[(*id).to_usize().unwrap()].to_shallow()..id.to_shallow()
+    }
+}
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdS>, IdS>
+    super::RawContiguousDescendants<IdD, IdS>
+    for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
+{
+    fn range(&self, id: &IdD) -> std::ops::Range<IdS> {
+        self.decomp.range(id)
+    }
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where

@@ -47,7 +47,7 @@ where
         mapper
     }
 
-    pub fn execute<'b>(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
+    pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert!(mapper.src_arena.len() > 0);
         let similarity_threshold: f64 =
             SIMILARITY_THRESHOLD_NUM as f64 / SIMILARITY_THRESHOLD_DEN as f64;

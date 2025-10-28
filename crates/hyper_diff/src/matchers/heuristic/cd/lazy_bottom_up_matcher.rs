@@ -12,17 +12,14 @@ use std::fmt::Debug;
 use super::leaf_count;
 
 pub struct BottomUpMatcher<
-    Dsrc,
-    Ddst,
-    HAST: HyperAST + Copy,
-    M: MonoMappingStore,
+    Mpr,
     const SIZE_THRESHOLD: usize = 4,
     const SIM_THRESHOLD_NUM: u64 = 6,
     const SIM_THRESHOLD_DEN: u64 = 10,
     const SIM_THRESHOLD2_NUM: u64 = 4,
     const SIM_THRESHOLD2_DEN: u64 = 10,
 > {
-    internal: Mapper<HAST, Dsrc, Ddst, M>,
+    _phantom: std::marker::PhantomData<*const Mpr>,
 }
 
 impl<
@@ -37,10 +34,7 @@ impl<
     const SIM_THRESHOLD2_DEN: u64, // = 10,
 >
     BottomUpMatcher<
-        Dsrc,
-        Ddst,
-        HAST,
-        M,
+        Mapper<HAST, Dsrc, Ddst, M>,
         SIZE_THRESHOLD,
         SIM_THRESHOLD_NUM,
         SIM_THRESHOLD_DEN,
@@ -61,19 +55,18 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
         for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
-        let mut matcher = Self { internal: mapping };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal, leaf_count);
-        matcher.internal
+        Self::execute(&mut mapper, leaf_count);
+        mapper
     }
 
     pub fn execute0(

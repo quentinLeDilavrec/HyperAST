@@ -11,16 +11,12 @@ use hyperast::{PrimInt, types};
 use std::fmt::Debug;
 
 pub struct LeavesMatcher<
-    Dsrc,
-    Ddst,
-    HAST,
-    M,
-    S = TextSimilarity<HAST>,
+    Mpr,
+    S = TextSimilarity,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    internal: Mapper<HAST, Dsrc, Ddst, M>,
-    _phantom: std::marker::PhantomData<S>,
+    _phantom: std::marker::PhantomData<*const (Mpr, S)>,
 }
 
 impl<
@@ -28,10 +24,10 @@ impl<
     Ddst: DecompressedTreeStore<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
-    S: Similarity<HAST = HAST, IdN = HAST::IdN>,
+    S: Similarity<HAST, IdN = HAST::IdN>,
     const SIM_THRESHOLD_NUM: u64,
     const SIM_THRESHOLD_DEN: u64, // DEFAULT_LABEL_SIM_THRESHOLD = 0.5
-> LeavesMatcher<Dsrc, Ddst, HAST, M, S, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
+> LeavesMatcher<Mapper<HAST, Dsrc, Ddst, M>, S, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>
 where
     M::Src: PrimInt,
     M::Dst: PrimInt,
@@ -42,7 +38,7 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn match_it(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
@@ -51,75 +47,70 @@ where
         M::Src: Shallow<M::Src>,
         M::Dst: Shallow<M::Dst>,
     {
-        let mut matcher = Self {
-            internal: mapping,
-            _phantom: std::marker::PhantomData,
-        };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal, is_leaf_file, is_leaf_file);
-        Self::execute(&mut matcher.internal, is_leaf_sub_file, is_leaf_sub_file);
-        Self::execute(&mut matcher.internal, is_leaf_stmt, is_leaf_stmt);
-        Self::execute(&mut matcher.internal, is_leaf, is_leaf);
-        matcher.internal
+        Self::execute_variants(&mut mapper);
+        mapper
+    }
+
+    pub fn execute_variants(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>)
+    where
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
+        for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
+        for<'t> LendT<'t, HAST>: hyperast::types::WithHashs,
+        M::Src: Shallow<M::Src>,
+        M::Dst: Shallow<M::Dst>,
+    {
+        Self::execute(mapper, is_leaf_file, is_leaf_file);
+        Self::execute(mapper, is_leaf_sub_file, is_leaf_sub_file);
+        Self::execute(mapper, is_leaf_stmt, is_leaf_stmt);
+        Self::execute(mapper, is_leaf, is_leaf);
     }
 
     pub fn match_files(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         for<'t> LendT<'t, HAST>: types::WithHashs,
     {
-        let mut matcher = Self {
-            internal: mapping,
-            _phantom: std::marker::PhantomData,
-        };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal, is_leaf_file, is_leaf_file);
-        matcher.internal
+        Self::execute(&mut mapper, is_leaf_file, is_leaf_file);
+        mapper
     }
 
     pub fn match_stmt(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
         for<'t> LendT<'t, HAST>: types::WithHashs,
     {
-        let mut matcher = Self {
-            internal: mapping,
-            _phantom: std::marker::PhantomData,
-        };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal, is_leaf_stmt, is_leaf_stmt);
-        matcher.internal
+        Self::execute(&mut mapper, is_leaf_stmt, is_leaf_stmt);
+        mapper
     }
     pub fn match_all(
-        mapping: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
+        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         M::Src: Shallow<M::Src>,
         M::Dst: Shallow<M::Dst>,
         for<'t> LendT<'t, HAST>: types::WithHashs,
     {
-        let mut matcher = Self {
-            internal: mapping,
-            _phantom: std::marker::PhantomData,
-        };
-        matcher.internal.mapping.mappings.topit(
-            matcher.internal.mapping.src_arena.len(),
-            matcher.internal.mapping.dst_arena.len(),
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
         );
-        Self::execute(&mut matcher.internal, is_leaf, is_leaf);
-        matcher.internal
+        Self::execute(&mut mapper, is_leaf, is_leaf);
+        mapper
     }
 
     pub fn execute(
@@ -328,7 +319,7 @@ mod tests {
             },
         };
         //  MappingStore mappings = new ChangeDistillerLeavesMatcher().match(src, dst);
-        let mapping = LeavesMatcher::<_, _, _, _>::match_all(mapping);
+        let mapping = LeavesMatcher::<_, TextSimilarity>::match_all(mapping);
         // assertEquals(2, mappings.size());
         assert_eq!(2, mapping.mapping.mappings.len());
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
@@ -417,8 +408,8 @@ mod tests {
             },
         };
         // NOTE cannot use TextSimilarity here because `SimpleTree` does not have a textual source code representation
-        let mapping = LeavesMatcher::<_, _, _, _, LabelSimilarity<_>>::match_stmt(mapping);
-        let mapping = LeavesMatcher::<_, _, _, _, LabelSimilarity<_>>::match_all(mapping);
+        let mapping = LeavesMatcher::<_, LabelSimilarity>::match_stmt(mapping);
+        let mapping = LeavesMatcher::<_, LabelSimilarity>::match_all(mapping);
         assert_eq!(5, mapping.mapping.mappings.len());
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
         let src = mapping.mapping.src_arena.root();

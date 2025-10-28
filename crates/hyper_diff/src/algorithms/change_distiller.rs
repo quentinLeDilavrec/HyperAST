@@ -36,13 +36,13 @@ where
         hyperast.decompress_pair(src, dst).into();
     let measure = measure.start();
 
-    let mapper = LeavesMatcher::<_, _, _, _>::match_it(mapper);
+    let mapper = LeavesMatcher::<_>::match_it(mapper);
     let subtree_mappings_s = mapper.mappings().len();
     tr!(subtree_mappings_s);
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = BottomUpMatcher::<_, _, _, _>::match_it(mapper);
+    let mapper = BottomUpMatcher::<_>::match_it(mapper);
     let bottomup_mappings_s = mapper.mappings().len();
 
     tr!(bottomup_mappings_s);

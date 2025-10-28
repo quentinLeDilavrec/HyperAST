@@ -14,26 +14,23 @@ pub mod lazy_bottom_up_matcher;
 pub mod lazy_leaves_matcher;
 pub mod leaves_matcher;
 
-pub trait Similarity {
-    type HAST;
+pub trait Similarity<HAST> {
     type IdN;
-    fn norm(hyperast: &Self::HAST, p: &[Self::IdN; 2]) -> f64;
-    fn dist(hyperast: &Self::HAST, p: &[Self::IdN; 2]) -> usize;
+    fn norm(hyperast: &HAST, p: &[Self::IdN; 2]) -> f64;
+    fn dist(hyperast: &HAST, p: &[Self::IdN; 2]) -> usize;
 }
 
-pub struct TextSimilarity<HAST>(std::marker::PhantomData<HAST>);
+pub struct TextSimilarity;
 
-impl<HAST> Similarity for TextSimilarity<HAST>
+impl<HAST> Similarity<HAST> for TextSimilarity
 where
     HAST: HyperAST + Clone,
     HAST::Label: Eq + Copy,
     HAST::IdN: Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type HAST = HAST;
     type IdN = HAST::IdN;
-
-    fn norm(hyperast: &Self::HAST, p: &[Self::IdN; 2]) -> f64 {
+    fn norm(hyperast: &HAST, p: &[Self::IdN; 2]) -> f64 {
         if p[0] == p[1] {
             return 1.0;
         }
@@ -48,7 +45,7 @@ where
         crate::matchers::optimal::zs::qgrams::qgram_distance_hash_opti(src_l, dst_l)
     }
 
-    fn dist(hyperast: &Self::HAST, p: &[Self::IdN; 2]) -> usize {
+    fn dist(hyperast: &HAST, p: &[Self::IdN; 2]) -> usize {
         if p[0] == p[1] {
             return 0;
         }
@@ -87,19 +84,18 @@ where
     }
 }
 
-pub struct LabelSimilarity<HAST>(std::marker::PhantomData<HAST>);
+pub struct LabelSimilarity;
 
-impl<HAST> Similarity for LabelSimilarity<HAST>
+impl<HAST> Similarity<HAST> for LabelSimilarity
 where
     HAST: HyperAST + Clone,
     HAST::Label: Eq + Copy,
     HAST::IdN: Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type HAST = HAST;
     type IdN = HAST::IdN;
 
-    fn norm(hyperast: &Self::HAST, p: &[Self::IdN; 2]) -> f64 {
+    fn norm(hyperast: &HAST, p: &[Self::IdN; 2]) -> f64 {
         if p[0] == p[1] {
             return 1.0;
         }
@@ -118,7 +114,7 @@ where
         crate::matchers::optimal::zs::qgrams::qgram_distance_hash_opti(src_l, dst_l)
     }
 
-    fn dist(hyperast: &Self::HAST, p: &[Self::IdN; 2]) -> usize {
+    fn dist(hyperast: &HAST, p: &[Self::IdN; 2]) -> usize {
         if p[0] == p[1] {
             return 0;
         }
@@ -136,7 +132,7 @@ where
     }
 }
 
-fn is_leaf_file<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf_file<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
 where
     HAST: HyperAST + Copy,
     D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
@@ -146,7 +142,7 @@ where
     t.is_file()
 }
 
-fn is_leaf_sub_file<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf_sub_file<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
 where
     HAST: HyperAST + Copy,
     D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
@@ -157,7 +153,7 @@ where
     n.get_metadata().is_some_and(|x| x.0 == 1)
 }
 
-fn is_leaf_stmt<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf_stmt<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
 where
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
@@ -168,7 +164,7 @@ where
     n.get_metadata().is_some_and(|x| x.0 == 1)
 }
 
-fn is_leaf<HAST, D, IdD, IdS>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf<HAST, D, IdD, IdS>(stores: HAST, arena: &D, idd: IdD) -> bool
 where
     HAST: HyperAST + Copy,
     IdS: Eq,
@@ -181,7 +177,7 @@ where
 }
 
 // it's an approximation because of the layered nature of the efficient variant of the leaf matching
-fn leaf_count<HAST>(hyperast: HAST, x: HAST::IdN) -> usize
+pub fn leaf_count<HAST>(hyperast: HAST, x: HAST::IdN) -> usize
 where
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,

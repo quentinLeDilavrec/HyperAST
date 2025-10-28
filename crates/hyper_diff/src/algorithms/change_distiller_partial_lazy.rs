@@ -42,7 +42,7 @@ where
     let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
     let measure = measure.start();
 
-    let mapper = LazyLeavesMatcher::<_, _, _, M>::match_it(mapper);
+    let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
     let subtree_mappings_s = mapper.mappings().len();
     tr!(subtree_mappings_s);
 
@@ -57,7 +57,7 @@ where
 
     let measure = measure.start();
 
-    let mapper = BottomUpMatcher::<_, _, _, _>::match_it(mapper);
+    let mapper = BottomUpMatcher::<_>::match_it(mapper);
     let bottomup_mappings_s = mapper.mappings().len();
 
     tr!(bottomup_mappings_s);

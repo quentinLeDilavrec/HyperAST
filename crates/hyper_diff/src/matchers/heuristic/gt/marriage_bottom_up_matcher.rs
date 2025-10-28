@@ -55,7 +55,7 @@ where
         mapper
     }
 
-    pub fn execute<'b>(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
+    pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert!(mapper.src_arena.len() > 0);
         for a in mapper.src_arena.iter_df_post::<false>() {
             if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {

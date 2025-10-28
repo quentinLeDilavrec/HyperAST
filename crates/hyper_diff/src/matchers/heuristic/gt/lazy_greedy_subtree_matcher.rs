@@ -15,7 +15,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 pub struct LazyGreedySubtreeMatcher<HAST, Dsrc, Ddst, M, const MIN_HEIGHT: usize = 1> {
-    mapper: Mapper<HAST, Dsrc, Ddst, M>,
+    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
 }
 
 impl<

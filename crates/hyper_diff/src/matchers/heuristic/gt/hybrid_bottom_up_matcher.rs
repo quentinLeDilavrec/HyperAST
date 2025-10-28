@@ -22,8 +22,7 @@ pub struct HybridBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    mapper: Mapper<HAST, Dsrc, Ddst, M>,
-    _phantom: std::marker::PhantomData<*const MZs>,
+    _phantom: std::marker::PhantomData<*const (Mapper<HAST, Dsrc, Ddst, M>, MZs)>,
 }
 
 impl<

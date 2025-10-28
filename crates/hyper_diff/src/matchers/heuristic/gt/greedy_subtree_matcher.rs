@@ -13,7 +13,7 @@ use num_traits::{ToPrimitive, one, zero};
 use std::hash::Hash;
 
 pub struct GreedySubtreeMatcher<Dsrc, Ddst, HAST, M, const MIN_HEIGHT: usize = 1> {
-    mapper: SubtreeMatcher<Dsrc, Ddst, HAST, M, MIN_HEIGHT>,
+    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
 }
 
 impl<
@@ -272,7 +272,7 @@ where
 }
 
 pub struct SubtreeMatcher<Dsrc, Ddst, HAST, M, const MIN_HEIGHT: usize> {
-    pub(crate) mapper: Mapper<HAST, Dsrc, Ddst, M>,
+    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
 }
 
 impl<

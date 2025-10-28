@@ -23,7 +23,7 @@ pub struct GreedyBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    pub(crate) mapper: Mapper<HAST, Dsrc, Ddst, M>,
+    _phantom: std::marker::PhantomData<*const Mapper<HAST, Dsrc, Ddst, M>>,
 }
 
 /// TODO PostOrder might not be necessary

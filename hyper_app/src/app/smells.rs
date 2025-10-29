@@ -34,27 +34,19 @@
 //! https://github.com/Marcono1234/gson/commit/3d241ca0a6435cbf1fa1cdaed2af8480b99fecde
 //! about fixing try catches in tests
 
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    ops::{Range, SubAssign},
-};
-
-use egui_addon::{
-    interactive_split::interactive_splitter::InteractiveSplitter,
-    multi_split::{
-        multi_splitter::MultiSplitter, multi_splitter_orientation::MultiSplitterOrientation,
-    },
-};
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::ops::{Range, SubAssign};
 use wasm_rs_dbg::dbg;
 
-use crate::app::utils_edition::MakeHighlights;
+use egui_addon::InteractiveSplitter;
+use egui_addon::MultiSplitter;
 
-use super::{
-    code_tracking::RemoteFile,
-    show_repo_menu,
-    types::{self, CodeRange, Commit, SelectedConfig},
-};
+use super::code_tracking::RemoteFile;
+use super::show_repo_menu;
+use super::types;
+use super::types::{CodeRange, Commit, SelectedConfig};
+use super::utils_edition::MakeHighlights;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(default)]
@@ -67,7 +59,7 @@ pub(super) struct ComputeConfigQuery {
     /// the query configuring the query simplification/generalization
     /// eg. `(predicate (identifier) (#EQ? "EQ") (parameters (string) @label )) @pred`
     meta_simp: String,
-    config: super::types::Config,
+    config: types::Config,
     len: usize,
     simple_matching: bool,
     prepro_matching: bool,
@@ -366,7 +358,7 @@ pub(super) fn show_result(
             _ => (),
         },
         Err(error) => {
-            wasm_rs_dbg::dbg!();
+            dbg!();
             // This should only happen if the fetch API isn't available or something similar.
             ui.colored_label(
                 ui.visuals().error_fg_color,
@@ -682,7 +674,7 @@ fn show_query_with_example(
                 ui2.label(format!("{}", bad_query.examples.len()));
                 return;
             }
-            MultiSplitter::with_orientation(MultiSplitterOrientation::Horizontal)
+            MultiSplitter::horizontal()
                 .ratios(if bad_ex_cont.len() <= 8 {
                     vec![1.0 / bad_ex_cont.len() as f32; bad_ex_cont.len() - 1]
                 } else {
@@ -1075,12 +1067,6 @@ pub(super) fn fetch_results(
         query: String,
         commits: usize,
     }
-    let _language = match smells.config {
-        types::Config::Any => "",
-        types::Config::MavenJava => "Java",
-        types::Config::MakeCpp => "Cpp",
-    }
-    .to_string();
 
     #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
     pub struct ExamplesValues<S, T, U> {
@@ -1130,12 +1116,12 @@ impl types::Resource<Result<SearchResults, SmellsError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
+        dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
 
         if response.status == 404 {
             let Some(text) = response.text() else {
-                wasm_rs_dbg::dbg!();
+                dbg!();
                 return Err("".to_string());
             };
             return Err(text.to_string());
@@ -1152,11 +1138,11 @@ impl types::Resource<Result<SearchResults, SmellsError>> {
         }
         if response.status != 200 {
             let Some(text) = response.text() else {
-                wasm_rs_dbg::dbg!();
+                dbg!();
                 return Err("".to_string());
             };
             let Ok(json) = serde_json::from_str::<SmellsError>(text) else {
-                wasm_rs_dbg::dbg!();
+                dbg!();
                 return Err("".to_string());
             };
             return Ok(Self {
@@ -1170,7 +1156,7 @@ impl types::Resource<Result<SearchResults, SmellsError>> {
         let text = text.and_then(|text| {
             serde_json::from_str(text)
                 .inspect_err(|err| {
-                    wasm_rs_dbg::dbg!(&err);
+                    dbg!(&err);
                 })
                 .ok()
         });
@@ -1204,12 +1190,6 @@ pub(super) fn fetch_examples_at_commits(
         query: String,
         commits: usize,
     }
-    let _language = match smells.config {
-        types::Config::Any => "",
-        types::Config::MavenJava => "Java",
-        types::Config::MakeCpp => "Cpp",
-    }
-    .to_string();
 
     let mut request = ehttp::Request::post(&url, serde_json::to_vec(&[""]).unwrap());
     request.headers.insert(
@@ -1232,12 +1212,12 @@ impl types::Resource<Result<ExamplesValues, DiffsError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
+        dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
 
         if response.status == 404 {
             let Some(text) = response.text() else {
-                wasm_rs_dbg::dbg!();
+                dbg!();
                 return Err("".to_string());
             };
             return Err(text.to_string());
@@ -1247,11 +1227,11 @@ impl types::Resource<Result<ExamplesValues, DiffsError>> {
         }
         if response.status != 200 {
             let Some(text) = response.text() else {
-                wasm_rs_dbg::dbg!();
+                dbg!();
                 return Err("".to_string());
             };
             let Ok(json) = serde_json::from_str::<DiffsError>(text) else {
-                wasm_rs_dbg::dbg!();
+                dbg!();
                 return Err("".to_string());
             };
             return Ok(Self {
@@ -1264,7 +1244,7 @@ impl types::Resource<Result<ExamplesValues, DiffsError>> {
         let text = text.and_then(|text| {
             serde_json::from_str(text)
                 .inspect_err(|err| {
-                    wasm_rs_dbg::dbg!(&err);
+                    dbg!(&err);
                 })
                 .ok()
         });

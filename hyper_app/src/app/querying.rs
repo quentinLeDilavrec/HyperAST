@@ -1,30 +1,24 @@
-use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    ops::DerefMut,
-    sync::{Arc, Mutex},
-};
-
 use poll_promise::Promise;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 
-use crate::app::{
-    types::EditorHolder,
-    utils_edition::{self, show_available_remote_docs, show_locals_and_interact},
-    utils_results_batched::ComputeResultIdentified,
+use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
+
+use super::types::{CodeRange, Commit, CommitId, Config, QueryEditor, Resource, SelectedConfig};
+use super::types::{EditorHolder, WithDesc};
+use super::utils_edition::{EditStatus, EditingContext};
+use super::utils_edition::{
+    show_available_remote_docs, show_interactions, show_locals_and_interact,
+    show_shared_code_edition, update_shared_editors,
 };
+use super::utils_results_batched::show_long_result;
+use super::utils_results_batched::{ComputeError, PartialError};
+use super::utils_results_batched::{ComputeResultIdentified, ComputeResults, ComputeResultsProm};
+use super::{Sharing, code_editor_automerge, show_repo_menu};
 
-use self::example_queries::EXAMPLES;
-
-use egui_addon::{
-    code_editor::EditorInfo, interactive_split::interactive_splitter::InteractiveSplitter,
-};
-
-use super::{
-    Sharing, code_editor_automerge, show_repo_menu,
-    types::{Commit, Config, QueryEditor, Resource, SelectedConfig, WithDesc},
-    utils_edition::{EditStatus, show_interactions, update_shared_editors},
-    utils_results_batched::{self, ComputeResults, show_long_result},
-};
 pub(crate) mod example_queries;
+use self::example_queries::EXAMPLES;
 
 const INFO_QUERY: EditorInfo<&'static str> = EditorInfo {
     title: "Query",
@@ -70,7 +64,7 @@ impl<T> WithDesc<T> for QueryEditor<T> {
     }
 }
 
-impl<T> super::types::EditorHolder for QueryEditor<T> {
+impl<T> EditorHolder for QueryEditor<T> {
     type Item = T;
 
     fn iter_editors_mut(&mut self) -> impl Iterator<Item = &mut Self::Item> {
@@ -90,8 +84,8 @@ impl<T> QueryEditor<T> {
     }
 }
 
-impl Into<QueryEditor<super::code_editor_automerge::CodeEditor>> for QueryEditor {
-    fn into(self) -> QueryEditor<super::code_editor_automerge::CodeEditor> {
+impl Into<QueryEditor<code_editor_automerge::CodeEditor>> for QueryEditor {
+    fn into(self) -> QueryEditor<code_editor_automerge::CodeEditor> {
         self.to_shared()
     }
 }
@@ -121,17 +115,15 @@ impl Default for ComputeConfigQuery {
     }
 }
 
-pub(crate) type QueryingContext = super::utils_edition::EditingContext<
-    super::types::QueryEditor,
-    super::types::QueryEditor<code_editor_automerge::CodeEditor>,
->;
+pub(crate) type QueryingContext =
+    EditingContext<QueryEditor, QueryEditor<code_editor_automerge::CodeEditor>>;
 
 pub(super) fn remote_compute_query(
     ctx: &egui::Context,
     api_addr: &str,
     single: &Sharing<ComputeConfigQuery>,
     query_editors: &mut QueryingContext,
-) -> Promise<Result<Resource<Result<ComputeResults, QueryingError>>, String>> {
+) -> ComputeResultsProm<QueryingError> {
     let language = match single.content.config {
         Config::Any => "",
         Config::MavenJava => "Java",
@@ -208,7 +200,7 @@ pub(crate) fn remote_compute_query_aux(
     api_addr: &str,
     single: &ComputeConfigQuery,
     script: QueryContent,
-    additional_commits: impl Iterator<Item = super::types::CommitId>,
+    additional_commits: impl Iterator<Item = CommitId>,
 ) -> Promise<Result<StreamedComputeResults, QueryingError>> {
     // TODO multi requests from client
     // if single.len > 1 {
@@ -327,7 +319,7 @@ pub(crate) fn remote_compute_query_aux_old(
     api_addr: &str,
     single: &ComputeConfigQuery,
     script: QueryContent,
-) -> Promise<Result<Resource<Result<ComputeResults, QueryingError>>, String>> {
+) -> ComputeResultsProm<QueryingError> {
     // TODO multi requests from client
     // if single.len > 1 {
     //     let parents = fetch_commit_parents(&ctx, &single.commit, single.len);
@@ -360,7 +352,7 @@ pub(crate) fn remote_compute_query_differential(
     api_addr: &str,
     single: &ComputeConfigQueryDifferential,
     script: QueryContent,
-) -> Promise<Result<Resource<Result<DetailsResults, QueryingError>>, String>> {
+) -> DetailsResultsProm<QueryingError> {
     let ctx = ctx.clone();
     let (sender, promise) = Promise::new();
     assert_eq!(single.baseline.repo, single.commit.repo);
@@ -400,13 +392,11 @@ pub enum QueryingError {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Hash)]
 pub enum MatchingError {
-    TimeOut(utils_results_batched::ComputeResultIdentified),
-    MaxMatches(utils_results_batched::ComputeResultIdentified),
+    TimeOut(ComputeResultIdentified),
+    MaxMatches(ComputeResultIdentified),
 }
 
-impl utils_results_batched::PartialError<utils_results_batched::ComputeResultIdentified>
-    for MatchingError
-{
+impl PartialError<ComputeResultIdentified> for MatchingError {
     fn error(&self) -> impl ToString {
         match self {
             MatchingError::TimeOut(_) => "time out",
@@ -414,7 +404,7 @@ impl utils_results_batched::PartialError<utils_results_batched::ComputeResultIde
         }
     }
 
-    fn try_partial(&self) -> Option<&utils_results_batched::ComputeResultIdentified> {
+    fn try_partial(&self) -> Option<&ComputeResultIdentified> {
         match self {
             MatchingError::TimeOut(x) => Some(x),
             MatchingError::MaxMatches(x) => Some(x),
@@ -434,11 +424,7 @@ pub(super) fn show_querying(
     query: &mut Sharing<ComputeConfigQuery>,
     query_editors: &mut QueryingContext,
     trigger_compute: &mut bool,
-    querying_result: &mut Option<
-        poll_promise::Promise<
-            Result<super::types::Resource<Result<ComputeResults, QueryingError>>, String>,
-        >,
-    >,
+    querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
 ) {
     let api_endpoint = &end_point(api_addr);
     update_shared_editors(ui, query, api_endpoint, query_editors);
@@ -470,9 +456,7 @@ pub(crate) fn end_point(api_addr: &str) -> String {
 pub(crate) fn handle_interactions(
     ui: &mut egui::Ui,
     code_editors: &mut QueryingContext,
-    querying_result: &mut Option<
-        Promise<Result<Resource<Result<ComputeResults, QueryingError>>, String>>,
-    >,
+    querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
     single: &mut Sharing<ComputeConfigQuery>,
     trigger_compute: &mut bool,
 ) {
@@ -524,9 +508,8 @@ pub(crate) fn show_scripts_edition(
     show_available_remote_docs(ui, api_endpoint, single, querying_context);
     let local = querying_context
         .when_local(|code_editors| code_editors.iter_editors_mut().for_each(|c| c.ui(ui)));
-    let shared = querying_context.when_shared(|query_editors| {
-        utils_edition::show_shared_code_edition(ui, query_editors, single)
-    });
+    let shared = querying_context
+        .when_shared(|query_editors| show_shared_code_edition(ui, query_editors, single));
     assert!(local.or(shared).is_some());
 }
 
@@ -617,8 +600,10 @@ impl Resource<Result<ComputeResults, QueryingError>> {
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct DetailsResults {
     pub prepare_time: f64,
-    pub results: Vec<(super::types::CodeRange, super::types::CodeRange)>,
+    pub results: Vec<(CodeRange, CodeRange)>,
 }
+
+pub type DetailsResultsProm<Err> = Promise<Result<Resource<Result<DetailsResults, Err>>, String>>;
 
 impl std::hash::Hash for DetailsResults {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -702,7 +687,7 @@ pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigQ
     selected.show_combo_box(ui, "Repo Config");
 }
 
-impl utils_results_batched::ComputeError for QueryingError {
+impl ComputeError for QueryingError {
     fn head(&self) -> &str {
         match self {
             QueryingError::NetworkError(_) => "Network Error:",

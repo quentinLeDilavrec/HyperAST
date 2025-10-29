@@ -1,13 +1,15 @@
 //! NOTE Pretty adoc impl, would benefit from being merged with impl in egui_addon
 
-use super::{Lang, types::Languages};
 use egui::{Response, WidgetText};
-use egui_addon::{Languages as _, code_editor::EditorInfo};
+
+use egui_addon::Languages as _;
+use egui_addon::{Lang, code_editor::EditorInfo};
 use egui_demo_lib::easy_mark::easy_mark;
 
-const TREE_SITTER: bool = false;
+use super::crdt_over_ws::Quote;
+use super::types::Languages;
 
-use crate::app::crdt_over_ws::Quote;
+const TREE_SITTER: bool = false;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(crate) struct CodeEditor<C = Quote> {
@@ -289,20 +291,17 @@ impl CodeEditor {
                             ui.style(),
                         );
 
-                        let mut layouter =
-                            |ui: &egui::Ui,
-                             string: &super::crdt_over_ws::Quote,
-                             _wrap_width: f32| {
-                                let layout_job = egui_extras::syntax_highlighting::highlight(
-                                    ui.ctx(),
-                                    ui.style(),
-                                    &theme,
-                                    string.text.as_str(),
-                                    language,
-                                );
-                                // layout_job.wrap.max_width = wrap_width; // no wrapping
-                                ui.fonts(|f| f.layout_job(layout_job))
-                            };
+                        let mut layouter = |ui: &egui::Ui, string: &Quote, _wrap_width: f32| {
+                            let layout_job = egui_extras::syntax_highlighting::highlight(
+                                ui.ctx(),
+                                ui.style(),
+                                &theme,
+                                string.text.as_str(),
+                                language,
+                            );
+                            // layout_job.wrap.max_width = wrap_width; // no wrapping
+                            ui.fonts(|f| f.layout_job(layout_job))
+                        };
                         ui.add(
                             egui_addon::code_editor::generic_text_edit::TextEdit::multiline(code)
                                 .font(egui::TextStyle::Monospace) // for cursor height

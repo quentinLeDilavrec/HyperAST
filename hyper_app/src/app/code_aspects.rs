@@ -1,22 +1,23 @@
-use super::tree_view::FetchedViewImpl;
-use super::tree_view::{Action, NodeIdentifier, PrefillCache, store::FetchedHyperAST};
-use super::types;
-use super::types::Resource;
-use super::utils_egui::MyUiExt as _;
-use egui_addon::egui_utils::{radio_collapsing, show_wip};
-use hyperast::store::nodes::fetched;
-use hyperast::store::nodes::fetched::LabelIdentifier;
 use poll_promise::Promise;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-pub(crate) const WANTED: types::SelectedConfig = types::SelectedConfig::Aspects;
+use egui_addon::egui_utils::{radio_collapsing, show_wip};
+
+use super::tree_view::FetchedViewImpl;
+use super::tree_view::{
+    Action, LabelIdentifier, NodeIdentifier, PrefillCache, SimplePacked, store::FetchedHyperAST,
+};
+use super::types::{Commit, ComputeConfigAspectViews, Repo, Resource, SelectedConfig};
+use super::utils_egui::MyUiExt as _;
+
+pub(crate) const WANTED: SelectedConfig = SelectedConfig::Aspects;
 
 pub(crate) fn show_config(
     ui: &mut egui::Ui,
-    aspects: &mut types::ComputeConfigAspectViews,
-    aspects_result: &mut Option<Promise<Result<Resource<FetchedView>, String>>>,
+    aspects: &mut ComputeConfigAspectViews,
+    aspects_result: &mut Option<FetchedViewProm>,
     api_addr: &str,
     store: Arc<FetchedHyperAST>,
 ) {
@@ -128,6 +129,8 @@ pub struct FetchedView {
     prefill_cache: Option<PrefillCache>,
 }
 
+type FetchedViewProm = Promise<Result<Resource<FetchedView>, String>>;
+
 fn ser_node_id<S>(id: &NodeIdentifier, s: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -193,10 +196,10 @@ where
 // }
 
 pub(crate) fn show(
-    aspects_result: &mut poll_promise::Promise<Result<types::Resource<FetchedView>, String>>,
+    aspects_result: &mut FetchedViewProm,
     ui: &mut egui::Ui,
     api_addr: &str,
-    aspects: &mut types::ComputeConfigAspectViews,
+    aspects: &mut ComputeConfigAspectViews,
 ) {
     if let Some(aspects_result) = aspects_result.ready_mut() {
         match aspects_result {
@@ -320,7 +323,7 @@ impl FetchedView {
         &mut self,
         ui: &mut egui::Ui,
         api_addr: &str,
-        aspects: &types::ComputeConfigAspectViews,
+        aspects: &ComputeConfigAspectViews,
         focus: Option<Focus<'_>>,
         hightlights: Vec<HightLightHandle<'_>>,
         additions: Option<&[u32]>,
@@ -342,7 +345,6 @@ impl FetchedView {
             deletions,
         );
         let r = imp.show(ui, api_addr, &self.root);
-        // wasm_rs_dbg::dbg!(&imp);
         self.prefill_cache = imp.prefill_cache;
         r
     }
@@ -407,9 +409,9 @@ pub(super) type RemoteView = Promise<ehttp::Result<Resource<FetchedView>>>;
 pub(super) fn remote_fetch_tree(
     ctx: &egui::Context,
     api_addr: &str,
-    commit: &types::Commit,
+    commit: &Commit,
     path: &str,
-) -> Promise<Result<Resource<FetchedView>, String>> {
+) -> FetchedViewProm {
     let ctx = ctx.clone();
     let (sender, promise) = Promise::new();
     let url = format!(
@@ -432,9 +434,9 @@ pub(super) fn remote_fetch_node_old(
     ctx: &egui::Context,
     api_addr: &str,
     store: Arc<FetchedHyperAST>,
-    commit: &types::Commit,
+    commit: &Commit,
     path: &str,
-) -> Promise<Result<Resource<FetchedView>, String>> {
+) -> FetchedViewProm {
     let ctx = ctx.clone();
     let (sender, promise) = Promise::new();
     let url = format!(
@@ -474,7 +476,7 @@ pub(super) fn remote_fetch_node(
     ctx: &egui::Context,
     api_addr: &str,
     store: Arc<FetchedHyperAST>,
-    commit: &types::Commit,
+    commit: &Commit,
     path: &str,
 ) -> Promise<Result<NodeIdentifier, String>> {
     let ctx = ctx.clone();
@@ -509,7 +511,7 @@ pub(super) fn remote_fetch_nodes_by_ids(
     ctx: &egui::Context,
     api_addr: &str,
     store: Arc<FetchedHyperAST>,
-    repo: &types::Repo,
+    repo: &Repo,
     ids: HashSet<NodeIdentifier>,
 ) -> Promise<Result<Resource<()>, String>> {
     let ctx = ctx.clone();
@@ -549,7 +551,7 @@ pub(super) fn remote_fetch_labels(
     ctx: &egui::Context,
     api_addr: &str,
     store: Arc<FetchedHyperAST>,
-    repo: &types::Repo,
+    repo: &Repo,
     ids: HashSet<LabelIdentifier>,
 ) -> Promise<Result<Resource<()>, String>> {
     let ctx = ctx.clone();
@@ -589,16 +591,16 @@ pub(super) fn remote_fetch_labels(
 
 #[derive(serde::Deserialize)]
 pub struct FetchedNodes {
-    node_store: fetched::SimplePacked<String>,
+    node_store: SimplePacked<String>,
 }
 #[derive(serde::Deserialize)]
 pub struct FetchedNode {
     root: Vec<NodeIdentifier>,
-    node_store: fetched::SimplePacked<String>,
+    node_store: SimplePacked<String>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct FetchedLabels {
-    label_ids: Vec<fetched::LabelIdentifier>,
+    label_ids: Vec<LabelIdentifier>,
     labels: Vec<String>,
 }

@@ -10,6 +10,9 @@ pub mod meta_edge;
 pub mod multi_split;
 pub mod syntax_highlighting;
 
+pub use interactive_split::interactive_splitter::InteractiveSplitter;
+pub use multi_split::MultiSplitter;
+
 #[derive(Debug, Clone)]
 pub struct Lang {
     pub name: String,

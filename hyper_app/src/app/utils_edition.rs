@@ -1,12 +1,13 @@
-use super::utils_results_batched::{self, ComputeError, RemoteResult};
+use super::code_editor_automerge;
+use super::utils_results_batched::{ComputeError, ComputeResultsProm, show_short_result};
 use super::{Sharing, crdt_over_ws, types::WithDesc};
-use crate::app::code_editor_automerge;
-use automerge::sync::SyncDoc;
+use automerge::sync::{Message, SyncDoc};
 use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex, RwLock};
-pub type SharedCodeEditors<T> = std::sync::Arc<std::sync::Mutex<T>>;
+
+type SharedCodeEditors<T> = std::sync::Arc<std::sync::Mutex<T>>;
 
 // TODO allow to change user name and generate a random default
 #[cfg(target_arch = "wasm32")]
@@ -153,7 +154,7 @@ pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
     match receiver.next().await {
         Some(Ok(tokio_tungstenite_wasm::Message::Binary(bin))) => {
             let (doc, sync_state): &mut (_, _) = &mut doc.write().unwrap();
-            let message = automerge::sync::Message::decode(&bin).unwrap();
+            let message = Message::decode(&bin).unwrap();
             doc.sync()
                 .receive_sync_message(sync_state, message)
                 .unwrap();
@@ -168,14 +169,15 @@ pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
     }
     while let Some(Ok(msg)) = receiver.next().await {
         wasm_rs_dbg::dbg!();
+        use tokio_tungstenite_wasm::Message as Msg;
         match msg {
-            tokio_tungstenite_wasm::Message::Text(msg) => {
+            Msg::Text(msg) => {
                 wasm_rs_dbg::dbg!(&msg);
             }
-            tokio_tungstenite_wasm::Message::Binary(bin) => {
+            Msg::Binary(bin) => {
                 wasm_rs_dbg::dbg!();
                 let (doc, sync_state): &mut (_, _) = &mut doc.write().unwrap();
-                let message = automerge::sync::Message::decode(&bin).unwrap();
+                let message = Message::decode(&bin).unwrap();
                 // doc.merge(other)
                 match doc.sync().receive_sync_message(sync_state, message) {
                     Ok(_) => (),
@@ -198,20 +200,19 @@ pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
                 let mut sender = sender.clone();
                 if let Some(message) = doc.sync().generate_sync_message(sync_state) {
                     wasm_rs_dbg::dbg!();
-                    let message =
-                        tokio_tungstenite_wasm::Message::Binary(message.encode().to_vec());
+                    let message = Msg::Binary(message.encode().to_vec());
                     rt.spawn(async move {
                         sender.send(message).await.unwrap();
                     });
                 } else {
                     wasm_rs_dbg::dbg!();
-                    let message = tokio_tungstenite_wasm::Message::Binary(vec![]);
+                    let message = Msg::Binary(vec![]);
                     rt.spawn(async move {
                         sender.send(message).await.unwrap();
                     });
                 };
             }
-            tokio_tungstenite_wasm::Message::Close(_) => {
+            Msg::Close(_) => {
                 wasm_rs_dbg::dbg!();
                 break;
             }
@@ -449,7 +450,7 @@ pub(crate) fn show_interactions<'a, L, S>(
     ui: &mut egui::Ui,
     context: &'a mut EditingContext<L, S>,
     docs_db: &Option<crdt_over_ws::WsDocsDb>,
-    compute_result: &mut Option<RemoteResult<impl ComputeError + Send + Sync>>,
+    compute_result: &mut Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,
     examples_names: impl Fn(usize) -> String,
 ) -> InteractionResp<&'a L> {
     let mut save_button = None;
@@ -477,7 +478,7 @@ pub(crate) fn show_interactions<'a, L, S>(
     let compute_button = ui
         .horizontal(|ui| {
             let compute_button = ui.add(egui::Button::new("Compute"));
-            utils_results_batched::show_short_result(&*compute_result, ui);
+            show_short_result(&*compute_result, ui);
             compute_button
         })
         .inner;

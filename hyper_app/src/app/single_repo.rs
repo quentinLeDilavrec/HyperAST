@@ -1,31 +1,23 @@
-use std::{
-    ops::DerefMut,
-    sync::{Arc, Mutex},
-};
-
 use poll_promise::Promise;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 
-use crate::app::{
-    types::EditorHolder,
-    utils_edition::{
-        show_available_remote_docs, show_locals_and_interact, show_shared_code_edition,
-    },
-    utils_results_batched::ComputeResults,
+use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
+
+use super::types::{CodeEditors, Commit, Config, Resource, SelectedConfig};
+use super::types::{EditorHolder, WithDesc};
+use super::utils_edition::{EditStatus, EditingContext};
+use super::utils_edition::{
+    show_available_remote_docs, show_interactions, show_locals_and_interact,
+    show_shared_code_edition, update_shared_editors,
 };
+use super::utils_results_batched::ComputeError;
+use super::utils_results_batched::{ComputeResults, ComputeResultsProm, show_long_result};
+use super::{Sharing, code_editor_automerge, show_repo_menu};
 
-use self::example_scripts::EXAMPLES;
-
-use egui_addon::{
-    code_editor::EditorInfo, interactive_split::interactive_splitter::InteractiveSplitter,
-};
-
-use super::{
-    Sharing, code_editor_automerge, show_repo_menu,
-    types::{CodeEditors, Commit, Config, Resource, SelectedConfig, WithDesc},
-    utils_edition::{self, EditStatus, EditingContext, show_interactions, update_shared_editors},
-    utils_results_batched,
-};
 mod example_scripts;
+
+use example_scripts::EXAMPLES;
 
 const INFO_INIT: EditorInfo<&'static str> = EditorInfo {
     title: "Init",
@@ -124,7 +116,7 @@ impl Into<CodeEditors<super::code_editor_automerge::CodeEditor>> for CodeEditors
 }
 
 pub(super) type ScriptingContext =
-    utils_edition::EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>;
+    EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -152,15 +144,12 @@ impl Default for ComputeConfigSingle {
     }
 }
 
-// pub(super) type RemoteResult =
-//     Promise<ehttp::Result<Resource<Result<ComputeResults, ScriptingError>>>>;
-
 pub(super) fn remote_compute_single(
     ctx: &egui::Context,
     api_addr: &str,
     single: &mut ComputeConfigSingle,
     code_editors: &mut ScriptingContext,
-) -> Promise<Result<Resource<Result<ComputeResults, ScriptingError>>, String>> {
+) -> ComputeResultsProm<ScriptingError> {
     // TODO multi requests from client
     // if single.len > 1 {
     //     let parents = fetch_commit_parents(&ctx, &single.commit, single.len);
@@ -225,11 +214,7 @@ pub(super) fn show_single_repo(
     single: &mut Sharing<ComputeConfigSingle>,
     code_editors: &mut ScriptingContext,
     trigger_compute: &mut bool,
-    compute_single_result: &mut Option<
-        poll_promise::Promise<
-            Result<super::types::Resource<Result<ComputeResults, ScriptingError>>, String>,
-        >,
-    >,
+    compute_single_result: &mut Option<ComputeResultsProm<ScriptingError>>,
 ) {
     let api_endpoint = &format!("{}/sharing-scripts", api_addr);
     update_shared_editors(ui, single, api_endpoint, code_editors);
@@ -244,7 +229,7 @@ pub(super) fn show_single_repo(
                 single,
                 trigger_compute,
             );
-            utils_results_batched::show_long_result(&*compute_single_result, ui);
+            show_long_result(&*compute_single_result, ui);
         });
     } else {
         InteractiveSplitter::vertical()
@@ -261,7 +246,7 @@ pub(super) fn show_single_repo(
                     single,
                     trigger_compute,
                 );
-                utils_results_batched::show_long_result(&*compute_single_result, ui);
+                show_long_result(&*compute_single_result, ui);
             });
     }
 }
@@ -269,9 +254,7 @@ pub(super) fn show_single_repo(
 fn handle_interactions(
     ui: &mut egui::Ui,
     code_editors: &mut EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>,
-    compute_single_result: &mut Option<
-        Promise<Result<Resource<Result<ComputeResults, ScriptingError>>, String>>,
-    >,
+    compute_single_result: &mut Option<ComputeResultsProm<ScriptingError>>,
     single: &mut Sharing<ComputeConfigSingle>,
     trigger_compute: &mut bool,
 ) {
@@ -442,7 +425,7 @@ pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigS
     selected.show_combo_box(ui, "Repo Config");
 }
 
-impl utils_results_batched::ComputeError for ScriptingError {
+impl ComputeError for ScriptingError {
     fn head(&self) -> &str {
         match self {
             ScriptingError::AtCompilation(_) => "Error at compilation:",

@@ -1,17 +1,17 @@
-use crate::app::code_editor::generic_text_buffer::byte_index_from_char_index;
 use egui::Id;
-use egui_addon::egui_utils::{highlight_byte_range, radio_collapsing, show_wip};
-use egui_addon::interactive_split::interactive_splitter::InteractiveSplitter;
 use poll_promise::Promise;
 use std::collections::{HashMap, hash_map};
 use std::ops::Range;
 
-use super::{
-    show_repo_menu,
-    types::{self, CodeRange, Commit, Resource},
-    utils_egui::MyUiExt as _,
-    utils_poll::{self, Accumulable, Buffered},
-};
+use egui_addon::InteractiveSplitter;
+use egui_addon::egui_utils::{highlight_byte_range, radio_collapsing, show_wip};
+
+use super::code_editor::generic_text_buffer::byte_index_from_char_index;
+use super::show_repo_menu;
+use super::types::ComputeConfigTracking;
+use super::types::{CodeRange, Commit, FileIdentifier, Resource, SelectedConfig};
+use super::utils_egui::MyUiExt as _;
+use super::utils_poll::{Accumulable, Buffered};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct FetchedFile {
@@ -21,7 +21,6 @@ pub struct FetchedFile {
 
 impl Resource<FetchedFile> {
     pub(super) fn from_response(_ctx: &egui::Context, response: ehttp::Response) -> Self {
-        // wasm_rs_dbg::dbg!(&response);
         let _content_type = response.content_type().unwrap_or_default();
         // let image = if content_type.starts_with("image/") {
         //     RetainedImage::from_image_bytes(&response.url, &response.bytes).ok()
@@ -58,7 +57,7 @@ pub(super) type RemoteFile = Promise<ehttp::Result<Resource<FetchedFile>>>;
 pub(super) fn remote_fetch_file(
     ctx: &egui::Context,
     api_addr: &str,
-    commit: &types::Commit,
+    commit: &Commit,
     file_path: &str,
 ) -> RemoteFile {
     let ctx = ctx.clone();
@@ -196,14 +195,12 @@ pub(super) fn track(
         )
     };
 
-    // wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
     // request
     //     .headers
     //     .insert("Content-Type".to_string(), "text".to_string());
 
     ehttp::fetch(request, move |response| {
-        // wasm_rs_dbg::dbg!(&response);
         ctx.request_repaint(); // wake up UI thread
         let resource =
             response.and_then(|response| Resource::<TrackingResult>::from_response(&ctx, response));
@@ -217,9 +214,6 @@ impl Resource<TrackingResult> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        // wasm_rs_dbg::dbg!(&response);
-        // let content_type = response.content_type().unwrap_or_default();
-
         let text = response.text();
         let text = text.ok_or("")?;
 
@@ -228,7 +222,6 @@ impl Resource<TrackingResult> {
         } else {
             return Err(text.into());
         };
-        // wasm_rs_dbg::dbg!(&text);
 
         Ok(Self {
             response,
@@ -242,7 +235,6 @@ impl Resource<TrackingResultWithChanges> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        // wasm_rs_dbg::dbg!(&response);
         // let content_type = response.content_type().unwrap_or_default();
 
         let text = response.text();
@@ -262,11 +254,11 @@ impl Resource<TrackingResultWithChanges> {
     }
 }
 
-pub(crate) const WANTED: types::SelectedConfig = types::SelectedConfig::Tracking;
+pub(crate) const WANTED: SelectedConfig = SelectedConfig::Tracking;
 
 pub(crate) fn show_config(
     ui: &mut egui::Ui,
-    tracking: &mut types::ComputeConfigTracking,
+    tracking: &mut ComputeConfigTracking,
     tracking_result: &mut Buffered<Result<Resource<TrackingResult>, String>>,
 ) {
     let repo_changed = show_repo_menu(ui, &mut tracking.target.file.commit.repo);
@@ -302,9 +294,9 @@ pub(crate) fn show_config(
 pub(super) fn show_code_tracking_results(
     ui: &mut egui::Ui,
     api_addr: &str,
-    tracking: &mut types::ComputeConfigTracking,
-    tracking_result: &mut utils_poll::Buffered<RemoteResult>,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    tracking: &mut ComputeConfigTracking,
+    tracking_result: &mut Buffered<RemoteResult>,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
     ctx: &egui::Context,
 ) {
     let result_changed = tracking_result.try_poll();

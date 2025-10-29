@@ -1,33 +1,31 @@
-use self::{
-    single_repo::ComputeConfigSingle,
-    tree_view::store::FetchedHyperAST,
-    types::{Commit, Repo},
+use egui::util::hash;
+use re_ui::{UiExt as _, notifications::NotificationUi};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use strum::IntoEnumIterator;
+
+use egui_addon::{
+    code_editor::{self, generic_text_buffer::TextBuffer},
+    egui_utils::radio_collapsing,
+    syntax_highlighting,
 };
+
 use crate::{
     command::{CommandReceiver, CommandSender, UICommand},
     command_palette::CommandPalette,
 };
 use code_aspects::remote_fetch_node;
 use commit::{CommitSlice, SelectedProjects, fetch_commit};
-use core::f32;
-use egui::util::hash;
-use egui_addon::{
-    Lang,
-    code_editor::{self, generic_text_buffer::TextBuffer},
-    egui_utils::radio_collapsing,
-    syntax_highlighting,
-};
 use querying::DetailsResults;
-use re_ui::{UiExt as _, notifications::NotificationUi};
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
-use strum::IntoEnumIterator;
+use single_repo::ComputeConfigSingle;
 use tree_view::make_pp_code;
-use types::{QueriedLang, SelectedConfig};
+use tree_view::store::FetchedHyperAST;
+use types::{Commit, QueriedLang, Repo, SelectedConfig};
 use utils_poll::{Buffered3, MultiBuffered2};
+use utils_results_batched::ComputeResultsProm;
+
+pub use types::Languages;
 
 mod app_components;
 mod code_aspects;
@@ -50,7 +48,6 @@ mod utils_edition;
 mod utils_egui;
 mod utils_poll;
 mod utils_results_batched;
-pub use self::types::Languages;
 pub(crate) use app_components::show_repo_menu;
 pub(crate) use utils_commit::show_commit_menu;
 mod commit_graph;
@@ -387,9 +384,6 @@ struct QueryResults {
         Result<querying::StreamedComputeResults, querying::QueryingError>,
         Result<querying::StreamedComputeResults, querying::QueryingError>,
     >,
-    // Buffered5<,
-    // utils_results_batched::ComputeResults, querying::QueryingError
-    // >,
     tab: TabId,
 }
 type CommitMdPayload = (commit::CommitMetadata, Option<(Commit, ProjectId)>);
@@ -431,11 +425,11 @@ pub(crate) struct AppData {
     aspects: types::ComputeConfigAspectViews,
 
     #[serde(skip)]
-    compute_single_result: Option<utils_results_batched::RemoteResult<single_repo::ScriptingError>>,
+    compute_single_result: Option<ComputeResultsProm<single_repo::ScriptingError>>,
     #[serde(skip)]
-    querying_result: Option<utils_results_batched::RemoteResult<querying::QueryingError>>,
+    querying_result: Option<ComputeResultsProm<querying::QueryingError>>,
     #[serde(skip)]
-    tsg_result: Option<utils_results_batched::RemoteResult<tsg::QueryingError>>,
+    tsg_result: Option<ComputeResultsProm<tsg::QueryingError>>,
     #[serde(skip)]
     smells_result: Option<smells::RemoteResult>,
     #[serde(skip)]
@@ -920,7 +914,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     .show(ui, |ui| {
                         if EDIT_AWARE {
                             // some issues on cursor behavior, like lising focus on arrow key press
-                            use egui_addon::code_editor::generic_text_edit::TextEdit;
+                            use code_editor::generic_text_edit::TextEdit;
                             ui.add_sized(
                                 ui.available_size(),
                                 TextEdit::multiline(code)
@@ -1307,7 +1301,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                                 let store = data.store.clone();
 
                                 let rect = ui.clip_rect();
-                                use egui_addon::interactive_split::interactive_splitter::InteractiveSplitter;
+                                use egui_addon::InteractiveSplitter;
                                 InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
                                     ui1.set_clip_rect(ui1.max_rect().intersect(rect));
                                     ui2.set_clip_rect(ui2.max_rect().intersect(rect));

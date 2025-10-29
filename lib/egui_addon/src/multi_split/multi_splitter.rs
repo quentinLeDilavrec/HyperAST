@@ -1,6 +1,6 @@
 use egui::{Align, Layout, Sense, Ui};
 
-use super::multi_splitter_orientation::{MultiSplitterOrientation, MultiSplitterResponse};
+use super::{MultiSplitterOrientation, MultiSplitterResponse};
 
 /// A splitter which can separate the UI into 2 parts either vertically or horizontally.
 ///

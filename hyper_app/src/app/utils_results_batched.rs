@@ -1,12 +1,10 @@
 use poll_promise::Promise;
 
-use crate::app::types;
-use crate::app::utils;
-use crate::app::utils::SecFmt;
-
 use super::ProjectId;
 use super::types::CommitId;
 use super::types::Resource;
+use super::utils::SecFmt;
+use super::utils::file_save;
 
 pub(crate) trait ComputeError {
     fn head(&self) -> &str;
@@ -14,7 +12,7 @@ pub(crate) trait ComputeError {
 }
 
 pub(super) fn show_short_result(
-    promise: &Option<RemoteResult<impl ComputeError + Send + Sync>>,
+    promise: &Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,
     ui: &mut egui::Ui,
 ) {
     let Some(promise) = &promise else {
@@ -35,7 +33,7 @@ pub(super) fn show_short_result(
     };
     if ui.add(egui::Button::new("Export")).clicked() {
         if let Ok(text) = serde_json::to_string_pretty(content) {
-            utils::file_save("query_results", ".json", &text);
+            file_save("query_results", ".json", &text);
         }
     };
     show_short_result_aux(content, ui);
@@ -65,10 +63,10 @@ pub(crate) fn show_short_result_aux(content: &ComputeResults, ui: &mut egui::Ui)
 }
 
 pub(super) type Remote<R> = Promise<ehttp::Result<Resource<R>>>;
-pub(super) type RemoteResult<E> = Remote<Result<ComputeResults, E>>;
+// pub(super) type RemoteResult<E> = Remote<Result<ComputeResults, E>>;
 
 pub(crate) fn show_long_result(
-    promise: &Option<RemoteResult<impl ComputeError + Send + Sync>>,
+    promise: &Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,
     ui: &mut egui::Ui,
 ) {
     let Some(promise) = &promise else {
@@ -106,6 +104,8 @@ pub struct ComputeResults {
     pub results: Vec<Result<ComputeResultIdentified, String>>,
 }
 
+pub type ComputeResultsProm<Err> = Promise<Result<Resource<Result<ComputeResults, Err>>, String>>;
+
 impl std::hash::Hash for ComputeResults {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.results.hash(state);
@@ -114,7 +114,7 @@ impl std::hash::Hash for ComputeResults {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Hash)]
 pub struct ComputeResultIdentified {
-    pub commit: types::CommitId,
+    pub commit: CommitId,
     #[serde(flatten)]
     pub inner: ComputeResult,
 }

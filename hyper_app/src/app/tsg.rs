@@ -1,23 +1,21 @@
-use self::example_queries::EXAMPLES;
-use super::{
-    Sharing, code_editor_automerge, show_repo_menu,
-    types::{Commit, Config, Resource, SelectedConfig, TsgEditor, WithDesc},
-    utils_edition::{show_interactions, update_shared_editors},
-    utils_results_batched::{self, ComputeResults, show_long_result},
-};
-use crate::app::{
-    types::EditorHolder as _,
-    utils_edition::{self, show_available_remote_docs, show_locals_and_interact},
-};
-use egui_addon::{
-    code_editor::EditorInfo, interactive_split::interactive_splitter::InteractiveSplitter,
-};
+use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 use poll_promise::Promise;
-use std::{
-    ops::DerefMut as _,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
+
+use super::code_editor_automerge::CodeEditor;
+use super::types::{Commit, Config, Resource, SelectedConfig, TsgEditor};
+use super::types::{EditorHolder, WithDesc};
+use super::utils_edition::show_shared_code_edition;
+use super::utils_edition::{EditStatus, EditingContext};
+use super::utils_edition::{show_available_remote_docs, show_locals_and_interact};
+use super::utils_edition::{show_interactions, update_shared_editors};
+use super::utils_results_batched::show_long_result;
+use super::utils_results_batched::{ComputeError, ComputeResults, ComputeResultsProm};
+use super::{Sharing, code_editor_automerge, show_repo_menu};
+
 mod example_queries;
+
+use example_queries::EXAMPLES;
 
 const INFO_QUERY: EditorInfo<&'static str> = EditorInfo {
     title: "Graph Extractor",
@@ -101,7 +99,7 @@ impl<T> WithDesc<T> for TsgEditor<T> {
     }
 }
 
-impl<T> super::types::EditorHolder for TsgEditor<T> {
+impl<T> EditorHolder for TsgEditor<T> {
     type Item = T;
 
     fn iter_editors_mut(&mut self) -> impl Iterator<Item = &mut Self::Item> {
@@ -121,14 +119,13 @@ impl<T> TsgEditor<T> {
     }
 }
 
-impl Into<TsgEditor<super::code_editor_automerge::CodeEditor>> for TsgEditor {
-    fn into(self) -> TsgEditor<super::code_editor_automerge::CodeEditor> {
+impl Into<TsgEditor<CodeEditor>> for TsgEditor {
+    fn into(self) -> TsgEditor<CodeEditor> {
         self.to_shared()
     }
 }
 
-pub(super) type TsgContext =
-    utils_edition::EditingContext<TsgEditor, TsgEditor<code_editor_automerge::CodeEditor>>;
+pub(super) type TsgContext = EditingContext<TsgEditor, TsgEditor<CodeEditor>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -151,17 +148,14 @@ impl Default for ComputeConfigQuery {
     }
 }
 
-type QueryingContext = utils_edition::EditingContext<
-    super::types::TsgEditor,
-    super::types::TsgEditor<code_editor_automerge::CodeEditor>,
->;
+type QueryingContext = EditingContext<TsgEditor, TsgEditor<CodeEditor>>;
 
 pub(super) fn remote_compute_query(
     ctx: &egui::Context,
     api_addr: &str,
     single: &mut Sharing<ComputeConfigQuery>,
     query_editors: &mut QueryingContext,
-) -> Promise<Result<Resource<Result<ComputeResults, QueryingError>>, String>> {
+) -> ComputeResultsProm<QueryingError> {
     // TODO multi requests from client
     // if single.len > 1 {
     //     let parents = fetch_commit_parents(&ctx, &single.commit, single.len);
@@ -189,8 +183,7 @@ pub(super) fn remote_compute_query(
     }
     .to_string();
     let script = match &mut query_editors.current {
-        utils_edition::EditStatus::Shared(_, shared_script)
-        | utils_edition::EditStatus::Sharing(shared_script) => {
+        EditStatus::Shared(_, shared_script) | EditStatus::Sharing(shared_script) => {
             let code_editors = shared_script.lock().unwrap();
             QueryContent {
                 language,
@@ -199,13 +192,14 @@ pub(super) fn remote_compute_query(
                 path: single.content.path.clone(),
             }
         }
-        utils_edition::EditStatus::Local { name: _, content }
-        | utils_edition::EditStatus::Example { i: _, content } => QueryContent {
-            language,
-            query: content.query.code().to_string(),
-            commits: single.content.len,
-            path: single.content.path.clone(),
-        },
+        EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
+            QueryContent {
+                language,
+                query: content.query.code().to_string(),
+                commits: single.content.len,
+                path: single.content.path.clone(),
+            }
+        }
     };
 
     let mut request = ehttp::Request::post(&url, serde_json::to_vec(&script).unwrap());
@@ -236,11 +230,7 @@ pub(super) fn show_querying(
     query: &mut Sharing<ComputeConfigQuery>,
     query_editors: &mut QueryingContext,
     trigger_compute: &mut bool,
-    querying_result: &mut Option<
-        poll_promise::Promise<
-            Result<super::types::Resource<Result<ComputeResults, QueryingError>>, String>,
-        >,
-    >,
+    querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
 ) {
     let api_endpoint = &format!("{}/sharing-tsg", api_addr);
     update_shared_editors(ui, query, api_endpoint, query_editors);
@@ -268,9 +258,7 @@ pub(super) fn show_querying(
 fn handle_interactions(
     ui: &mut egui::Ui,
     code_editors: &mut QueryingContext,
-    querying_result: &mut Option<
-        Promise<Result<Resource<Result<ComputeResults, QueryingError>>, String>>,
-    >,
+    querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
     single: &mut Sharing<ComputeConfigQuery>,
     trigger_compute: &mut bool,
 ) {
@@ -282,10 +270,10 @@ fn handle_interactions(
         let content = content.clone().to_shared();
         let content = Arc::new(Mutex::new(content));
         let name = name.to_string();
-        code_editors.current = utils_edition::EditStatus::Sharing(content.clone());
+        code_editors.current = EditStatus::Sharing(content.clone());
         let mut content = content.lock().unwrap();
         let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_atempt(&single.rt, name, content.deref_mut());
+        db.create_doc_atempt(&single.rt, name, &mut *content);
     } else if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving query: {:#?}", content.clone());
@@ -294,7 +282,7 @@ fn handle_interactions(
         code_editors
             .local_scripts
             .insert(name.to_string(), content.clone());
-        code_editors.current = utils_edition::EditStatus::Local { name, content };
+        code_editors.current = EditStatus::Local { name, content };
     } else if interaction.compute_button.clicked() {
         *trigger_compute |= true;
     }
@@ -322,9 +310,8 @@ fn show_scripts_edition(
     show_available_remote_docs(ui, api_endpoint, single, querying_context);
     let local = querying_context
         .when_local(|code_editors| code_editors.iter_editors_mut().for_each(|c| c.ui(ui)));
-    let shared = querying_context.when_shared(|query_editors| {
-        utils_edition::show_shared_code_edition(ui, query_editors, single)
-    });
+    let shared = querying_context
+        .when_shared(|query_editors| show_shared_code_edition(ui, query_editors, single));
     assert!(local.or(shared).is_some());
 }
 
@@ -337,7 +324,7 @@ fn show_examples(
         let mut j = 0;
         for ex in EXAMPLES {
             let mut text = egui::RichText::new(ex.name);
-            if let utils_edition::EditStatus::Example { i, .. } = &querying_context.current {
+            if let EditStatus::Example { i, .. } = &querying_context.current {
                 if &j == i {
                     text = text.strong();
                 }
@@ -348,7 +335,7 @@ fn show_examples(
                 single.config = ex.config;
                 single.len = ex.commits;
                 single.path = ex.path.to_string();
-                querying_context.current = utils_edition::EditStatus::Example {
+                querying_context.current = EditStatus::Example {
                     i: j,
                     content: (&ex.query).into(),
                 };
@@ -411,7 +398,7 @@ impl Resource<Result<ComputeResults, QueryingError>> {
     }
 }
 
-impl utils_results_batched::ComputeError for QueryingError {
+impl ComputeError for QueryingError {
     fn head(&self) -> &str {
         match self {
             QueryingError::MissingLanguage(_) => "Missing Language:",

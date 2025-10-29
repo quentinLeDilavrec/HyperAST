@@ -1,27 +1,33 @@
+use poll_promise::Promise;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::collections::hash_map::Entry;
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::hash::Hasher;
+
+use super::code_tracking::FetchedFile;
+use super::code_tracking::RemoteFile;
+use super::types::FileIdentifier;
 
 /// Much simpler than [`Buffered`]...
 /// would need a bench to see if [`Buffered`] should be completly removed.
-/// But  because of the T: std::marker::Send + 'static I need to impl my how Ser/De
+/// But  because of the T: Send + 'static I need to impl my how Ser/De
 // #[serde(default)]
 // #[serde(bound (deserialize = "T: Default + Deserialize<'de>"))]
-pub struct Buffered2<T: std::marker::Send + 'static, U = T> {
+pub struct Buffered2<T: Send + 'static, U = T> {
     content: Option<U>,
     // #[serde(skip)]
-    promise: Option<poll_promise::Promise<T>>,
+    promise: Option<Promise<T>>,
 }
 
-pub type Buffered3<U> = Buffered2<ehttp::Result<super::types::Resource<U>>, U>;
+pub type HttpRes<T> = ehttp::Result<super::types::Resource<T>>;
 
-pub type Buffered4<U> = Buffered2<ehttp::Result<super::types::Resource<U>>, PreHashed<U>>;
+pub type Buffered3<U> = Buffered2<HttpRes<U>, U>;
 
-pub type Buffered5<U, E> =
-    Buffered2<ehttp::Result<super::types::Resource<Result<U, E>>>, Result<PreHashed<U>, E>>;
+pub type Buffered4<U> = Buffered2<HttpRes<U>, PreHashed<U>>;
 
 #[derive(Deserialize, Serialize)]
 pub struct PreHashed<T> {
@@ -34,13 +40,13 @@ impl<T> PreHashed<T> {
     }
 }
 
-impl<T> std::hash::Hash for PreHashed<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl<T> Hash for PreHashed<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.hash.hash(state);
     }
 }
 
-impl<T: std::hash::Hash> From<T> for PreHashed<T> {
+impl<T: Hash> From<T> for PreHashed<T> {
     fn from(value: T) -> Self {
         let mut state = std::hash::DefaultHasher::new();
         value.hash(&mut state);
@@ -63,7 +69,7 @@ impl<T> std::ops::DerefMut for PreHashed<T> {
     }
 }
 
-impl<T: std::marker::Send + 'static, U> Default for Buffered2<T, U> {
+impl<T: Send + 'static, U> Default for Buffered2<T, U> {
     fn default() -> Self {
         Self {
             content: None,
@@ -72,7 +78,7 @@ impl<T: std::marker::Send + 'static, U> Default for Buffered2<T, U> {
     }
 }
 
-impl<'de, T: std::marker::Send + 'static, U: serde::Deserialize<'de>> serde::Deserialize<'de>
+impl<'de, T: Send + 'static, U: serde::Deserialize<'de>> serde::Deserialize<'de>
     for Buffered2<T, U>
 {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -84,7 +90,7 @@ impl<'de, T: std::marker::Send + 'static, U: serde::Deserialize<'de>> serde::Des
     }
 }
 
-impl<T: std::marker::Send + 'static, U: Serialize> Serialize for Buffered2<T, U> {
+impl<T: Send + 'static, U: Serialize> Serialize for Buffered2<T, U> {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -96,7 +102,7 @@ impl<T: std::marker::Send + 'static, U: Serialize> Serialize for Buffered2<T, U>
     }
 }
 
-impl<T: std::marker::Send + 'static, U: Debug> Debug for Buffered2<T, U> {
+impl<T: Send + 'static, U: Debug> Debug for Buffered2<T, U> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = &mut f.debug_struct("Buffered2");
         if let Some(prom) = &self.promise {
@@ -111,7 +117,7 @@ impl<T: std::marker::Send + 'static, U: Debug> Debug for Buffered2<T, U> {
     }
 }
 
-impl<T: std::marker::Send + 'static> Buffered2<T> {
+impl<T: Send + 'static> Buffered2<T> {
     pub fn try_poll(&mut self) -> bool {
         if let Some(prom) = self.promise.take() {
             match prom.try_take() {
@@ -126,7 +132,7 @@ impl<T: std::marker::Send + 'static> Buffered2<T> {
     }
 }
 
-impl<T: std::marker::Send + 'static, U> Buffered2<T, U> {
+impl<T: Send + 'static, U> Buffered2<T, U> {
     pub fn try_poll_with(&mut self, mut f: impl FnMut(T) -> U) -> bool {
         if let Some(prom) = self.promise.take() {
             match prom.try_take() {
@@ -157,7 +163,7 @@ impl<T: std::marker::Send + 'static, U> Buffered2<T, U> {
         self.content.is_some()
     }
 
-    pub fn buffer(&mut self, waiting: poll_promise::Promise<T>) {
+    pub fn buffer(&mut self, waiting: Promise<T>) {
         self.promise = Some(waiting)
     }
 
@@ -167,34 +173,20 @@ impl<T: std::marker::Send + 'static, U> Buffered2<T, U> {
 }
 
 #[derive(Default, Deserialize, Serialize)]
-pub enum Buffered<T: std::marker::Send + 'static> {
+pub enum Buffered<T: Send + 'static> {
     #[default]
     Empty,
     #[serde(skip)]
-    Init(poll_promise::Promise<T>),
+    Init(Promise<T>),
     Single(T),
     #[serde(skip)]
     Waiting {
         content: T,
-        waiting: poll_promise::Promise<T>,
+        waiting: Promise<T>,
     },
 }
 
-// impl<T: Serialize + std::marker::Send + 'static> Serialize for Buffered<T> {
-//     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         match self {
-//             Buffered::Empty => s.serialize_none(),
-//             Buffered::Init(_) => s.serialize_none(),
-//             Buffered::Single(content) => s.serialize_some(content),
-//             Buffered::Waiting { content, waiting } => s.serialize_some(content),
-//         }
-//     }
-// }
-
-impl<T: Debug + std::marker::Send + 'static> Debug for Buffered<T> {
+impl<T: Debug + Send + 'static> Debug for Buffered<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Empty => write!(f, "Empty"),
@@ -212,7 +204,7 @@ impl<T: Debug + std::marker::Send + 'static> Debug for Buffered<T> {
     }
 }
 
-impl<T: std::marker::Send + 'static> Buffered<T> {
+impl<T: Send + 'static> Buffered<T> {
     pub fn try_poll(&mut self) -> bool {
         let this = std::mem::take(self);
         let (changed, new) = match this {
@@ -245,7 +237,7 @@ impl<T: std::marker::Send + 'static> Buffered<T> {
         }
     }
 
-    pub fn buffer(&mut self, waiting: poll_promise::Promise<T>) {
+    pub fn buffer(&mut self, waiting: Promise<T>) {
         let this = std::mem::take(self);
         *self = match this {
             Buffered::Empty => Buffered::Init(waiting),
@@ -274,13 +266,13 @@ impl<T: std::marker::Send + 'static> Buffered<T> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct MultiBuffered<T, U: std::marker::Send + 'static> {
+pub struct MultiBuffered<T, U: Send + 'static> {
     pub(crate) content: Option<T>,
     #[serde(skip)]
-    pub(crate) waiting: VecDeque<poll_promise::Promise<U>>,
+    pub(crate) waiting: VecDeque<Promise<U>>,
 }
 
-impl<T, U: std::marker::Send + 'static> Default for MultiBuffered<T, U> {
+impl<T, U: Send + 'static> Default for MultiBuffered<T, U> {
     fn default() -> Self {
         Self {
             content: Default::default(),
@@ -317,18 +309,13 @@ impl Accumulable<String> for Vec<String> {
     }
 }
 
-pub struct MultiBuffered2<K, V2: std::marker::Send + 'static, V = V2> {
+pub struct MultiBuffered2<K, V2: Send + 'static, V = V2> {
     pub(crate) content: HashMap<K, V>,
-    pub(crate) waiting: HashMap<K, poll_promise::Promise<V2>>,
+    pub(crate) waiting: HashMap<K, Promise<V2>>,
 }
 
-//
-impl<
-    'de,
-    K: Eq + std::hash::Hash + serde::Deserialize<'de>,
-    V2: std::marker::Send + 'static,
-    V: serde::Deserialize<'de>,
-> serde::Deserialize<'de> for MultiBuffered2<K, V2, V>
+impl<'de, K: Eq + Hash + serde::Deserialize<'de>, V2: Send + 'static, V: serde::Deserialize<'de>>
+    serde::Deserialize<'de> for MultiBuffered2<K, V2, V>
 {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let content = HashMap::<K, V>::deserialize(d)?;
@@ -339,7 +326,7 @@ impl<
     }
 }
 
-impl<K: Eq + std::hash::Hash + Serialize, V2: std::marker::Send + 'static, V: Serialize> Serialize
+impl<K: Eq + Hash + Serialize, V2: Send + 'static, V: Serialize> Serialize
     for MultiBuffered2<K, V2, V>
 {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
@@ -350,9 +337,7 @@ impl<K: Eq + std::hash::Hash + Serialize, V2: std::marker::Send + 'static, V: Se
     }
 }
 
-impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> Default
-    for MultiBuffered2<K, V2, V>
-{
+impl<K: Eq + Hash, V2: Send + 'static, V> Default for MultiBuffered2<K, V2, V> {
     fn default() -> Self {
         Self {
             content: Default::default(),
@@ -361,7 +346,7 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> Default
     }
 }
 
-impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2<K, V2, V> {
+impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
     pub fn try_poll_with(&mut self, key: &K, mut f: impl FnMut(V2) -> V) -> bool {
         if let Some((key, prom)) = self.waiting.remove_entry(key) {
             match prom.try_take() {
@@ -398,11 +383,11 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2
     }
 }
 
-impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2<K, V2, V> {
+impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
     pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash,
+        Q: Eq + Hash,
     {
         self.content.get_mut(key)
     }
@@ -410,7 +395,7 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2
     pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash,
+        Q: Eq + Hash,
     {
         self.content.get(key)
     }
@@ -418,19 +403,19 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2
     pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + std::hash::Hash,
+        Q: Eq + Hash,
     {
         self.content.remove(key)
     }
 }
 
-impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2<K, V2, V> {
+impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
     #[allow(unused)]
     pub fn is_waiting(&self, k: &K) -> bool {
         self.waiting.contains_key(k)
     }
 
-    pub fn insert(&mut self, key: K, waiting: poll_promise::Promise<V2>) {
+    pub fn insert(&mut self, key: K, waiting: Promise<V2>) {
         self.waiting.insert(key, waiting);
     }
 
@@ -441,13 +426,13 @@ impl<K: Eq + std::hash::Hash, V2: std::marker::Send + 'static, V> MultiBuffered2
     pub(crate) fn is_absent<Q: ?Sized>(&self, k: &Q) -> bool
     where
         K: std::borrow::Borrow<Q>,
-        Q: std::hash::Hash + Eq,
+        Q: Hash + Eq,
     {
         !self.content.contains_key(k) && !self.waiting.contains_key(k)
     }
 }
 
-impl<T: Default, U: std::marker::Send + 'static> MultiBuffered<T, U> {
+impl<T: Default, U: Send + 'static> MultiBuffered<T, U> {
     pub fn try_poll(&mut self) -> bool
     where
         T: Accumulable<U>,
@@ -482,7 +467,7 @@ impl<T: Default, U: std::marker::Send + 'static> MultiBuffered<T, U> {
         !self.waiting.is_empty()
     }
 
-    pub fn buffer(&mut self, waiting: poll_promise::Promise<U>) {
+    pub fn buffer(&mut self, waiting: Promise<U>) {
         self.waiting.push_back(waiting)
     }
     #[allow(unused)]
@@ -492,19 +477,14 @@ impl<T: Default, U: std::marker::Send + 'static> MultiBuffered<T, U> {
 }
 
 pub(crate) fn try_fetch_remote_file<R>(
-    file_result: &std::collections::hash_map::Entry<
-        '_,
-        super::types::FileIdentifier,
-        super::code_tracking::RemoteFile,
-    >,
-    mut f: impl FnMut(&super::code_tracking::FetchedFile) -> R,
+    file_result: &Entry<'_, FileIdentifier, RemoteFile>,
+    mut f: impl FnMut(&FetchedFile) -> R,
 ) -> Option<Result<R, String>> {
-    if let std::collections::hash_map::Entry::Occupied(promise) = file_result {
+    if let Entry::Occupied(promise) = file_result {
         let promise = promise.get();
         if let Some(result) = promise.ready() {
             match result {
                 Ok(resource) => {
-                    // ui_resource(ui, resource);
                     if let Some(text) = &resource.content {
                         Some(Ok(f(text)))
                     } else {

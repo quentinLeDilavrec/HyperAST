@@ -1,16 +1,5 @@
-use super::{
-    code_aspects::{HightLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids},
-    long_tracking::TARGET_COLOR,
-};
-use crate::app::syntax_highlighting::{self as syntax_highlighter, syntax_highlighting_async};
 use egui::TextFormat;
 use epaint::text::LayoutSection;
-pub use hyperast::store::nodes::fetched::NodeIdentifier;
-use hyperast::{
-    nodes::IndentedAlt,
-    store::nodes::fetched::LabelIdentifier,
-    types::{AnyType, HyperType, Labeled, WithChildren, WithStats},
-};
 use std::{
     fmt::Debug,
     num::NonZeroU32,
@@ -18,6 +7,16 @@ use std::{
     sync::{Arc, atomic::AtomicUsize},
     time::Duration,
 };
+
+use super::code_aspects::{HightLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids};
+use super::long_tracking::TARGET_COLOR;
+use super::syntax_highlighting as syntax_highlighter;
+use super::syntax_highlighting::syntax_highlighting_async;
+
+use hyperast::nodes::IndentedAlt;
+pub use hyperast::store::nodes::fetched::{LabelIdentifier, NodeIdentifier, SimplePacked};
+use hyperast::types::{AnyType, HyperType, Labeled, WithChildren, WithStats};
+
 mod cache;
 
 pub(crate) mod store {

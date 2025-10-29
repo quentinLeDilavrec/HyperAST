@@ -1,40 +1,29 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    ops::Range,
-    sync::Arc,
-};
+use epaint::{Pos2, ahash::HashSet};
+use poll_promise::Promise;
+use std::collections::{HashMap, VecDeque};
+use std::ops::Range;
+use std::sync::Arc;
 
 use egui_addon::{
-    code_editor::generic_text_buffer::byte_index_from_char_index,
-    egui_utils::{highlight_byte_range, radio_collapsing, show_wip},
-    meta_edge::meta_egde,
-    multi_split::multi_splitter::MultiSplitter,
-};
-use epaint::{Pos2, ahash::HashSet};
-use hyperast::{
-    store::nodes::fetched::NodeIdentifier,
-    types::{AnyType, HyperType, Labeled, TypeStore},
-};
-use poll_promise::Promise;
-
-use crate::app::{
-    code_aspects::{self, HightLightHandle},
-    code_tracking::TrackingResultWithChanges,
-    commit::{fetch_commit, fetch_commit0},
-    tree_view,
-    types::Resource,
+    MultiSplitter, code_editor::generic_text_buffer::byte_index_from_char_index,
+    egui_utils::highlight_byte_range, meta_edge::meta_egde,
 };
 
-use super::{
-    code_aspects::{FetchedView, Focus},
-    code_tracking::{self, RemoteFile, TrackingResult},
-    commit::CommitMetadata,
-    show_commit_menu,
-    tree_view::store::FetchedHyperAST,
-    types::{self, CodeRange, Commit, ComputeConfigAspectViews},
-    utils_egui::MyUiExt as _,
-    utils_poll::{self, AccumulableResult, Buffered, MultiBuffered},
+use hyperast::store::nodes::fetched::NodeIdentifier;
+use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
+
+use super::code_aspects::{FetchedView, HightLightHandle, remote_fetch_node_old};
+use super::code_tracking::{
+    RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
 };
+use super::commit::{CommitMetadata, fetch_commit0};
+use super::show_commit_menu;
+use super::tree_view::{Action, store::FetchedHyperAST};
+use super::types::{
+    CodeRange, Commit, ComputeConfigAspectViews, FileIdentifier, Resource, SelectedConfig,
+};
+use super::utils_egui::MyUiExt as _;
+use super::utils_poll::{AccumulableResult, Buffered, MultiBuffered};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -67,15 +56,14 @@ pub(crate) struct LongTacking {
     pub(crate) origin_index: usize,
     #[serde(skip)] // TODO remove that
     pub(crate) results: VecDeque<(
-        utils_poll::Buffered<Result<CommitMetadata, String>>,
-        utils_poll::MultiBuffered<
-            utils_poll::AccumulableResult<code_tracking::TrackingResultsWithChanges, Vec<String>>,
-            Result<code_tracking::TrackingResultWithChanges, String>,
+        Buffered<Result<CommitMetadata, String>>,
+        MultiBuffered<
+            AccumulableResult<TrackingResultsWithChanges, Vec<String>>,
+            Result<TrackingResultWithChanges, String>,
         >,
     )>,
     #[serde(skip)]
-    pub(crate) tree_viewer:
-        HashMap<Commit, utils_poll::Buffered<Result<Resource<FetchedView>, String>>>,
+    pub(crate) tree_viewer: HashMap<Commit, Buffered<Result<Resource<FetchedView>, String>>>,
     #[serde(skip)]
     pub(crate) additionnal_links: Vec<[CodeRange; 2]>,
 }
@@ -118,7 +106,7 @@ pub(crate) struct Flags {
     pub(crate) declaration: bool,
 }
 
-pub(crate) const WANTED: types::SelectedConfig = types::SelectedConfig::LongTracking;
+pub(crate) const WANTED: SelectedConfig = SelectedConfig::LongTracking;
 
 pub(crate) fn show_config(ui: &mut egui::Ui, tracking: &mut LongTacking) {
     show_commit_menu(ui, &mut tracking.origins[0].file.commit);
@@ -220,10 +208,10 @@ pub(crate) type Attacheds = Vec<(
 pub(crate) fn show_results(
     ui: &mut egui::Ui,
     api_addr: &str,
-    aspects: &mut types::ComputeConfigAspectViews,
+    aspects: &mut ComputeConfigAspectViews,
     store: Arc<FetchedHyperAST>,
     long_tracking: &mut LongTacking,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
 ) {
     let w_id = ui.id().with("Tracking Timeline");
     let timeline_window = ui.available_rect_before_wrap();
@@ -272,10 +260,7 @@ pub(crate) fn show_results(
         .show_inside(ui, |ui| {
             ui.set_clip_rect(ui.max_rect().expand2((1.0, 0.0).into()));
             let mut add_content = |ui: &mut egui::Ui, col: usize| {
-                let mut aaa = (
-                    utils_poll::Buffered::Empty,
-                    utils_poll::MultiBuffered::default(),
-                );
+                let mut aaa = (Buffered::Empty, MultiBuffered::default());
                 let (md, tracking_result) = if long_tracking.results.is_empty() {
                     &mut aaa //&long_tracking.target
                 } else {
@@ -755,11 +740,11 @@ pub(crate) fn show_results(
 
             if long_tracking.tree_view {
                 let tree_viewer = long_tracking.tree_viewer.entry(curr_commit.clone());
-                let tree_viewer = tree_viewer.or_insert_with(|| utils_poll::Buffered::default());
+                let tree_viewer = tree_viewer.or_insert_with(|| Buffered::default());
                 let trigger = tree_viewer.try_poll();
                 let Some(tree_viewer) = tree_viewer.get_mut() else {
                     if !tree_viewer.is_waiting() {
-                        tree_viewer.buffer(code_aspects::remote_fetch_node_old(
+                        tree_viewer.buffer(remote_fetch_node_old(
                             ui.ctx(),
                             api_addr,
                             store.clone(),
@@ -1339,7 +1324,7 @@ fn color_gr_shift(color: epaint::Color32, step: f32) -> epaint::Color32 {
 
 fn show_detached_element(
     ui: &mut egui::Ui,
-    store: &Arc<tree_view::store::FetchedHyperAST>,
+    store: &Arc<FetchedHyperAST>,
     global_opt: &DetatchedViewOptions,
     x: &CodeRange,
     id: egui::Id,
@@ -1706,7 +1691,7 @@ fn show_code_view(
     ui: &mut egui::Ui,
     api_addr: &str,
     curr_view: &mut ColView<'_>,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
 ) -> Option<egui::text_edit::TextEditOutput> {
     let curr_file = {
         let curr = if curr_view.matcheds.get(0).is_some() {
@@ -1883,9 +1868,9 @@ pub(crate) fn show_tree_view(
                             "",
                         );
                         let bool = match a {
-                            tree_view::Action::Focused(_) => false,
-                            tree_view::Action::PartialFocused(_) => true,
-                            tree_view::Action::Keep => true,
+                            Action::Focused(_) => false,
+                            Action::PartialFocused(_) => true,
+                            Action::Keep => true,
                             x => panic!("{:?}", x),
                         };
                         if bool {
@@ -1915,8 +1900,8 @@ pub(crate) fn show_tree_view(
                             "",
                         );
                         let bool = match a {
-                            tree_view::Action::Focused(_) => false,
-                            tree_view::Action::PartialFocused(_) => true,
+                            Action::Focused(_) => false,
+                            Action::PartialFocused(_) => true,
                             _ => false,
                         };
                         if !bool {
@@ -1969,12 +1954,12 @@ pub(crate) fn show_tree_view(
                     }
                 }
                 match a {
-                    tree_view::Action::Focused(p) => {
+                    Action::Focused(p) => {
                         scroll_focus = Some(p);
                         None
                     }
-                    tree_view::Action::Clicked(p) => Some(p),
-                    tree_view::Action::SerializeKind(k) => {
+                    Action::Clicked(p) => Some(p),
+                    Action::SerializeKind(k) => {
                         let k = &k.as_any();
                         if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
                             aspects.ser_opt_cpp.insert(k.to_owned());
@@ -1986,7 +1971,7 @@ pub(crate) fn show_tree_view(
 
                         None
                     }
-                    tree_view::Action::HideKind(k) => {
+                    Action::HideKind(k) => {
                         let k = &k.as_any();
                         if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
                             aspects.hide_opt_cpp.insert(k.to_owned());

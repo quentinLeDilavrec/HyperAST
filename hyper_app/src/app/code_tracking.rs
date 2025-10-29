@@ -68,7 +68,6 @@ pub(super) fn remote_fetch_file(
         api_addr, &commit.repo.user, &commit.repo.name, &commit.id, &file_path,
     );
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
     // request
     //     .headers

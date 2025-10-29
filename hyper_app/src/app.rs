@@ -416,13 +416,7 @@ pub(crate) struct AppData {
     code_views: Vec<CodeView>,
     queries: Vec<QueryData>,
     queries_results: Vec<QueryResults>,
-    queries_differential_results: Option<(
-        ProjectId,
-        QueryId,
-        Buffered3<Result<DetailsResults, querying::QueryingError>>,
-        TabId,
-        u64, // hash of query and selected_baseline
-    )>,
+    queries_differential_results: Option<QueriesDifferentialResults>,
     // #[serde(skip)]
     // results_per_commit: ResultsPerCommit,
     #[serde(skip)]
@@ -482,6 +476,14 @@ pub(crate) struct AppData {
     #[serde(skip)]
     misc_cache: HashMap<(std::any::TypeId, u64), Box<dyn std::any::Any>>,
 }
+
+type QueriesDifferentialResults = (
+    ProjectId,
+    QueryId,
+    Buffered3<Result<DetailsResults, querying::QueryingError>>,
+    TabId,
+    u64, // hash of query and selected_baseline
+);
 
 #[derive(Deserialize, Serialize, Default)]
 #[serde(untagged)]
@@ -623,6 +625,7 @@ enum ResultFormat {
     List,
     Json,
     Hunks,
+    Tree,
 }
 
 impl Tab {
@@ -1225,205 +1228,133 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         });
                     }
                     ResultFormat::Hunks => {
-                        let oid = &self.selected_commit.as_ref().unwrap().1;
-                        ui.label(oid);
-                        let Some(selected_baseline) = &self.selected_baseline else {
-                            *format = ResultFormat::Table;
+                        let proj_id = *proj_id;
+                        if show_hunks_header(
+                            ui,
+                            format,
+                            &mut self.data,
+                            &mut self.selected_baseline,
+                            &mut self.selected_commit,
+                        ) {
                             return Default::default();
-                        };
-                        ui.label(format!("baseline: {}", selected_baseline));
-                        if let Some(msg) = self
-                            .data
-                            .fetched_commit_metadata
-                            .get(oid)
-                            .and_then(|x| x.as_ref().ok())
-                            .and_then(|x| x.message.as_ref())
-                        {
-                            ui.label("message: ");
-                            egui::Frame::group(ui.style()).show(ui, |ui| {
-                                let mut msg_lines = msg.lines();
-                                let mut i = 0;
-                                while let Some(t) = msg_lines.next() {
-                                    ui.label(t);
-                                    i += 1;
-                                    if i == 3 {
-                                        let rem = msg_lines.count();
-                                        if rem > 0 {
-                                            ui.weak(format!("... ({rem} rem. lines)"));
-                                        }
-                                        break;
-                                    }
-                                }
-                            });
                         }
 
+                        let data = &mut *self.data;
+
+                        let Some(selected_baseline) = &self.selected_baseline else {
+                            unreachable!()
+                        };
+                        let Some(selected_commit) = &self.selected_commit else {
+                            unreachable!()
+                        };
+
                         let qid = 0; //q_res.1 as usize;
-                        if let Some(differential) = &mut self.data.queries_differential_results {
-                            if differential.2.is_waiting() {
-                                ui.spinner();
-                            }
-                            differential.2.try_poll_with(|x| {
-                                x.map_err(|e| querying::QueryingError::NetworkError(e))
-                                    .and_then(|x| x.content.unwrap())
-                            });
-                            if !differential.2.is_present() && !differential.2.is_waiting() {
-                                self.data.queries_differential_results = None;
-                            } else if let Some(Err(_)) = differential.2.get() {
-                                self.data.queries_differential_results = None;
-                            } else if hash((
-                                self.data.queries[qid].query.as_ref(),
-                                selected_baseline.clone(),
-                            )) != differential.4
-                            {
-                                self.data.queries_differential_results = None;
+                        if let Some(differential) = &mut data.queries_differential_results {
+                            if update_queries_differential_results(
+                                ui,
+                                &data.queries,
+                                selected_baseline,
+                                qid,
+                                differential,
+                            ) {
+                                data.queries_differential_results = None;
                             } else if let Some(Ok(x)) = differential.2.get() {
-                                const B: f32 = 15.;
-                                const H: f32 = 800.;
-                                let id = ui.id();
-                                let len = x.results.len();
-                                egui::ScrollArea::vertical()
-                                    .scroll_bar_visibility(
-                                        egui::scroll_area::ScrollBarVisibility::AlwaysVisible,
-                                    )
-                                    .show_rows(ui, H, len, |ui, cols| {
-                                        let (mut rect, _) = ui.allocate_exact_size(
-                                            egui::Vec2::new(
-                                                ui.available_width(),
-                                                H * (cols.end - cols.start) as f32,
-                                            ),
-                                            egui::Sense::hover(),
-                                        );
-                                        let top = rect.top();
-                                        for i in cols.clone() {
-                                            let mut rect = {
-                                                let (t, b) = rect.split_top_bottom_at_y(
-                                                    top + H * (i - cols.start + 1) as f32,
-                                                );
-                                                rect = b;
-                                                t
-                                            };
-                                            use std::ops::SubAssign;
-                                            rect.bottom_mut().sub_assign(B);
-                                            let line_pos_1 =
-                                                egui::emath::GuiRounding::round_to_pixels(
-                                                    rect.left_bottom(),
-                                                    ui.painter().pixels_per_point(),
-                                                );
-                                            let line_pos_2 =
-                                                egui::emath::GuiRounding::round_to_pixels(
-                                                    rect.right_bottom(),
-                                                    ui.painter().pixels_per_point(),
-                                                );
-                                            ui.painter().line_segment(
-                                                [line_pos_1, line_pos_2],
-                                                ui.visuals().window_stroke(),
-                                            );
-                                            rect.bottom_mut().sub_assign(B);
-                                            let mut ui = ui.new_child(
-                                                egui::UiBuilder::new().max_rect(rect).layout(
-                                                    egui::Layout::top_down(egui::Align::Min),
-                                                ),
-                                            );
-                                            ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-                                            ui.label(format!(
-                                                "{}:{}..{}",
-                                                x.results[i].0.file.file_path,
-                                                x.results[i].0.range.as_ref().unwrap().start,
-                                                x.results[i].0.range.as_ref().unwrap().end
-                                            ));
-                                            ui.push_id(id.with(i).with(&x.results[i]), |ui| {
-                                                let after = x.results[i].1.clone();
-                                                assert_eq!(
-                                                    after.file.commit.id,
-                                                    self.selected_commit.as_ref().unwrap().1
-                                                );
-                                                // after.file.commit.id = self
-                                                //     .selected_commit
-                                                //     .as_ref()
-                                                //     .unwrap()
-                                                //     .1
-                                                //     .clone();
-                                                smells::show_diff(
-                                                    ui,
-                                                    &self.data.api_addr,
-                                                    &smells::ExamplesValue {
-                                                        before: x.results[i].0.clone(),
-                                                        after,
-                                                        inserts: Default::default(),
-                                                        deletes: Default::default(),
-                                                        moves: Default::default(),
-                                                    },
-                                                    &mut self.data.fetched_files,
-                                                );
-                                            });
-                                        }
-                                    });
+                                let fetched_files = &mut data.fetched_files;
+                                let api_addr = &data.api_addr;
+                                show_hunks(ui, fetched_files, api_addr, x, selected_commit);
                             }
-                        } else {
-                            let pid: ProjectId = self.selected_commit.as_ref().unwrap().0;
-                            if pid != *proj_id {
-                                return Default::default();
-                            }
-                            let (repo, mut c) = self.data.selected_code_data.get_mut(pid).unwrap();
-                            let language = &self.data.queries[qid].lang;
-                            let query = self.data.queries[qid].query.as_ref().to_string();
-                            wasm_rs_dbg::dbg!(&query);
-                            let config = if language == "Cpp" {
-                                types::Config::MakeCpp
-                            } else if language == "Java" {
-                                types::Config::MavenJava
-                            } else {
-                                wasm_rs_dbg::dbg!(&language);
-                                types::Config::MavenJava
-                            };
-                            // let language = config.language().to_string();
-                            let language = language.to_string();
-                            let commits = 2;
-                            let baseline = Commit {
-                                repo: repo.clone(),
-                                id: self.selected_baseline.as_ref().unwrap().clone(),
-                            };
-                            let commit = Commit {
-                                repo: repo.clone(),
-                                id: self.selected_commit.as_ref().unwrap().1.clone(),
-                            };
-                            let max_matches = self.data.queries[qid].max_matches;
-                            let timeout = self.data.queries[qid].timeout;
-                            let precomp = self.data.queries[qid]
-                                .precomp
-                                .clone()
-                                .map(|id| &self.data.queries[id as usize]);
-                            let precomp = precomp.map(|p| p.query.as_ref().to_string());
-                            let hash =
-                                hash((&query, self.selected_baseline.as_ref().unwrap().clone()));
-                            let prom = querying::remote_compute_query_differential(
-                                ui.ctx(),
-                                &self.data.api_addr,
-                                &querying::ComputeConfigQueryDifferential {
-                                    commit,
-                                    config,
-                                    baseline,
-                                },
-                                querying::QueryContent {
-                                    language,
-                                    query,
-                                    precomp,
-                                    commits,
-                                    max_matches,
-                                    timeout,
-                                },
-                            );
-                            self.data.queries_differential_results =
-                                Some((pid, 0, Default::default(), *pane, hash));
-                            self.data
-                                .queries_differential_results
-                                .as_mut()
-                                .unwrap()
-                                .2
-                                .buffer(prom);
+                        } else if let Some(value) = compute_queries_differential_results(
+                            ui,
+                            pane,
+                            proj_id,
+                            qid,
+                            data,
+                            selected_baseline,
+                            selected_commit,
+                        ) {
+                            return value;
                         }
-                        // todo!("horizontal commits ; vertial hunks (per commit)");
-                        // TODO integrate with tracking
+                    }
+                    ResultFormat::Tree => {
+                        let proj_id = *proj_id;
+
+                        let data = &mut *self.data;
+
+                        let Some(selected_baseline) = &self.selected_baseline else {
+                            unreachable!()
+                        };
+                        let Some(selected_commit) = &self.selected_commit else {
+                            unreachable!()
+                        };
+
+                        let qid = 0; //q_res.1 as usize;
+                        if let Some(differential) = &mut data.queries_differential_results {
+                            if update_queries_differential_results(
+                                ui,
+                                &data.queries,
+                                selected_baseline,
+                                qid,
+                                differential,
+                            ) {
+                                data.queries_differential_results = None;
+                            } else if let Some(Ok(x)) = differential.2.get_mut() {
+                                let fetched_files = &mut data.fetched_files;
+                                let api_addr = &data.api_addr;
+
+                                let aspects = &mut data.aspects;
+                                let selected_projects = &mut data.selected_code_data;
+                                let long_tacking = &mut data.long_tracking;
+                                let store = data.store.clone();
+
+                                let rect = ui.clip_rect();
+                                use egui_addon::interactive_split::interactive_splitter::InteractiveSplitter;
+                                InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
+                                    ui1.set_clip_rect(ui1.max_rect().intersect(rect));
+                                    ui2.set_clip_rect(ui2.max_rect().intersect(rect));
+                                    let commit = selected_commit;
+                                    ui2.push_id(commit, |ui| {
+                                        show_tree_view(
+                                            ui,
+                                            aspects,
+                                            selected_projects,
+                                            long_tacking,
+                                            store,
+                                            commit,
+                                            api_addr,
+                                            x,
+                                            true,
+                                        );
+                                        ui.separator();
+                                    });
+                                    let commit = &(selected_commit.0, selected_baseline.clone());
+                                    ui1.push_id(commit, |ui| {
+                                        let store = data.store.clone();
+                                        show_tree_view(
+                                            ui,
+                                            aspects,
+                                            selected_projects,
+                                            long_tacking,
+                                            store,
+                                            commit,
+                                            api_addr,
+                                            x,
+                                            false,
+                                        );
+                                        ui.separator();
+                                    });
+                                });
+                            }
+                        } else if let Some(value) = compute_queries_differential_results(
+                            ui,
+                            pane,
+                            proj_id,
+                            qid,
+                            data,
+                            selected_baseline,
+                            selected_commit,
+                        ) {
+                            return value;
+                        }
                     }
                     ResultFormat::List => {
                         todo!()
@@ -1726,6 +1657,247 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 }
 
+fn show_tree_view(
+    ui: &mut egui::Ui,
+    aspects: &mut types::ComputeConfigAspectViews,
+    selected_projects: &mut SelectedProjects,
+    long_tacking: &mut long_tracking::LongTacking,
+    store: Arc<FetchedHyperAST>,
+    commit: &(ProjectId, String),
+    api_addr: &String,
+    x: &mut DetailsResults,
+    left_side: bool,
+) {
+    let i = 0;
+
+    let (repo, mut c) = selected_projects.get_mut(commit.0).unwrap();
+
+    let curr_commit = Commit {
+        repo: repo.clone(),
+        id: commit.1.clone(),
+    };
+    let tree_viewer = long_tacking.tree_viewer.entry(curr_commit.clone());
+    let tree_viewer = tree_viewer.or_insert_with(|| utils_poll::Buffered::default());
+    let trigger = tree_viewer.try_poll();
+    let Some(tree_viewer) = tree_viewer.get_mut() else {
+        if !tree_viewer.is_waiting() {
+            tree_viewer.buffer(code_aspects::remote_fetch_node_old(
+                ui.ctx(),
+                &api_addr,
+                store,
+                &curr_commit,
+                "",
+            ));
+        }
+        return Default::default();
+    };
+
+    let Ok(tree_viewer) = tree_viewer else {
+        return Default::default();
+    };
+    let mut curr_view = long_tracking::ColView::default();
+    curr_view.matcheds.extend(
+        x.results
+            .iter_mut()
+            .enumerate()
+            .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
+    );
+    let col = 0;
+    let min_col = 0;
+    let mut attacheds: long_tracking::Attacheds = vec![];
+    let mut defered_focus_scroll = None;
+    long_tracking::show_tree_view(
+        ui,
+        &api_addr,
+        tree_viewer,
+        &mut curr_view,
+        trigger,
+        aspects,
+        col,
+        min_col,
+        &mut attacheds,
+        &mut defered_focus_scroll,
+    );
+
+    if let Some((o, i, mut scroll)) = defered_focus_scroll {
+        let o: f32 = o;
+        let g_o = attacheds
+            .get(i)
+            .and_then(|a| a.0.get(&0))
+            .and_then(|x| x.1)
+            .map(|p| p.min.y)
+            .unwrap_or(ui.max_rect().height() / 2000.0);
+        let g_o: f32 = 50.0;
+        scroll.state.offset = (0.0, (o - g_o).max(0.0)).into();
+        scroll.state.store(ui.ctx(), scroll.id);
+    }
+}
+
+fn show_hunks(
+    ui: &mut egui::Ui,
+    fetched_files: &mut HashMap<types::FileIdentifier, code_tracking::RemoteFile>,
+    api_addr: &String,
+    x: &DetailsResults,
+    selected_commit: &(ProjectId, String),
+) {
+    const B: f32 = 15.;
+    const H: f32 = 800.;
+    let id = ui.id();
+    let len = x.results.len();
+    egui::ScrollArea::vertical()
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+        .show_rows(ui, H, len, |ui, cols| {
+            let (mut rect, _) = ui.allocate_exact_size(
+                egui::Vec2::new(ui.available_width(), H * (cols.end - cols.start) as f32),
+                egui::Sense::hover(),
+            );
+            let top = rect.top();
+            for i in cols.clone() {
+                let mut rect = {
+                    let (t, b) = rect.split_top_bottom_at_y(top + H * (i - cols.start + 1) as f32);
+                    rect = b;
+                    t
+                };
+                use std::ops::SubAssign;
+                rect.bottom_mut().sub_assign(B);
+                let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
+                    rect.left_bottom(),
+                    ui.painter().pixels_per_point(),
+                );
+                let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
+                    rect.right_bottom(),
+                    ui.painter().pixels_per_point(),
+                );
+                ui.painter()
+                    .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
+                rect.bottom_mut().sub_assign(B);
+                let mut ui = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(rect)
+                        .layout(egui::Layout::top_down(egui::Align::Min)),
+                );
+                ui.set_clip_rect(rect.intersect(ui.clip_rect()));
+                ui.label(format!(
+                    "{}:{}..{}",
+                    x.results[i].0.file.file_path,
+                    x.results[i].0.range.as_ref().unwrap().start,
+                    x.results[i].0.range.as_ref().unwrap().end
+                ));
+                ui.push_id(id.with(i).with(&x.results[i]), |ui| {
+                    let after = x.results[i].1.clone();
+                    assert_eq!(after.file.commit.id, selected_commit.1);
+                    smells::show_diff(
+                        ui,
+                        api_addr,
+                        &smells::ExamplesValue {
+                            before: x.results[i].0.clone(),
+                            after,
+                            inserts: Default::default(),
+                            deletes: Default::default(),
+                            moves: Default::default(),
+                        },
+                        fetched_files,
+                    );
+                });
+            }
+        });
+}
+
+fn update_queries_differential_results(
+    ui: &mut egui::Ui,
+    queries: &Vec<QueryData>,
+    selected_baseline: &String,
+    qid: usize,
+    differential: &mut QueriesDifferentialResults,
+) -> bool {
+    if differential.2.is_waiting() {
+        ui.spinner();
+    }
+    differential.2.try_poll_with(|x| {
+        x.map_err(|e| querying::QueryingError::NetworkError(e))
+            .and_then(|x| x.content.unwrap())
+    });
+    if !differential.2.is_present() && !differential.2.is_waiting() {
+        true
+    } else if let Some(Err(_)) = differential.2.get() {
+        true
+    } else if hash((queries[qid].query.as_ref(), selected_baseline.clone())) != differential.4 {
+        true
+    } else {
+        false
+    }
+}
+
+fn compute_queries_differential_results(
+    ui: &mut egui::Ui,
+    pane: &mut u16,
+    proj_id: ProjectId,
+    qid: usize,
+    data: &mut AppData,
+    selected_baseline: &String,
+    selected_commit: &(ProjectId, String),
+) -> Option<egui_tiles::UiResponse> {
+    let pid: ProjectId = selected_commit.0;
+    if pid != proj_id {
+        return Some(Default::default());
+    }
+    let (repo, mut c) = data.selected_code_data.get_mut(pid).unwrap();
+    let language = &data.queries[qid].lang;
+    let query = data.queries[qid].query.as_ref().to_string();
+    wasm_rs_dbg::dbg!(&query);
+    let config = if language == "Cpp" {
+        types::Config::MakeCpp
+    } else if language == "Java" {
+        types::Config::MavenJava
+    } else {
+        wasm_rs_dbg::dbg!(&language);
+        types::Config::MavenJava
+    };
+    let language = language.to_string();
+    let commits = 2;
+    let baseline = Commit {
+        repo: repo.clone(),
+        id: selected_baseline.clone(),
+    };
+    let commit = Commit {
+        repo: repo.clone(),
+        id: selected_commit.1.clone(),
+    };
+    let max_matches = data.queries[qid].max_matches;
+    let timeout = data.queries[qid].timeout;
+    let precomp = data.queries[qid]
+        .precomp
+        .clone()
+        .map(|id| &data.queries[id as usize]);
+    let precomp = precomp.map(|p| p.query.as_ref().to_string());
+    let hash = hash((&query, selected_baseline.clone()));
+    let prom = querying::remote_compute_query_differential(
+        ui.ctx(),
+        &data.api_addr,
+        &querying::ComputeConfigQueryDifferential {
+            commit,
+            config,
+            baseline,
+        },
+        querying::QueryContent {
+            language,
+            query,
+            precomp,
+            commits,
+            max_matches,
+            timeout,
+        },
+    );
+    data.queries_differential_results = Some((pid, 0, Default::default(), *pane, hash));
+    data.queries_differential_results
+        .as_mut()
+        .unwrap()
+        .2
+        .buffer(prom);
+    // let language = config.language().to_string();
+    None
+}
+
 impl<'a> MyTileTreeBehavior<'a> {
     fn show_commits(&mut self, ui: &mut egui::Ui) {
         for i in self.data.selected_code_data.project_ids() {
@@ -1806,6 +1978,46 @@ impl<'a> MyTileTreeBehavior<'a> {
         //     //
         // }
     }
+}
+
+fn show_hunks_header(
+    ui: &mut egui::Ui,
+    format: &mut ResultFormat,
+    data: &mut AppData,
+    selected_baseline: &mut Option<String>,
+    selected_commit: &mut Option<(ProjectId, String)>,
+) -> bool {
+    let oid = &selected_commit.as_ref().unwrap().1;
+    ui.label(oid);
+    let Some(selected_baseline) = &selected_baseline else {
+        *format = ResultFormat::Table;
+        return true;
+    };
+    ui.label(format!("baseline: {}", selected_baseline));
+    if let Some(msg) = data
+        .fetched_commit_metadata
+        .get(oid)
+        .and_then(|x| x.as_ref().ok())
+        .and_then(|x| x.message.as_ref())
+    {
+        ui.label("message: ");
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            let mut msg_lines = msg.lines();
+            let mut i = 0;
+            while let Some(t) = msg_lines.next() {
+                ui.label(t);
+                i += 1;
+                if i == 3 {
+                    let rem = msg_lines.count();
+                    if rem > 0 {
+                        ui.weak(format!("... ({rem} rem. lines)"));
+                    }
+                    break;
+                }
+            }
+        });
+    }
+    false
 }
 
 fn poll_md_with_pr(

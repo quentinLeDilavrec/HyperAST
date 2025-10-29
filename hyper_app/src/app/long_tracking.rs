@@ -26,7 +26,7 @@ use crate::app::{
 };
 
 use super::{
-    code_aspects::FetchedView,
+    code_aspects::{FetchedView, Focus},
     code_tracking::{self, RemoteFile, TrackingResult},
     commit::CommitMetadata,
     show_commit_menu,
@@ -208,7 +208,7 @@ impl State {
     }
 }
 type PortId = egui::Id;
-type Attacheds = Vec<(
+pub(crate) type Attacheds = Vec<(
     HashMap<usize, (PortId, Option<egui::Rect>)>,
     HashMap<usize, (PortId, Option<egui::Rect>)>,
 )>;
@@ -227,9 +227,7 @@ pub(crate) fn show_results(
 ) {
     let w_id = ui.id().with("Tracking Timeline");
     let timeline_window = ui.available_rect_before_wrap();
-    let spacing: egui::Vec2 = (0.0, 0.0).into(); //4.0 // ui.spacing().item_spacing;
-    // let spacing: egui::Vec2 = (4.0, 4.0).into(); //4.0 // ui.spacing().item_spacing;
-    // let spacing: egui::Vec2 = (30.0, 4.0).into(); //4.0 // ui.spacing().item_spacing;
+    let spacing: egui::Vec2 = (0.0, 0.0).into();
     let mut w_state = State::load(ui.ctx(), w_id);
     let (total_cols, col_width) = if long_tracking.results.len() <= 2 {
         (
@@ -294,7 +292,6 @@ pub(crate) fn show_results(
                     } else {
                         if !md.is_waiting() {
                             let code_range = &mut long_tracking.origins[0];
-                            // wasm_rs_dbg::dbg!(&code_range);
                             md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
                         }
                         return;
@@ -333,32 +330,6 @@ pub(crate) fn show_results(
                             md,
                         )
                     }
-                    // match tracking_result {
-                    //     Ok(tracking_result) => {
-                    //         tracked = Some(TrackingResultWithChanges {
-                    //             track: TrackingResult {
-                    //                 compute_time: tracking_result.track.compute_time.clone(),
-                    //                 commits_processed: tracking_result
-                    //                     .track
-                    //                     .commits_processed
-                    //                     .clone(),
-                    //                 src: tracking_result.track.src.clone(),
-                    //                 intermediary: tracking_result.track.intermediary.clone(),
-                    //                 fallback: tracking_result.track.fallback.clone(),
-                    //                 matched: vec![],
-                    //             },
-                    //             src_changes: tracking_result.src_changes.clone(),
-                    //             dst_changes: tracking_result.dst_changes.clone(),
-                    //         });
-                    //         (
-                    //             tracking_result.track.matched.get_mut(0).unwrap_or_else(|| {
-                    //                 tracking_result.track.fallback.as_mut().unwrap()
-                    //             }),
-                    //             md,
-                    //         )
-                    //     }
-                    //     Err(err) => panic!("{}", err),
-                    // }
                 } else if let Some(tracking_result) = tracking_result.get_mut() {
                     if tracking_result.content.track.results.is_empty()
                         && !tracking_result.errors.is_empty()
@@ -369,27 +340,12 @@ pub(crate) fn show_results(
                         );
                         return;
                     } else if !md.is_waiting() {
-                        // tracked = Some(TrackingResultWithChanges {
-                        //     track: TrackingResult {
-                        //         compute_time: tracking_result.track.compute_time.clone(),
-                        //         commits_processed: tracking_result.track.commits_processed.clone(),
-                        //         src: tracking_result.track.src.clone(),
-                        //         intermediary: tracking_result.track.intermediary.clone(),
-                        //         fallback: tracking_result.track.fallback.clone(),
-                        //         matched: vec![],
-                        //     },
-                        //     src_changes: tracking_result.src_changes.clone(),
-                        //     dst_changes: tracking_result.dst_changes.clone(),
-                        // });
                         let track = tracking_result.content.track.results.get(0).unwrap();
                         if let Some(code_range) = &track.intermediary {
-                            // wasm_rs_dbg::dbg!(&code_range);
                             md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
                         } else if let Some(code_range) = track.matched.get(0) {
-                            // wasm_rs_dbg::dbg!(&code_range);
                             md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
                         } else if let Some(code_range) = &track.fallback {
-                            // wasm_rs_dbg::dbg!(&code_range);
                             md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
                         } else {
                             unreachable!("should have been matched or been given a fallback")
@@ -404,31 +360,15 @@ pub(crate) fn show_results(
                     ui.spinner();
                     return;
                 };
-                // ui.label(format!("{} {} {}", min_col, col, max_col));
                 show_commitid_info(tracked, ui, code_ranges);
                 match md {
                     Ok(md) => {
                         md.show(ui);
-                        // ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                        //     ui.label(format!("Pparents: {}",md.parents.join(" + ")));
-                        // });
                     }
                     Err(err) => {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     }
                 }
-                // if let Some(scroll_state) = scroll_state {
-                //     ui.label(format!(
-                //         "Timeline left pos {:?}/{}",
-                //         scroll_state.offset.x,
-                //         col_width_with_spacing * total_cols as f32 - spacing.x,
-                //     ));
-                //     ui.label(format!(
-                //         "Timeline right pos {:?}/{}",
-                //         scroll_state.offset.x + timeline_window_width,
-                //         col_width_with_spacing * total_cols as f32 - spacing.x,
-                //     ));
-                // }
             };
             if total_cols == 0 {
                 ui.spinner();
@@ -597,18 +537,10 @@ pub(crate) fn show_results(
                             }
                             is_resizing = ui.ctx().is_being_dragged(resize_id);
                             if is_resizing {
-                                // let width = (pointer.x - second_rect.left()).abs();
-                                // let width =
-                                //     clamp_to_range(width, width_range.clone()).at_most(available_rect.width());
-                                // second_rect.min.x = second_rect.max.x - width;
                                 let x = pointer.x.clamp(ui.max_rect().min.x, ui.max_rect().max.x);
                                 let f = (x - rect.min.x).at_least(0.0);
-                                // ratio = (f / rect.width()).clamp(0.1, 0.9);
                                 let col_ratio = ui.max_rect().width() / total_cols as f32 / f;
-                                // w_state.end = f;
                                 w_state.width = timeline_window.width() * col_ratio;
-                                // (f / ui.max_rect().width() * viewport_width)
-                                //     .clamp(col_width, viewport_width - w_state.offset);
 
                                 let col_width_with_spacing = w_state.width + spacing.x;
                                 let viewport_width = (col_width_with_spacing * total_cols as f32
@@ -619,9 +551,6 @@ pub(crate) fn show_results(
                                     ui.max_rect().x_range(),
                                     0.0..=viewport_width,
                                 );
-
-                                // let map_l = egui::remap_clamp(w_state.offset, 0.0..=viewport_width, ui.max_rect().x_range());
-                                // assert!((map_l-map_left).abs()<f32::EPSILON);
                             }
 
                             let dragging_something_else =
@@ -645,17 +574,15 @@ pub(crate) fn show_results(
                     painter.vline(rect.right(), rect.y_range(), stroke);
                 }
                 w_state.store(ui.ctx(), w_id);
-            } // ui.painter_at(ui.min_rect()).debug_rect(ui.min_rect(), egui::Color32::GREEN, "text");
+            }
         });
     let is_origin = |col| col == long_tracking.origin_index;
     let mut waiting = vec![];
     let mut new_origins = vec![];
     let mut add_contents = |ui: &mut egui::Ui, col_range: Range<usize>| -> Attacheds {
         let min_col = col_range.start;
-        // // wasm_rs_dbg::dbg!(&col_range, &long_tracking.results);
         let mut attacheds: Attacheds = vec![];
         let mut defered_focus_scroll = None;
-        // // wasm_rs_dbg::dbg!(&long_tracking.results);
         for col in col_range {
             attacheds.push((Default::default(), Default::default()));
             let x_range = ui.available_rect_before_wrap().x_range();
@@ -675,22 +602,12 @@ pub(crate) fn show_results(
                 },
             );
             ui.set_clip_rect(clip_rect);
-            // let ui = &mut ui.child_ui_with_id_source(
-            //     rect,
-            //     egui::Layout::top_down(egui::Align::Min),
-            //     col,
-            //     // 10000 + col as isize - long_tracking.target_index as isize,
-            // );
-            // ui.set_clip_rect(clip_rect);
 
             let has_past = |col| col != 0;
             let has_future = |col| col + 1 < total_cols;
 
-            // let mut cond_path;
-
             let mut curr_view: ColView<'_> = ColView::default();
             if is_origin(col) {
-                // curr_view.original_target = Some(&mut long_tracking.target);
                 match (has_past(col), has_future(col)) {
                     (true, true) => {
                         let qqq = long_tracking
@@ -699,8 +616,6 @@ pub(crate) fn show_results(
                             .and_then(|x| x.1.get_mut());
                         if let Some(qqq) = qqq {
                             if let Some(qqq) = &mut qqq.content.dst_changes {
-                                // assert_ne!(long_tracking.origins[0].file.commit, qqq.commit);
-                                // curr_view.left_commit = Some(&mut qqq.commit);
                                 curr_view.additions = Some(&mut qqq.additions);
                             }
                             if let Some(qqq) = &mut qqq.content.src_changes {
@@ -725,28 +640,14 @@ pub(crate) fn show_results(
                             .results
                             .get_mut(col - 1)
                             .and_then(|x| x.1.get_mut());
-                        // curr_view.effective_target = long_tracking
-                        //     .results
-                        //     .get_mut(col - 1)
-                        //     .and_then(|x| x.1.get_mut())
-                        //     .and_then(|x| x.as_mut().ok())
-                        //     .map(|x| &mut x.track.src);
                         if let Some(qqq) = qqq {
                             if let Some(ppp) = &mut qqq.content.dst_changes {
-                                // assert_ne!(long_tracking.origins[0].file.commit, ppp.commit);
-                                // curr_view.left_commit = Some(&mut ppp.commit);
                                 curr_view.additions = Some(&mut ppp.additions);
                             }
                             if let Some(qqq) = &mut qqq.content.src_changes {
                                 assert_ne!(long_tracking.origins[0].file.commit, qqq.commit);
                                 curr_view.left_commit = Some(&mut qqq.commit);
                             }
-                            // // wasm_rs_dbg::dbg!(
-                            //     total_cols,
-                            //     col,
-                            //     long_tracking.origins.len(),
-                            //     qqq.content.track.results.len()
-                            // );
                             let mut origins = long_tracking.origins.iter_mut();
                             for (i, qqq) in qqq.content.track.results.iter_mut().enumerate() {
                                 curr_view.effective_targets.push((&mut qqq.src, i));
@@ -768,27 +669,6 @@ pub(crate) fn show_results(
                             .push((&mut long_tracking.origins[0], 0));
                     }
                 }
-            // } else if is_origin(col + 1) {
-            //     if has_past(col) {
-            //         let mut it = long_tracking.results.range_mut(col - 1..=col);
-            //         curr_view.effective_target = it
-            //             .next()
-            //             .and_then(|x| x.1.get_mut())
-            //             .and_then(|x| x.as_mut().ok())
-            //             .map(|x| &mut x.src);
-            //         curr_view.matched = it
-            //             .next()
-            //             .and_then(|x| x.1.get_mut())
-            //             .and_then(|x| x.as_mut().ok())
-            //             .map(|x| &mut x.matched[0]);
-            //     } else {
-            //         curr_view.matched = long_tracking
-            //             .results
-            //             .get_mut(col)
-            //             .and_then(|x| x.1.get_mut())
-            //             .and_then(|x| x.as_mut().ok())
-            //             .map(|x| &mut x.matched[0]);
-            //     }
             } else {
                 if has_past(col) {
                     let mut it = long_tracking.results.range_mut(col - 1..=col);
@@ -860,7 +740,6 @@ pub(crate) fn show_results(
                     };
                 }
             }
-            // // wasm_rs_dbg::dbg!(col, total_cols);
 
             let curr_commit = {
                 let curr = if curr_view.matcheds.get(0).is_some() {
@@ -871,12 +750,10 @@ pub(crate) fn show_results(
                 let Some((curr, _)) = curr else {
                     continue;
                 };
-
                 &curr.file.commit
             };
 
             if long_tracking.tree_view {
-                // let ui = &mut ui.child_ui_with_id_source(ui.max_rect(), ui.layout().clone(), col);
                 let tree_viewer = long_tracking.tree_viewer.entry(curr_commit.clone());
                 let tree_viewer = tree_viewer.or_insert_with(|| utils_poll::Buffered::default());
                 let trigger = tree_viewer.try_poll();
@@ -889,23 +766,9 @@ pub(crate) fn show_results(
                             &curr_commit,
                             "",
                         ));
-                        // tree_viewer.buffer(code_aspects::remote_fetch_tree(
-                        //     ui.ctx(),
-                        //     &curr.file.commit,
-                        //     "",
-                        // ));
                     }
                     continue;
                 };
-
-                // ui.label(format!(
-                //     "{} {} {} {} {}",
-                //     col,
-                //     curr_view.deletions.is_some(),
-                //     curr_view.additions.is_some(),
-                //     curr_view.effective_targets.len(),
-                //     curr_view.matcheds.len(),
-                // ));
                 match tree_viewer {
                     Ok(tree_viewer) => {
                         if let Some(p) = show_tree_view(
@@ -930,7 +793,6 @@ pub(crate) fn show_results(
                             };
                             if is_origin(col) {
                                 curr.path = p;
-                                // curr.range = Some(r.clone());
                                 if col == 0 {
                                     // TODO only request changes when we have none
                                     let track_at_path = track_at_path_with_changes(
@@ -943,14 +805,12 @@ pub(crate) fn show_results(
                                     waiting.push((col, track_at_path));
                                 } else {
                                     // TODO allow to reset tracking
-                                    // if ! long_tracking.origins.contains(x) {
                                     new_origins.push(CodeRange {
                                         file: curr.file.clone(),
                                         range: None,
                                         path: curr.path.clone(),
                                         path_ids: vec![],
                                     });
-                                    // }
                                     let past_commit = &curr_view.left_commit.unwrap();
                                     assert_ne!(&curr.file.commit, *past_commit);
                                     let track_at_path = track_at_path(
@@ -964,7 +824,6 @@ pub(crate) fn show_results(
                                     waiting.push((col, track_at_path));
                                 }
                             } else {
-                                // panic!("{:?}",p);
                                 if col == 0 {
                                     let track_at_path = track_at_path_with_changes(
                                         ui.ctx(),
@@ -1021,7 +880,6 @@ pub(crate) fn show_results(
                                 curr
                             };
                             if curr.range != Some(r.clone()) {
-                                // // wasm_rs_dbg::dbg!(&r);
                                 if is_origin(col) {
                                     curr.range = Some(r.clone());
                                 }
@@ -1059,18 +917,13 @@ pub(crate) fn show_results(
         }
 
         if let Some((o, i, mut scroll)) = defered_focus_scroll {
-            // // wasm_rs_dbg::dbg!(&o);
             let o: f32 = o;
-            // // wasm_rs_dbg::dbg!(attacheds.get(i));
-            // // wasm_rs_dbg::dbg!(i);
             let g_o = attacheds
                 .get(i)
                 .and_then(|a| a.0.get(&0))
                 .and_then(|x| x.1)
                 .map(|p| p.min.y)
                 .unwrap_or(timeline_window.height() / 2000.0);
-            // // wasm_rs_dbg::dbg!(scroll.state.offset);
-            // // wasm_rs_dbg::dbg!(g_o);
             let g_o: f32 = 50.0;
             scroll.state.offset = (0.0, (o - g_o).max(0.0)).into();
             scroll.state.store(ui.ctx(), scroll.id);
@@ -1097,8 +950,6 @@ pub(crate) fn show_results(
             .layout(egui::Layout::left_to_right(egui::Align::BOTTOM))
             .max_rect(rect),
     );
-    // cui.skip_ahead_auto_ids(min_col);
-    // cui.set_clip_rect(timeline_window);
     let attacheds = (add_contents)(&mut cui, min_col..max_col);
 
     long_tracking.origins.extend(new_origins);
@@ -1127,20 +978,9 @@ pub(crate) fn show_results(
                 if cable {
                     let green: egui::Id = green;
                     let blue: egui::Id = blue;
-                    // let in_plug = Plug::to(green.clone()).default_pos(egui::Pos2::ZERO);
-                    // ui.add(Cable::new(green.with(blue), in_plug, out_plug));
                 }
 
                 if let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) {
-                    // let m_center = m_rect.right_center();
-                    // let src_center = src_rect.left_center();
-                    // let y_bary = (m_center.y + src_center.y) / 2.0;
-                    // let m_pos =
-                    //     pos2(m_rect.right(), y_bary.clamp(m_rect.top(), m_rect.bottom()));
-                    // let src_pos = pos2(
-                    //     src_rect.left(),
-                    //     y_bary.clamp(src_rect.top(), src_rect.bottom()),
-                    // );
                     let m_rect: egui::Rect = m_rect;
                     let src_rect: egui::Rect = src_rect;
                     let mut m_pos = m_rect.right_center();
@@ -1150,21 +990,6 @@ pub(crate) fn show_results(
                     ctrl.1.x = r_bound;
                     m_pos.x = m_pos.x.at_most(l_bound);
                     src_pos.x = src_pos.x.at_least(r_bound);
-                    // let b_d = (m_pos.x - src_pos.x).abs();
-                    // ctrl.0.x += b_d / 2.0 * 1.0;
-                    // if ctrl.0.x < min_left_x {
-                    //     ctrl.0.x = min_left_x;
-                    // } else {
-                    //     min_left_x = ctrl.0.x;
-                    // }
-                    // ctrl.1.x -= b_d / 10.0 * 1.0;
-                    // if ctrl.1.x < min_right_x {
-                    //     if src_pos.x > min_right_x {
-                    //         ctrl.1.x = min_right_x;
-                    //     }
-                    // } else {
-                    //     min_right_x = ctrl.1.x;
-                    // }
                     let color = ui.style().visuals.text_color();
                     let link =
                         epaint::PathShape::line(vec![m_pos, ctrl.0, ctrl.1, src_pos], (2.0, color));
@@ -1185,16 +1010,6 @@ pub(crate) fn show_results(
                     f(g, b)
                 }
             }
-            // if let (Some((green, Some(green_pos))), Some((blue, Some(blue_pos)))) =
-            //     (ports[i].1, ports[i + 1].0)
-            // {
-            //     let in_plug = Plug::to(green).default_pos(egui::Pos2::ZERO);
-            //     let out_plug = Plug::to(blue);
-
-            //     ui.add(Cable::new(i, in_plug, out_plug));
-            // } else {
-            //     // ui.add(Cable::new(i, Plug::unplugged(), Plug::unplugged()));
-            // }
         }
     }
 
@@ -1227,9 +1042,7 @@ pub(crate) fn show_results(
                             hovered_fut = Some(src.clone());
                         }
                         if let Some(past) = resp.inner.1 {
-                            // wasm_rs_dbg::dbg!(&past);
                             if past.double_clicked() {
-                                // wasm_rs_dbg::dbg!(&past);
                             } else {
                                 if past.is_pointer_button_down_on() {
                                     let id = src_id;
@@ -1248,11 +1061,9 @@ pub(crate) fn show_results(
                         }
                         {
                             let is_dragged = ui.ctx().is_being_dragged(line_id);
-                            // wasm_rs_dbg::dbg!(&is_dragged);
                             if is_dragged {
                                 let state =
                                     ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id));
-                                // wasm_rs_dbg::dbg!(&state, ui.ctx().pointer_latest_pos());
                                 let state = if let Some(mut state) = state {
                                     if let Some(pos) = ui.ctx().pointer_latest_pos() {
                                         state.1 = pos;
@@ -1261,7 +1072,6 @@ pub(crate) fn show_results(
                                 } else {
                                     ui.ctx().pointer_latest_pos().map(|x| (x, x))
                                 };
-                                // wasm_rs_dbg::dbg!(&state);
                                 if let Some(state) = state {
                                     ui.painter().line_segment(
                                         [state.0, state.1],
@@ -1283,7 +1093,6 @@ pub(crate) fn show_results(
                                 else {
                                     panic!()
                                 };
-                                // wasm_rs_dbg::dbg!(&state);
                                 if let Some(pos) = ui.ctx().pointer_latest_pos() {
                                     state.1 = pos;
                                 }
@@ -1321,9 +1130,7 @@ pub(crate) fn show_results(
                                 hovered_fut = Some(m.clone());
                             }
                             if let Some(past) = resp.inner.1 {
-                                // wasm_rs_dbg::dbg!(&past);
                                 if past.double_clicked() {
-                                    // wasm_rs_dbg::dbg!(&past);
                                 } else {
                                     if past.is_pointer_button_down_on() {
                                         ui.memory_mut(|mem| {
@@ -1342,12 +1149,10 @@ pub(crate) fn show_results(
                             }
                             {
                                 let is_dragged = ui.ctx().is_being_dragged(line_id);
-                                // wasm_rs_dbg::dbg!(&is_dragged);
                                 if is_dragged {
                                     let state = ui.memory_mut(|mem| {
                                         mem.data.get_temp::<(Pos2, Pos2)>(line_id)
                                     });
-                                    // wasm_rs_dbg::dbg!(&state, ui.ctx().pointer_latest_pos());
                                     let state = if let Some(mut state) = state {
                                         if let Some(pos) = ui.ctx().pointer_latest_pos() {
                                             state.1 = pos;
@@ -1356,7 +1161,6 @@ pub(crate) fn show_results(
                                     } else {
                                         ui.ctx().pointer_latest_pos().map(|x| (x, x))
                                     };
-                                    // wasm_rs_dbg::dbg!(&state);
                                     if let Some(state) = state {
                                         ui.painter().line_segment(
                                             [state.0, state.1],
@@ -1378,7 +1182,6 @@ pub(crate) fn show_results(
                                     }) else {
                                         panic!()
                                     };
-                                    // wasm_rs_dbg::dbg!(&state);
                                     if let Some(pos) = ui.ctx().pointer_latest_pos() {
                                         state.1 = pos;
                                     }
@@ -1414,51 +1217,14 @@ pub(crate) fn show_results(
                         let b_d = m_rect.right() - src_rect.left();
                         let mut color = egui::Color32::RED;
                         let mut ctrl = (m_pos, src_pos);
-                        // egui::Color32::BLACK
                         use std::f32::consts::TAU;
                         let center_v = m_rect.center() - src_rect.center();
                         let angle =
                             ((center_v) * epaint::vec2(0.5, 1.0)).normalized().angle() / TAU + 0.5
                                 - 0.125;
-                        // // wasm_rs_dbg::dbg!(angle);
                         if (0.03..0.25).contains(&angle) {
-                            // ctrl.0.x += m_rect.width()/2.0 + 150.0;//-b_d / 3.0;
-                            // ctrl.1.x -= src_rect.width()/2.0 + 150.0;//-b_d / 3.0;
-                            // let b_d = b_d + 100.0;
-                            // ctrl.0.x += m_rect.width()/2.0 + b_d.abs() * 50.0 / (center_v.y.abs() + 1.0);
-                            // ctrl.1.x -= src_rect.width()/2.0 + b_d.abs() * 50.0 / (center_v.y.abs() + 1.0);
-                            // ctrl.0.y -= center_v.y / 2.0;
-                            // ctrl.1.y += center_v.y / 2.0;
-                            // let center = m_rect.center()-center_v/2.0;
-                            // let link = epaint::PathShape::line(
-                            //     vec![m_pos, ctrl.0, (ctrl.0.x, center.y).into(),center, (ctrl.1.x, center.y).into(),ctrl.1, src_pos],
-                            //     (5.0, color),
-                            // );
-                            // ui.painter().add(link);
-                            // color = egui::Color32::??;
-                            // let link = epaint::CubicBezierShape::from_points_stroke(
-                            //     [m_pos, ctrl.0, (ctrl.0.x, center.y).into(),center],
-                            //     false,
-                            //     egui::Color32::TRANSPARENT,
-                            //     (5.0, color),
-                            // );
-                            // ui.painter().add(link);
-                            // let link = epaint::CubicBezierShape::from_points_stroke(
-                            //     [center, (ctrl.1.x, center.y).into(),ctrl.1, src_pos],
-                            //     false,
-                            //     egui::Color32::TRANSPARENT,
-                            //     (5.0, color),
-                            // );
-                            // ui.painter().add(link);
                         } else if (0.25..0.5).contains(&angle) {
-                            // color = egui::Color32::GREEN;
-                            // let link = epaint::PathShape::line(
-                            //     vec![m_pos, ctrl.0, ctrl.1, src_pos],
-                            //     (5.0, color),
-                            // );
-                            // ui.painter().add(link);
                         } else if (0.5..0.71).contains(&angle) {
-                            // color = egui::Color32::BLUE;
                         } else {
                             ctrl.0.x += m_rect.width() / 2.0 - b_d / 2.0 * 1.0;
                             ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
@@ -1494,16 +1260,6 @@ pub(crate) fn show_results(
                     }
                 }
             }
-            // for (x, i) in curr_view.effective_targets.iter() {
-            //     let id = ui.id().with("target").with(x);
-            //     let default_pos = (default_x, *i as f32 * 10.0);
-            //     show_detached_element(ui, x, id, default_pos);
-            // }
-            // for (x, i) in curr_view.matcheds.iter() {
-            //     let id = ui.id().with("matched").with(x);
-            //     let default_pos = (default_x, *i as f32 * 10.0);
-            //     show_detached_element(ui, x, id, default_pos);
-            // }
         }
         if let (Some(hovered_fut), Some(released_past)) = (hovered_fut, released_past) {
             long_tracking
@@ -1690,7 +1446,6 @@ fn show_detached_element(
                                 .try_resolve::<AnyType>(r_id)
                             {
                                 let t = store.resolve_type(&r_id);
-                                // wasm_rs_dbg::dbg!(t);
                                 if t.generic_eq(&hyperast_gen_ts_cpp::types::Type::NumberLiteral) {
                                     if value.is_none() {
                                         let l = r.get_label_unchecked();
@@ -1856,34 +1611,7 @@ fn show_detached_element(
                     past_resp = None;
                 }
             }
-
-            // ui.painter().set(
-            //     past,
-            //     epaint::RectShape::filled(
-            //         egui::Rect::from_min_max(
-            //             min - epaint::Vec2::new(10.0, 10.0),
-            //             (min.x, min.y + size.y + 10.0).into(),
-            //         )
-            //         .expand(20.0),
-            //         egui::Rounding::same(1.0),
-            //         egui::Color32::RED,
-            //     ),
-            // );
-            if false {
-                ui.painter().set(
-                    futur,
-                    epaint::RectShape::filled(
-                        egui::Rect::from_min_max(
-                            (min.x + size.x, min.y - 10.0).into(),
-                            (min.x + size.x + 10.0, min.y + size.y + 10.0).into(),
-                        )
-                        .expand(20.0),
-                        egui::CornerRadius::same(1),
-                        egui::Color32::GREEN,
-                    ),
-                );
-                fut_resp = None;
-            } else {
+            {
                 let mut out = epaint::Mesh::default();
                 let mut top = min;
                 top.x += size.x;
@@ -1964,13 +1692,13 @@ fn show_detached_element(
 }
 
 #[derive(Default, Debug)]
-struct ColView<'a> {
-    left_commit: Option<&'a mut Commit>,
-    effective_targets: Vec<(&'a mut CodeRange, usize)>,
-    original_targets: Vec<(&'a mut CodeRange, usize)>,
-    matcheds: Vec<(&'a mut CodeRange, usize)>,
-    additions: Option<&'a [u32]>,
-    deletions: Option<&'a [u32]>,
+pub(crate) struct ColView<'a> {
+    pub left_commit: Option<&'a mut Commit>,
+    pub effective_targets: Vec<(&'a mut CodeRange, usize)>,
+    pub original_targets: Vec<(&'a mut CodeRange, usize)>,
+    pub matcheds: Vec<(&'a mut CodeRange, usize)>,
+    pub additions: Option<&'a [u32]>,
+    pub deletions: Option<&'a [u32]>,
 }
 
 #[allow(unused)]
@@ -2025,14 +1753,12 @@ fn show_code_view(
             let color = egui::Color32::RED.linear_multiply(0.1);
             let rect = highlight_byte_range(ui, te, &range, color);
             // if result_changed {
-            //     // wasm_rs_dbg::dbg!(
             //         aa.content_size,
             //         aa.state.offset.y,
             //         aa.inner_rect.height(),
             //         rect.top(),
             //     );
             //     pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-            //     // wasm_rs_dbg::dbg!(pos_ratio);
             // }
         }
         if let Some(
@@ -2048,14 +1774,12 @@ fn show_code_view(
             let color = egui::Color32::BLUE.linear_multiply(0.1);
             // let rect = highlight_byte_range(ui, te, &range, color);
             // if result_changed {
-            //     // wasm_rs_dbg::dbg!(
             //         aa.content_size,
             //         aa.state.offset.y,
             //         aa.inner_rect.height(),
             //         rect.top(),
             //     );
             //     pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-            //     // wasm_rs_dbg::dbg!(pos_ratio);
             // }
         }
         if let Some(
@@ -2071,14 +1795,12 @@ fn show_code_view(
             let color = egui::Color32::GREEN.linear_multiply(0.1);
             let rect = highlight_byte_range(ui, te, &range, color);
             // if result_changed {
-            //     // wasm_rs_dbg::dbg!(
             //         aa.content_size,
             //         aa.state.offset.y,
             //         aa.inner_rect.height(),
             //         rect.top(),
             //     );
             //     pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-            //     // wasm_rs_dbg::dbg!(pos_ratio);
             // }
         }
 
@@ -2089,7 +1811,7 @@ fn show_code_view(
     }
 }
 
-fn show_tree_view(
+pub(crate) fn show_tree_view(
     ui: &mut egui::Ui,
     api_addr: &str,
     tree_viewer: &mut Resource<FetchedView>,
@@ -2148,7 +1870,7 @@ fn show_tree_view(
                     if trigger {
                         let mut pi = foc.path_ids.clone();
                         pi.reverse();
-                        focus = Some((&foc.path[..], &pi[..]));
+                        focus = Some((&foc.path[..], &pi[..]).into());
                         let id = ui.id();
                         let a = content.show(
                             ui,
@@ -2163,6 +1885,7 @@ fn show_tree_view(
                         let bool = match a {
                             tree_view::Action::Focused(_) => false,
                             tree_view::Action::PartialFocused(_) => true,
+                            tree_view::Action::Keep => true,
                             x => panic!("{:?}", x),
                         };
                         if bool {
@@ -2179,7 +1902,7 @@ fn show_tree_view(
                         let mut pi = foc.path_ids.clone();
                         pi.reverse();
                         if bool {
-                            focus = Some((&foc.path[..], &pi[..]));
+                            focus = Some((&foc.path[..], &pi[..]).into());
                         }
                         let a = content.show(
                             ui,
@@ -2234,14 +1957,16 @@ fn show_tree_view(
                 };
                 // let a = content.show(ui, aspects, focus, hightlights, "");
                 for (k, blue_pos) in blue_pos {
-                    ports[col - min_col]
-                        .0
-                        .insert(k, (ui.id().with("blue_highlight").with(k), blue_pos));
+                    if let Some(port) = ports.get_mut(col - min_col) {
+                        let v = (ui.id().with("blue_highlight").with(k), blue_pos);
+                        port.0.insert(k, v);
+                    }
                 }
                 for (k, green_pos) in green_pos {
-                    ports[col - min_col]
-                        .1
-                        .insert(k, (ui.id().with("green_highlight").with(k), green_pos));
+                    if let Some(port) = ports.get_mut(col - min_col) {
+                        let v = (ui.id().with("green_highlight").with(k), green_pos);
+                        port.1.insert(k, v);
+                    }
                 }
                 match a {
                     tree_view::Action::Focused(p) => {
@@ -2280,20 +2005,11 @@ fn show_tree_view(
             }
         });
     if let Some(o) = scroll_focus {
-        // // wasm_rs_dbg::dbg!(o);
-        // // wasm_rs_dbg::dbg!(&ports);
-        // // wasm_rs_dbg::dbg!(ports.get(col - min_col + 1));
         *defered_focus_scroll = Some((o, col - min_col + 1, scroll));
         None
     } else {
         scroll.inner
     }
-    // egui::Window::new("scroller button").show(ui.ctx(), |ui| {
-    //     egui::Slider::new(&mut scroll.state.offset.y, 0.0..=200.0).ui(ui);
-
-    //     scroll.state.store(ui.ctx(), scroll.id);
-    // });
-    // // wasm_rs_dbg::dbg!(scroll.state.offset);
 }
 const SC_COPY: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::C);
@@ -2314,7 +2030,6 @@ fn show_commitid_info(
                 });
                 if ui.input_mut(|mem| mem.consume_shortcut(&SC_COPY)) {
                     ui.ctx().copy_text(id.to_string());
-                    wasm_rs_dbg::dbg!(id);
                 }
             }
         }
@@ -2385,14 +2100,12 @@ pub(super) fn track(
         )
     };
 
-    // // wasm_rs_dbg::dbg!(&url);
     let mut request = ehttp::Request::get(&url);
     // request
     //     .headers
     //     .insert("Content-Type".to_string(), "text".to_string());
 
     ehttp::fetch(request, move |response| {
-        // // wasm_rs_dbg::dbg!(&response);
         ctx.request_repaint(); // wake up UI thread
         let resource = response
             .and_then(|response| {
@@ -2437,14 +2150,12 @@ pub(super) fn track_at_path(
         )
     };
 
-    // wasm_rs_dbg::dbg!(&url);
     let mut request = ehttp::Request::get(&url);
     // request
     //     .headers
     //     .insert("Content-Type".to_string(), "text".to_string());
 
     ehttp::fetch(request, move |response| {
-        // wasm_rs_dbg::dbg!(&response);
         ctx.request_repaint(); // wake up UI thread
         let resource = response
             .and_then(|response| {
@@ -2483,14 +2194,12 @@ pub(super) fn track_at_path_with_changes(
         )
     };
 
-    // wasm_rs_dbg::dbg!(&url);
     let mut request = ehttp::Request::get(&url);
     // request
     //     .headers
     //     .insert("Content-Type".to_string(), "text".to_string());
 
     ehttp::fetch(request, move |response| {
-        // wasm_rs_dbg::dbg!(&response);
         ctx.request_repaint(); // wake up UI thread
         let resource = response
             .and_then(|response| {

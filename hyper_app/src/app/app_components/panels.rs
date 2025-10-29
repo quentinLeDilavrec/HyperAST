@@ -46,15 +46,7 @@ impl crate::HyperApp {
                     } else if let super::Tab::QueryResults { id, format } =
                         &mut self.tabs[pane as usize]
                     {
-                        egui::ComboBox::from_label("Commits")
-                            .selected_text(format.as_ref())
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(format, super::ResultFormat::List, "List");
-                                ui.selectable_value(format, super::ResultFormat::Table, "Table");
-                                ui.add_enabled_ui(false, |ui| {
-                                    ui.selectable_value(format, super::ResultFormat::Json, "Json");
-                                });
-                            });
+                        selection_querying_result_format(ui, format);
                     } else if let super::Tab::LocalQuery(id) = self.tabs[pane as usize] {
                         self.show_local_query_left_panel(ui, id);
                     } else if let super::Tab::TreeAspect = self.tabs[pane as usize] {
@@ -683,6 +675,24 @@ impl crate::HyperApp {
                 }
             });
     }
+}
+
+fn selection_querying_result_format(ui: &mut egui::Ui, format: &mut super::ResultFormat) {
+    egui::ComboBox::from_label("Commits")
+        .selected_text(format.as_ref())
+        .show_ui(ui, |ui| {
+            ui.selectable_value(format, super::ResultFormat::List, "List");
+            ui.selectable_value(format, super::ResultFormat::Table, "Table");
+            if format == &super::ResultFormat::Tree {
+                ui.selectable_value(format, super::ResultFormat::Hunks, "Hunks");
+            }
+            if format == &super::ResultFormat::Hunks {
+                ui.selectable_value(format, super::ResultFormat::Tree, "Tree");
+            }
+            ui.add_enabled_ui(false, |ui| {
+                ui.selectable_value(format, super::ResultFormat::Json, "Json");
+            });
+        });
 }
 
 fn lang_selection<'a, T>(

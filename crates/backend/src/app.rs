@@ -452,7 +452,7 @@ async fn fetch_code_with_node_ids(
     axum::extract::Path(ids): axum::extract::Path<String>,
     axum::extract::State(state): axum::extract::State<SharedState>,
 ) -> axum::response::Result<Timed<fetch::FetchedNodes>> {
-    dbg!(&ids);
+    log::trace!("fetch_code_with_node_ids {:?}", &ids);
     fetch::fetch_with_node_ids(state, ids.split("/")).map_err(|err| err.into())
 }
 async fn fetch_labels(
@@ -471,14 +471,10 @@ impl IntoResponse for fetch::FetchedLabels {
 
 impl IntoResponse for fetch::FetchedNodes {
     fn into_response(self) -> Response {
-        dbg!();
         let to_string = serde_json::to_string(&self);
-        dbg!();
         let var_name = to_string.unwrap();
-        dbg!();
         let resp = var_name.into_response();
         // let resp = Json(self).into_response();
-        dbg!();
         resp
     }
 }

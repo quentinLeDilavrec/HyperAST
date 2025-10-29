@@ -212,7 +212,8 @@ impl LangRef<AnyType> for Java {
         todo!("{}", t)
     }
     fn to_u16(&self, t: AnyType) -> u16 {
-        todo!("{}", t)
+        let t: &Type = t.as_any().downcast_ref().unwrap();
+        Lang.to_u16(*t)
     }
 
     fn name(&self) -> &'static str {

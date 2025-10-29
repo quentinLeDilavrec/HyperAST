@@ -286,13 +286,42 @@ pub(crate) struct HightLightHandle<'a> {
     pub screen_pos: &'a mut Option<egui::Rect>,
 }
 
+pub(crate) struct Focus<'a> {
+    pub offsets: &'a [usize],
+    pub ids: &'a [NodeIdentifier],
+}
+
+impl Debug for Focus<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Focus {{ {:?} {:?} }}", self.offsets, self.ids)
+    }
+}
+
+impl<'a> From<(&'a [usize], &'a [NodeIdentifier])> for Focus<'a> {
+    fn from(value: (&'a [usize], &'a [NodeIdentifier])) -> Self {
+        Focus {
+            offsets: value.0,
+            ids: value.1,
+        }
+    }
+}
+
+impl Focus<'_> {
+    pub fn is_empty(&self) -> bool {
+        if self.offsets.is_empty() {
+            assert!(self.ids.is_empty());
+        }
+        self.offsets.is_empty()
+    }
+}
+
 impl FetchedView {
     pub(crate) fn show(
         &mut self,
         ui: &mut egui::Ui,
         api_addr: &str,
         aspects: &types::ComputeConfigAspectViews,
-        focus: Option<(&[usize], &[NodeIdentifier])>,
+        focus: Option<Focus<'_>>,
         hightlights: Vec<HightLightHandle<'_>>,
         additions: Option<&[u32]>,
         deletions: Option<&[u32]>,
@@ -322,10 +351,8 @@ impl FetchedView {
 #[allow(unused)]
 impl Resource<FetchedView> {
     fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Self {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         let text = response.text();
-        wasm_rs_dbg::dbg!(&text);
         let text = text.map(|x| serde_json::from_str(x).unwrap());
 
         Self {
@@ -337,7 +364,6 @@ impl Resource<FetchedView> {
 #[allow(unused)]
 impl Resource<FetchedNodes> {
     fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Self {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         let text = response.text();
         let text = text.map(|x| serde_json::from_str(x).unwrap());
@@ -351,7 +377,6 @@ impl Resource<FetchedNodes> {
 #[allow(unused)]
 impl Resource<FetchedNode> {
     fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Self {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         let text = response.text();
         let text = text.map(|x| serde_json::from_str(x).unwrap());
@@ -365,7 +390,6 @@ impl Resource<FetchedNode> {
 #[allow(unused)]
 impl Resource<FetchedLabels> {
     fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Self {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         let text = response.text();
         let text = text.map(|x| serde_json::from_str(x).unwrap());
@@ -393,7 +417,6 @@ pub(super) fn remote_fetch_tree(
         api_addr, &commit.repo.user, &commit.repo.name, &commit.id, &path,
     );
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
 
     ehttp::fetch(request, move |response| {
@@ -419,7 +442,6 @@ pub(super) fn remote_fetch_node_old(
         api_addr, &commit.repo.user, &commit.repo.name, &commit.id, &path,
     );
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
 
     let store = store.clone();
@@ -462,7 +484,6 @@ pub(super) fn remote_fetch_node(
         api_addr, &commit.repo.user, &commit.repo.name, &commit.id, &path,
     );
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
 
     ehttp::fetch(request, move |response| {
@@ -501,7 +522,6 @@ pub(super) fn remote_fetch_nodes_by_ids(
         url += &id.to_string();
     }
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
     let store = store.clone();
     ehttp::fetch(request, move |response| {
@@ -541,7 +561,6 @@ pub(super) fn remote_fetch_labels(
         url += &id.to_string();
     }
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
     let store = store.clone();
     ehttp::fetch(request, move |response| {

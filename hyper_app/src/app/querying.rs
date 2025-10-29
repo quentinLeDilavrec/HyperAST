@@ -224,7 +224,6 @@ pub(crate) fn remote_compute_query_aux(
         "http://{}/query-st/github/{}/{}/{}/{}",
         api_addr, &single.commit.repo.user, &single.commit.repo.name, &single.commit.id, addi,
     );
-    wasm_rs_dbg::dbg!(&url, &script);
 
     let mut request = ehttp::Request::post(&url, serde_json::to_vec(&script).unwrap());
     request.headers.insert(
@@ -339,7 +338,6 @@ pub(crate) fn remote_compute_query_aux_old(
         "http://{}/query/github/{}/{}/{}",
         api_addr, &single.commit.repo.user, &single.commit.repo.name, &single.commit.id,
     );
-    wasm_rs_dbg::dbg!(&url, &script);
 
     let mut request = ehttp::Request::post(&url, serde_json::to_vec(&script).unwrap());
     request.headers.insert(
@@ -374,7 +372,6 @@ pub(crate) fn remote_compute_query_differential(
         &single.commit.id,
         &single.baseline.id,
     );
-    wasm_rs_dbg::dbg!(&url, &script);
 
     let mut request = ehttp::Request::post(&url, serde_json::to_vec(&script).unwrap());
     request.headers.insert(
@@ -573,7 +570,6 @@ impl Resource<Result<ComputeResults, QueryingError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         if !content_type.starts_with("application/json") {
             return Err(format!("Wrong content type: {}", content_type));
@@ -635,7 +631,6 @@ impl Resource<Result<DetailsResults, QueryingError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         if !content_type.starts_with("application/json") {
             return Err(format!("Wrong content type: {}", content_type));
@@ -647,7 +642,6 @@ impl Resource<Result<DetailsResults, QueryingError>> {
         // };
         if response.status != 200 {
             let Some(text) = response.text() else {
-                wasm_rs_dbg::dbg!();
                 return Err("".to_string());
             };
             let json = match serde_json::from_str::<QueryingError>(text) {

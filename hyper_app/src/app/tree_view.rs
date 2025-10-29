@@ -330,7 +330,7 @@ pub(crate) struct FetchedViewImpl<'a> {
     min_before_count: usize,
     draw_count: usize,
     hightlights: Vec<HightLightHandle<'a>>,
-    focus: Option<(&'a [usize], &'a [NodeIdentifier])>,
+    focus: Option<super::code_aspects::Focus<'a>>,
     path: Vec<usize>,
     root_ui_id: egui::Id,
     additions: Option<&'a [u32]>,
@@ -390,7 +390,7 @@ impl<'a> FetchedViewImpl<'a> {
         aspects: &'a super::types::ComputeConfigAspectViews,
         take: Option<PrefillCache>,
         hightlights: Vec<HightLightHandle<'a>>,
-        focus: Option<(&'a [usize], &'a [NodeIdentifier])>,
+        focus: Option<super::code_aspects::Focus<'a>>,
         path: Vec<usize>,
         root_ui_id: egui::Id,
         additions: Option<&'a [u32]>,
@@ -704,7 +704,7 @@ impl<'a> FetchedViewImpl<'a> {
             .clicked()
         {
             Action::Clicked(self.path.to_vec())
-        } else if let Some((&[], _)) = self.focus {
+        } else if self.focus.iter().any(|x| x.is_empty()) {
             Action::Focused(min.y)
         } else {
             show.body_returned.unwrap_or(Action::Keep)
@@ -878,7 +878,7 @@ impl<'a> FetchedViewImpl<'a> {
                 .unwrap_or_default()
         } else if interact.clicked() {
             Action::Clicked(self.path.to_vec())
-        } else if let Some((&[], _)) = self.focus {
+        } else if self.focus.iter().any(|x| x.is_empty()) {
             Action::Focused(min.y)
         } else {
             node_menu(ui, interact, kind)
@@ -979,7 +979,6 @@ impl<'a> FetchedViewImpl<'a> {
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
         if self.focus.is_some() {
-            // wasm_rs_dbg::dbg!();
             load_with_default_open.set_open(true)
         }
         // wasm_rs_dbg::dbg!();
@@ -1078,7 +1077,7 @@ impl<'a> FetchedViewImpl<'a> {
             .clicked()
         {
             Action::Clicked(self.path.to_vec())
-        } else if let Some((&[], _)) = self.focus {
+        } else if self.focus.iter().any(|x| x.is_empty()) {
             Action::Focused(min.y)
         } else {
             show.body_returned.unwrap_or(Action::Keep)
@@ -1374,7 +1373,7 @@ impl<'a> FetchedViewImpl<'a> {
 
         let action = if resp.1.clicked() {
             Action::Clicked(self.path.to_vec())
-        } else if let Some((&[], _)) = self.focus {
+        } else if self.focus.iter().any(|x| x.is_empty()) {
             Action::Focused(min.y)
         } else {
             Action::Keep
@@ -1431,7 +1430,7 @@ impl<'a> FetchedViewImpl<'a> {
         prefill.head = ui.available_rect_before_wrap().min.y - min.y;
         // TODO selection_highlight
         self.prefill_cache = Some(prefill);
-        if let Some((&[], _)) = self.focus {
+        if self.focus.iter().any(|x| x.is_empty()) {
             Action::Focused(min.y)
         } else {
             action
@@ -1513,32 +1512,22 @@ impl<'a> FetchedViewImpl<'a> {
         path: Vec<usize>,
     ) -> ControlFlow<()> {
         let rect = ui.available_rect_before_wrap();
-        let focus = self.focus.as_ref().and_then(|x| {
-            if x.0.is_empty() {
-                None
-            } else if x.0[0] == i {
-                Some((&x.0[1..], &x.1[1..]))
-            } else {
-                None
-            }
-        });
+        let focus = (self.focus.as_ref())
+            .filter(|x| x.offsets.get(0) == Some(&i))
+            .map(|x| {
+                let offsets = &x.offsets[1..];
+                let ids = x.ids.get(1..).unwrap_or(&[]);
+                super::code_aspects::Focus { offsets, ids }
+            });
         if self.focus.is_none()
             && rect.min.y > 0.0
             && ui.ctx().screen_rect().height() - CLIP_LEN < rect.min.y
         {
-            // wasm_rs_dbg::dbg!(self.focus);
             return ControlFlow::Break(());
         }
         let hightlights: Vec<_> =
             vec_extract_if_polyfill::MakeExtractIf::extract_if(&mut self.hightlights, |handle| {
                 !handle.path.is_empty() && handle.path[0] == i
-                // if x.is_empty() {
-                //     None
-                // } else if x[0] == i {
-                //     Some((&x[1..], *c, *p))
-                // } else {
-                //     None
-                // }
             })
             .map(|handle| HightLightHandle {
                 path: &handle.path[1..],
@@ -1547,7 +1536,6 @@ impl<'a> FetchedViewImpl<'a> {
                 id: handle.id,
             })
             .collect();
-        // let mut ignore = None;
         let mut imp = if let Some(child) = prefill_old.children.get(i) {
             let child_size = prefill_old.children_sizes.get(i).unwrap(); // children and children_sizes should be the same sizes
             let exact_max_y = rect.min.y + *child;
@@ -1577,7 +1565,6 @@ impl<'a> FetchedViewImpl<'a> {
                     );
                 }
                 ui.allocate_space((ui.min_size().x, *child).into());
-                // wasm_rs_dbg::dbg!(self.focus);
                 return ControlFlow::Continue(());
             } else {
                 if DEBUG_LAYOUT {
@@ -1708,10 +1695,10 @@ impl<'a> FetchedViewImpl<'a> {
             }
             if let Some(focus) = &imp.focus {
                 wasm_rs_dbg::dbg!(&focus);
-                if let Some(x) = self.focus.as_ref().unwrap().1.first() {
+                if let Some(x) = self.focus.as_ref().unwrap().ids.first() {
                     imp.additions = None;
                     imp.deletions = None;
-                    let a = imp.ui_non_loaded(ui, *c, *focus.0.first().unwrap_or(&0), *x);
+                    let a = imp.ui_non_loaded(ui, *c, *focus.offsets.first().unwrap_or(&0), *x);
                     match a {
                         Action::PartialFocused(x) => Action::PartialFocused(x),
                         Action::Focused(x) => Action::PartialFocused(x),
@@ -1729,6 +1716,9 @@ impl<'a> FetchedViewImpl<'a> {
                     match a {
                         Action::PartialFocused(x) => Action::PartialFocused(x),
                         Action::Focused(x) => Action::PartialFocused(x),
+                        Action::Keep => {
+                            Action::PartialFocused(ui.available_rect_before_wrap().min.y)
+                        }
                         x => panic!("{:?}", x),
                         // x => x,
                     }

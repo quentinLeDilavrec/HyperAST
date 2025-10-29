@@ -201,13 +201,13 @@ pub struct PieceOfCode<IdN = self::IdN, Idx = usize> {
     name: String,
     commit: String,
     path: Vec<Idx>,
+    file: String,
+    start: usize,
+    end: usize,
     #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>"))]
     #[serde(serialize_with = "custom_ser")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     path_ids: Vec<IdN>, // WARN this is not fetched::NodeIdentifier
-    file: String,
-    start: usize,
-    end: usize,
 }
 
 fn custom_ser<IdN: Clone + Into<self::IdN>, S>(

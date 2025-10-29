@@ -189,7 +189,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
             let split: Vec<_> = text.split("/").collect();
             if split[0] != "github.com" {
                 // TODO launch an alert
-                // wasm_rs_dbg::dbg!("only github.com is allowed");
+                log::warn!("only github.com is provided");
                 return 0;
             }
             if split.len() == 5 {
@@ -198,7 +198,6 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
                 assert_eq!("commit", split[3].to_string());
                 self.commit.id = split[4].to_string();
             }
-            // wasm_rs_dbg::dbg!(&self.commit);
             self.str.get((&self.forge, &self.commit));
             return text.chars().count();
         }
@@ -209,7 +208,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
         let split: Vec<_> = t.split("/").collect();
         if split[0] != "github.com" {
             // TODO launch an alert
-            // wasm_rs_dbg::dbg!("only github.com is allowed");
+            log::warn!("only github.com is provided");
             return 0;
         }
         self.commit.repo.user = split[1].to_string();
@@ -242,8 +241,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
             let split: Vec<_> = text.split("/").collect();
             if split[0] != "github.com" {
                 // TODO launch an alert
-                // wasm_rs_dbg::dbg!(&split[0]);
-                // wasm_rs_dbg::dbg!("only github.com is allowed");
+                log::warn!("only github.com is provided");
                 return 0;
             }
             if split.len() == 5 {
@@ -252,7 +250,6 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
                 assert_eq!("commit", split[3].to_string());
                 self.commit.id = split[4].to_string();
             }
-            // wasm_rs_dbg::dbg!(&split, &self.commit);
             self.str.get((&self.forge, &self.commit));
             return text.chars().count();
         }
@@ -267,7 +264,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
         let split: Vec<_> = text.split("/").collect();
         if split[0] != "github.com" {
             // TODO launch an alert
-            // wasm_rs_dbg::dbg!("only github.com is allowed");
+            log::warn!("only github.com is provided");
             return 0;
         }
         self.commit.repo.user = split[1].to_string();

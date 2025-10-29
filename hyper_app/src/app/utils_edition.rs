@@ -168,7 +168,6 @@ pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
         _ => (),
     }
     while let Some(Ok(msg)) = receiver.next().await {
-        wasm_rs_dbg::dbg!();
         use tokio_tungstenite_wasm::Message as Msg;
         match msg {
             Msg::Text(msg) => {

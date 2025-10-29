@@ -356,7 +356,6 @@ impl Resource<Result<ComputeResults, QueryingError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         if !content_type.starts_with("application/json") {
             return Err(format!("Wrong content type: {}", content_type));

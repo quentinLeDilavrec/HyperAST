@@ -140,7 +140,6 @@ impl<S> WsChannel<S> {
         }
     }
     async fn make_ws_async(who: User, url: String) -> tokio_tungstenite_wasm::Result<WsCont> {
-        wasm_rs_dbg::dbg!(&url);
         match tokio_tungstenite_wasm::connect(url).await {
             Ok(stream) => {
                 wasm_rs_dbg::dbg!("Handshake for client {} has been completed", who);
@@ -221,7 +220,6 @@ impl WsDoc {
     }
 
     pub(crate) fn changed(&mut self, rt: &Rt, quote: &mut impl Reconcile) {
-        wasm_rs_dbg::dbg!();
         let (doc, sync_state): &mut (_, _) = &mut self.data.write().unwrap();
         if let Err(e) = reconcile(doc, &*quote) {
             log::warn!(

@@ -727,7 +727,6 @@ pub(crate) fn show_query(
         }
         ui.fonts(|f| f.layout_job(layout_job))
     };
-    // dbg!(&code);
     let scroll_resp = egui::scroll_area::ScrollArea::both().show(ui, |ui| {
         egui_addon::code_editor::generic_text_edit::TextEdit::multiline(&mut code)
             .layouter(&mut layouter)
@@ -1116,7 +1115,6 @@ impl types::Resource<Result<SearchResults, SmellsError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
 
         if response.status == 404 {
@@ -1152,7 +1150,6 @@ impl types::Resource<Result<SearchResults, SmellsError>> {
         }
 
         let text = response.text();
-        dbg!(&text);
         let text = text.and_then(|text| {
             serde_json::from_str(text)
                 .inspect_err(|err| {
@@ -1160,7 +1157,6 @@ impl types::Resource<Result<SearchResults, SmellsError>> {
                 })
                 .ok()
         });
-        dbg!(&text);
 
         Ok(Self {
             response,
@@ -1212,7 +1208,6 @@ impl types::Resource<Result<ExamplesValues, DiffsError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
 
         if response.status == 404 {

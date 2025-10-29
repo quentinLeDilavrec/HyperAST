@@ -1306,7 +1306,6 @@ fn update_results_per_commit(
 ) {
     let header = &r.head; //.results.iter().find(|x| x.is_ok());
     // let Some(header) = header.as_ref() else {
-    //     wasm_rs_dbg::dbg!("issue with header");
     //     panic!("issue with header");
     // };
     // let font_id = egui::TextStyle::Body.resolve(ui.style());

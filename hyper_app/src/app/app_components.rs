@@ -336,12 +336,10 @@ impl super::HyperApp {
 
             let button = egui::Button::new("branch");
             if ui.add_enabled(false, button).clicked() {
-                // TODO
                 wasm_rs_dbg::dbg!("TODO add branch");
             }
             let button = egui::Button::new("commit range");
             if ui.add_enabled(false, button).clicked() {
-                // TODO
                 wasm_rs_dbg::dbg!("TODO add commit range");
             }
         };

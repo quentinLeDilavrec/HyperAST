@@ -245,7 +245,6 @@ impl Resource<TrackingResultWithChanges> {
         } else {
             return Err(text.into());
         };
-        // wasm_rs_dbg::dbg!(&text);
 
         Ok(Self {
             response,
@@ -339,14 +338,7 @@ pub(super) fn show_code_tracking_results(
                     //     }
                     // });
                     if result_changed {
-                        // wasm_rs_dbg::dbg!(
-                        //     aa.content_size,
-                        //     aa.state.offset.y,
-                        //     aa.inner_rect.height(),
-                        //     rect.top(),
-                        // );
                         pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-                        // wasm_rs_dbg::dbg!(pos_ratio);
                     }
                 }
                 if !aa.inner.response.is_pointer_button_down_on() {
@@ -359,7 +351,6 @@ pub(super) fn show_code_tracking_results(
                             end: byte_index_from_char_index(s, r.end),
                         };
                         if tracking.target.range != Some(r.clone()) {
-                            // wasm_rs_dbg::dbg!(&r);
                             tracking.target.range = Some(r);
                             tracking_result.buffer(track(
                                 ctx,
@@ -423,8 +414,6 @@ pub(super) fn show_code_tracking_results(
                                             .map(|x| x.unwrap_or(0.5))
                                     });
                                     if result_changed || b.is_some() {
-                                        // wasm_rs_dbg::dbg!(result_changed);
-                                        // wasm_rs_dbg::dbg!(pos_ratio);
                                         if b.is_some() {
                                             ctx.memory_mut(|mem| {
                                                 mem.data
@@ -432,12 +421,6 @@ pub(super) fn show_code_tracking_results(
                                             });
                                         }
 
-                                        // wasm_rs_dbg::dbg!(
-                                        //     aa.content_size,
-                                        //     aa.state.offset.y,
-                                        //     aa.inner_rect.height(),
-                                        //     rect.top(),
-                                        // );
                                         let pos_ratio = pos_ratio.unwrap_or(b.unwrap_or(0.5));
                                         let qq = pos_ratio * aa.inner_rect.height();
                                         aa.state.offset.y = rect.top() - qq;
@@ -447,14 +430,10 @@ pub(super) fn show_code_tracking_results(
                             }
                         }
                     } else {
-                        // wasm_rs_dbg::dbg!(&track_result);
                     }
                 }
-                Some(Err(_err)) => {
-                    // wasm_rs_dbg::dbg!(err);
-                }
+                Some(Err(_err)) => {}
                 None => {
-                    // wasm_rs_dbg::dbg!();
                     // *track_result = Some(code_tracking::track(
                     //     ctx,
                     //     &tracking.target.file.commit,

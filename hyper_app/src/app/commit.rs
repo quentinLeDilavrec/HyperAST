@@ -36,7 +36,6 @@ impl CommitMetadata {
         if let Some(date) = date {
             ui.label(format!("Date:\t{:?}", date));
         } else {
-            // wasm_rs_dbg::dbg!(self.timezone, self.time);
         }
         if ui.available_width() > 300.0 {
             ui.label(format!("Parents: {}", self.parents.join(" + ")));
@@ -87,7 +86,6 @@ pub(super) fn fetch_commit(
         api_addr, &commit.repo.user, &commit.repo.name, &commit.id,
     );
 
-    // wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
     // request
     //     .headers
@@ -116,7 +114,6 @@ pub(super) fn fetch_commit0(
         api_addr, &commit.repo.user, &commit.repo.name, &commit.id,
     );
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
     // request
     //     .headers
@@ -186,7 +183,6 @@ pub(super) fn fetch_merge_pr(
         api_addr, &commit.repo.user, &commit.repo.name,
     );
 
-    wasm_rs_dbg::dbg!(&url);
     let request = ehttp::Request::get(&url);
 
     ehttp::fetch(request, move |response| {
@@ -236,7 +232,6 @@ pub(super) fn fetch_commit_parents(
     //     .insert("Content-Type".to_string(), "text".to_string());
 
     ehttp::fetch(request, move |response| {
-        wasm_rs_dbg::dbg!(&response);
         ctx.request_repaint(); // wake up UI thread
         let resource = response
             .and_then(|response| Resource::<Vec<String>>::from_response(&ctx, response))
@@ -249,7 +244,6 @@ pub(super) fn fetch_commit_parents(
 impl Resource<Vec<String>> {
     #[allow(unused)]
     fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
         // let content_type = response.content_type().unwrap_or_default();
 
         let text = response.text();

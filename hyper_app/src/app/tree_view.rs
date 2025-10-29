@@ -416,7 +416,6 @@ impl<'a> FetchedViewImpl<'a> {
         ui.style_mut().spacing.item_spacing.y = 0.0;
 
         let node_store = self.store.node_store.read().unwrap();
-        // wasm_rs_dbg::dbg!(root);
         let action = if let Some(r) = node_store.try_resolve::<NodeIdentifier>(*root) {
             // let lang = r.get_lang();
             // gen::types::Type::Lang;
@@ -469,7 +468,6 @@ impl<'a> FetchedViewImpl<'a> {
         if let Some(mut timer) = lock.take() {
             let dt = ui.input(|mem| mem.unstable_dt);
             timer += dt;
-            // wasm_rs_dbg::dbg!(dt, timer, Duration::from_secs(2).as_secs_f32());
             if timer < Duration::from_secs(1).as_secs_f32() {
                 *lock = Some(timer);
                 return action;
@@ -543,7 +541,6 @@ impl<'a> FetchedViewImpl<'a> {
         let min = ui.available_rect_before_wrap().min;
         if min.y < 0.0 {
             self.min_before_count += 1;
-            // wasm_rs_dbg::dbg!(min.y);
         }
         // ui.painter().debug_rect(
         //     ui.available_rect_before_wrap(),
@@ -558,7 +555,6 @@ impl<'a> FetchedViewImpl<'a> {
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
         if self.focus.is_some() {
-            // wasm_rs_dbg::dbg!(&self.focus, &self.path, &cs);
             load_with_default_open.set_open(true)
         }
 
@@ -592,7 +588,6 @@ impl<'a> FetchedViewImpl<'a> {
                 let ret = {
                     let text = format!("{}: ", kind);
                     let mut rt = egui::RichText::new(text).monospace();
-                    // wasm_rs_dbg::dbg!(&self.global_pos);
                     if let Some(gp) = &self.global_pos {
                         if self.additions.is_some() || self.deletions.is_some() {
                             let add = self.additions.unwrap_or_default();
@@ -610,7 +605,6 @@ impl<'a> FetchedViewImpl<'a> {
                                     rt = rt.color(egui::Color32::DARK_GREEN);
                                 }
                             } else if del.last() == Some(gp) {
-                                // wasm_rs_dbg::dbg!(del, gp);
                                 // rt = rt.strikethrough();
                                 rt = rt.color(egui::Color32::DARK_RED);
                             }
@@ -767,7 +761,6 @@ impl<'a> FetchedViewImpl<'a> {
                         if self.additions.is_some() || self.deletions.is_some() {
                             let add = self.additions.unwrap_or_default();
                             let del = self.deletions.unwrap_or_default();
-                            // wasm_rs_dbg::dbg!(add, del);
                             if add.is_empty() && del.is_empty() {
                                 rt = rt.size(8.0);
                                 rt = rt.color(egui::Color32::GRAY);
@@ -810,7 +803,6 @@ impl<'a> FetchedViewImpl<'a> {
                 //         if self.additions.is_some() || self.deletions.is_some() {
                 //             let add = self.additions.unwrap_or_default();
                 //             let del = self.deletions.unwrap_or_default();
-                //             // wasm_rs_dbg::dbg!(add, del);
                 //             ui.label(format!("{:?}", add));
                 //             ui.label(format!("{:?}", del));
                 //         }
@@ -968,7 +960,6 @@ impl<'a> FetchedViewImpl<'a> {
         offset: usize,
         child: NodeIdentifier,
     ) -> Action {
-        // wasm_rs_dbg::dbg!();
         let min = ui.available_rect_before_wrap().min;
         if min.y < 0.0 {
             self.min_before_count += 1;
@@ -980,18 +971,15 @@ impl<'a> FetchedViewImpl<'a> {
         if self.focus.is_some() {
             load_with_default_open.set_open(true)
         }
-        // wasm_rs_dbg::dbg!();
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
                 // ui.label(format!("{}: {}", kind, label));
-                // wasm_rs_dbg::dbg!();
                 ui.monospace(format!("waiting: {}", nid))
                 // .context_menu(|ui| {
                 //     ui.label(format!("{:?}", self.path));
                 // })
             })
             .body(|ui| {
-                // wasm_rs_dbg::dbg!();
                 let mut act = Action::Keep;
                 let mut prefill_old = if let Some(prefill_cache) = self.prefill_cache.take() {
                     prefill_cache
@@ -1011,17 +999,6 @@ impl<'a> FetchedViewImpl<'a> {
                 };
                 let mut path = self.path.clone();
                 path.push(offset);
-                // wasm_rs_dbg::dbg!(offset, &self.focus, &path);
-                // let mut path_bis = self.path.clone();
-                // for o in self.focus.unwrap().0 {
-                //     wasm_rs_dbg::dbg!(offset, &self.path, &self.focus, o, &path_bis);
-                //     path_bis.push(*o);
-                //     let id = ui.id().with(&path_bis);
-                //     let mut load_with_default_open =
-                //         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true);
-                //     load_with_default_open.set_open(true);
-                //     load_with_default_open.store(ui.ctx());
-                // }
                 self.children_ui_aux(
                     ui,
                     offset,
@@ -1162,7 +1139,6 @@ impl<'a> FetchedViewImpl<'a> {
                         if self.additions.is_some() || self.deletions.is_some() {
                             let add = self.additions.unwrap_or_default();
                             let del = self.deletions.unwrap_or_default();
-                            // wasm_rs_dbg::dbg!(add, del);
                             if add.binary_search(gp).is_ok() {
                                 if del.last() == Some(gp) {
                                     rt = rt.color(egui::Color32::BLUE);
@@ -1218,7 +1194,6 @@ impl<'a> FetchedViewImpl<'a> {
                         if self.additions.is_some() || self.deletions.is_some() {
                             let add = self.additions.unwrap_or_default();
                             let del = self.deletions.unwrap_or_default();
-                            // wasm_rs_dbg::dbg!(add, del);
                             if add.binary_search(gp).is_ok() {
                                 if del.last() == Some(gp) {
                                     rt = rt.color(egui::Color32::BLUE);
@@ -1349,7 +1324,6 @@ impl<'a> FetchedViewImpl<'a> {
                 if !del.is_empty() {
                     ui.painter().debug_rect(rect, egui::Color32::BLUE, "");
                 } else {
-                    // wasm_rs_dbg::dbg!(self.global_pos, size, add);
                     ui.painter().debug_rect(rect, egui::Color32::GREEN, "");
                 }
             } else if !del.is_empty() {
@@ -1453,11 +1427,6 @@ impl<'a> FetchedViewImpl<'a> {
         let additions = self.additions.as_ref().map(|x| &x[..]);
         let deletions = self.deletions.as_ref().map(|x| &x[..]);
         let mut prefill_old = if let Some(prefill_cache) = self.prefill_cache.take() {
-            // wasm_rs_dbg::dbg!(
-            //     &prefill_cache.head,
-            //     &prefill_cache.children,
-            //     &prefill_cache.next.is_some()
-            // );
             prefill_cache
         } else {
             PrefillCache {
@@ -1705,7 +1674,6 @@ impl<'a> FetchedViewImpl<'a> {
                             Action::PartialFocused(ui.available_rect_before_wrap().min.y)
                         } // TODO find why it is not focused
                         x => panic!("{:?}", x),
-                        // x => x,
                     }
                 } else {
                     let kind: &'static dyn HyperType = &hyperast_gen_ts_cpp::types::Type::ERROR;
@@ -2209,7 +2177,6 @@ fn selection_highlight(
         if clip.intersects(rect) {
             if *color == &egui::Color32::BLUE {
                 let _id = root_ui_id.with("blue_highlight").with(id);
-                // wasm_rs_dbg::dbg!("green", id);
                 let pos = egui::pos2(min.x - 15.0, min.y - 10.0);
                 let pos = clip.clamp(pos);
                 if ui.clip_rect().contains(pos) {

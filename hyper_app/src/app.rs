@@ -1844,7 +1844,7 @@ fn compute_queries_differential_results(
     } else if language == "Java" {
         types::Config::MavenJava
     } else {
-        wasm_rs_dbg::dbg!(&language);
+        log::warn!("{} is not supported defaulting to Java", &language);
         types::Config::MavenJava
     };
     let language = language.to_string();

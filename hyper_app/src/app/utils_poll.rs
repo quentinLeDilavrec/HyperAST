@@ -480,23 +480,16 @@ pub(crate) fn try_fetch_remote_file<R>(
     file_result: &Entry<'_, FileIdentifier, RemoteFile>,
     mut f: impl FnMut(&FetchedFile) -> R,
 ) -> Option<Result<R, String>> {
-    if let Entry::Occupied(promise) = file_result {
-        let promise = promise.get();
-        if let Some(result) = promise.ready() {
-            match result {
-                Ok(resource) => {
-                    if let Some(text) = &resource.content {
-                        Some(Ok(f(text)))
-                    } else {
-                        None
-                    }
-                }
-                Err(error) => Some(Err(error.to_string())),
-            }
-        } else {
-            None
+    let Entry::Occupied(promise) = file_result else {
+        return None;
+    };
+    let promise = promise.get();
+    let result = promise.ready()?;
+    match result {
+        Ok(resource) => {
+            let text = resource.content.as_ref()?;
+            Some(Ok(f(text)))
         }
-    } else {
-        None
+        Err(error) => Some(Err(error.to_string())),
     }
 }

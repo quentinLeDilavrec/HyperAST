@@ -63,13 +63,9 @@ pub fn compute2_bounding_rect_from_row_range(
 }
 
 pub fn first_ws_x(row: &epaint::text::Row) -> Option<f32> {
-    row.glyphs
-        .iter()
+    (row.glyphs.iter())
         .find(|x| !x.chr.is_ascii_whitespace())
-        .map(|g| {
-            // dbg!(g);
-            g.pos.x
-        })
+        .map(|g| g.pos.x)
 }
 
 pub fn compute_cursor_range(

@@ -531,17 +531,12 @@ impl<'a> CommitSlice<'a> {
     }
 
     pub(crate) fn last_mut(&mut self) -> Option<&mut CommitId> {
-        if self.end == 0 {
-            return None;
-        }
-        Some(&mut self.commits[self.end - 1])
+        self.commits.get_mut(self.end.checked_sub(1)?)
     }
 
     pub(crate) fn pop(&mut self) -> CommitId {
-        if self.end == 0 {
-            panic!("trying to remove a commit from a project without any")
-        }
-        self.end -= 1;
+        self.end = (self.end.checked_sub(1))
+            .expect("trying to remove a commit from a project without any");
         self.offsets[self.i + 1..].iter_mut().for_each(|x| *x -= 1);
         self.commits.remove(self.end)
     }

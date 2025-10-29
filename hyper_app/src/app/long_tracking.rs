@@ -1699,11 +1699,7 @@ fn show_code_view(
         } else {
             curr_view.original_targets.get_mut(0)
         };
-        let Some((curr, _)) = curr else {
-            return None;
-        };
-
-        &mut curr.file
+        &mut curr?.0.file
     };
 
     let file_result = fetched_files.entry(curr_file.clone());
@@ -1819,117 +1815,48 @@ pub(crate) fn show_tree_view(
             ui.set_height(3_000.0);
             ui.set_width(ui.available_width() - 15.0);
             // ui.set_clip_rect(ui.ctx().screen_rect());
-            if let Some(content) = &mut tree_viewer.content {
-                let mut hightlights = vec![];
-                let mut focus = None;
-                let mut blue_pos = HashMap::<usize, std::option::Option<egui::Rect>>::default();
-                let mut green_pos = HashMap::<usize, std::option::Option<egui::Rect>>::default();
-                for (_, i) in curr_view.effective_targets.iter() {
-                    blue_pos.insert(*i, None);
-                }
-                for (i, b_p) in blue_pos.iter_mut() {
-                    hightlights.push(HightLightHandle {
-                        path: &curr_view
-                            .effective_targets
-                            .iter()
-                            .find(|x| x.1 == *i)
-                            .unwrap()
-                            .0
-                            .path[..],
-                        color: &egui::Color32::BLUE,
-                        id: *i,
-                        screen_pos: b_p,
-                    });
-                }
-                let a = if curr_view.matcheds.len() == 1 {
-                    let Some((foc, i)) = curr_view.matcheds.get(0) else {
-                        unreachable!()
-                    };
-                    green_pos.insert(*i, None);
-                    hightlights.push(HightLightHandle {
-                        path: &foc.path[..],
-                        color: &TARGET_COLOR,
-                        id: *i,
-                        screen_pos: green_pos.get_mut(i).unwrap(),
-                    });
-                    if trigger {
-                        let mut pi = foc.path_ids.clone();
-                        pi.reverse();
-                        focus = Some((&foc.path[..], &pi[..]).into());
-                        let id = ui.id();
-                        let a = content.show(
-                            ui,
-                            api_addr,
-                            aspects,
-                            focus,
-                            hightlights,
-                            curr_view.additions,
-                            curr_view.deletions,
-                            "",
-                        );
-                        let bool = match a {
-                            Action::Focused(_) => false,
-                            Action::PartialFocused(_) => true,
-                            Action::Keep => true,
-                            x => panic!("{:?}", x),
-                        };
-                        if bool {
-                            ui.ctx().memory_mut(|mem| {
-                                *mem.data.get_temp_mut_or_default::<bool>(id) = true;
-                            });
-                        }
-                        a
-                    } else {
-                        let id = ui.id();
-                        let bool = ui
-                            .ctx()
-                            .memory_mut(|mem| mem.data.get_temp::<bool>(id).unwrap_or(false));
-                        let mut pi = foc.path_ids.clone();
-                        pi.reverse();
-                        if bool {
-                            focus = Some((&foc.path[..], &pi[..]).into());
-                        }
-                        let a = content.show(
-                            ui,
-                            api_addr,
-                            aspects,
-                            focus,
-                            hightlights,
-                            curr_view.additions,
-                            curr_view.deletions,
-                            "",
-                        );
-                        let bool = match a {
-                            Action::Focused(_) => false,
-                            Action::PartialFocused(_) => true,
-                            _ => false,
-                        };
-                        if !bool {
-                            ui.ctx().memory_mut(|mem| {
-                                mem.data.remove::<bool>(id);
-                            });
-                        }
-                        a
-                    }
-                } else {
-                    for (_, i) in curr_view.matcheds.iter() {
-                        green_pos.insert(*i, None);
-                    }
-                    for (i, g_p) in green_pos.iter_mut() {
-                        hightlights.push(HightLightHandle {
-                            path: &curr_view
-                                .matcheds
-                                .iter()
-                                .find(|x| x.1 == *i)
-                                .unwrap()
-                                .0
-                                .path[..],
-                            color: &TARGET_COLOR,
-                            id: *i,
-                            screen_pos: g_p,
-                        });
-                    }
-                    content.show(
+
+            let Some(content) = &mut tree_viewer.content else {
+                return None;
+            };
+            let mut hightlights = vec![];
+            let mut focus = None;
+            let mut blue_pos = HashMap::<usize, std::option::Option<egui::Rect>>::default();
+            let mut green_pos = HashMap::<usize, std::option::Option<egui::Rect>>::default();
+            for (_, i) in curr_view.effective_targets.iter() {
+                blue_pos.insert(*i, None);
+            }
+            for (i, b_p) in blue_pos.iter_mut() {
+                hightlights.push(HightLightHandle {
+                    path: &curr_view
+                        .effective_targets
+                        .iter()
+                        .find(|x| x.1 == *i)
+                        .unwrap()
+                        .0
+                        .path[..],
+                    color: &egui::Color32::BLUE,
+                    id: *i,
+                    screen_pos: b_p,
+                });
+            }
+            let a = if curr_view.matcheds.len() == 1 {
+                let Some((foc, i)) = curr_view.matcheds.get(0) else {
+                    unreachable!()
+                };
+                green_pos.insert(*i, None);
+                hightlights.push(HightLightHandle {
+                    path: &foc.path[..],
+                    color: &TARGET_COLOR,
+                    id: *i,
+                    screen_pos: green_pos.get_mut(i).unwrap(),
+                });
+                if trigger {
+                    let mut pi = foc.path_ids.clone();
+                    pi.reverse();
+                    focus = Some((&foc.path[..], &pi[..]).into());
+                    let id = ui.id();
+                    let a = content.show(
                         ui,
                         api_addr,
                         aspects,
@@ -1938,55 +1865,113 @@ pub(crate) fn show_tree_view(
                         curr_view.additions,
                         curr_view.deletions,
                         "",
-                    )
-                };
-                // let a = content.show(ui, aspects, focus, hightlights, "");
-                for (k, blue_pos) in blue_pos {
-                    if let Some(port) = ports.get_mut(col - min_col) {
-                        let v = (ui.id().with("blue_highlight").with(k), blue_pos);
-                        port.0.insert(k, v);
+                    );
+                    let bool = match a {
+                        Action::Focused(_) => false,
+                        Action::PartialFocused(_) => true,
+                        Action::Keep => true,
+                        x => panic!("{:?}", x),
+                    };
+                    if bool {
+                        ui.ctx().memory_mut(|mem| {
+                            *mem.data.get_temp_mut_or_default::<bool>(id) = true;
+                        });
                     }
-                }
-                for (k, green_pos) in green_pos {
-                    if let Some(port) = ports.get_mut(col - min_col) {
-                        let v = (ui.id().with("green_highlight").with(k), green_pos);
-                        port.1.insert(k, v);
+                    a
+                } else {
+                    let id = ui.id();
+                    let bool = ui
+                        .ctx()
+                        .memory_mut(|mem| mem.data.get_temp::<bool>(id).unwrap_or(false));
+                    let mut pi = foc.path_ids.clone();
+                    pi.reverse();
+                    if bool {
+                        focus = Some((&foc.path[..], &pi[..]).into());
                     }
-                }
-                match a {
-                    Action::Focused(p) => {
-                        scroll_focus = Some(p);
-                        None
+                    let a = content.show(
+                        ui,
+                        api_addr,
+                        aspects,
+                        focus,
+                        hightlights,
+                        curr_view.additions,
+                        curr_view.deletions,
+                        "",
+                    );
+                    let bool = match a {
+                        Action::Focused(_) => false,
+                        Action::PartialFocused(_) => true,
+                        _ => false,
+                    };
+                    if !bool {
+                        ui.ctx().memory_mut(|mem| {
+                            mem.data.remove::<bool>(id);
+                        });
                     }
-                    Action::Clicked(p) => Some(p),
-                    Action::SerializeKind(k) => {
-                        let k = &k.as_any();
-                        if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
-                            aspects.ser_opt_cpp.insert(k.to_owned());
-                        } else if let Some(k) =
-                            k.downcast_ref::<hyperast_gen_ts_java::types::Type>()
-                        {
-                            aspects.ser_opt_java.insert(k.to_owned());
-                        }
-
-                        None
-                    }
-                    Action::HideKind(k) => {
-                        let k = &k.as_any();
-                        if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
-                            aspects.hide_opt_cpp.insert(k.to_owned());
-                        } else if let Some(k) =
-                            k.downcast_ref::<hyperast_gen_ts_java::types::Type>()
-                        {
-                            aspects.hide_opt_java.insert(k.to_owned());
-                        }
-
-                        None
-                    }
-                    _ => None,
+                    a
                 }
             } else {
-                None
+                for (_, i) in curr_view.matcheds.iter() {
+                    green_pos.insert(*i, None);
+                }
+                for (i, g_p) in green_pos.iter_mut() {
+                    let matched = curr_view.matcheds.iter().find(|x| x.1 == *i).unwrap();
+                    hightlights.push(HightLightHandle {
+                        path: &matched.0.path[..],
+                        color: &TARGET_COLOR,
+                        id: *i,
+                        screen_pos: g_p,
+                    });
+                }
+                content.show(
+                    ui,
+                    api_addr,
+                    aspects,
+                    focus,
+                    hightlights,
+                    curr_view.additions,
+                    curr_view.deletions,
+                    "",
+                )
+            };
+            // let a = content.show(ui, aspects, focus, hightlights, "");
+            for (k, blue_pos) in blue_pos {
+                if let Some(port) = ports.get_mut(col - min_col) {
+                    let v = (ui.id().with("blue_highlight").with(k), blue_pos);
+                    port.0.insert(k, v);
+                }
+            }
+            for (k, green_pos) in green_pos {
+                if let Some(port) = ports.get_mut(col - min_col) {
+                    let v = (ui.id().with("green_highlight").with(k), green_pos);
+                    port.1.insert(k, v);
+                }
+            }
+            match a {
+                Action::Focused(p) => {
+                    scroll_focus = Some(p);
+                    None
+                }
+                Action::Clicked(p) => Some(p),
+                Action::SerializeKind(k) => {
+                    let k = &k.as_any();
+                    if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
+                        aspects.ser_opt_cpp.insert(*k);
+                    } else if let Some(k) = k.downcast_ref::<hyperast_gen_ts_java::types::Type>() {
+                        aspects.ser_opt_java.insert(*k);
+                    }
+                    None
+                }
+                Action::HideKind(k) => {
+                    let k = &k.as_any();
+                    if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
+                        aspects.hide_opt_cpp.insert(*k);
+                    } else if let Some(k) = k.downcast_ref::<hyperast_gen_ts_java::types::Type>() {
+                        aspects.hide_opt_java.insert(*k);
+                    }
+                    None
+                }
+                _ => None,
             }
         });
     if let Some(o) = scroll_focus {

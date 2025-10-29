@@ -142,8 +142,7 @@ pub(crate) fn prepare_paste(
 ) -> Option<String> {
     if *await_response {
         let paste = ui.input(|i| {
-            i.events
-                .iter()
+            (i.events.iter())
                 .find(|e| matches!(e, egui::Event::Paste(_)))
                 .cloned()
         });

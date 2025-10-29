@@ -1883,12 +1883,8 @@ fn compute_queries_differential_results(
         },
     );
     data.queries_differential_results = Some((pid, 0, Default::default(), *pane, hash));
-    data.queries_differential_results
-        .as_mut()
-        .unwrap()
-        .2
-        .buffer(prom);
-    // let language = config.language().to_string();
+    let res = data.queries_differential_results.as_mut().unwrap();
+    res.2.buffer(prom);
     None
 }
 

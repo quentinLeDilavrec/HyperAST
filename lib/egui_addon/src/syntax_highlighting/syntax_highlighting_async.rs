@@ -369,8 +369,7 @@ impl Highlighter {
     }
 
     fn init_h<'a>(&'a self, language: &str, theme: &CodeTheme) -> Option<HighlightLines<'a>> {
-        let syntax = self
-            .ps
+        let syntax = (self.ps)
             .find_syntax_by_name(language)
             .or_else(|| self.ps.find_syntax_by_extension(language))?;
         let theme = theme.syntect_theme.syntect_key_name();

@@ -551,7 +551,7 @@ pub(super) fn show_locals_and_interact<T, U, L, S>(
                 let content = Arc::new(Mutex::new(content));
                 context.current = EditStatus::Shared(usize::MAX, content.clone());
                 let mut content = content.lock().unwrap();
-                docs.doc_db.as_mut().unwrap().create_doc_atempt(
+                docs.doc_db.as_mut().unwrap().create_doc_attempt(
                     &docs.rt,
                     name,
                     content.deref_mut(),

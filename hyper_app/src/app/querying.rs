@@ -471,7 +471,7 @@ pub(crate) fn handle_interactions(
         code_editors.current = EditStatus::Sharing(content.clone());
         let mut content = content.lock().unwrap();
         let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_atempt(&single.rt, name, content.deref_mut());
+        db.create_doc_attempt(&single.rt, name, content.deref_mut());
     } else if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving query: {:#?}", content.clone());

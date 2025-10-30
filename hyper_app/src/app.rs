@@ -1,3 +1,4 @@
+use eframe::App;
 use egui::util::hash;
 use re_ui::{UiExt as _, notifications::NotificationUi};
 use serde::{Deserialize, Serialize};
@@ -768,9 +769,13 @@ impl HyperApp {
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
             if let Some(s) = storage.get_string(eframe::APP_KEY) {
-                match serde_json::from_str(&s) {
+                match serde_json::from_str::<HyperApp>(&s) {
                     Ok(_r) => {
-                        r = _r;
+                        if _r.persistance {
+                            r = _r;
+                        } else {
+                            r = HyperApp::default();
+                        }
                     }
                     Err(err) => {
                         wasm_rs_dbg::dbg!(storage.get_string(eframe::APP_KEY));
@@ -820,9 +825,13 @@ impl HyperApp {
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
             if let Some(s) = storage.get_string(eframe::APP_KEY) {
-                match serde_json::from_str(&s) {
+                match serde_json::from_str::<HyperApp>(&s) {
                     Ok(_r) => {
-                        r = _r;
+                        if _r.persistance {
+                            r = _r;
+                        } else {
+                            r = HyperApp::default()
+                        }
                     }
                     Err(err) => {
                         wasm_rs_dbg::dbg!(storage.get_string(eframe::APP_KEY));
@@ -2114,14 +2123,24 @@ pub(crate) fn show_project_selection(ui: &mut egui::Ui, data: &mut AppData) {
 }
 
 impl eframe::App for HyperApp {
-    /// Called by the frame work to save state before shutdown.
+    /// Called by the framework to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         if !self.persistance {
             if let Some(s) = storage.get_string(eframe::APP_KEY) {
                 match serde_json::from_str::<HyperApp>(&s) {
-                    Ok(r) => {
-                        if !r.persistance {
+                    Ok(mut r) => {
+                        if r.persistance {
+                            log::info!("disabling persistence");
                             self.save_interval = std::time::Duration::from_secs(20);
+                            r.persistance = false;
+                            match serde_json::to_string(&r) {
+                                Ok(s) => {
+                                    storage.set_string(eframe::APP_KEY, s);
+                                }
+                                Err(err) => {
+                                    log::debug!("Failed to encode RON: {err}");
+                                }
+                            }
                             return;
                         }
                     }
@@ -2131,6 +2150,8 @@ impl eframe::App for HyperApp {
                     }
                 }
             }
+            self.save_interval = std::time::Duration::from_secs(20);
+            return;
             // let r: Option<HyperApp> = eframe::get_value(storage, eframe::APP_KEY);
             // if let Some(r) = r {
             //     if !r.persistance {
@@ -2155,11 +2176,11 @@ impl eframe::App for HyperApp {
                 storage.set_string(eframe::APP_KEY, s);
             }
             Err(err) => {
-                log::debug!("Failed to decode RON: {err}");
+                log::debug!("Failed to encode RON: {err}");
                 // storage.set_string(eframe::APP_KEY, s)
             }
         }
-        self.save_interval = std::time::Duration::from_secs(20);
+        self.save_interval = std::time::Duration::from_secs(5);
         // eframe::set_value(storage, eframe::APP_KEY, self);
     }
     /// Time between automatic calls to [`Self::save`]

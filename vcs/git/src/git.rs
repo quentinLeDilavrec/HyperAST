@@ -6,6 +6,7 @@ use std::{
 };
 
 pub use git2::Error;
+pub use git2::ErrorCode;
 pub use git2::Oid;
 pub use git2::Repository;
 use git2::{RemoteCallbacks, Revwalk, TreeEntry};
@@ -357,12 +358,13 @@ pub fn fetch_github_repository(repo_name: &str) -> Repository {
     fetch_repository(url, path)
 }
 
-pub fn fetch_fork(mut x: git2::Remote, head: &str) -> Result<(), git2::Error> {
+pub fn fetch_remote(mut x: git2::Remote, head: &str) -> Result<(), git2::Error> {
+    let name = x.name().unwrap_or("").to_string();
     let mut callbacks = RemoteCallbacks::new();
-
-    callbacks.transfer_progress(|x| {
+    callbacks.transfer_progress(move |x| {
         log::info!(
-            "fork transfer {}/{}",
+            "{}/{head} transfer {}/{}",
+            name,
             x.received_objects(),
             x.total_objects()
         );

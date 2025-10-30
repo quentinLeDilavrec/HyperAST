@@ -70,6 +70,7 @@ pub(crate) fn added_deleted(
 
     let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &src_tr, &dst_tr);
 
+    let mut updated = hashbrown::HashSet::<u32>::default();
     let mapped = {
         let mappings_cache = &state.mappings_alone;
         use hyper_diff::matchers::mapping_store::MappingStore;
@@ -168,9 +169,24 @@ pub(crate) fn added_deleted(
                     mapper.mapping.src_arena.len(),
                     mapper.mapping.dst_arena.len(),
                 );
-                matching::full2(&mut mapper);
+                matching::full2_gumtree_simple(&mut mapper);
                 let vec_store = mapper.mappings.clone();
 
+                for (i, x) in vec_store.src_to_dst.iter().enumerate() {
+                    if *x == 0 {
+                        continue;
+                    }
+                    let s = mapper.src_arena.original(&(i as u32));
+                    use hyperast::types::Labeled;
+                    let s = hyperast.resolve(&s);
+                    let s = s.try_get_label();
+                    let d = mapper.dst_arena.original(&(x - 1));
+                    let d = hyperast.resolve(&d);
+                    let d = d.try_get_label();
+                    if s != d {
+                        updated.insert(i as u32);
+                    }
+                }
                 dbg!();
                 entry
                     .insert((crate::MappingStage::Bottomup, vec_store))
@@ -181,22 +197,28 @@ pub(crate) fn added_deleted(
     let unmapped_dst: Vec<_> = global_pos_with_spaces(
         &repositories.processor.main_stores,
         dst_tr,
-        mapped
-            .1
-            .dst_to_src
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| if *x == 0 { Some(i as u32) } else { None }),
+        (mapped.1.dst_to_src.iter().enumerate()).filter_map(|(i, x)| {
+            if *x == 0 {
+                Some(i as u32)
+            } else if updated.contains(&(x - 1)) {
+                Some(i as u32)
+            } else {
+                None
+            }
+        }),
     );
     let unmapped_src: Vec<_> = global_pos_with_spaces(
         &repositories.processor.main_stores,
         src_tr,
-        mapped
-            .1
-            .src_to_dst
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| if *x == 0 { Some(i as u32) } else { None }),
+        (mapped.1.src_to_dst.iter().enumerate()).filter_map(|(i, x)| {
+            if *x == 0 {
+                Some(i as u32)
+            } else if updated.contains(&(i as u32)) {
+                Some(i as u32)
+            } else {
+                None
+            }
+        }),
     );
 
     Ok((

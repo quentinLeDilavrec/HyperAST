@@ -425,7 +425,11 @@ fn compute_mappings_full<'store, 'alone, 'trees, 'mapper, 'rest, 's: 'trees>(
             };
 
             let now = std::time::Instant::now();
-            matching::bottom_up_hiding(hyperast, &mm, mapper);
+
+            // matching::bottom_up_hiding(hyperast, &mm, mapper);
+
+            hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
+            hyper_diff::matchers::heuristic::gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher::<_, mapping_store::VecStore<_>, 200>::execute(mapper);
             let bottom_up_hiding_t = now.elapsed().as_secs_f64();
             dbg!(bottom_up_hiding_t);
 

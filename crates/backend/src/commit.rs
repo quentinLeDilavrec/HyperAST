@@ -149,7 +149,7 @@ pub fn add_remote(_state: SharedState, path: ParamRemote) -> Result<(), String> 
     match r {
         Ok(x) => {
             log::error!("{:?}", &head);
-            hyperast_vcs_git::git::fetch_fork(x, &head).unwrap();
+            hyperast_vcs_git::git::fetch_remote(x, &head).unwrap();
             Ok(())
         }
         Err(e) => {

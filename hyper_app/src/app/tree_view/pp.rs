@@ -34,9 +34,11 @@ fn subtree_to_layout(
     store: &FetchedHyperAST,
     theme: &CodeTheme,
     nid: NodeIdentifier,
+    size: f32,
+    color: egui::Color32,
 ) -> (usize, Vec<LayoutSection>) {
     // let read = store.read();
-    match Layouter::<_, _>::new(&store.read(), nid, theme).compute() {
+    match Layouter::<_, _>::new(&store.read(), nid, theme, size, color).compute() {
         Err(IndentedAlt::FmtError) => panic!(),
         Err(IndentedAlt::NoIndent) => panic!(),
         Ok(x) => x,
@@ -48,6 +50,8 @@ pub(crate) fn make_pp_code(
     ctx: &egui::Context,
     nid: NodeIdentifier,
     theme: CodeTheme,
+    size: f32,
+    color: egui::Color32,
 ) -> epaint::text::LayoutJob {
     #[derive(Default)]
     struct PrettyPrinter {}
@@ -59,14 +63,23 @@ pub(crate) fn make_pp_code(
 
     type PPCache = cache::FrameCache<String, PrettyPrinter>;
 
+    type Param<'a> = (
+        Arc<FetchedHyperAST>,
+        &'a CodeTheme,
+        NodeIdentifier,
+        usize,
+        Size,
+        egui::Color32,
+    );
+
     let code = ctx.memory_mut(|mem| mem.caches.cache::<PPCache>().get((store.as_ref(), nid)));
     #[derive(Default)]
     struct Spawnr {}
-    impl Spawner<(Arc<FetchedHyperAST>, &CodeTheme, NodeIdentifier, usize), Layouter> for Spawnr {
+    impl Spawner<Param<'_>, Layouter> for Spawnr {
         fn spawn(
             &self,
             ctx: &egui::Context,
-            (_store, _theme, _id, len): (Arc<FetchedHyperAST>, &CodeTheme, NodeIdentifier, usize),
+            (_store, _theme, _id, len, size, color): Param<'_>,
         ) -> Layouter {
             Layouter {
                 ctx: ctx.clone(),
@@ -87,17 +100,15 @@ pub(crate) fn make_pp_code(
         i: usize,
         total_str_len: usize,
     }
+
     impl
-        syntax_highlighting_async::cache::IncrementalComputer<
-            Spawnr,
-            (Arc<FetchedHyperAST>, &CodeTheme, NodeIdentifier, usize),
-            Vec<LayoutSection>,
-        > for Layouter
+        syntax_highlighting_async::cache::IncrementalComputer<Spawnr, Param<'_>, Vec<LayoutSection>>
+        for Layouter
     {
         fn increment(
             &mut self,
             _spawner: &Spawnr,
-            (store, theme, id, len): (Arc<FetchedHyperAST>, &CodeTheme, NodeIdentifier, usize),
+            (store, theme, id, len, size, color): Param<'_>,
         ) -> Vec<LayoutSection> {
             let theme = theme.clone();
             assert_eq!(len, self.total_str_len);
@@ -105,7 +116,8 @@ pub(crate) fn make_pp_code(
                 let h = self.queued.clone();
                 let ctx = self.ctx.clone();
                 let fut = move || {
-                    let (len, sections) = subtree_to_layout(store.as_ref(), &theme, id);
+                    let (len, sections) =
+                        subtree_to_layout(store.as_ref(), &theme, id, size.0, color);
                     h.1.push(sections);
                     h.0.store(len, Ordering::Relaxed);
                     ctx.request_repaint_after(Duration::from_millis(10));
@@ -117,7 +129,8 @@ pub(crate) fn make_pp_code(
                     leading_space: 0.0,
                     byte_range: 0..self.total_str_len,
                     format: TextFormat {
-                        font_id: egui::FontId::monospace(12.0),
+                        font_id: egui::FontId::monospace(size.0),
+                        color,
                         ..Default::default()
                     },
                 }]
@@ -125,7 +138,7 @@ pub(crate) fn make_pp_code(
                 self.i = self.queued.as_ref().0.load(Ordering::Relaxed);
                 for _ in 0..self.queued.as_ref().1.len() {
                     let sections = self.queued.as_ref().1.pop();
-                    if let Some(sections) = sections {
+                    if let Some(mut sections) = sections {
                         self.sections.extend_from_slice(&sections);
                     }
                 }
@@ -136,7 +149,8 @@ pub(crate) fn make_pp_code(
                         leading_space: 0.0,
                         byte_range: self.i..self.total_str_len,
                         format: TextFormat {
-                            font_id: egui::FontId::monospace(12.0),
+                            font_id: egui::FontId::monospace(size.0),
+                            color,
                             ..Default::default()
                         },
                     })
@@ -153,9 +167,10 @@ pub(crate) fn make_pp_code(
     type HCache = syntax_highlighting_async::cache::IncrementalCache<Layouter, Spawnr>;
 
     let sections = ctx.memory_mut(|mem| {
-        mem.caches
-            .cache::<HCache>()
-            .get(ctx, (store.clone(), &theme, nid, code.len()))
+        mem.caches.cache::<HCache>().get(
+            ctx,
+            (store.clone(), &theme, nid, code.len(), Size(size), color),
+        )
     });
 
     let layout_job = epaint::text::LayoutJob {
@@ -164,4 +179,12 @@ pub(crate) fn make_pp_code(
         ..epaint::text::LayoutJob::default()
     };
     layout_job
+}
+
+#[derive(Clone)]
+struct Size(f32);
+impl std::hash::Hash for Size {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
 }

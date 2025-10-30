@@ -13,33 +13,42 @@ pub struct Layouter<'a, 'b, IdN, HAST, const SPC: bool = false> {
     root: IdN,
     root_indent: &'static str,
     theme: &'b CodeTheme,
+    size: f32,
+    color: egui::Color32,
 }
 
 impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC> {
-    pub fn new(stores: &'store HAST, root: IdN, theme: &'b CodeTheme) -> Self {
+    pub fn new(
+        stores: &'store HAST,
+        root: IdN,
+        theme: &'b CodeTheme,
+        size: f32,
+        color: egui::Color32,
+    ) -> Self {
         Self {
             stores,
             root,
             root_indent: "\n",
             theme,
+            size,
+            color,
         }
     }
 }
 
-fn make_section(
-    theme: &CodeTheme,
-    out: &mut Vec<LayoutSection>,
+struct Frmt {
     format: TokenType,
-    offset: usize,
-    end: usize,
-) {
-    let mut format = theme.formats[format].clone();
-    format.font_id = egui::FontId::monospace(12.0);
-    out.push(LayoutSection {
-        leading_space: 0.0,
-        byte_range: offset..end.clone(),
-        format,
-    });
+    size: f32,
+    color: egui::Color32,
+}
+
+impl Frmt {
+    fn with(self, theme: &CodeTheme) -> egui::TextFormat {
+        let mut format = theme.formats[self.format].clone();
+        format.font_id = egui::FontId::monospace(self.size);
+        format.color = format.color.blend(self.color);
+        format
+    }
 }
 
 impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC>
@@ -79,8 +88,12 @@ where
                 let s = Space::format_indentation(s.as_bytes());
                 let b: String = s.iter().map(|x| x.to_string()).collect();
                 let end = *offset + len;
-                let format = TokenType::Punctuation;
-                make_section(self.theme, out, format, *offset, end);
+                let format = self.frmt(TokenType::Punctuation);
+                out.push(LayoutSection {
+                    leading_space: 0.0,
+                    byte_range: *offset..end.clone(),
+                    format: format.with(self.theme),
+                });
                 *offset = end;
                 if b.contains("\n") {
                     b
@@ -98,8 +111,12 @@ where
                 // out.write_str(&kind.to_string()).unwrap();
                 let len = kind.to_string().len();
                 let end = *offset + len;
-                let format = TokenType::Keyword;
-                make_section(self.theme, out, format, *offset, end);
+                let format = self.frmt(TokenType::Keyword);
+                out.push(LayoutSection {
+                    leading_space: 0.0,
+                    byte_range: *offset..end.clone(),
+                    format: format.with(self.theme),
+                });
                 *offset = end;
             }
             (label, Some(children)) => {
@@ -128,11 +145,23 @@ where
                 let s = self.stores.label_store().resolve(label);
                 let len = s.len();
                 let end = *offset + len;
-                let format = TokenType::Punctuation;
-                make_section(self.theme, out, format, *offset, end);
+                let format = self.frmt(TokenType::Punctuation);
+                out.push(LayoutSection {
+                    leading_space: 0.0,
+                    byte_range: *offset..end.clone(),
+                    format: format.with(self.theme),
+                });
                 *offset = end;
             }
         };
         Err(IndentedAlt::NoIndent)
+    }
+
+    fn frmt(&self, format: TokenType) -> Frmt {
+        Frmt {
+            format,
+            size: self.size,
+            color: self.color,
+        }
     }
 }

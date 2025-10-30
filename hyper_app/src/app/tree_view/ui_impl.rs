@@ -722,11 +722,38 @@ impl<'a> FetchedViewImpl<'a> {
     }
 
     fn show_pp(&mut self, ui: &mut egui::Ui, nid: NodeIdentifier) -> Action {
+        let mut size = 12.0;
+        let mut color = ui.style().visuals.text_color().gamma_multiply(0.0);
+        if let Some(gp) = &self.global_pos {
+            if self.additions.is_some() || self.deletions.is_some() {
+                let add = self.additions.unwrap_or_default();
+                let del = self.deletions.unwrap_or_default();
+                if add.is_empty() && del.is_empty() {
+                    size = 9.0;
+                    color = ui.style().visuals.text_color().gamma_multiply(0.7);
+                } else if add.last() == Some(gp) {
+                    if del.last() == Some(gp) {
+                        color = egui::Color32::DARK_BLUE.gamma_multiply(0.2);
+                    } else {
+                        color = egui::Color32::DARK_GREEN.gamma_multiply(0.2);
+                    }
+                } else if del.last() == Some(gp) {
+                    color = egui::Color32::DARK_RED.gamma_multiply(0.2);
+                } else if add.is_empty() {
+                    color = egui::Color32::DARK_RED.gamma_multiply(0.3);
+                } else if del.is_empty() {
+                    color = egui::Color32::DARK_GREEN.gamma_multiply(0.3);
+                } else {
+                    color = egui::Color32::DARK_BLUE.gamma_multiply(0.3);
+                }
+            }
+        }
+
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
         let min = ui.available_rect_before_wrap().min;
         let theme = syntax_highlighter::simple::CodeTheme::from_memory(ui.ctx());
         // TODO fetch entire subtree, line breaks would also be useful
-        let layout_job = make_pp_code(self.store.clone(), ui.ctx(), nid, theme);
+        let layout_job = make_pp_code(self.store.clone(), ui.ctx(), nid, theme, size, color);
         let galley = ui.fonts(|f| f.layout_job(layout_job));
 
         let size = galley.size();

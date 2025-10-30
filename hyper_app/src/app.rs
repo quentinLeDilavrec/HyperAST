@@ -1063,8 +1063,14 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         let theme = egui_addon::syntax_highlighting::simple::CodeTheme::from_memory(
                             ui.ctx(),
                         );
-                        let layout_job =
-                            make_pp_code(self.data.store.clone(), ui.ctx(), *nid, theme);
+                        let layout_job = make_pp_code(
+                            self.data.store.clone(),
+                            ui.ctx(),
+                            *nid,
+                            theme,
+                            6.0,
+                            egui::Color32::BLACK,
+                        );
                         let galley = ui.fonts(|f| f.layout_job(layout_job));
                         let size = galley.size();
                         let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());

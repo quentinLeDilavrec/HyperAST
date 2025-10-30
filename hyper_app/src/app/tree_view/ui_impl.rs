@@ -75,7 +75,6 @@ impl<'a> FetchedViewImpl<'a> {
 
         self.draw_count += 1;
         let id = ui.id().with(&self.path);
-        // let id = ui.make_persistent_id("my_collapsing_header");
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
         if self.focus.is_some() {
@@ -109,7 +108,9 @@ impl<'a> FetchedViewImpl<'a> {
                 };
                 let mut label = egui::RichText::new(label);
                 let ret = {
-                    let text = format!("{}: ", kind);
+                    let text = format!("{} ", kind);
+                    let add = self.additions.unwrap_or_default();
+                    let del = self.deletions.unwrap_or_default();
                     let mut rt = egui::RichText::new(text).monospace();
                     if let Some(gp) = &self.global_pos {
                         if self.additions.is_some() || self.deletions.is_some() {
@@ -128,54 +129,37 @@ impl<'a> FetchedViewImpl<'a> {
                                     rt = rt.color(egui::Color32::DARK_GREEN);
                                 }
                             } else if del.last() == Some(gp) {
-                                // rt = rt.strikethrough();
                                 rt = rt.color(egui::Color32::DARK_RED);
+                            } else if add.is_empty() {
+                                rt = rt.color(egui::Color32::DARK_RED.gamma_multiply(1.3));
+                            } else if del.is_empty() {
+                                rt = rt.color(egui::Color32::DARK_GREEN.gamma_multiply(1.3));
+                            } else {
+                                rt = rt.color(egui::Color32::DARK_BLUE.gamma_multiply(1.3));
                             }
                         }
                     }
-                    // if self
-                    //     .additions
-                    //     .map_or(false, |x| x.contains(&self.global_pos))
-                    // {
-                    //     if self
-                    //         .deletions
-                    //         .map_or(false, |x| x.contains(&self.global_pos))
-                    //     {
-                    //         rt = rt.color(egui::Color32::BLUE);
-                    //     } else {
-                    //         rt = rt.color(egui::Color32::GREEN);
-                    //     }
-                    // } else if self
-                    //     .deletions
-                    //     .map_or(false, |x| x.contains(&self.global_pos))
-                    // {
-                    //     rt = rt.color(egui::Color32::RED);
-                    // }
-                    ui.label(rt)
-                }
-                // .context_menu(|ui| {
-                //     ui.label(format!("{:?}", cs));
-                //     ui.label(format!("{:?}", self.path));
-                // })
-                ;
+                    let r = ui.label(rt);
+
+                    if !add.is_empty() {
+                        let mut rt_adds = egui::RichText::new(format!("+{}", add.len()))
+                            .monospace()
+                            .color(egui::Color32::GREEN);
+                        ui.label(rt_adds);
+                    }
+                    if !del.is_empty() {
+                        let mut rt_dels = egui::RichText::new(format!("-{} ", del.len()))
+                            .monospace()
+                            .color(egui::Color32::RED);
+                        ui.label(rt_dels);
+                    }
+                    r
+                };
                 ui.label(label);
                 ret
             })
             .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size)))
             .into();
-        // let show = egui::CollapsingHeader::new(format!("{}: {}", kind, label))
-        //     .id_source(id)
-        //     .default_open(depth < 1)
-        //     .show(ui, |ui| {
-        //         if egui::collapsing_header::CollapsingState::load(ui.ctx(), id).map_or(false, |x|x.is_open()) {
-        //             let o = self.store.both.cs_ofs[nid] as usize;
-        //             let cs = &self.store.both.children[o..o + self.store.both.cs_lens[nid] as usize]
-        //                 .to_vec();
-        //             self.children_ui(ui, depth, cs)
-        //         } else {
-        //             Action::Keep
-        //         }
-        //     });
 
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
         prefill.head = show.header_response.rect.height();
@@ -268,6 +252,12 @@ impl<'a> FetchedViewImpl<'a> {
                             } else if del.last() == Some(gp) {
                                 // rt = rt.underline();
                                 rt = rt.color(egui::Color32::DARK_RED);
+                            } else if add.is_empty() {
+                                rt = rt.color(egui::Color32::DARK_RED.gamma_multiply(1.3));
+                            } else if del.is_empty() {
+                                rt = rt.color(egui::Color32::DARK_GREEN.gamma_multiply(1.3));
+                            } else {
+                                rt = rt.color(egui::Color32::DARK_BLUE.gamma_multiply(1.3));
                             }
                         }
                     }
@@ -387,7 +377,7 @@ impl<'a> FetchedViewImpl<'a> {
                     break;
                 }
                 if add[i] == gp {
-                    end = i + 1;
+                    end = i;
                     break;
                 }
                 if add[i] > gp {
@@ -423,7 +413,7 @@ impl<'a> FetchedViewImpl<'a> {
                     break;
                 }
                 if del[i] == gp {
-                    end = i + 1;
+                    end = i;
                     break;
                 }
                 if del[i] > gp {
@@ -549,18 +539,11 @@ impl<'a> FetchedViewImpl<'a> {
                 .replace("\t", "\\t")
                 .replace(" ", "·")
         } else {
-            if !self
-                .store
-                .labels_pending
-                .lock()
-                .unwrap()
+            if !(self.store.labels_pending.lock().unwrap())
                 .iter()
                 .any(|x| x.contains(&label))
             {
-                self.store
-                    .labels_waiting
-                    .lock()
-                    .unwrap()
+                (self.store.labels_waiting.lock().unwrap())
                     .get_or_insert(Default::default())
                     .insert(label);
             }
@@ -569,11 +552,7 @@ impl<'a> FetchedViewImpl<'a> {
         let action;
         let rect = if label.len() > 50 {
             if kind.is_spaces() {
-                let monospace = ui.monospace(format!("{}: ", kind))
-                // .context_menu(|ui| {
-                //     ui.label(format!("{:?}", self.path));
-                // })
-                ;
+                let monospace = ui.monospace(format!("{}: ", kind));
                 let interact = monospace.interact(egui::Sense::click_and_drag());
                 action = if interact.drag_stopped() {
                     show_node_menu(ui, interact, kind).unwrap_or_default()
@@ -601,7 +580,6 @@ impl<'a> FetchedViewImpl<'a> {
                                     rt = rt.color(egui::Color32::GREEN);
                                 }
                             } else if del.binary_search(gp).is_ok() {
-                                rt = rt.underline();
                                 rt = rt.color(egui::Color32::RED);
                             } else {
                                 label = label.size(8.0);
@@ -609,6 +587,11 @@ impl<'a> FetchedViewImpl<'a> {
                                 rt = rt.size(8.0);
                                 rt = rt.color(egui::Color32::GRAY);
                             }
+                        } else {
+                            label = label.size(8.0);
+                            label = label.color(egui::Color32::GRAY);
+                            rt = rt.size(8.0);
+                            rt = rt.color(egui::Color32::GRAY);
                         }
                     }
                     ui.label(rt).interact(egui::Sense::click_and_drag())
@@ -656,7 +639,6 @@ impl<'a> FetchedViewImpl<'a> {
                                     rt = rt.color(egui::Color32::GREEN);
                                 }
                             } else if del.binary_search(gp).is_ok() {
-                                rt = rt.underline();
                                 rt = rt.color(egui::Color32::RED);
                             } else {
                                 label = label.size(8.0);

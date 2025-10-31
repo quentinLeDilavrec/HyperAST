@@ -54,6 +54,32 @@ impl<U, V>
     }
 }
 
+struct ChangeColor {
+    add: egui::Color32,
+    del: egui::Color32,
+    both: egui::Color32,
+}
+
+impl ChangeColor {
+    fn select(&self, is_add: bool, is_del: bool) -> Option<egui::Color32> {
+        if is_add && is_del {
+            Some(self.both)
+        } else if is_add {
+            Some(self.add)
+        } else if is_del {
+            Some(self.del)
+        } else {
+            None
+        }
+    }
+}
+
+const CC: ChangeColor = ChangeColor {
+    add: egui::Color32::GREEN,
+    del: egui::Color32::RED,
+    both: egui::Color32::from_rgb(200, 200, 0),
+};
+
 impl<'a> FetchedViewImpl<'a> {
     pub(super) fn ui_both_impl(
         &mut self,
@@ -89,74 +115,46 @@ impl<'a> FetchedViewImpl<'a> {
                 let label = if let Some(label) = label_store.try_resolve(&label) {
                     label
                 } else {
-                    if !self
-                        .store
-                        .labels_pending
-                        .lock()
-                        .unwrap()
+                    if !(self.store.labels_pending.lock().unwrap())
                         .iter()
                         .any(|x| x.contains(&label))
                     {
-                        self.store
-                            .labels_waiting
-                            .lock()
-                            .unwrap()
+                        (self.store.labels_waiting.lock().unwrap())
                             .get_or_insert(Default::default())
                             .insert(label);
                     }
                     "..."
                 };
                 let mut label = egui::RichText::new(label);
-                let ret = {
-                    let text = format!("{} ", kind);
-                    let add = self.additions.unwrap_or_default();
-                    let del = self.deletions.unwrap_or_default();
-                    let mut rt = egui::RichText::new(text).monospace();
-                    if let Some(gp) = &self.global_pos {
-                        if self.additions.is_some() || self.deletions.is_some() {
-                            let add = self.additions.unwrap_or_default();
-                            let del = self.deletions.unwrap_or_default();
-                            // wasm_rs_dbg::dbg!(add, del);
-                            if add.is_empty() && del.is_empty() {
-                                label = label.size(8.0);
-                                label = label.color(egui::Color32::GRAY);
-                                rt = rt.size(8.0);
-                                rt = rt.color(egui::Color32::GRAY);
-                            } else if add.last() == Some(gp) {
-                                if del.last() == Some(gp) {
-                                    rt = rt.color(egui::Color32::DARK_BLUE);
-                                } else {
-                                    rt = rt.color(egui::Color32::DARK_GREEN);
-                                }
-                            } else if del.last() == Some(gp) {
-                                rt = rt.color(egui::Color32::DARK_RED);
-                            } else if add.is_empty() {
-                                rt = rt.color(egui::Color32::DARK_RED.gamma_multiply(1.3));
-                            } else if del.is_empty() {
-                                rt = rt.color(egui::Color32::DARK_GREEN.gamma_multiply(1.3));
-                            } else {
-                                rt = rt.color(egui::Color32::DARK_BLUE.gamma_multiply(1.3));
-                            }
-                        }
-                    }
-                    let r = ui.label(rt);
-
-                    if !add.is_empty() {
-                        let mut rt_adds = egui::RichText::new(format!("+{}", add.len()))
-                            .monospace()
-                            .color(egui::Color32::GREEN);
-                        ui.label(rt_adds);
-                    }
-                    if !del.is_empty() {
-                        let mut rt_dels = egui::RichText::new(format!("-{} ", del.len()))
-                            .monospace()
-                            .color(egui::Color32::RED);
-                        ui.label(rt_dels);
-                    }
-                    r
+                let text = format!("{} ", kind);
+                let no_change = self.additions.is_none() && self.deletions.is_none();
+                let add = self.additions.unwrap_or_default();
+                let del = self.deletions.unwrap_or_default();
+                let rt = egui::RichText::new(text).monospace();
+                let gp = self.global_pos.as_ref();
+                let rt = if no_change || gp.is_none() {
+                    rt
+                } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
+                    rt.color(c.gamma_multiply(0.95))
+                } else if let Some(c) = CC.select(!add.is_empty(), !del.is_empty()) {
+                    rt.color(c.gamma_multiply(0.8))
+                } else {
+                    label = label.size(8.0).color(egui::Color32::GRAY);
+                    rt.size(8.0).color(egui::Color32::GRAY)
                 };
+
+                let r = ui.label(rt);
+
+                if !add.is_empty() {
+                    let mut rt_adds = egui::RichText::new(format!("+{}", add.len())).color(CC.add);
+                    ui.label(rt_adds.monospace());
+                }
+                if !del.is_empty() {
+                    let mut rt_dels = egui::RichText::new(format!("-{} ", del.len())).color(CC.del);
+                    ui.label(rt_dels.monospace());
+                }
                 ui.label(label);
-                ret
+                r
             })
             .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size)))
             .into();
@@ -221,7 +219,7 @@ impl<'a> FetchedViewImpl<'a> {
 
         self.additions_deletions_compute(size);
         if self.is_pp(kind) {
-            let action = self.show_pp(ui, nid);
+            let action = self.show_pp(ui, nid, size);
             return action;
         }
 
@@ -234,65 +232,23 @@ impl<'a> FetchedViewImpl<'a> {
             .show_header(ui, |ui| {
                 // ui.label(format!("{}: {}", kind, label));
                 {
-                    let text = format!("{}: ", kind);
-                    let mut rt = egui::RichText::new(text).monospace();
-                    if let Some(gp) = &self.global_pos {
-                        if self.additions.is_some() || self.deletions.is_some() {
-                            let add = self.additions.unwrap_or_default();
-                            let del = self.deletions.unwrap_or_default();
-                            if add.is_empty() && del.is_empty() {
-                                rt = rt.size(8.0);
-                                rt = rt.color(egui::Color32::GRAY);
-                            } else if add.last() == Some(gp) {
-                                if del.last() == Some(gp) {
-                                    rt = rt.color(egui::Color32::DARK_BLUE);
-                                } else {
-                                    rt = rt.color(egui::Color32::DARK_GREEN);
-                                }
-                            } else if del.last() == Some(gp) {
-                                // rt = rt.underline();
-                                rt = rt.color(egui::Color32::DARK_RED);
-                            } else if add.is_empty() {
-                                rt = rt.color(egui::Color32::DARK_RED.gamma_multiply(1.3));
-                            } else if del.is_empty() {
-                                rt = rt.color(egui::Color32::DARK_GREEN.gamma_multiply(1.3));
-                            } else {
-                                rt = rt.color(egui::Color32::DARK_BLUE.gamma_multiply(1.3));
-                            }
-                        }
-                    }
-                    // if self
-                    //     .additions
-                    //     .map_or(false, |x| x.contains(&self.global_pos))
-                    // {
-                    //     if self
-                    //         .deletions
-                    //         .map_or(false, |x| x.contains(&self.global_pos))
-                    //     {
-                    //         rt = rt.color(egui::Color32::BLUE);
-                    //     } else {
-                    //         rt = rt.color(egui::Color32::GREEN);
-                    //     }
-                    // } else if self
-                    //     .deletions
-                    //     .map_or(false, |x| x.contains(&self.global_pos))
-                    // {
-                    //     rt = rt.color(egui::Color32::RED);
-                    // }
+                    let no_change = self.additions.is_none() && self.deletions.is_none();
+                    let add = self.additions.unwrap_or_default();
+                    let del = self.deletions.unwrap_or_default();
+                    let text = format!("{}: ({},{})", kind, add.len(), del.len());
+                    let rt = egui::RichText::new(text).monospace();
+                    let gp = self.global_pos.as_ref();
+                    let rt = if no_change || gp.is_none() {
+                        rt
+                    } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
+                        rt.color(c.gamma_multiply(0.95))
+                    } else if let Some(c) = CC.select(!add.is_empty(), !del.is_empty()) {
+                        rt.color(c.gamma_multiply(0.8))
+                    } else {
+                        rt.size(8.0).color(egui::Color32::GRAY)
+                    };
                     ui.label(rt)
                 }
-                // .context_menu(|ui| {
-                //     ui.label(format!("{:?}", self.path));
-
-                //     if let Some(gp) = &self.global_pos {
-                //         if self.additions.is_some() || self.deletions.is_some() {
-                //             let add = self.additions.unwrap_or_default();
-                //             let del = self.deletions.unwrap_or_default();
-                //             ui.label(format!("{:?}", add));
-                //             ui.label(format!("{:?}", del));
-                //         }
-                //     }
-                // })
             })
             .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size)))
             .into();
@@ -519,7 +475,7 @@ impl<'a> FetchedViewImpl<'a> {
         &mut self,
         ui: &mut egui::Ui,
         kind: AnyType,
-        _size: u32,
+        size: u32,
         nid: NodeIdentifier,
         label: LabelIdentifier,
     ) -> Action {
@@ -530,8 +486,9 @@ impl<'a> FetchedViewImpl<'a> {
         let min = ui.available_rect_before_wrap().min;
         self.draw_count += 1;
         let id = ui.id().with(&self.path);
+        self.additions_deletions_compute(size);
         if self.is_pp(kind) {
-            let action = self.show_pp(ui, nid);
+            let action = self.show_pp(ui, nid, size);
             return action;
         }
         let label = if let Some(get) = self.store.label_store.read().unwrap().try_resolve(&label) {
@@ -549,11 +506,41 @@ impl<'a> FetchedViewImpl<'a> {
             }
             "...".to_string()
         };
+        let no_change = self.additions.is_none() && self.deletions.is_none();
+        let add = self.additions.unwrap_or_default();
+        let del = self.deletions.unwrap_or_default();
+        let gp = self.global_pos.as_ref();
+        let (color, size) = if no_change || gp.is_none() {
+            (None, None)
+        } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
+            (Some(c.gamma_multiply(0.95)), None)
+        } else if let Some(c) = gp.and_then(|gp| {
+            CC.select(
+                *add.first().unwrap_or(&u32::MAX) <= *gp + size,
+                *del.first().unwrap_or(&u32::MAX) <= *gp + size,
+                // add.binary_search(gp).is_ok(),
+                // del.binary_search(gp).is_ok()
+            )
+        }) {
+            (Some(c.gamma_multiply(0.8)), None)
+        } else {
+            (Some(egui::Color32::GRAY), Some(8.0))
+        };
+
         let action;
         let rect = if label.len() > 50 {
             if kind.is_spaces() {
-                let monospace = ui.monospace(format!("{}: ", kind));
-                let interact = monospace.interact(egui::Sense::click_and_drag());
+                let text = format!("{}: ", kind);
+                let mut rt = egui::RichText::new(text).monospace();
+                if let Some(color) = color {
+                    rt = rt.color(color);
+                }
+                if let Some(size) = size {
+                    rt = rt.size(size);
+                }
+
+                let interact = ui.label(rt).interact(egui::Sense::click_and_drag());
+                let rect1 = interact.rect;
                 action = if interact.drag_stopped() {
                     show_node_menu(ui, interact, kind).unwrap_or_default()
                 } else if interact.clicked() {
@@ -561,38 +548,35 @@ impl<'a> FetchedViewImpl<'a> {
                 } else {
                     show_node_menu(ui, interact, kind).unwrap_or_default()
                 };
-                let rect1 = monospace.rect;
                 let rect2 = ui.label(format!("{}", label)).rect;
                 rect1.union(rect2)
             } else {
-                let mut label = egui::RichText::new(label);
+                let mut label = egui::RichText::new(label).monospace();
                 let monospace = {
+                    // let no_change = self.additions.is_none() && self.deletions.is_none();
+                    // let add = self.additions.unwrap_or_default();
+                    // let del = self.deletions.unwrap_or_default();
+                    // let gp = self.global_pos.as_ref();
                     let text = format!("{}: ", kind);
                     let mut rt = egui::RichText::new(text).monospace();
-                    if let Some(gp) = &self.global_pos {
-                        if self.additions.is_some() || self.deletions.is_some() {
-                            let add = self.additions.unwrap_or_default();
-                            let del = self.deletions.unwrap_or_default();
-                            if add.binary_search(gp).is_ok() {
-                                if del.last() == Some(gp) {
-                                    rt = rt.color(egui::Color32::BLUE);
-                                } else {
-                                    rt = rt.color(egui::Color32::GREEN);
-                                }
-                            } else if del.binary_search(gp).is_ok() {
-                                rt = rt.color(egui::Color32::RED);
-                            } else {
-                                label = label.size(8.0);
-                                label = label.color(egui::Color32::GRAY);
-                                rt = rt.size(8.0);
-                                rt = rt.color(egui::Color32::GRAY);
-                            }
-                        } else {
-                            label = label.size(8.0);
-                            label = label.color(egui::Color32::GRAY);
-                            rt = rt.size(8.0);
-                            rt = rt.color(egui::Color32::GRAY);
-                        }
+                    // let rt = if no_change || gp.is_none() {
+                    //     rt
+                    // } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
+                    //     rt.color(c.gamma_multiply(0.95))
+                    // } else if let Some(c) = gp.and_then(|gp| CC.select(add.binary_search(gp).is_ok(), del.binary_search(gp).is_ok())) {
+                    //     rt.color(c.gamma_multiply(0.8))
+                    // } else {
+                    //     label = label.size(8.0);
+                    //     label = label.color(egui::Color32::GRAY);
+                    //     rt.size(8.0).color(egui::Color32::GRAY)
+                    // };
+                    if let Some(color) = color {
+                        label = label.color(color);
+                        rt = rt.color(color);
+                    }
+                    if let Some(size) = size {
+                        label = label.size(size);
+                        rt = rt.size(size);
                     }
                     ui.label(rt).interact(egui::Sense::click_and_drag())
                 }
@@ -628,25 +612,33 @@ impl<'a> FetchedViewImpl<'a> {
                     let text = format!("{}: ", kind);
                     let mut label = egui::RichText::new(label);
                     let mut rt = egui::RichText::new(text).monospace();
-                    if let Some(gp) = &self.global_pos {
-                        if self.additions.is_some() || self.deletions.is_some() {
-                            let add = self.additions.unwrap_or_default();
-                            let del = self.deletions.unwrap_or_default();
-                            if add.binary_search(gp).is_ok() {
-                                if del.last() == Some(gp) {
-                                    rt = rt.color(egui::Color32::BLUE);
-                                } else {
-                                    rt = rt.color(egui::Color32::GREEN);
-                                }
-                            } else if del.binary_search(gp).is_ok() {
-                                rt = rt.color(egui::Color32::RED);
-                            } else {
-                                label = label.size(8.0);
-                                label = label.color(egui::Color32::GRAY);
-                                rt = rt.size(8.0);
-                                rt = rt.color(egui::Color32::GRAY);
-                            }
-                        }
+                    // if let Some(gp) = &self.global_pos {
+                    //     if self.additions.is_some() || self.deletions.is_some() {
+                    //         let add = self.additions.unwrap_or_default();
+                    //         let del = self.deletions.unwrap_or_default();
+                    //         if add.binary_search(gp).is_ok() {
+                    //             if del.last() == Some(gp) {
+                    //                 rt = rt.color(egui::Color32::BLUE);
+                    //             } else {
+                    //                 rt = rt.color(egui::Color32::GREEN);
+                    //             }
+                    //         } else if del.binary_search(gp).is_ok() {
+                    //             rt = rt.color(egui::Color32::RED);
+                    //         } else {
+                    //             label = label.size(8.0);
+                    //             label = label.color(egui::Color32::GRAY);
+                    //             rt = rt.size(8.0);
+                    //             rt = rt.color(egui::Color32::GRAY);
+                    //         }
+                    //     }
+                    // }
+                    if let Some(color) = color {
+                        label = label.color(color);
+                        rt = rt.color(color);
+                    }
+                    if let Some(size) = size {
+                        label = label.size(size);
+                        rt = rt.size(size);
                     }
                     let interact =
                         ui.add(egui::Label::new(rt).sense(egui::Sense::click_and_drag()));
@@ -721,61 +713,62 @@ impl<'a> FetchedViewImpl<'a> {
         false
     }
 
-    fn show_pp(&mut self, ui: &mut egui::Ui, nid: NodeIdentifier) -> Action {
-        let mut size = 12.0;
-        let mut color = ui.style().visuals.text_color().gamma_multiply(0.0);
-        if let Some(gp) = &self.global_pos {
-            if self.additions.is_some() || self.deletions.is_some() {
-                let add = self.additions.unwrap_or_default();
-                let del = self.deletions.unwrap_or_default();
-                if add.is_empty() && del.is_empty() {
-                    size = 9.0;
-                    color = ui.style().visuals.text_color().gamma_multiply(0.7);
-                } else if add.last() == Some(gp) {
-                    if del.last() == Some(gp) {
-                        color = egui::Color32::DARK_BLUE.gamma_multiply(0.2);
-                    } else {
-                        color = egui::Color32::DARK_GREEN.gamma_multiply(0.2);
-                    }
-                } else if del.last() == Some(gp) {
-                    color = egui::Color32::DARK_RED.gamma_multiply(0.2);
-                } else if add.is_empty() {
-                    color = egui::Color32::DARK_RED.gamma_multiply(0.3);
-                } else if del.is_empty() {
-                    color = egui::Color32::DARK_GREEN.gamma_multiply(0.3);
-                } else {
-                    color = egui::Color32::DARK_BLUE.gamma_multiply(0.3);
-                }
-            }
-        }
+    fn show_pp(&mut self, ui: &mut egui::Ui, nid: NodeIdentifier, size: u32) -> Action {
+        let mut font = 12.0;
+
+        let tc = ui.style().visuals.code_bg_color;
+        let no_change = self.additions.is_none() && self.deletions.is_none();
+        let add = self.additions.unwrap_or_default();
+        let del = self.deletions.unwrap_or_default();
+        let gp = self.global_pos.as_ref();
+        let fg;
+        let bg;
+        if no_change || gp.is_none() {
+            fg = tc.gamma_multiply(0.0);
+            bg = egui::Color32::TRANSPARENT;
+        } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
+            fg = c; //.gamma_multiply(0.1).to_opaque();
+            bg = c.gamma_multiply(0.1);
+        } else if let Some(c) = gp.and_then(|gp| {
+            CC.select(
+                *add.first().unwrap_or(&u32::MAX) <= *gp + size,
+                *del.first().unwrap_or(&u32::MAX) <= *gp + size,
+            )
+        }) {
+            fg = c; //.gamma_multiply(0.3).to_opaque();
+            bg = c.gamma_multiply(0.05);
+        } else {
+            font = 8.0;
+            fg = tc.gamma_multiply(0.27);
+            bg = egui::Color32::TRANSPARENT;
+        };
 
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
         let min = ui.available_rect_before_wrap().min;
         let theme = syntax_highlighter::simple::CodeTheme::from_memory(ui.ctx());
         // TODO fetch entire subtree, line breaks would also be useful
-        let layout_job = make_pp_code(self.store.clone(), ui.ctx(), nid, theme, size, color);
+        let layout_job = make_pp_code(self.store.clone(), ui.ctx(), nid, theme, font, fg, bg);
         let galley = ui.fonts(|f| f.layout_job(layout_job));
 
         let size = galley.size();
         let resp = ui.allocate_exact_size(size, egui::Sense::click());
 
         let rect = egui::Rect::from_min_size(min, size);
-        if self.additions.is_some() || self.deletions.is_some() {
-            let add = self.additions.unwrap_or_default();
-            let del = self.deletions.unwrap_or_default();
-            if add.is_empty() && del.is_empty() {
-                // ui.painter().debug_rect(rect, egui::Color32::GRAY, "");
-            } else if !add.is_empty() {
-                if !del.is_empty() {
-                    ui.painter().debug_rect(rect, egui::Color32::BLUE, "");
-                } else {
-                    ui.painter().debug_rect(rect, egui::Color32::GREEN, "");
-                }
-            } else if !del.is_empty() {
-                ui.painter().debug_rect(rect, egui::Color32::RED, "");
-            }
-        }
-        let rect = rect;
+        // if self.additions.is_some() || self.deletions.is_some() {
+        //     let add = self.additions.unwrap_or_default();
+        //     let del = self.deletions.unwrap_or_default();
+        //     if add.is_empty() && del.is_empty() {
+        //         // ui.painter().debug_rect(rect, egui::Color32::GRAY, "");
+        //     } else if !add.is_empty() {
+        //         if !del.is_empty() {
+        //             ui.painter().debug_rect(rect, egui::Color32::BLUE, "");
+        //         } else {
+        //             ui.painter().debug_rect(rect, egui::Color32::GREEN, "");
+        //         }
+        //     } else if !del.is_empty() {
+        //         ui.painter().debug_rect(rect, egui::Color32::RED, "");
+        //     }
+        // }
         ui.painter_at(rect.expand(1.0))
             .galley(min, galley, egui::Color32::RED);
 

@@ -1068,8 +1068,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             ui.ctx(),
                             *nid,
                             theme,
-                            6.0,
-                            egui::Color32::BLACK,
+                            12.0,
+                            ui.style().visuals.text_color(),
+                            egui::Color32::TRANSPARENT,
                         );
                         let galley = ui.fonts(|f| f.layout_job(layout_job));
                         let size = galley.size();
@@ -2129,6 +2130,12 @@ pub(crate) fn show_project_selection(ui: &mut egui::Ui, data: &mut AppData) {
 }
 
 impl eframe::App for HyperApp {
+    fn persist_egui_memory(&self) -> bool {
+        // TODO: remove problematic state saved to persistent memory
+        // mostly long_tracking (the zone)
+        false
+    }
+
     /// Called by the framework to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         if !self.persistance {

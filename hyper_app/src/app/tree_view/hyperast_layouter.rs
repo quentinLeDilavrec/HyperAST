@@ -14,7 +14,8 @@ pub struct Layouter<'a, 'b, IdN, HAST, const SPC: bool = false> {
     root_indent: &'static str,
     theme: &'b CodeTheme,
     size: f32,
-    color: egui::Color32,
+    fg: egui::Color32,
+    bg: egui::Color32,
 }
 
 impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC> {
@@ -23,7 +24,8 @@ impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC
         root: IdN,
         theme: &'b CodeTheme,
         size: f32,
-        color: egui::Color32,
+        fg: egui::Color32,
+        bg: egui::Color32,
     ) -> Self {
         Self {
             stores,
@@ -31,7 +33,8 @@ impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC
             root_indent: "\n",
             theme,
             size,
-            color,
+            fg,
+            bg,
         }
     }
 }
@@ -39,14 +42,16 @@ impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC
 struct Frmt {
     format: TokenType,
     size: f32,
-    color: egui::Color32,
+    fg: egui::Color32,
+    bg: egui::Color32,
 }
 
 impl Frmt {
     fn with(self, theme: &CodeTheme) -> egui::TextFormat {
         let mut format = theme.formats[self.format].clone();
         format.font_id = egui::FontId::monospace(self.size);
-        format.color = format.color.blend(self.color);
+        format.background = self.bg;
+        format.color = format.color.blend(self.fg);
         format
     }
 }
@@ -161,7 +166,8 @@ where
         Frmt {
             format,
             size: self.size,
-            color: self.color,
+            fg: self.fg,
+            bg: self.bg,
         }
     }
 }

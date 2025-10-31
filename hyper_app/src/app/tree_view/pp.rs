@@ -35,10 +35,11 @@ fn subtree_to_layout(
     theme: &CodeTheme,
     nid: NodeIdentifier,
     size: f32,
-    color: egui::Color32,
+    fg: egui::Color32,
+    bg: egui::Color32,
 ) -> (usize, Vec<LayoutSection>) {
     // let read = store.read();
-    match Layouter::<_, _>::new(&store.read(), nid, theme, size, color).compute() {
+    match Layouter::<_, _>::new(&store.read(), nid, theme, size, fg, bg).compute() {
         Err(IndentedAlt::FmtError) => panic!(),
         Err(IndentedAlt::NoIndent) => panic!(),
         Ok(x) => x,
@@ -51,7 +52,8 @@ pub(crate) fn make_pp_code(
     nid: NodeIdentifier,
     theme: CodeTheme,
     size: f32,
-    color: egui::Color32,
+    fg: egui::Color32,
+    bg: egui::Color32,
 ) -> epaint::text::LayoutJob {
     #[derive(Default)]
     struct PrettyPrinter {}
@@ -70,6 +72,7 @@ pub(crate) fn make_pp_code(
         usize,
         Size,
         egui::Color32,
+        egui::Color32,
     );
 
     let code = ctx.memory_mut(|mem| mem.caches.cache::<PPCache>().get((store.as_ref(), nid)));
@@ -79,7 +82,7 @@ pub(crate) fn make_pp_code(
         fn spawn(
             &self,
             ctx: &egui::Context,
-            (_store, _theme, _id, len, size, color): Param<'_>,
+            (_store, _theme, _id, len, size, fg, bg): Param<'_>,
         ) -> Layouter {
             Layouter {
                 ctx: ctx.clone(),
@@ -108,7 +111,7 @@ pub(crate) fn make_pp_code(
         fn increment(
             &mut self,
             _spawner: &Spawnr,
-            (store, theme, id, len, size, color): Param<'_>,
+            (store, theme, id, len, size, fg, bg): Param<'_>,
         ) -> Vec<LayoutSection> {
             let theme = theme.clone();
             assert_eq!(len, self.total_str_len);
@@ -117,7 +120,7 @@ pub(crate) fn make_pp_code(
                 let ctx = self.ctx.clone();
                 let fut = move || {
                     let (len, sections) =
-                        subtree_to_layout(store.as_ref(), &theme, id, size.0, color);
+                        subtree_to_layout(store.as_ref(), &theme, id, size.0, fg, bg);
                     h.1.push(sections);
                     h.0.store(len, Ordering::Relaxed);
                     ctx.request_repaint_after(Duration::from_millis(10));
@@ -130,7 +133,8 @@ pub(crate) fn make_pp_code(
                     byte_range: 0..self.total_str_len,
                     format: TextFormat {
                         font_id: egui::FontId::monospace(size.0),
-                        color,
+                        color: fg,
+                        background: bg,
                         ..Default::default()
                     },
                 }]
@@ -150,7 +154,8 @@ pub(crate) fn make_pp_code(
                         byte_range: self.i..self.total_str_len,
                         format: TextFormat {
                             font_id: egui::FontId::monospace(size.0),
-                            color,
+                            color: fg,
+                            background: bg,
                             ..Default::default()
                         },
                     })
@@ -169,7 +174,7 @@ pub(crate) fn make_pp_code(
     let sections = ctx.memory_mut(|mem| {
         mem.caches.cache::<HCache>().get(
             ctx,
-            (store.clone(), &theme, nid, code.len(), Size(size), color),
+            (store.clone(), &theme, nid, code.len(), Size(size), fg, bg),
         )
     });
 

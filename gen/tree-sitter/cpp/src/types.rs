@@ -432,6 +432,8 @@ impl HyperType for Type {
             Type::Comment => Shared::Comment,
             Type::Identifier => Shared::Identifier,
             Type::QualifiedIdentifier => Shared::Identifier,
+            x if x.is_identifier() => Shared::Literal,
+            x if x.is_literal() => Shared::Literal,
             _ => Shared::Other,
         }
     }
@@ -504,7 +506,11 @@ impl TypeTrait for Type {
     }
 
     fn is_literal(&self) -> bool {
-        todo!()
+        self == &Self::NumberLiteral
+            || self == &Self::CharLiteral
+            || self == &Self::StringLiteral
+            || self == &Self::NumberLiteral
+            || self == &Self::RawStringLiteral
     }
 
     fn is_primitive(&self) -> bool {
@@ -516,7 +522,11 @@ impl TypeTrait for Type {
     }
 
     fn is_identifier(&self) -> bool {
-        todo!()
+        self == &Self::Identifier
+            || self == &Self::QualifiedIdentifier
+            || self == &Self::QualifiedIdentifier_
+            || self == &Self::QualifiedIdentifier__
+            || self == &Self::QualifiedIdentifier___
     }
 
     fn is_instance_ref(&self) -> bool {

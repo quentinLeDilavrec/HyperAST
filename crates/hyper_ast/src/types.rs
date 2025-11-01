@@ -248,7 +248,7 @@ pub enum Shared {
     Comment,
     // ExpressionStatement,
     // ReturnStatement,
-    // TryStatement,
+    Literal,
     Identifier,
     TypeDeclaration,
     Branch,

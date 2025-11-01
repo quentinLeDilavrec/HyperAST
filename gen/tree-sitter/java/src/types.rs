@@ -417,6 +417,7 @@ impl HyperType for Type {
             Type::Identifier => Shared::Identifier,
             Type::TypeIdentifier => Shared::Identifier,
             Type::ScopedIdentifier => Shared::Identifier,
+            x if x.is_literal() => Shared::Literal,
             x if x.is_fork() => Shared::Branch,
             _ => Shared::Other,
         }

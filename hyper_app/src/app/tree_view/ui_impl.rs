@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use egui_addon::syntax_highlighting as syntax_highlighter;
 
+use crate::app::code_aspects::Focus;
 use crate::app::code_aspects::HightLightHandle;
 use crate::app::long_tracking::TARGET_COLOR;
 
@@ -15,8 +16,6 @@ use hyperast::types::{AnyType, HyperType, Labeled};
 use hyperast::types::{WithChildren as _, WithStats as _};
 
 pub use super::store::{LabelIdentifier, NodeIdentifier};
-
-use crate::app::code_aspects::Focus;
 
 struct FoldRet<U, V> {
     #[allow(unused)]
@@ -516,8 +515,8 @@ impl<'a> FetchedViewImpl<'a> {
             (Some(c.gamma_multiply(0.95)), None)
         } else if let Some(c) = gp.and_then(|gp| {
             CC.select(
-                *add.first().unwrap_or(&u32::MAX) <= *gp + size,
-                *del.first().unwrap_or(&u32::MAX) <= *gp + size,
+                *add.first().unwrap_or(&u32::MAX) <= *gp,
+                *del.first().unwrap_or(&u32::MAX) <= *gp,
                 // add.binary_search(gp).is_ok(),
                 // del.binary_search(gp).is_ok()
             )
@@ -731,8 +730,8 @@ impl<'a> FetchedViewImpl<'a> {
             bg = c.gamma_multiply(0.1);
         } else if let Some(c) = gp.and_then(|gp| {
             CC.select(
-                *add.first().unwrap_or(&u32::MAX) <= *gp + size,
-                *del.first().unwrap_or(&u32::MAX) <= *gp + size,
+                *add.first().unwrap_or(&u32::MAX) <= *gp,
+                *del.first().unwrap_or(&u32::MAX) <= *gp,
             )
         }) {
             fg = c; //.gamma_multiply(0.3).to_opaque();

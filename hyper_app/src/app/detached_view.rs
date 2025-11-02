@@ -13,6 +13,8 @@ use super::code_tracking::TrackingResult;
 use super::tree_view::store::FetchedHyperAST;
 use super::types::CodeRange;
 
+const DEBUG: bool = false;
+
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub(crate) struct DetatchedViewOptions {
@@ -169,11 +171,13 @@ fn ui_detached_node(
     let src_rect = {
         let default_pos = (default_x + col_width / 2.0, i as f32 * 50.0);
         let resp = show_detached_element_aux(ui, store, options, src, src_id, default_pos);
-        ui.painter().debug_rect(
-            resp.response.rect.expand(20.0),
-            egui::Color32::RED,
-            format!("{default_x} {i} {:?}", src.path_ids),
-        );
+        if DEBUG {
+            ui.painter().debug_rect(
+                resp.response.rect.expand(20.0),
+                egui::Color32::RED,
+                format!("{default_x} {i} {:?}", src.path_ids),
+            );
+        }
         if let Some(fut) = resp.inner.future {
             result.future = Some(src.clone());
             if fut.double_clicked() {
@@ -266,29 +270,28 @@ fn ui_detached_node(
         } else {
             let default_pos = (default_x, i as f32 * 50.0);
             let resp = show_detached_element_aux(ui, store, options, &m, id, default_pos);
-            ui.painter().debug_rect(
-                resp.response.rect.expand(20.0),
-                egui::Color32::BLUE,
-                format!(
-                    "{default_x} {i} {:?}\n{:?}\n{}",
-                    m.file,
-                    m.path_ids,
-                    (result.element.iter())
-                        .map(|x| format!(
-                            "                           {} {} {} {} {} {:?} {:?}\n                           {:?} {:?}\n",
-                            m.file.commit == x.0.file.commit,
-                            m.file == x.0.file,
-                            m.path == x.0.path,
-                            m.range == x.0.range,
-                            m.path_ids == x.0.path_ids,
-                            x.0.path,
-                            x.0.path_ids,
-                            x.0.file.commit.id,
-                            x.0.file.file_path,
-                        ))
-                        .collect::<String>()
-                ),
-            );
+
+            if DEBUG {
+                let all = (result.element.iter())
+                    .map(|x| format!(
+                        "                           {} {} {} {} {} {:?} {:?}\n                           {:?} {:?}\n",
+                        m.file.commit == x.0.file.commit,
+                        m.file == x.0.file,
+                        m.path == x.0.path,
+                        m.range == x.0.range,
+                        m.path_ids == x.0.path_ids,
+                        x.0.path,
+                        x.0.path_ids,
+                        x.0.file.commit.id,
+                        x.0.file.file_path,
+                    ))
+                    .collect::<String>();
+                ui.painter().debug_rect(
+                    resp.response.rect.expand(20.0),
+                    egui::Color32::BLUE,
+                    format!("{default_x} {i} {:?}\n{:?}\n{}", m.file, m.path_ids, all),
+                );
+            }
             result.element.insert(m.clone(), resp.inner.element.rect);
             if let Some(_) = resp.inner.future {
                 result.future = Some(m.clone());

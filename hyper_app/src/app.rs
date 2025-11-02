@@ -438,7 +438,7 @@ pub(crate) struct AppData {
     smells_diffs_result: Option<smells::RemoteResultDiffs>,
 
     #[serde(skip)]
-    fetched_files: HashMap<types::FileIdentifier, code_tracking::RemoteFile>,
+    fetched_files: code_tracking::FetchedFiles,
     #[serde(skip)]
     fetched_files2: HashMap<
         types::FileIdentifier,
@@ -1746,7 +1746,7 @@ fn show_tree_view(
 
 fn show_hunks(
     ui: &mut egui::Ui,
-    fetched_files: &mut HashMap<types::FileIdentifier, code_tracking::RemoteFile>,
+    fetched_files: &mut code_tracking::FetchedFiles,
     api_addr: &String,
     x: &DetailsResults,
     selected_commit: &(ProjectId, String),

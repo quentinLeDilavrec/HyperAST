@@ -13,7 +13,7 @@ use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
 
 use super::code_aspects::{FetchedView, HightLightHandle, remote_fetch_node_old};
 use super::code_tracking::{
-    RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
+    FetchedFiles, RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
 };
 use super::commit::{CommitMetadata, fetch_commit0};
 use super::show_commit_menu;
@@ -206,7 +206,7 @@ impl<'a> LongTrackingResultsImpl<'a> {
         api_addr: &'a str,
         aspects: &mut ComputeConfigAspectViews,
         long_tracking: &mut LongTacking,
-        fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+        fetched_files: &mut FetchedFiles,
     ) -> Self {
         let w_id = ui.id().with("Tracking Timeline");
         let timeline_window = ui.available_rect_before_wrap();
@@ -299,7 +299,7 @@ fn show_commit(
     store: &Arc<FetchedHyperAST>,
     aspects: &mut ComputeConfigAspectViews,
     long_tracking: &mut LongTacking,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
     let mut tracking_result = (Buffered::Empty, MultiBuffered::default());
@@ -392,7 +392,7 @@ fn show_timeline(
     aspects: &mut ComputeConfigAspectViews,
     store: &Arc<FetchedHyperAST>,
     long_tracking: &mut LongTacking,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
     ui.set_clip_rect(ui.max_rect().expand2((1.0, 0.0).into()));
@@ -599,7 +599,7 @@ fn show_trackings(
     aspects: &mut ComputeConfigAspectViews,
     store: &Arc<FetchedHyperAST>,
     long_tracking: &mut LongTacking,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
     let mut cui = res_impl.make_tracking_ui(ui);
@@ -721,7 +721,7 @@ impl<'a> AttachedImpl<'a> {
         long_tracking: &mut LongTacking,
         store: &Arc<FetchedHyperAST>,
         aspects: &mut ComputeConfigAspectViews,
-        fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+        fetched_files: &mut FetchedFiles,
     ) -> () {
         let res_impl = self.res_impl;
         for col in res_impl.col_range() {
@@ -1054,7 +1054,7 @@ fn show_ser_view_of_tracking(
     ui: &mut egui::Ui,
     flags: &Flags,
     col: usize,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
     attached: &mut AttachedImpl<'_>,
     curr_view: &mut ColView<'_>,
 ) {
@@ -1126,7 +1126,7 @@ pub(crate) fn show_results(
     aspects: &mut ComputeConfigAspectViews,
     store: Arc<FetchedHyperAST>,
     long_tracking: &mut LongTacking,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
 ) {
     let mut res_impl =
         LongTrackingResultsImpl::new(ui, api_addr, aspects, long_tracking, fetched_files);
@@ -1200,7 +1200,7 @@ fn show_code_view(
     ui: &mut egui::Ui,
     api_addr: &str,
     curr_view: &mut ColView<'_>,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
 ) -> Option<egui::text_edit::TextEditOutput> {
     let curr_file = {
         let curr = if curr_view.matcheds.get(0).is_some() {

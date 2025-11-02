@@ -42,7 +42,7 @@ use wasm_rs_dbg::dbg;
 use egui_addon::InteractiveSplitter;
 use egui_addon::MultiSplitter;
 
-use super::code_tracking::RemoteFile;
+use super::code_tracking::{FetchedFiles, RemoteFile};
 use super::show_repo_menu;
 use super::types;
 use super::types::{CodeRange, Commit, SelectedConfig};
@@ -376,7 +376,7 @@ pub(super) fn show_central_panel(
     _trigger_compute: &mut bool,
     smells_result: &mut Option<RemoteResult>,
     smells_diffs_result: &mut Option<RemoteResultDiffs>,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
 ) {
     if let Some(_x) = &mut smells.stats {
         todo!();
@@ -606,7 +606,7 @@ pub(crate) fn show_examples(
     ui: &mut egui::Ui,
     api_addr: &str,
     examples: &mut ExamplesValues,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
 ) {
     let id = ui.id();
     let len = examples.examples.len();
@@ -657,7 +657,7 @@ fn show_query_with_example(
     api_addr: &str,
     bad_query: &SearchResult,
     examples: &mut ExamplesValues,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
 ) {
     InteractiveSplitter::vertical()
         .ratio(0.3)
@@ -760,7 +760,7 @@ pub(crate) fn show_diff(
     ui: &mut egui::Ui,
     api_addr: &str,
     example: &ExamplesValue,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
 ) {
     let rect = ui.clip_rect();
     let mov_col = move_color(ui);
@@ -872,7 +872,7 @@ impl<'a, const LEFT: bool> MakeHighlights for MH<'a, LEFT> {
 
 fn show_either_side<MH: MakeHighlights>(
     ui: &mut egui::Ui,
-    fetched_files: &mut HashMap<types::FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
     api_addr: &str,
     code: &CodeRange,
     color: egui::Rgba,

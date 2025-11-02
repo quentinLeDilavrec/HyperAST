@@ -19,6 +19,9 @@ pub struct FetchedFile {
     pub line_breaks: Vec<usize>,
 }
 
+pub(crate) type FetchedFiles =
+    std::collections::HashMap<FileIdentifier, super::code_tracking::RemoteFile>;
+
 impl Resource<FetchedFile> {
     pub(super) fn from_response(_ctx: &egui::Context, response: ehttp::Response) -> Self {
         let _content_type = response.content_type().unwrap_or_default();
@@ -295,7 +298,7 @@ pub(super) fn show_code_tracking_results(
     api_addr: &str,
     tracking: &mut ComputeConfigTracking,
     tracking_result: &mut Buffered<RemoteResult>,
-    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    fetched_files: &mut FetchedFiles,
     ctx: &egui::Context,
 ) {
     let result_changed = tracking_result.try_poll();

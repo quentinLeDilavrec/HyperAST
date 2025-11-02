@@ -165,7 +165,7 @@ role_impl!(
     Modules => "modules",
 
     // // Cpp
-    // Size => "size",
+    Size => "size",
     Label => "label",
     Member => "member",
     Function => "function",

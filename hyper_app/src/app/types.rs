@@ -352,12 +352,26 @@ pub(crate) struct Resource<T> {
 }
 
 impl<T> Resource<T> {
-    pub fn map<U, F: Fn(T) -> U>(self, f: F) -> Resource<U> {
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Resource<U> {
         Resource {
             response: self.response,
             content: self.content.map(f),
         }
     }
+}
+
+impl<T: serde::de::DeserializeOwned> Resource<T> {
+    pub fn from_resp(response: ehttp::Response) -> Self {
+        let content = from_resp(&response);
+        Self { content, response }
+    }
+}
+
+fn from_resp<T: serde::de::DeserializeOwned>(response: &ehttp::Response) -> Option<T> {
+    let content_type = response.content_type().unwrap_or_default();
+    let text = response.text()?;
+    let text = serde_json::from_str::<T>(text).unwrap();
+    Some(text)
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]

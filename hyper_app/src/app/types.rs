@@ -26,7 +26,7 @@ pub(crate) struct ComputeConfigDiff {
     pub(crate) after: CommitId,
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct CodeRange {
     #[serde(flatten)]
@@ -36,6 +36,36 @@ pub struct CodeRange {
     pub(crate) path: Vec<usize>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(crate) path_ids: Vec<NodeIdentifier>,
+}
+
+impl PartialEq for CodeRange {
+    fn eq(&self, other: &Self) -> bool {
+        let r = self.file.commit == other.file.commit
+            // && self.range == other.range
+            && self.path == other.path
+        && self.path_ids == other.path_ids;
+        if r && !(self.range == other.range && self.path_ids == other.path_ids) {
+            wasm_rs_dbg::dbg!(
+                &self.file.commit,
+                &self.range,
+                &other.range,
+                &self.path_ids,
+                &other.path_ids,
+            );
+        }
+        r
+    }
+}
+
+impl Eq for CodeRange {}
+
+impl Hash for CodeRange {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.file.commit.hash(state);
+        // self.range.hash(state);
+        self.path.hash(state);
+        // self.path_ids.hash(state);
+    }
 }
 
 impl Default for CodeRange {

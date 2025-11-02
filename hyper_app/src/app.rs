@@ -34,6 +34,7 @@ mod code_editor_automerge;
 mod code_tracking;
 mod commit;
 pub(crate) mod crdt_over_ws;
+mod detached_view;
 #[allow(unused)]
 mod long_tracking;
 mod querying;
@@ -1718,13 +1719,13 @@ fn show_tree_view(
     let mut defered_focus_scroll = None;
     long_tracking::show_tree_view(
         ui,
-        &api_addr,
+        min_col,
+        api_addr,
+        col,
+        trigger,
         tree_viewer,
         &mut curr_view,
-        trigger,
         aspects,
-        col,
-        min_col,
         &mut attacheds,
         &mut defered_focus_scroll,
     );

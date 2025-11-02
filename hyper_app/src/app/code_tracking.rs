@@ -81,7 +81,7 @@ pub(super) fn remote_fetch_file(
     promise
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct TrackingResult {
     pub compute_time: f64,
     pub commits_processed: usize,

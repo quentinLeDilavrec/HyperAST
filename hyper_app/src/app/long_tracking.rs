@@ -1,13 +1,12 @@
 use epaint::{Pos2, ahash::HashSet};
 use poll_promise::Promise;
 use std::collections::{HashMap, VecDeque};
-use std::ops::Range;
+use std::ops::{ControlFlow, Range};
 use std::sync::Arc;
 
-use egui_addon::{
-    MultiSplitter, code_editor::generic_text_buffer::byte_index_from_char_index,
-    egui_utils::highlight_byte_range, meta_edge::meta_egde,
-};
+use egui_addon::MultiSplitter;
+use egui_addon::code_editor::generic_text_buffer::byte_index_from_char_index;
+use egui_addon::egui_utils::highlight_byte_range;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
 use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
@@ -25,24 +24,15 @@ use super::types::{
 use super::utils_egui::MyUiExt as _;
 use super::utils_poll::{AccumulableResult, Buffered, MultiBuffered};
 
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub(crate) struct DetatchedViewOptions {
-    pub(crate) bezier: bool,
-    pub(crate) meta: bool,
-    pub(crate) three: bool,
-    pub(crate) cable: bool,
-}
-impl Default for DetatchedViewOptions {
-    fn default() -> Self {
-        Self {
-            bezier: false,
-            meta: true,
-            three: false,
-            cable: false,
-        }
-    }
-}
+use super::detached_view::DetatchedViewOptions;
+
+type AccumulableTrackingResults = AccumulableResult<TrackingResultsWithChanges, Vec<String>>;
+type LongTrackingResults = VecDeque<(
+    Buffered<Result<CommitMetadata, String>>,
+    MultiBuffered<AccumulableTrackingResults, Result<TrackingResultWithChanges, String>>,
+)>;
+
+type BufferedPerCommit<T> = HashMap<Commit, Buffered<T>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -55,15 +45,9 @@ pub(crate) struct LongTacking {
     pub(crate) origins: Vec<CodeRange>,
     pub(crate) origin_index: usize,
     #[serde(skip)] // TODO remove that
-    pub(crate) results: VecDeque<(
-        Buffered<Result<CommitMetadata, String>>,
-        MultiBuffered<
-            AccumulableResult<TrackingResultsWithChanges, Vec<String>>,
-            Result<TrackingResultWithChanges, String>,
-        >,
-    )>,
+    pub(crate) results: LongTrackingResults,
     #[serde(skip)]
-    pub(crate) tree_viewer: HashMap<Commit, Buffered<Result<Resource<FetchedView>, String>>>,
+    pub(crate) tree_viewer: BufferedPerCommit<Result<Resource<FetchedView>, String>>,
     #[serde(skip)]
     pub(crate) additionnal_links: Vec<[CodeRange; 2]>,
 }
@@ -105,6 +89,38 @@ pub(crate) struct Flags {
     pub(crate) references: bool,
     pub(crate) declaration: bool,
 }
+impl Flags {
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        macro_rules! show {
+            ($($f:ident: $s:expr),+ $(; $($df:ident: $ds:expr),+)?) => {
+                $(ui.checkbox(&mut self.$f, $s))|+
+                $(| ui.add_enabled_ui(false, |ui| {
+                    let r = $(ui.checkbox(&mut self.$df, $ds))|+;
+                    ui.wip(Some("need more parameters ?"));
+                    r
+                }).inner)?
+            }
+        }
+        show!(
+            upd: "updated",
+            child: "children changed",
+            parent: "parent changed";
+            exact_child: "children changed formatting",
+            exact_parent: "parent changed formatting",
+            sim_child: "children changed structure",
+            sim_parent: "parent changed structure",
+            meth: "method changed",
+            typ: "type changed",
+            top: "top-level type changed",
+            file: "file changed",
+            pack: "package changed",
+            dependency: "dependency changed",
+            dependent: "dependent changed",
+            references: "references changed",
+            declaration: "declaration changed"
+        )
+    }
+}
 
 pub(crate) const WANTED: SelectedConfig = SelectedConfig::LongTracking;
 
@@ -130,48 +146,16 @@ pub(crate) fn show_config(ui: &mut egui::Ui, tracking: &mut LongTacking) {
     ui.checkbox(&mut tracking.detatched_view, "detatched view");
     if tracking.detatched_view {
         ui.indent("detached_options", |ui| {
-            ui.checkbox(&mut tracking.detatched_view_options.bezier, "bezier");
-            ui.checkbox(&mut tracking.detatched_view_options.meta, "meta");
-            ui.checkbox(&mut tracking.detatched_view_options.three, "three");
-            ui.checkbox(&mut tracking.detatched_view_options.cable, "cable");
+            tracking.detatched_view_options.ui(ui);
         });
     }
     ui.add(egui::Label::new(
         egui::RichText::from("Triggers").font(egui::FontId::proportional(16.0)),
     ));
-    let flags = &mut tracking.flags;
-    ui.checkbox(&mut flags.upd, "updated");
-    ui.checkbox(&mut flags.child, "children changed");
-    ui.checkbox(&mut flags.parent, "parent changed");
-
-    ui.add_enabled_ui(false, |ui| {
-        ui.checkbox(&mut flags.exact_child, "children changed formatting");
-        ui.checkbox(&mut flags.exact_parent, "parent changed formatting");
-        ui.checkbox(&mut flags.sim_child, "children changed structure");
-        ui.checkbox(&mut flags.sim_parent, "parent changed structure");
-        ui.checkbox(&mut flags.meth, "method changed");
-        ui.checkbox(&mut flags.typ, "type changed");
-        ui.checkbox(&mut flags.top, "top-lvl type changed");
-        ui.checkbox(&mut flags.file, "file changed");
-        ui.checkbox(&mut flags.pack, "package changed");
-        ui.checkbox(&mut flags.dependency, "dependency changed");
-        ui.checkbox(&mut flags.dependent, "dependent changed");
-        ui.checkbox(&mut flags.references, "references changed");
-        ui.checkbox(&mut flags.declaration, "declaration changed");
-        // ui.add(
-        //     egui::Slider::new(&mut tracking.len, 0..=200)
-        //         .text("commits")
-        //         .clamp_to_range(false)
-        //         .integer()
-        //         .logarithmic(true),
-        // );
-        ui.wip(Some("need more parameters ?"));
-    });
+    tracking.flags.ui(ui);
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
-// #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-// #[cfg_attr(feature = "serde", serde(default))]
 pub struct State {
     pub(crate) offset: f32,
     pub(crate) width: f32,
@@ -196,749 +180,459 @@ impl State {
     }
 }
 type PortId = egui::Id;
+
 pub(crate) type Attacheds = Vec<(
     HashMap<usize, (PortId, Option<egui::Rect>)>,
     HashMap<usize, (PortId, Option<egui::Rect>)>,
 )>;
-// type Detacheds = Vec<(
-//     HashMap<usize, (egui::Id, Option<egui::Pos2>)>,
-//     HashMap<usize, (egui::Id, Option<egui::Pos2>)>,
-// )>;
 
-pub(crate) fn show_results(
+struct LongTrackingResultsImpl<'a> {
+    viewport_x: egui::Rangef,
+    timeline_window: egui::Rect,
+    max_col: usize,
+    min_col: usize,
+    total_cols: usize,
+    w_state: Option<State>,
+    spacing: egui::Vec2,
+    w_id: egui::Id,
+    col_width: f32,
+    viewport_width: f32,
+    api_addr: &'a str,
+}
+
+impl<'a> LongTrackingResultsImpl<'a> {
+    fn new(
+        ui: &mut egui::Ui,
+        api_addr: &'a str,
+        aspects: &mut ComputeConfigAspectViews,
+        long_tracking: &mut LongTacking,
+        fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    ) -> Self {
+        let w_id = ui.id().with("Tracking Timeline");
+        let timeline_window = ui.available_rect_before_wrap();
+        let spacing: egui::Vec2 = (0.0, 0.0).into();
+        let mut w_state = State::load(ui.ctx(), w_id);
+        let col_width = if long_tracking.results.len() <= 2 {
+            let width = ui.available_width() / long_tracking.results.len() as f32;
+            width
+        } else if let Some(w_state) = w_state {
+            w_state.width
+        } else {
+            let width = timeline_window.width() * 0.4;
+            w_state = Some(State { offset: 0.0, width });
+            width
+        };
+        let total_cols = long_tracking.results.len();
+        let col_width_with_spacing = col_width + spacing.x;
+        use egui::NumExt;
+        let viewport_width = (col_width_with_spacing * total_cols as f32 - spacing.x).at_least(0.0);
+
+        let viewport_left = timeline_window.left() - w_state.map_or(0.0, |x| x.offset);
+        let viewport_x = egui::Rangef::new(viewport_left, viewport_left + viewport_width);
+
+        let mut min_col = (viewport_x.min / col_width_with_spacing).floor() as usize;
+        let offset = w_state.map_or(0.0, |x| x.offset);
+        let mut min_col = (offset / col_width_with_spacing).floor() as usize;
+        let offset = offset + timeline_window.width();
+        let mut max_col = (offset / col_width_with_spacing).ceil() as usize;
+        if max_col > total_cols {
+            let diff = max_col.saturating_sub(min_col);
+            max_col = total_cols;
+            min_col = total_cols.saturating_sub(diff);
+        }
+
+        Self {
+            api_addr,
+            viewport_x,
+            timeline_window,
+            max_col,
+            min_col,
+            total_cols,
+            w_state,
+            w_id,
+            viewport_width,
+            spacing,
+            col_width,
+        }
+    }
+
+    fn col_range(&self) -> Range<usize> {
+        self.min_col..self.max_col
+    }
+
+    fn make_main_ui(&self, ui: &mut egui::Ui) -> egui::Ui {
+        let LongTrackingResultsImpl {
+            viewport_x,
+            timeline_window,
+            ..
+        } = *self;
+        use egui::NumExt;
+        let viewport =
+            egui::Rect::from_x_y_ranges(viewport_x, ui.available_rect_before_wrap().y_range());
+        let layout = egui::Layout::left_to_right(egui::Align::BOTTOM);
+        let mut ui = ui.new_child(egui::UiBuilder::new().layout(layout).max_rect(viewport));
+        ui.set_clip_rect(timeline_window);
+        ui
+    }
+
+    fn make_tracking_ui(&self, ui: &mut egui::Ui) -> egui::Ui {
+        let LongTrackingResultsImpl {
+            max_col,
+            min_col,
+            spacing,
+            col_width,
+            ..
+        } = *self;
+        let scale = |x| ui.max_rect().left() + min_col as f32 * (col_width + spacing.x);
+        let [x_min, x_max] = [min_col, max_col].map(scale);
+        let x_min = x_min + spacing.x / 3.0;
+        let x_max = x_max - spacing.x * 2.0 / 3.0;
+        let rect = egui::Rect::from_x_y_ranges(x_min..=x_max, ui.max_rect().y_range());
+        let layout = egui::Layout::left_to_right(egui::Align::BOTTOM);
+        ui.new_child(egui::UiBuilder::new().layout(layout).max_rect(rect))
+    }
+}
+
+fn show_commit(
+    ui: &mut egui::Ui,
+    col: usize,
+    store: &Arc<FetchedHyperAST>,
+    aspects: &mut ComputeConfigAspectViews,
+    long_tracking: &mut LongTacking,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    res_impl: &LongTrackingResultsImpl<'_>,
+) {
+    let mut tracking_result = (Buffered::Empty, MultiBuffered::default());
+    let (md, tracking_result) = if long_tracking.results.is_empty() {
+        &mut tracking_result
+    } else {
+        let res = &mut long_tracking.results[col];
+        res.1.try_poll();
+        res.0.try_poll();
+        res
+    };
+    let tracked;
+    let (code_ranges, md) = if col == long_tracking.origin_index {
+        tracked = None;
+        if let Some(md) = md.get_mut() {
+            (long_tracking.origins.iter_mut().collect::<Vec<_>>(), md)
+        } else {
+            if !md.is_waiting() {
+                let code_range = &mut long_tracking.origins[0];
+                md.buffer(fetch_commit0(
+                    ui.ctx(),
+                    res_impl.api_addr,
+                    &code_range.file.commit,
+                ));
+            }
+            return;
+        }
+    } else if let (Some(tracking_result), Some(md)) = (tracking_result.get_mut(), md.get_mut()) {
+        if tracking_result.content.track.results.is_empty() {
+            panic!("{:?}", tracking_result.errors)
+        } else {
+            let track = &tracking_result.content.track.results[0];
+
+            tracked = Some(TrackingResultWithChanges {
+                track: TrackingResult {
+                    matched: vec![],
+                    ..track.clone()
+                },
+                src_changes: tracking_result.content.src_changes.clone(),
+                dst_changes: tracking_result.content.dst_changes.clone(),
+            });
+            let track = &mut tracking_result.content.track.results;
+            let track = track.iter_mut().map(|track| {
+                ((track.matched).get_mut(0)).unwrap_or_else(|| track.fallback.as_mut().unwrap())
+            });
+            (track.collect(), md)
+        }
+    } else if let Some(tracking_result) = tracking_result.get_mut() {
+        if tracking_result.content.track.results.is_empty() && !tracking_result.errors.is_empty() {
+            ui.colored_label(
+                ui.visuals().error_fg_color,
+                tracking_result.errors.join("\n"),
+            );
+            return;
+        } else if !md.is_waiting() {
+            let track = &tracking_result.content.track.results[0];
+            let api_addr = res_impl.api_addr;
+            if let Some(code_range) = &track.intermediary {
+                md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
+            } else if let Some(code_range) = track.matched.get(0) {
+                md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
+            } else if let Some(code_range) = &track.fallback {
+                md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
+            } else {
+                unreachable!("should have been matched or been given a fallback")
+            }
+            ui.spinner();
+            return;
+        } else {
+            ui.spinner();
+            return;
+        }
+    } else {
+        ui.spinner();
+        return;
+    };
+    show_commitid_info(tracked, ui, code_ranges);
+    match md {
+        Ok(md) => {
+            md.show(ui);
+        }
+        Err(err) => {
+            ui.colored_label(ui.visuals().error_fg_color, err);
+        }
+    }
+}
+fn show_timeline(
     ui: &mut egui::Ui,
     api_addr: &str,
     aspects: &mut ComputeConfigAspectViews,
-    store: Arc<FetchedHyperAST>,
+    store: &Arc<FetchedHyperAST>,
     long_tracking: &mut LongTacking,
     fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    res_impl: &LongTrackingResultsImpl<'_>,
 ) {
-    let w_id = ui.id().with("Tracking Timeline");
-    let timeline_window = ui.available_rect_before_wrap();
-    let spacing: egui::Vec2 = (0.0, 0.0).into();
-    let mut w_state = State::load(ui.ctx(), w_id);
-    let (total_cols, col_width) = if long_tracking.results.len() <= 2 {
-        (
-            long_tracking.results.len(),
-            ui.available_width() / long_tracking.results.len() as f32,
+    ui.set_clip_rect(ui.max_rect().expand2((1.0, 0.0).into()));
+
+    let mut show_c = |ui: &mut _, col| {
+        show_commit(
+            ui,
+            col,
+            store,
+            aspects,
+            long_tracking,
+            fetched_files,
+            res_impl,
         )
-    } else {
-        let width = if let Some(w_state) = w_state {
-            w_state.width
-        } else {
-            w_state = Some(State {
-                offset: 0.0,
-                width: timeline_window.width() * 0.4,
-            });
-            timeline_window.width() * 0.4
-        };
-        (long_tracking.results.len(), width)
     };
-    let col_width_with_spacing = col_width + spacing.x;
-    let viewport_width = (col_width_with_spacing * total_cols as f32 - spacing.x).at_least(0.0);
+    if res_impl.total_cols == 0 {
+        ui.spinner();
+    } else if res_impl.total_cols == 1 {
+        show_c(ui, 0);
+    } else {
+        let total_cols = res_impl.total_cols;
+        let ratios = (0..total_cols - 1)
+            .map(|_| 1.0 / (total_cols) as f32)
+            .collect();
+        MultiSplitter::vertical()
+            .ratios(ratios)
+            .show(ui, move |uis| {
+                for (col, ui) in uis.into_iter().enumerate() {
+                    show_c(ui, col);
+                }
+            });
+    }
+    let Some(mut w_state) = res_impl.w_state else {
+        return;
+    };
+    let map_left = egui::remap_clamp(
+        w_state.offset,
+        0.0..=res_impl.viewport_width,
+        ui.max_rect().x_range(),
+    );
+    let map_right = egui::remap_clamp(
+        w_state.offset + res_impl.timeline_window.width(),
+        0.0..=res_impl.viewport_width,
+        ui.max_rect().x_range(),
+    );
+    let rect = {
+        let map_width =
+            res_impl.timeline_window.width() / res_impl.viewport_width * ui.max_rect().width();
+        egui::Rect::from_x_y_ranges(map_left..=map_left + map_width, ui.max_rect().y_range())
+    };
+    timeline_drag_box(ui, &mut w_state, rect, res_impl);
+    // left vertical handle
+    if let Some(s) = timeline_drag_box_vertical_handle(
+        ui,
+        rect,
+        map_right,
+        res_impl,
+        rect.left(),
+        ui.id().with("__resize_l"),
+        |x| rect.max.x - x,
+    ) {
+        w_state = s;
+        w_state.offset -= res_impl.timeline_window.width();
+    }
+    // right vertical handle
+    if let Some(s) = timeline_drag_box_vertical_handle(
+        ui,
+        rect,
+        map_left,
+        res_impl,
+        rect.right(),
+        ui.id().with("__resize_r"),
+        |x| x - rect.min.x,
+    ) {
+        w_state = s;
+    }
+    w_state.store(ui.ctx(), res_impl.w_id);
+}
 
-    let timeline_window_width = timeline_window.width();
-    let veiwport_left = timeline_window.left() - w_state.map_or(0.0, |x| x.offset);
-    let viewport_x = veiwport_left..=veiwport_left + viewport_width;
+fn timeline_drag_box_vertical_handle(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    map_offset: f32,
+    res_impl: &LongTrackingResultsImpl<'_>,
+    line_x: f32,
+    resize_id: egui::Id,
+    resize: impl Fn(f32) -> f32,
+) -> Option<State> {
+    let LongTrackingResultsImpl {
+        timeline_window,
+        total_cols,
+        viewport_width,
+        spacing,
+        ..
+    } = *res_impl;
+    use egui::NumExt;
+    let mut res = None;
+    let mut resize_hover = false;
+    let mut is_resizing = false;
+    if let Some(pointer) = ui.ctx().pointer_latest_pos() {
+        let we_are_on_top = (ui.ctx())
+            .layer_id_at(pointer)
+            .map_or(true, |top_layer_id| top_layer_id == ui.layer_id());
+        let mouse_over_resize_line = we_are_on_top
+            && rect.y_range().contains(pointer.y)
+            && (line_x - pointer.x).abs() <= ui.style().interaction.resize_grab_radius_side;
 
-    let mut min_col = (viewport_x.start() / col_width_with_spacing).floor() as usize;
-    let saedfgwsef = w_state.map_or(0.0, |x| x.offset);
-    let mut min_col = (saedfgwsef / col_width_with_spacing).floor() as usize;
-    let jtyjfgnb = saedfgwsef + timeline_window_width;
-    let mut max_col = (jtyjfgnb / col_width_with_spacing).ceil() as usize;
-    if max_col > total_cols {
-        let diff = max_col.saturating_sub(min_col);
-        max_col = total_cols;
-        min_col = total_cols.saturating_sub(diff);
+        if ui.input(|i| i.pointer.any_pressed() && i.pointer.any_down()) && mouse_over_resize_line {
+            ui.ctx().set_dragged_id(resize_id);
+        }
+        is_resizing = ui.ctx().is_being_dragged(resize_id);
+        if is_resizing {
+            let x = timeline_window.x_range().clamp(pointer.x); // or ui.max_rect()
+            // let x = x.clamp(timeline_window.min.x, timeline_window.max.x);
+            let col_x = resize(x).at_least(0.0);
+            let col_ratio = ui.max_rect().width() / total_cols as f32 / col_x;
+            let width = timeline_window.width() * col_ratio;
+
+            let with_spacing = width + spacing.x;
+            let viewport_width = (with_spacing * total_cols as f32 - spacing.x).at_least(0.0);
+            let from = ui.max_rect().x_range();
+            let to = 0.0..=viewport_width;
+            let offset = egui::remap_clamp(map_offset, from, to);
+            res = Some(State { offset, width })
+        }
+
+        let dragging_something_else = ui.input(|i| i.pointer.any_down() || i.pointer.any_pressed());
+        resize_hover = mouse_over_resize_line && !dragging_something_else;
+
+        if resize_hover || is_resizing {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+        }
+    }
+    let stroke = if is_resizing {
+        ui.style().visuals.widgets.active.fg_stroke // highly visible
+    } else if resize_hover {
+        ui.style().visuals.widgets.hovered.fg_stroke // highly visible
+    } else {
+        ui.style().visuals.widgets.noninteractive.bg_stroke // dim
+        // egui::Stroke::NONE
+    };
+    let painter = ui.painter_at(ui.max_rect());
+    painter.vline(line_x, rect.y_range(), stroke);
+    res
+}
+
+fn timeline_drag_box(
+    ui: &mut egui::Ui,
+    w_state: &mut State,
+    rect: egui::Rect,
+    res_impl: &LongTrackingResultsImpl<'_>,
+) {
+    let LongTrackingResultsImpl {
+        timeline_window,
+        viewport_width,
+        ..
+    } = *res_impl;
+    let interactive_rect = egui::Rect::from_center_size(rect.center(), (40., 30.).into());
+    let id = ui.id().with("map_drag");
+    let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id().with("drag_handle"));
+    let map_drag = ui
+        .scope_builder(
+            egui::UiBuilder::new()
+                .layer_id(layer_id)
+                .max_rect(ui.max_rect()),
+            |ui| ui.interact(interactive_rect, id, egui::Sense::drag()),
+        )
+        .inner;
+    if map_drag.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+    let mult = if map_drag.dragged() {
+        let delta = map_drag.drag_delta();
+        if delta.x != 0.0 {
+            let x = delta.x / ui.max_rect().width() * viewport_width;
+            let max = viewport_width - timeline_window.width();
+            w_state.offset = (w_state.offset + x).clamp(0.0, max);
+        }
+        0.8
+    } else {
+        0.4
+    };
+    let fill_color = egui::Color32::DARK_GRAY.linear_multiply(mult);
+    let painter = ui.painter_at(ui.max_rect());
+    painter.rect(
+        rect,
+        egui::CornerRadius::ZERO,
+        fill_color,
+        egui::Stroke::new(1.0, egui::Color32::DARK_GRAY),
+        egui::StrokeKind::Inside,
+    );
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        "↔",
+        egui::FontId::monospace(50.0),
+        egui::Color32::BLACK,
+    );
+}
+
+fn show_trackings(
+    ui: &mut egui::Ui,
+    api_addr: &str,
+    aspects: &mut ComputeConfigAspectViews,
+    store: &Arc<FetchedHyperAST>,
+    long_tracking: &mut LongTacking,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    res_impl: &LongTrackingResultsImpl<'_>,
+) {
+    let mut cui = res_impl.make_tracking_ui(ui);
+
+    let mut attached = AttachedImpl::new(res_impl, long_tracking.origin_index);
+    attached.ui(&mut cui, long_tracking, store, aspects, fetched_files);
+
+    let LongTrackingResultsImpl {
+        timeline_window,
+        total_cols,
+        w_id,
+        spacing,
+        col_width,
+        ..
+    } = *res_impl;
+
+    // handle the scrolling
+    if let Some((o, i, mut scroll)) = attached.differed_focus_scroll {
+        let o: f32 = o;
+        let g_o = (attached.attacheds.get(i))
+            .and_then(|a| a.0.get(&0))
+            .and_then(|x| x.1)
+            .map(|p| p.min.y)
+            .unwrap_or(timeline_window.height() / 2000.0);
+        let g_o: f32 = 50.0;
+        scroll.state.offset = (0.0, (o - g_o).max(0.0)).into();
+        scroll.state.store(ui.ctx(), scroll.id);
     }
 
-    egui::panel::TopBottomPanel::bottom("Timeline Map")
-        .frame(egui::Frame::side_top_panel(ui.style()).inner_margin(0.0))
-        .height_range(0.0..=ui.available_height() / 3.0)
-        .default_height(ui.available_height() / 5.0)
-        .resizable(true)
-        .show_inside(ui, |ui| {
-            ui.set_clip_rect(ui.max_rect().expand2((1.0, 0.0).into()));
-            let mut add_content = |ui: &mut egui::Ui, col: usize| {
-                let mut aaa = (Buffered::Empty, MultiBuffered::default());
-                let (md, tracking_result) = if long_tracking.results.is_empty() {
-                    &mut aaa //&long_tracking.target
-                } else {
-                    let res = &mut long_tracking.results[col];
-                    res.1.try_poll();
-                    res.0.try_poll();
-                    res
-                };
-                let tracked;
-                let (code_ranges, md) = if col == long_tracking.origin_index {
-                    tracked = None;
-                    if let Some(md) = md.get_mut() {
-                        (long_tracking.origins.iter_mut().collect::<Vec<_>>(), md)
-                    } else {
-                        if !md.is_waiting() {
-                            let code_range = &mut long_tracking.origins[0];
-                            md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
-                        }
-                        return;
-                    }
-                } else if let (Some(tracking_result), Some(md)) =
-                    (tracking_result.get_mut(), md.get_mut())
-                {
-                    if tracking_result.content.track.results.is_empty() {
-                        panic!("{:?}", tracking_result.errors)
-                    } else {
-                        let track = tracking_result.content.track.results.get(0).unwrap();
+    long_tracking.origins.extend(attached.new_origins);
 
-                        tracked = Some(TrackingResultWithChanges {
-                            track: TrackingResult {
-                                compute_time: track.compute_time.clone(),
-                                commits_processed: track.commits_processed.clone(),
-                                src: track.src.clone(),
-                                intermediary: track.intermediary.clone(),
-                                fallback: track.fallback.clone(),
-                                matched: vec![],
-                            },
-                            src_changes: tracking_result.content.src_changes.clone(),
-                            dst_changes: tracking_result.content.dst_changes.clone(),
-                        });
-                        let track = &mut tracking_result.content.track.results;
-                        (
-                            track
-                                .iter_mut()
-                                .map(|track| {
-                                    track
-                                        .matched
-                                        .get_mut(0)
-                                        .unwrap_or_else(|| track.fallback.as_mut().unwrap())
-                                })
-                                .collect(),
-                            md,
-                        )
-                    }
-                } else if let Some(tracking_result) = tracking_result.get_mut() {
-                    if tracking_result.content.track.results.is_empty()
-                        && !tracking_result.errors.is_empty()
-                    {
-                        ui.colored_label(
-                            ui.visuals().error_fg_color,
-                            tracking_result.errors.join("\n"),
-                        );
-                        return;
-                    } else if !md.is_waiting() {
-                        let track = tracking_result.content.track.results.get(0).unwrap();
-                        if let Some(code_range) = &track.intermediary {
-                            md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
-                        } else if let Some(code_range) = track.matched.get(0) {
-                            md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
-                        } else if let Some(code_range) = &track.fallback {
-                            md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
-                        } else {
-                            unreachable!("should have been matched or been given a fallback")
-                        }
-                        ui.spinner();
-                        return;
-                    } else {
-                        ui.spinner();
-                        return;
-                    }
-                } else {
-                    ui.spinner();
-                    return;
-                };
-                show_commitid_info(tracked, ui, code_ranges);
-                match md {
-                    Ok(md) => {
-                        md.show(ui);
-                    }
-                    Err(err) => {
-                        ui.colored_label(ui.visuals().error_fg_color, err);
-                    }
-                }
-            };
-            if total_cols == 0 {
-                ui.spinner();
-            } else if total_cols == 1 {
-                add_content(ui, 0);
-            } else {
-                let ratios = (0..total_cols - 1)
-                    .map(|_| 1.0 / (total_cols) as f32)
-                    .collect();
-                MultiSplitter::vertical().ratios(ratios).show(ui, |uis| {
-                    for (col, ui) in uis.into_iter().enumerate() {
-                        add_content(ui, col);
-                    }
-                });
-            }
-            if let Some(mut w_state) = w_state {
-                let tl_win_left = w_state.offset;
-                let tl_win_right = tl_win_left + timeline_window_width;
-                let tl_rel_range = tl_win_left / viewport_width..=tl_win_right / viewport_width;
-                let tl_range = egui::lerp(ui.max_rect().x_range(), *tl_rel_range.start())
-                    ..=egui::lerp(ui.max_rect().x_range(), *tl_rel_range.end());
-                let map_left = egui::remap_clamp(
-                    w_state.offset,
-                    0.0..=viewport_width,
-                    ui.max_rect().x_range(),
-                );
-                let map_right = egui::remap_clamp(
-                    w_state.offset + timeline_window_width,
-                    0.0..=viewport_width,
-                    ui.max_rect().x_range(),
-                );
-                let map_width = timeline_window_width / viewport_width * ui.max_rect().width();
-                let rect = egui::Rect::from_x_y_ranges(
-                    map_left..=map_left + map_width,
-                    ui.max_rect().y_range(),
-                );
-                let painter = ui.painter_at(ui.max_rect());
-                {
-                    let map_drag = ui.interact(
-                        egui::Rect::from_center_size(rect.center(), (40., 40.).into()),
-                        ui.id().with("map_drag"),
-                        egui::Sense::drag(),
-                    );
-                    let fill_color;
-                    if map_drag.hovered() {
-                        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                    }
-                    if map_drag.dragged() {
-                        let delta = map_drag.drag_delta();
-                        if delta.x != 0.0 {
-                            w_state.offset = (w_state.offset
-                                + delta.x / ui.max_rect().width() * viewport_width)
-                                .clamp(0.0, viewport_width - timeline_window.width());
-                        }
-                        fill_color = egui::Color32::DARK_GRAY.linear_multiply(0.8)
-                    } else {
-                        fill_color = egui::Color32::DARK_GRAY.linear_multiply(0.4)
-                    }
-                    painter.rect(
-                        rect,
-                        egui::CornerRadius::ZERO,
-                        fill_color,
-                        egui::Stroke::new(1.0, egui::Color32::DARK_GRAY),
-                        egui::StrokeKind::Inside,
-                    );
-                    painter.text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "↔",
-                        egui::FontId::monospace(50.0),
-                        egui::Color32::BLACK,
-                    );
-                }
-                {
-                    let resizable = true;
-                    let mut resize_hover = false;
-                    let mut is_resizing = false;
-                    if resizable {
-                        let resize_id = ui.id().with("__resize_l");
-                        if let Some(pointer) = ui.ctx().pointer_latest_pos() {
-                            let we_are_on_top = ui
-                                .ctx()
-                                .layer_id_at(pointer)
-                                .map_or(true, |top_layer_id| top_layer_id == ui.layer_id());
-                            let mouse_over_resize_line = we_are_on_top
-                                && rect.y_range().contains(pointer.y)
-                                && (rect.left() - pointer.x).abs()
-                                    <= ui.style().interaction.resize_grab_radius_side;
-
-                            if ui.input(|i| i.pointer.any_pressed() && i.pointer.any_down())
-                                && mouse_over_resize_line
-                            {
-                                ui.ctx().set_dragged_id(resize_id);
-                            }
-                            is_resizing = ui.ctx().is_being_dragged(resize_id);
-                            if is_resizing {
-                                // let width = (pointer.x - second_rect.left()).abs();
-                                // let width =
-                                //     clamp_to_range(width, width_range.clone()).at_most(available_rect.width());
-                                // second_rect.min.x = second_rect.max.x - width;
-                                let x = pointer
-                                    .x
-                                    .clamp(timeline_window.min.x, timeline_window.max.x);
-                                let f = (rect.max.x - x).at_least(0.0); // - rect.min.x;
-                                let col_ratio = ui.max_rect().width() / total_cols as f32 / f;
-                                w_state.width = timeline_window.width() * col_ratio;
-
-                                let col_width_with_spacing = w_state.width + spacing.x;
-                                let viewport_width = (col_width_with_spacing * total_cols as f32
-                                    - spacing.x)
-                                    .at_least(0.0);
-                                w_state.offset = egui::remap_clamp(
-                                    map_right,
-                                    ui.max_rect().x_range(),
-                                    0.0..=viewport_width,
-                                ) - timeline_window_width;
-
-                                // let map_r = egui::remap_clamp(w_state.offset+timeline_window_width, 0.0..=viewport_width, ui.max_rect().x_range());
-                                // assert!((map_r-map_right).abs()<1.0);
-                            }
-
-                            let dragging_something_else =
-                                ui.input(|i| i.pointer.any_down() || i.pointer.any_pressed());
-                            resize_hover = mouse_over_resize_line && !dragging_something_else;
-
-                            if resize_hover || is_resizing {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                            }
-                        }
-                    }
-
-                    let stroke = if is_resizing {
-                        ui.style().visuals.widgets.active.fg_stroke // highly visible
-                    } else if resize_hover {
-                        ui.style().visuals.widgets.hovered.fg_stroke // highly visible
-                    } else if true {
-                        //show_separator_line {
-                        // TOOD(emilk): distinguish resizable from non-resizable
-                        ui.style().visuals.widgets.noninteractive.bg_stroke // dim
-                    } else {
-                        egui::Stroke::NONE
-                    };
-
-                    painter.vline(rect.left(), rect.y_range(), stroke);
-                }
-                {
-                    let resizable = true;
-                    let mut resize_hover = false;
-                    let mut is_resizing = false;
-                    if resizable {
-                        let resize_id = ui.id().with("__resize_r");
-                        if let Some(pointer) = ui.ctx().pointer_latest_pos() {
-                            let we_are_on_top = ui
-                                .ctx()
-                                .layer_id_at(pointer)
-                                .map_or(true, |top_layer_id| top_layer_id == ui.layer_id());
-                            let mouse_over_resize_line = we_are_on_top
-                                && rect.y_range().contains(pointer.y)
-                                && (rect.right() - pointer.x).abs()
-                                    <= ui.style().interaction.resize_grab_radius_side;
-
-                            if ui.input(|i| i.pointer.any_pressed() && i.pointer.any_down())
-                                && mouse_over_resize_line
-                            {
-                                ui.ctx().set_dragged_id(resize_id);
-                            }
-                            is_resizing = ui.ctx().is_being_dragged(resize_id);
-                            if is_resizing {
-                                let x = pointer.x.clamp(ui.max_rect().min.x, ui.max_rect().max.x);
-                                let f = (x - rect.min.x).at_least(0.0);
-                                let col_ratio = ui.max_rect().width() / total_cols as f32 / f;
-                                w_state.width = timeline_window.width() * col_ratio;
-
-                                let col_width_with_spacing = w_state.width + spacing.x;
-                                let viewport_width = (col_width_with_spacing * total_cols as f32
-                                    - spacing.x)
-                                    .at_least(0.0);
-                                w_state.offset = egui::remap_clamp(
-                                    map_left,
-                                    ui.max_rect().x_range(),
-                                    0.0..=viewport_width,
-                                );
-                            }
-
-                            let dragging_something_else =
-                                ui.input(|i| i.pointer.any_down() || i.pointer.any_pressed());
-                            resize_hover = mouse_over_resize_line && !dragging_something_else;
-
-                            if resize_hover || is_resizing {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                            }
-                        }
-                    }
-
-                    let stroke = if is_resizing {
-                        ui.style().visuals.widgets.active.fg_stroke // highly visible
-                    } else if resize_hover {
-                        ui.style().visuals.widgets.hovered.fg_stroke // highly visible
-                    } else {
-                        egui::Stroke::NONE
-                    };
-
-                    painter.vline(rect.right(), rect.y_range(), stroke);
-                }
-                w_state.store(ui.ctx(), w_id);
-            }
-        });
-    let is_origin = |col| col == long_tracking.origin_index;
-    let mut waiting = vec![];
-    let mut new_origins = vec![];
-    let mut add_contents = |ui: &mut egui::Ui, col_range: Range<usize>| -> Attacheds {
-        let min_col = col_range.start;
-        let mut attacheds: Attacheds = vec![];
-        let mut defered_focus_scroll = None;
-        for col in col_range {
-            attacheds.push((Default::default(), Default::default()));
-            let x_range = ui.available_rect_before_wrap().x_range();
-            let x_start = x_range.min + col_width_with_spacing * (col - min_col) as f32;
-            let x_end = x_start + col_width;
-            let max_rect = egui::Rect::from_x_y_ranges(x_start..=x_end, ui.max_rect().y_range());
-            let x_start = timeline_window.x_range().min.max(x_start - spacing.x);
-            let x_end = timeline_window.x_range().max.min(x_end);
-            let clip_rect = egui::Rect::from_x_y_ranges(x_start..=x_end, ui.max_rect().y_range());
-            let ui = &mut egui::Ui::new(
-                ui.ctx().clone(),
-                w_id.with(col as isize - long_tracking.origin_index as isize),
-                egui::UiBuilder {
-                    ui_stack_info: ui.stack().info.clone(),
-                    max_rect: Some(max_rect),
-                    ..Default::default()
-                },
-            );
-            ui.set_clip_rect(clip_rect);
-
-            let has_past = |col| col != 0;
-            let has_future = |col| col + 1 < total_cols;
-
-            let mut curr_view: ColView<'_> = ColView::default();
-            if is_origin(col) {
-                match (has_past(col), has_future(col)) {
-                    (true, true) => {
-                        let qqq = long_tracking
-                            .results
-                            .get_mut(col - 1)
-                            .and_then(|x| x.1.get_mut());
-                        if let Some(qqq) = qqq {
-                            if let Some(qqq) = &mut qqq.content.dst_changes {
-                                curr_view.additions = Some(&mut qqq.additions);
-                            }
-                            if let Some(qqq) = &mut qqq.content.src_changes {
-                                assert_ne!(long_tracking.origins[0].file.commit, qqq.commit);
-                                curr_view.left_commit = Some(&mut qqq.commit);
-                            }
-                            let mut origins = long_tracking.origins.iter_mut();
-                            for (i, qqq) in qqq.content.track.results.iter_mut().enumerate() {
-                                curr_view.effective_targets.push((&mut qqq.src, i));
-                                curr_view
-                                    .effective_targets
-                                    .push((origins.next().unwrap(), i));
-                            }
-                        } else {
-                            curr_view
-                                .original_targets
-                                .push((&mut long_tracking.origins[0], 0));
-                        }
-                    }
-                    (true, false) => {
-                        let qqq = long_tracking
-                            .results
-                            .get_mut(col - 1)
-                            .and_then(|x| x.1.get_mut());
-                        if let Some(qqq) = qqq {
-                            if let Some(ppp) = &mut qqq.content.dst_changes {
-                                curr_view.additions = Some(&mut ppp.additions);
-                            }
-                            if let Some(qqq) = &mut qqq.content.src_changes {
-                                assert_ne!(long_tracking.origins[0].file.commit, qqq.commit);
-                                curr_view.left_commit = Some(&mut qqq.commit);
-                            }
-                            let mut origins = long_tracking.origins.iter_mut();
-                            for (i, qqq) in qqq.content.track.results.iter_mut().enumerate() {
-                                curr_view.effective_targets.push((&mut qqq.src, i));
-                                if let Some(origins) = origins.next() {
-                                    curr_view.original_targets.push((origins, i));
-                                }
-                            }
-                        } else {
-                            curr_view
-                                .original_targets
-                                .push((&mut long_tracking.origins[0], 0));
-                        }
-                    }
-                    (false, true) => todo!(),
-                    (false, false) => {
-                        // nothing to do
-                        curr_view
-                            .original_targets
-                            .push((&mut long_tracking.origins[0], 0));
-                    }
-                }
-            } else {
-                if has_past(col) {
-                    let mut it = long_tracking.results.range_mut(col - 1..=col);
-                    let past = it.next();
-
-                    if let Some(qqq) = past.and_then(|x| x.1.get_mut()) {
-                        if let Some(qqq) = &mut qqq.content.dst_changes {
-                            curr_view.additions = Some(&mut qqq.additions);
-                            // curr_view.left_commit = Some(&mut qqq.commit);
-                        }
-                        if let Some(ppp) = &mut qqq.content.src_changes {
-                            curr_view.left_commit = Some(&mut ppp.commit);
-                        }
-                        for (i, qqq) in qqq.content.track.results.iter_mut().enumerate() {
-                            assert_ne!(
-                                qqq.src.file.commit,
-                                **curr_view.left_commit.as_ref().unwrap()
-                            );
-                            curr_view.effective_targets.push((&mut qqq.src, i));
-                        }
-                    }
-                    let curr = it.next();
-                    if let Some(qqq) = curr.and_then(|x| x.1.get_mut()) {
-                        for (i, qqq) in qqq.content.track.results.iter_mut().enumerate() {
-                            curr_view.matcheds.push((
-                                qqq.matched.get_mut(0).or(qqq.fallback.as_mut()).unwrap(),
-                                i,
-                            ));
-                        }
-                        if let Some(qqq) = &mut qqq.content.src_changes {
-                            curr_view.deletions = Some(&mut qqq.deletions);
-                        }
-                    }
-                    if curr_view.original_targets.is_empty() {
-                        curr_view
-                            .original_targets
-                            .push((&mut long_tracking.origins[0], 0));
-                    }
-                    assert!(it.next().is_none());
-                } else {
-                    let result = long_tracking
-                        .results
-                        .get_mut(col)
-                        .and_then(|x| x.1.get_mut());
-                    match result {
-                        Some(qqq) => {
-                            if qqq.content.track.results.is_empty() {
-                                ui.colored_label(
-                                    ui.visuals().error_fg_color,
-                                    qqq.errors.join("\n"),
-                                );
-                                continue;
-                            }
-                            if let Some(qqq) = &mut qqq.content.src_changes {
-                                curr_view.deletions = Some(&mut qqq.deletions);
-                            }
-                            for (i, qqq) in qqq.content.track.results.iter_mut().enumerate() {
-                                curr_view.matcheds.push((
-                                    qqq.matched.get_mut(0).or(qqq.fallback.as_mut()).unwrap(),
-                                    i,
-                                ));
-                            }
-                        }
-                        None => {
-                            curr_view
-                                .original_targets
-                                .push((&mut long_tracking.origins[0], 0));
-                        }
-                    };
-                }
-            }
-
-            let curr_commit = {
-                let curr = if curr_view.matcheds.get(0).is_some() {
-                    curr_view.matcheds.get_mut(0)
-                } else {
-                    curr_view.original_targets.get_mut(0)
-                };
-                let Some((curr, _)) = curr else {
-                    continue;
-                };
-                &curr.file.commit
-            };
-
-            if long_tracking.tree_view {
-                let tree_viewer = long_tracking.tree_viewer.entry(curr_commit.clone());
-                let tree_viewer = tree_viewer.or_insert_with(|| Buffered::default());
-                let trigger = tree_viewer.try_poll();
-                let Some(tree_viewer) = tree_viewer.get_mut() else {
-                    if !tree_viewer.is_waiting() {
-                        tree_viewer.buffer(remote_fetch_node_old(
-                            ui.ctx(),
-                            api_addr,
-                            store.clone(),
-                            &curr_commit,
-                            "",
-                        ));
-                    }
-                    continue;
-                };
-                match tree_viewer {
-                    Ok(tree_viewer) => {
-                        if let Some(p) = show_tree_view(
-                            ui,
-                            api_addr,
-                            tree_viewer,
-                            &mut curr_view,
-                            trigger,
-                            aspects,
-                            col,
-                            min_col,
-                            &mut attacheds,
-                            &mut defered_focus_scroll,
-                        ) {
-                            let curr = if !curr_view.matcheds.is_empty() {
-                                curr_view.matcheds.get_mut(0)
-                            } else {
-                                curr_view.original_targets.get_mut(0)
-                            };
-                            let Some((curr, _)) = curr else {
-                                panic!();
-                            };
-                            if is_origin(col) {
-                                curr.path = p;
-                                if col == 0 {
-                                    // TODO only request changes when we have none
-                                    let track_at_path = track_at_path_with_changes(
-                                        ui.ctx(),
-                                        api_addr,
-                                        &curr.file.commit,
-                                        &curr.path,
-                                        &long_tracking.flags,
-                                    );
-                                    waiting.push((col, track_at_path));
-                                } else {
-                                    // TODO allow to reset tracking
-                                    new_origins.push(CodeRange {
-                                        file: curr.file.clone(),
-                                        range: None,
-                                        path: curr.path.clone(),
-                                        path_ids: vec![],
-                                    });
-                                    let past_commit = &curr_view.left_commit.unwrap();
-                                    assert_ne!(&curr.file.commit, *past_commit);
-                                    let track_at_path = track_at_path(
-                                        ui.ctx(),
-                                        api_addr,
-                                        &curr.file.commit,
-                                        Some(past_commit),
-                                        &curr.path,
-                                        &Default::default(),
-                                    );
-                                    waiting.push((col, track_at_path));
-                                }
-                            } else {
-                                if col == 0 {
-                                    let track_at_path = track_at_path_with_changes(
-                                        ui.ctx(),
-                                        api_addr,
-                                        &curr.file.commit,
-                                        &p,
-                                        &long_tracking.flags,
-                                    );
-                                    waiting.push((col, track_at_path));
-                                } else {
-                                    let past_commit = &curr_view.left_commit.unwrap();
-                                    let present_commit = &curr.file.commit;
-                                    // TODO allow to reset tracking
-                                    assert_ne!(&present_commit, past_commit);
-                                    let track_at_path = track_at_path(
-                                        ui.ctx(),
-                                        api_addr,
-                                        &present_commit,
-                                        Some(past_commit),
-                                        &p,
-                                        &Default::default(),
-                                    );
-                                    waiting.push((col, track_at_path));
-                                }
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        log::error!("{}", err);
-                        ui.colored_label(ui.visuals().error_fg_color, err);
-                    }
-                }
-            } else if long_tracking.ser_view {
-                if let Some(te) = show_code_view(ui, api_addr, &mut curr_view, fetched_files) {
-                    let offset = 0; //aa.inner.0;
-                    if !te.response.is_pointer_button_down_on() {
-                        let bb = &te.cursor_range;
-                        if let Some(bb) = bb {
-                            let s = te.galley.text();
-                            let r = bb.as_sorted_char_range();
-                            let r = Range {
-                                start: offset + byte_index_from_char_index(s, r.start),
-                                end: offset + byte_index_from_char_index(s, r.end),
-                            };
-                            let curr = {
-                                let curr = if curr_view.matcheds.get(0).is_some() {
-                                    curr_view.matcheds.get_mut(0)
-                                } else {
-                                    curr_view.original_targets.get_mut(0)
-                                };
-                                let Some((curr, _)) = curr else {
-                                    continue;
-                                };
-                                curr
-                            };
-                            if curr.range != Some(r.clone()) {
-                                if is_origin(col) {
-                                    curr.range = Some(r.clone());
-                                }
-                                if col == 0 {
-                                    waiting.push((
-                                        col,
-                                        track(
-                                            ui.ctx(),
-                                            api_addr,
-                                            &curr.file.commit,
-                                            &curr.file.file_path,
-                                            &Some(r),
-                                            &long_tracking.flags,
-                                        ),
-                                    ));
-                                } else {
-                                    // TODO allow to reset tracking
-                                    waiting.push((
-                                        col,
-                                        track(
-                                            ui.ctx(),
-                                            api_addr,
-                                            &curr.file.commit,
-                                            &curr.file.file_path,
-                                            &Some(r),
-                                            &long_tracking.flags,
-                                        ),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if let Some((o, i, mut scroll)) = defered_focus_scroll {
-            let o: f32 = o;
-            let g_o = attacheds
-                .get(i)
-                .and_then(|a| a.0.get(&0))
-                .and_then(|x| x.1)
-                .map(|p| p.min.y)
-                .unwrap_or(timeline_window.height() / 2000.0);
-            let g_o: f32 = 50.0;
-            scroll.state.offset = (0.0, (o - g_o).max(0.0)).into();
-            scroll.state.store(ui.ctx(), scroll.id);
-        }
-
-        attacheds
-    };
-    use egui::NumExt;
-    let viewport =
-        egui::Rect::from_x_y_ranges(viewport_x, ui.available_rect_before_wrap().y_range());
-    let ui = &mut ui.new_child(
-        egui::UiBuilder::new()
-            .layout(egui::Layout::left_to_right(egui::Align::BOTTOM))
-            .max_rect(viewport),
-    );
-    ui.set_clip_rect(timeline_window);
-
-    let x_min = ui.max_rect().left() + min_col as f32 * col_width_with_spacing + spacing.x / 3.0;
-    let x_max =
-        ui.max_rect().left() + max_col as f32 * col_width_with_spacing - spacing.x * 2.0 / 3.0;
-    let rect = egui::Rect::from_x_y_ranges(x_min..=x_max, ui.max_rect().y_range());
-    let mut cui = ui.new_child(
-        egui::UiBuilder::new()
-            .layout(egui::Layout::left_to_right(egui::Align::BOTTOM))
-            .max_rect(rect),
-    );
-    let attacheds = (add_contents)(&mut cui, min_col..max_col);
-
-    long_tracking.origins.extend(new_origins);
-    for (col, waiting) in waiting {
+    // add new tracking being computed on backend
+    for (col, waiting) in attached.waiting {
         if col == 0 {
             long_tracking.results.push_front(Default::default());
             long_tracking.origin_index += 1;
@@ -948,732 +642,547 @@ pub(crate) fn show_results(
             long_tracking.results[col - 1].1.buffer(waiting);
         }
     }
-    {
-        ui.set_clip_rect(timeline_window);
-        for i in 0..attacheds.len() - 1 {
-            let (left, right) = attacheds.split_at(i + 1);
-            let (greens, blues) = (&left.last().unwrap().1, &right.first().unwrap().0);
-            let mut done = HashSet::default();
-            let cable = false;
-            let mut min_right_x = 0.0;
-            let mut min_left_x = 0.0;
-            let l_bound = veiwport_left + (i + 1) as f32 * col_width_with_spacing - 15.0;
-            let r_bound = l_bound + 25.0;
-            let mut f = |&(green, g_rect), &(blue, b_rect)| {
-                if cable {
-                    let green: egui::Id = green;
-                    let blue: egui::Id = blue;
-                }
 
-                if let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) {
-                    let m_rect: egui::Rect = m_rect;
-                    let src_rect: egui::Rect = src_rect;
-                    let mut m_pos = m_rect.right_center();
-                    let mut src_pos = src_rect.left_center();
-                    let mut ctrl = (m_pos, src_pos);
-                    ctrl.0.x = l_bound;
-                    ctrl.1.x = r_bound;
-                    m_pos.x = m_pos.x.at_most(l_bound);
-                    src_pos.x = src_pos.x.at_least(r_bound);
-                    let color = ui.style().visuals.text_color();
-                    let link =
-                        epaint::PathShape::line(vec![m_pos, ctrl.0, ctrl.1, src_pos], (2.0, color));
-                    ui.painter().add(link);
-                }
-            };
-            for (k, g) in greens {
-                done.insert(k);
-                if let Some(b) = blues.get(&k) {
-                    f(g, b)
-                }
+    // render the attached color boxes
+    ui.set_clip_rect(timeline_window);
+    for i in 0..attached.attacheds.len() - 1 {
+        let (left, right) = attached.attacheds.split_at(i + 1);
+        let (greens, blues) = (&left.last().unwrap().1, &right.first().unwrap().0);
+        let mut done = HashSet::default();
+        let cable = false;
+        let mut min_right_x = 0.0;
+        let mut min_left_x = 0.0;
+        let l_bound = res_impl.viewport_x.min + (i + 1) as f32 * (col_width + spacing.x) - 15.0;
+        let r_bound = l_bound + 25.0;
+        let mut f = |&(green, g_rect), &(blue, b_rect)| {
+            if cable {
+                let green: egui::Id = green;
+                let blue: egui::Id = blue;
             }
-            for (k, b) in blues {
-                if done.contains(&k) {
-                    continue;
-                }
-                if let Some(g) = greens.get(&k) {
-                    f(g, b)
-                }
+
+            if let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) {
+                let m_rect: egui::Rect = m_rect;
+                let src_rect: egui::Rect = src_rect;
+                let mut m_pos = m_rect.right_center();
+                let mut src_pos = src_rect.left_center();
+                let mut ctrl = (m_pos, src_pos);
+                ctrl.0.x = l_bound;
+                ctrl.1.x = r_bound;
+                use egui::NumExt;
+                m_pos.x = m_pos.x.at_most(l_bound);
+                src_pos.x = src_pos.x.at_least(r_bound);
+                let color = ui.style().visuals.text_color();
+                let link =
+                    epaint::PathShape::line(vec![m_pos, ctrl.0, ctrl.1, src_pos], (2.0, color));
+                ui.painter().add(link);
+            }
+        };
+        for (k, g) in greens {
+            done.insert(k);
+            if let Some(b) = blues.get(&k) {
+                f(g, b)
             }
         }
-    }
-
-    if long_tracking.detatched_view {
-        let line_id: egui::Id = egui::Id::new("drag line");
-        let col_width = timeline_window_width / total_cols as f32;
-        let mut rendered = HashMap::<CodeRange, epaint::Rect>::default();
-        let mut hovered_fut = None;
-        let mut released_past = None;
-        for (col, (_, res)) in long_tracking.results.iter_mut().enumerate() {
-            let default_x = timeline_window.left() + col as f32 * col_width;
-            // ui.add(egui_cable::prelude::Port::new(id));
-            res.try_poll();
-            if let Some(res) = res.get_mut() {
-                let res = &mut res.content.track.results;
-                for (i, r) in res.iter_mut().enumerate() {
-                    let src = &mut r.src;
-                    let src_id = ui.id().with(&src);
-                    let src_rect = {
-                        let default_pos = (default_x + col_width / 2.0, i as f32 * 50.0);
-                        let resp = show_detached_element(
-                            ui,
-                            &store,
-                            &long_tracking.detatched_view_options,
-                            src,
-                            src_id,
-                            default_pos,
-                        );
-                        if let Some(_) = resp.inner.2 {
-                            hovered_fut = Some(src.clone());
-                        }
-                        if let Some(past) = resp.inner.1 {
-                            if past.double_clicked() {
-                            } else {
-                                if past.is_pointer_button_down_on() {
-                                    let id = src_id;
-                                    ui.memory_mut(|mem| {
-                                        if let Some(i) = mem.data.get_temp(line_id) {
-                                            if id.with("past_interact") != i {
-                                                panic!();
-                                            }
-                                        } else {
-                                            mem.data.insert_temp(line_id, id.with("past_interact"));
-                                        }
-                                    });
-                                    ui.ctx().set_dragged_id(line_id);
-                                }
-                            }
-                        }
-                        {
-                            let is_dragged = ui.ctx().is_being_dragged(line_id);
-                            if is_dragged {
-                                let state =
-                                    ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id));
-                                let state = if let Some(mut state) = state {
-                                    if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                                        state.1 = pos;
-                                    }
-                                    Some(state)
-                                } else {
-                                    ui.ctx().pointer_latest_pos().map(|x| (x, x))
-                                };
-                                if let Some(state) = state {
-                                    ui.painter().line_segment(
-                                        [state.0, state.1],
-                                        (2.0, egui::Color32::BLUE),
-                                    );
-                                    // ui.input(|i| {
-                                    //     i.pointer.any_pressed() && i.pointer.any_down()
-                                    // });
-
-                                    ui.memory_mut(|mem| {
-                                        mem.data.insert_temp::<(Pos2, Pos2)>(line_id, state)
-                                    });
-                                }
-                            } else if ui.memory_mut(|mem| {
-                                mem.data.get_temp(line_id) == Some(src_id.with("past_interact"))
-                            }) {
-                                let Some(mut state) =
-                                    ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id))
-                                else {
-                                    panic!()
-                                };
-                                if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                                    state.1 = pos;
-                                }
-                                ui.painter()
-                                    .line_segment([state.0, state.1], (2.0, egui::Color32::BLUE));
-                                released_past = Some(src.clone());
-                                // if let Some(hovered_src_fut) = hovered_src_fut {
-                                //     panic!();
-                                // }
-                                ui.memory_mut(|mem| {
-                                    mem.data.remove::<(Pos2, Pos2)>(line_id);
-                                    mem.data.remove::<egui::Id>(line_id)
-                                });
-                            }
-                        }
-                        rendered.insert(src.clone(), resp.inner.0.rect);
-                        resp.inner.0.rect
-                    };
-                    for m in &mut r.matched {
-                        let id = ui.id().with(&m);
-                        let m_rect = if let Some(m_pos) = rendered.get(&m) {
-                            m_pos.clone()
-                        } else {
-                            let default_pos = (default_x, i as f32 * 50.0);
-                            let resp = show_detached_element(
-                                ui,
-                                &store,
-                                &long_tracking.detatched_view_options,
-                                &m,
-                                id,
-                                default_pos,
-                            );
-                            rendered.insert(m.clone(), resp.inner.0.rect);
-                            if let Some(_) = resp.inner.2 {
-                                hovered_fut = Some(m.clone());
-                            }
-                            if let Some(past) = resp.inner.1 {
-                                if past.double_clicked() {
-                                } else {
-                                    if past.is_pointer_button_down_on() {
-                                        ui.memory_mut(|mem| {
-                                            if let Some(i) = mem.data.get_temp(line_id) {
-                                                if id.with("past_interact") != i {
-                                                    panic!();
-                                                }
-                                            } else {
-                                                mem.data
-                                                    .insert_temp(line_id, id.with("past_interact"));
-                                            }
-                                        });
-                                        ui.ctx().set_dragged_id(line_id);
-                                    }
-                                }
-                            }
-                            {
-                                let is_dragged = ui.ctx().is_being_dragged(line_id);
-                                if is_dragged {
-                                    let state = ui.memory_mut(|mem| {
-                                        mem.data.get_temp::<(Pos2, Pos2)>(line_id)
-                                    });
-                                    let state = if let Some(mut state) = state {
-                                        if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                                            state.1 = pos;
-                                        }
-                                        Some(state)
-                                    } else {
-                                        ui.ctx().pointer_latest_pos().map(|x| (x, x))
-                                    };
-                                    if let Some(state) = state {
-                                        ui.painter().line_segment(
-                                            [state.0, state.1],
-                                            (2.0, egui::Color32::BLUE),
-                                        );
-                                        // ui.input(|i| {
-                                        //     i.pointer.any_pressed() && i.pointer.any_down()
-                                        // });
-
-                                        ui.memory_mut(|mem| {
-                                            mem.data.insert_temp::<(Pos2, Pos2)>(line_id, state)
-                                        });
-                                    }
-                                } else if ui.memory_mut(|mem| {
-                                    mem.data.get_temp(line_id) == Some(id.with("past_interact"))
-                                }) {
-                                    let Some(mut state) = ui.memory_mut(|mem| {
-                                        mem.data.get_temp::<(Pos2, Pos2)>(line_id)
-                                    }) else {
-                                        panic!()
-                                    };
-                                    if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                                        state.1 = pos;
-                                    }
-                                    ui.painter().line_segment(
-                                        [state.0, state.1],
-                                        (2.0, egui::Color32::BLUE),
-                                    );
-                                    released_past = Some(m.clone());
-                                    ui.memory_mut(|mem| {
-                                        mem.data.remove::<(Pos2, Pos2)>(line_id);
-                                        mem.data.remove::<egui::Id>(line_id)
-                                    });
-                                }
-                            }
-                            resp.inner.0.rect
-                        };
-                        if long_tracking.detatched_view_options.cable {
-                            let in_id = src_id.with("right");
-                            // let in_plug = Plug::to(in_id).default_pos(egui::Pos2::ZERO);
-                            let out_id = id.with("left");
-                            // let out_plug = Plug::to(out_id).default_pos(egui::Pos2::ZERO);
-                            // ui.add(Cable::new(in_id.with(out_id), in_plug, out_plug));
-                        }
-                        let m_pos = m_rect.center();
-                        let src_pos = src_rect.center();
-                        let x = m_pos.x - src_pos.x + 350.0;
-                        let x = if x < 0.0 {
-                            -(m_pos.x - src_pos.x).abs() * 100.0 / x
-                        } else {
-                            2.0 * x
-                        };
-                        let y = ((m_pos.y - src_pos.y) / 2.0).clamp(-100.0, 100.0);
-                        let b_d = m_rect.right() - src_rect.left();
-                        let mut color = egui::Color32::RED;
-                        let mut ctrl = (m_pos, src_pos);
-                        use std::f32::consts::TAU;
-                        let center_v = m_rect.center() - src_rect.center();
-                        let angle =
-                            ((center_v) * epaint::vec2(0.5, 1.0)).normalized().angle() / TAU + 0.5
-                                - 0.125;
-                        if (0.03..0.25).contains(&angle) {
-                        } else if (0.25..0.5).contains(&angle) {
-                        } else if (0.5..0.71).contains(&angle) {
-                        } else {
-                            ctrl.0.x += m_rect.width() / 2.0 - b_d / 2.0 * 1.0;
-                            ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
-                            color = egui::Color32::BLACK;
-                            if long_tracking.detatched_view_options.meta {
-                                meta_egde(m_pos, src_pos, m_rect, ctrl, src_rect, color, ui);
-                            }
-                            if long_tracking.detatched_view_options.bezier {
-                                let link = epaint::CubicBezierShape::from_points_stroke(
-                                    [m_pos, ctrl.0, ctrl.1, src_pos],
-                                    false,
-                                    egui::Color32::TRANSPARENT,
-                                    (5.0, color),
-                                );
-                                let tolerance = (m_pos.x - src_pos.x).abs() * 0.01;
-                                ui.painter().extend(
-                                    link.to_path_shapes(Some(tolerance), None)
-                                        .into_iter()
-                                        .map(|x| epaint::Shape::Path(x)),
-                                );
-                            }
-                            if long_tracking.detatched_view_options.three {
-                                let link = epaint::PathShape::line(
-                                    vec![m_pos, ctrl.0, ctrl.1, src_pos],
-                                    (1.0, color),
-                                );
-                                ui.painter().add(link);
-                            }
-                            continue;
-                        }
-                        let link = epaint::PathShape::line(vec![m_pos, src_pos], (1.0, color));
-                        ui.painter().add(link);
-                    }
-                }
-            }
-        }
-        if let (Some(hovered_fut), Some(released_past)) = (hovered_fut, released_past) {
-            long_tracking
-                .additionnal_links
-                .push([hovered_fut, released_past]);
-        }
-        for [m, src] in &long_tracking.additionnal_links {
-            let m_rect = *rendered.get(m).unwrap();
-            let src_rect = *rendered.get(src).unwrap();
-            let m_pos = m_rect.center();
-            let src_pos = src_rect.center();
-            let x = m_pos.x - src_pos.x + 350.0;
-            let x = if x < 0.0 {
-                -(m_pos.x - src_pos.x).abs() * 100.0 / x
-            } else {
-                2.0 * x
-            };
-            let y = ((m_pos.y - src_pos.y) / 2.0).clamp(-100.0, 100.0);
-            let b_d = m_rect.right() - src_rect.left();
-            let mut color = egui::Color32::RED;
-            let mut ctrl = (m_pos, src_pos);
-            use std::f32::consts::TAU;
-            let center_v = m_rect.center() - src_rect.center();
-            let angle =
-                ((center_v) * epaint::vec2(0.5, 1.0)).normalized().angle() / TAU + 0.5 - 0.125;
-            if (0.03..0.25).contains(&angle) {
-            } else if (0.25..0.5).contains(&angle) {
-            } else if (0.5..0.71).contains(&angle) {
-            } else {
-                ctrl.0.x += m_rect.width() / 2.0 - b_d / 2.0 * 1.0;
-                ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
-                color = egui::Color32::BLACK;
-                if long_tracking.detatched_view_options.meta {
-                    meta_egde(m_pos, src_pos, m_rect, ctrl, src_rect, color, ui);
-                }
-                if long_tracking.detatched_view_options.bezier {
-                    let link = epaint::CubicBezierShape::from_points_stroke(
-                        [m_pos, ctrl.0, ctrl.1, src_pos],
-                        false,
-                        egui::Color32::TRANSPARENT,
-                        (5.0, color),
-                    );
-                    let tolerance = (m_pos.x - src_pos.x).abs() * 0.01;
-                    ui.painter().extend(
-                        link.to_path_shapes(Some(tolerance), None)
-                            .into_iter()
-                            .map(|x| epaint::Shape::Path(x)),
-                    );
-                }
-                if long_tracking.detatched_view_options.three {
-                    let link =
-                        epaint::PathShape::line(vec![m_pos, ctrl.0, ctrl.1, src_pos], (1.0, color));
-                    ui.painter().add(link);
-                }
+        for (k, b) in blues {
+            if done.contains(&k) {
                 continue;
             }
-            let link = epaint::PathShape::line(vec![m_pos, src_pos], (1.0, color));
-            ui.painter().add(link);
+            if let Some(g) = greens.get(&k) {
+                f(g, b)
+            }
         }
     }
 }
 
-struct LineDrag {
-    origin_code_ele: CodeRange,
-    line: (egui::Pos2, egui::Pos2),
-    ori_trap: egui::Id,
+struct AttachedImpl<'a> {
+    attacheds: Attacheds,
+    differed_focus_scroll: Option<DeferedFocusScroll>,
+    waiting: Vec<(usize, TrackingResultWithChangesProm)>,
+    new_origins: Vec<CodeRange>,
+    res_impl: &'a LongTrackingResultsImpl<'a>,
+    origin_index: usize,
+}
+impl<'a> AttachedImpl<'a> {
+    fn new(res_impl: &'a LongTrackingResultsImpl<'a>, origin_index: usize) -> Self {
+        Self {
+            attacheds: Default::default(),
+            differed_focus_scroll: Default::default(),
+            waiting: Default::default(),
+            new_origins: Default::default(),
+            res_impl,
+            origin_index,
+        }
+    }
+
+    // show attacheds
+    fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        long_tracking: &mut LongTacking,
+        store: &Arc<FetchedHyperAST>,
+        aspects: &mut ComputeConfigAspectViews,
+        fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    ) -> () {
+        let res_impl = self.res_impl;
+        for col in res_impl.col_range() {
+            self.attacheds.push(Default::default());
+
+            let ui = &mut self.prep_ui(ui, col);
+
+            let mut curr_view = match init_col_view(
+                ui,
+                self,
+                col,
+                &mut long_tracking.results,
+                &mut long_tracking.origins,
+            ) {
+                Ok(curr_view) => curr_view,
+                Err(err) => {
+                    ui.colored_label(ui.visuals().error_fg_color, err);
+                    continue;
+                }
+            };
+
+            if long_tracking.tree_view {
+                show_tree_view_of_tracking(
+                    ui,
+                    store,
+                    col,
+                    &long_tracking.flags,
+                    aspects,
+                    &mut long_tracking.tree_viewer,
+                    self,
+                    &mut curr_view,
+                );
+            } else if long_tracking.ser_view {
+                show_ser_view_of_tracking(
+                    ui,
+                    &long_tracking.flags,
+                    col,
+                    fetched_files,
+                    self,
+                    &mut curr_view,
+                );
+            }
+        }
+    }
+
+    fn prep_ui(&mut self, ui: &mut egui::Ui, col: usize) -> egui::Ui {
+        let relative = col as isize - self.origin_index as isize;
+        let LongTrackingResultsImpl {
+            timeline_window,
+            w_id,
+            spacing,
+            col_width,
+            min_col,
+            ..
+        } = *self.res_impl;
+        let x_range = ui.available_rect_before_wrap().x_range();
+        let x_start = x_range.min + (col_width + spacing.x) * (col - min_col) as f32;
+        let x_end = x_start + col_width;
+        let max_rect = egui::Rect::from_x_y_ranges(x_start..=x_end, ui.max_rect().y_range());
+        let x_start = timeline_window.x_range().min.max(x_start - spacing.x);
+        let x_end = timeline_window.x_range().max.min(x_end);
+        let clip_rect = egui::Rect::from_x_y_ranges(x_start..=x_end, ui.max_rect().y_range());
+        let mut ui = egui::Ui::new(
+            ui.ctx().clone(),
+            w_id.with(relative),
+            egui::UiBuilder {
+                ui_stack_info: ui.stack().info.clone(),
+                max_rect: Some(max_rect),
+                ..Default::default()
+            },
+        );
+        ui.set_clip_rect(clip_rect);
+        ui
+    }
+
+    fn is_origin(&self, col: usize) -> bool {
+        let relative = col as isize - self.origin_index as isize;
+        relative == 0
+    }
+
+    fn has_future(&self, col: usize) -> bool {
+        col + 1 < self.res_impl.total_cols
+    }
+    fn has_past(&self, col: usize) -> bool {
+        col != 0
+    }
 }
 
-fn color_gr_shift(color: epaint::Color32, step: f32) -> epaint::Color32 {
-    egui::Color32::from_rgba_unmultiplied(
-        color.r().saturating_add(step.round() as u8),
-        color.g().saturating_sub(step.round() as u8),
-        color.b(),
-        color.a(),
-    )
+fn init_col_view<'a>(
+    ui: &mut egui::Ui,
+    attached: &AttachedImpl<'_>,
+    col: usize,
+    tracking_results: &'a mut LongTrackingResults,
+    tracking_origins: &'a mut Vec<CodeRange>,
+) -> Result<ColView<'a>, String> {
+    let mut curr_view = ColView::default();
+    let original_targets = &mut curr_view.original_targets;
+    if attached.is_origin(col) {
+        match (attached.has_past(col), attached.has_future(col)) {
+            (true, true) => {
+                let result = tracking_results
+                    .get_mut(col - 1)
+                    .and_then(|x| x.1.get_mut());
+                let Some(result) = result else {
+                    original_targets.push((&mut tracking_origins[0], 0));
+                    return Ok(curr_view);
+                };
+                if let Some(x) = &mut result.content.dst_changes {
+                    curr_view.additions = Some(&mut x.additions);
+                }
+                if let Some(x) = &mut result.content.src_changes {
+                    assert_ne!(tracking_origins[0].file.commit, x.commit);
+                    curr_view.left_commit = Some(&mut x.commit);
+                }
+                let mut origins = tracking_origins.iter_mut();
+                for (i, result) in result.content.track.results.iter_mut().enumerate() {
+                    curr_view.effective_targets.push((&mut result.src, i));
+                    (curr_view.effective_targets).push((origins.next().unwrap(), i));
+                }
+            }
+            (true, false) => {
+                let result = tracking_results
+                    .get_mut(col - 1)
+                    .and_then(|x| x.1.get_mut());
+                let Some(result) = result else {
+                    original_targets.push((&mut tracking_origins[0], 0));
+                    return Ok(curr_view);
+                };
+                if let Some(changes) = &mut result.content.dst_changes {
+                    curr_view.additions = Some(&mut changes.additions);
+                }
+                if let Some(changes) = &mut result.content.src_changes {
+                    assert_ne!(tracking_origins[0].file.commit, changes.commit);
+                    curr_view.left_commit = Some(&mut changes.commit);
+                }
+                let mut origins = tracking_origins.iter_mut();
+                for (i, result) in result.content.track.results.iter_mut().enumerate() {
+                    curr_view.effective_targets.push((&mut result.src, i));
+                    if let Some(origins) = origins.next() {
+                        curr_view.original_targets.push((origins, i));
+                    }
+                }
+            }
+            (false, true) => todo!(),
+            (false, false) => {
+                // nothing to do
+                original_targets.push((&mut tracking_origins[0], 0));
+            }
+        }
+    } else if attached.has_past(col) {
+        let mut it = tracking_results.range_mut(col - 1..=col);
+        let past = it.next();
+
+        if let Some(result) = past.and_then(|x| x.1.get_mut()) {
+            if let Some(changes) = &mut result.content.dst_changes {
+                curr_view.additions = Some(&mut changes.additions);
+            }
+            if let Some(changes) = &mut result.content.src_changes {
+                curr_view.left_commit = Some(&mut changes.commit);
+            }
+            for (i, result) in result.content.track.results.iter_mut().enumerate() {
+                assert_ne!(
+                    result.src.file.commit,
+                    **curr_view.left_commit.as_ref().unwrap()
+                );
+                curr_view.effective_targets.push((&mut result.src, i));
+            }
+        }
+        let curr = it.next();
+        if let Some(result) = curr.and_then(|x| x.1.get_mut()) {
+            for (i, result) in result.content.track.results.iter_mut().enumerate() {
+                let result = result.matched.get_mut(0).or(result.fallback.as_mut());
+                (curr_view.matcheds).push((result.unwrap(), i));
+            }
+            if let Some(changes) = &mut result.content.src_changes {
+                curr_view.deletions = Some(&mut changes.deletions);
+            }
+        }
+        if original_targets.is_empty() {
+            original_targets.push((&mut tracking_origins[0], 0));
+        }
+        assert!(it.next().is_none());
+    } else {
+        let result = tracking_results.get_mut(col).and_then(|x| x.1.get_mut());
+        let Some(result) = result else {
+            original_targets.push((&mut tracking_origins[0], 0));
+            return Ok(curr_view);
+        };
+        if result.content.track.results.is_empty() {
+            return Err(result.errors.join("\n"));
+        }
+        if let Some(x) = &mut result.content.src_changes {
+            curr_view.deletions = Some(&mut x.deletions);
+        }
+        for (i, result) in result.content.track.results.iter_mut().enumerate() {
+            let result = result.matched.get_mut(0).or(result.fallback.as_mut());
+            curr_view.matcheds.push((result.unwrap(), i));
+        }
+    }
+    Ok(curr_view)
 }
 
-fn show_detached_element(
+fn show_tree_view_of_tracking(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
-    global_opt: &DetatchedViewOptions,
-    x: &CodeRange,
-    id: egui::Id,
-    default_pos: (f32, f32),
-) -> egui::InnerResponse<(
-    egui::Response,
-    Option<egui::Response>,
-    Option<egui::Response>,
-)> {
-    let p = ui.available_rect_before_wrap().left_bottom();
-    #[derive(Clone)]
-    struct O {
-        commit: bool,
-        file: bool,
-        path: bool,
-        id: bool,
-        kind: bool,
-        label: bool,
-        size: bool,
-        /// search number literal
-        extra: bool,
-    }
-    impl Default for O {
-        fn default() -> Self {
-            Self {
-                commit: true,
-                file: true,
-                path: true,
-                id: true,
-                kind: true,
-                label: true,
-                size: true,
-                extra: false,
-            }
+    col: usize,
+    flags: &Flags,
+    aspects: &mut ComputeConfigAspectViews,
+    tree_viewer: &mut BufferedPerCommit<Result<Resource<FetchedView>, String>>,
+    attached: &mut AttachedImpl<'_>,
+    curr_view: &mut ColView<'_>,
+) {
+    let res_impl = &attached.res_impl;
+    let curr_commit = {
+        let curr = if curr_view.matcheds.get(0).is_some() {
+            curr_view.matcheds.get_mut(0)
+        } else {
+            curr_view.original_targets.get_mut(0)
+        };
+        let Some((curr, _)) = curr else {
+            return;
+        };
+        &curr.file.commit
+    };
+    let tree_viewer = tree_viewer.entry(curr_commit.clone());
+    let tree_viewer = tree_viewer.or_insert_with(|| Buffered::default());
+    let trigger = tree_viewer.try_poll();
+    let Some(tree_viewer) = tree_viewer.get_mut() else {
+        if !tree_viewer.is_waiting() {
+            tree_viewer.buffer(remote_fetch_node_old(
+                ui.ctx(),
+                res_impl.api_addr,
+                store.clone(),
+                &curr_commit,
+                "",
+            ));
+        }
+        return;
+    };
+    let Ok(tree_viewer) = tree_viewer.as_mut().map_err(|err| {
+        log::error!("{}", err);
+        ui.colored_label(ui.visuals().error_fg_color, err);
+    }) else {
+        return;
+    };
+    let Some(p) = show_tree_view(
+        ui,
+        res_impl.min_col,
+        res_impl.api_addr,
+        col,
+        trigger,
+        tree_viewer,
+        curr_view,
+        aspects,
+        &mut attached.attacheds,
+        &mut attached.differed_focus_scroll,
+    ) else {
+        return;
+    };
+
+    let curr = if !curr_view.matcheds.is_empty() {
+        curr_view.matcheds.get_mut(0)
+    } else {
+        curr_view.original_targets.get_mut(0)
+    };
+    let Some((curr, _)) = curr else { return };
+    if attached.is_origin(col) {
+        curr.path = p;
+        if col == 0 {
+            // TODO only request changes when we have none
+            let track_at_path = track_at_path_with_changes(
+                ui.ctx(),
+                res_impl.api_addr,
+                &curr.file.commit,
+                &curr.path,
+                flags,
+            );
+            attached.waiting.push((col, track_at_path));
+        } else {
+            // TODO allow to reset tracking
+            attached.new_origins.push(CodeRange {
+                file: curr.file.clone(),
+                range: None,
+                path: curr.path.clone(),
+                path_ids: vec![],
+            });
+            let past_commit = curr_view.left_commit.as_ref().unwrap();
+            assert_ne!(&curr.file.commit, *past_commit);
+            let track_at_path = track_at_path(
+                ui.ctx(),
+                res_impl.api_addr,
+                &curr.file.commit,
+                Some(past_commit),
+                &curr.path,
+                &Default::default(),
+            );
+            attached.waiting.push((col, track_at_path));
+        }
+    } else {
+        if col == 0 {
+            let track_at_path = track_at_path_with_changes(
+                ui.ctx(),
+                res_impl.api_addr,
+                &curr.file.commit,
+                &p,
+                flags,
+            );
+            attached.waiting.push((col, track_at_path));
+        } else {
+            let past_commit = curr_view.left_commit.as_ref().unwrap();
+            let present_commit = &curr.file.commit;
+            // TODO allow to reset tracking
+            assert_ne!(&present_commit, past_commit);
+            let track_at_path = track_at_path(
+                ui.ctx(),
+                res_impl.api_addr,
+                &present_commit,
+                Some(past_commit),
+                &p,
+                &Default::default(),
+            );
+            attached.waiting.push((col, track_at_path));
         }
     }
-    let options = ui
-        .memory_mut(|mem| mem.data.get_temp::<O>(id))
-        .unwrap_or_default();
-    let area = egui::Area::new(id)
-        .default_pos(default_pos)
-        .show(ui.ctx(), |ui| {
-            let past_resp;
-            let fut_resp;
-            let past = ui.painter().add(egui::Shape::Noop);
-            let futur = ui.painter().add(egui::Shape::Noop);
-            let mut prepared = egui::Frame::window(&ui.style()).begin(ui);
-            let cui = &mut prepared.content_ui;
-            if options.commit {
-                cui.label(format!(
-                    "{}",
-                    &x.file.commit.id[..x.file.commit.id.len().min(6)]
-                ));
-            }
-            if options.file {
-                if let Some(range) = &x.range {
-                    cui.label(format!("{}:{:?}", x.file.file_path, range));
-                } else {
-                    cui.label(format!("{}", x.file.file_path));
-                }
-            }
-            if options.path {
-                cui.label(format!("{:?}", x.path));
-            }
-            if let Some(id) = x.path_ids.first() {
-                if options.id {
-                    cui.label(format!("{:?}", id));
-                }
-                if let Some(r) = store.node_store.read().unwrap().try_resolve::<AnyType>(*id) {
-                    use hyperast::types::{Tree, Typed, WithStats};
-                    if options.kind {
-                        let kind = store.resolve_type(id);
-                        cui.label(format!("{}", kind));
-                    }
-                    if options.label {
-                        let l = r.try_get_label().copied();
-                        if let Some(l) = l {
-                            if let Some(l) = store.label_store.read().unwrap().try_resolve(&l) {
-                                cui.label(format!("{:?}", l));
-                            }
-                        }
-                    }
-                    // let cs = r.children();
-                    if options.size {
-                        let size = r.size();
-                        cui.label(format!("size: {}", size));
-                    }
-                    if options.extra {
-                        use hyperast::types::{Labeled, WithChildren};
-                        let mut q: VecDeque<NodeIdentifier> = Default::default();
-                        if let Some(cs) = r.children() {
-                            cs.0.iter().for_each(|x| q.push_back(*x));
-                        }
-                        let mut value = None;
-                        let mut name = None;
-                        while let Some(r_id) = q.pop_front() {
-                            if value.is_some() && name.is_some() {
-                                break;
-                            }
-                            if let Some(r) = store
-                                .node_store
-                                .read()
-                                .unwrap()
-                                .try_resolve::<AnyType>(r_id)
-                            {
-                                let t = store.resolve_type(&r_id);
-                                if t.generic_eq(&hyperast_gen_ts_cpp::types::Type::NumberLiteral) {
-                                    if value.is_none() {
-                                        let l = r.get_label_unchecked();
-                                        if let Some(l) =
-                                            store.label_store.read().unwrap().try_resolve(&l)
-                                        {
-                                            value = Some(l.to_owned());
-                                        } else {
-                                            if !store
-                                                .labels_pending
-                                                .lock()
-                                                .unwrap()
-                                                .iter()
-                                                .any(|x| x.contains(l))
-                                            {
-                                                store
-                                                    .labels_waiting
-                                                    .lock()
-                                                    .unwrap()
-                                                    .get_or_insert(Default::default())
-                                                    .insert(*l);
-                                            }
-                                        }
-                                    }
-                                } else if t
-                                    .generic_eq(&hyperast_gen_ts_cpp::types::Type::Identifier)
-                                {
-                                    if name.is_none() {
-                                        let l = r.get_label_unchecked();
-                                        if let Some(l) =
-                                            store.label_store.read().unwrap().try_resolve(&l)
-                                        {
-                                            name = Some(l.to_owned());
-                                        } else {
-                                            if !store
-                                                .labels_pending
-                                                .lock()
-                                                .unwrap()
-                                                .iter()
-                                                .any(|x| x.contains(l))
-                                            {
-                                                store
-                                                    .labels_waiting
-                                                    .lock()
-                                                    .unwrap()
-                                                    .get_or_insert(Default::default())
-                                                    .insert(*l);
-                                            }
-                                        }
-                                    }
-                                } else if let Some(cs) = r.children() {
-                                    cs.0.iter().for_each(|x| q.push_back(*x));
-                                }
-                            } else {
-                                if !store
-                                    .nodes_pending
-                                    .lock()
-                                    .unwrap()
-                                    .iter()
-                                    .any(|x| x.contains(&r_id))
-                                {
-                                    store
-                                        .nodes_waiting
-                                        .lock()
-                                        .unwrap()
-                                        .get_or_insert(Default::default())
-                                        .insert(r_id);
-                                }
-                            }
-                        }
-                        if let Some(l) = name {
-                            cui.label(format!("name: {}", l));
-                        }
-                        if let Some(l) = value {
-                            cui.label(format!("value: {}", l));
-                        }
-                    }
-                } else {
-                    if !store
-                        .nodes_pending
-                        .lock()
-                        .unwrap()
-                        .iter()
-                        .any(|x| x.contains(id))
-                    {
-                        store
-                            .nodes_waiting
-                            .lock()
-                            .unwrap()
-                            .get_or_insert(Default::default())
-                            .insert(*id);
-                    }
-                }
-            }
-            // ui.text_edit_multiline(&mut format!("{:#?}", x));
-            if global_opt.cable {
-                // cui.add(egui_cable::prelude::Port::new(id.with("left")));
-                // cui.add_space(10.0);
-                // cui.add(egui_cable::prelude::Port::new(id.with("right")));
-            }
-            cui.min_rect();
-            let min = cui.min_rect().min;
-            let size = cui.min_rect().size();
-            let s = 25.0;
-            if false {
-                let mut out = epaint::Mesh::default();
-                let mut path = epaint::tessellator::Path::default();
-                path.clear();
-                let top = min;
-                let mut bot = min;
-                bot.y += size.y;
-                path.add_line_loop(&[
-                    epaint::pos2(top.x - s, top.y - s),
-                    epaint::pos2(top.x, top.y),
-                    epaint::pos2(bot.x, bot.y),
-                    epaint::pos2(bot.x - s, bot.y + s),
-                ]);
-                path.fill(10.0, egui::Color32::RED, &mut out);
-                ui.painter().set(past, out);
-                // path.stroke_closed(self.feathering, stroke, &mut out);
-                past_resp = Some(ui.interact(
-                    egui::Rect::NOTHING,
-                    id.with("past_interact"),
-                    egui::Sense::click(),
-                ));
-            } else {
-                let mut out = epaint::Mesh::default();
-                let top = min;
-                let mut bot = min;
-                bot.y += size.y;
-                let rect = egui::Rect::from_min_max(top + (-2.0 * s, 0.0).into(), bot);
-                let right_paint = |col| {
-                    let transp = egui::Color32::TRANSPARENT;
-                    out.colored_vertex(epaint::pos2(top.x - s, top.y - s), transp);
-                    out.colored_vertex(epaint::pos2(top.x, top.y), col);
-                    out.colored_vertex(epaint::pos2(bot.x, bot.y), col);
-                    out.colored_vertex(epaint::pos2(bot.x - s, bot.y + s), transp);
-                    out.add_triangle(0, 1, 2);
-                    out.add_triangle(0, 2, 3);
-                    ui.painter().set(past, out);
-                };
-                if ui
-                    .ctx()
-                    .pointer_hover_pos()
-                    .map_or(false, |x| rect.contains(x))
-                {
-                    let resp = ui.interact(rect, id.with("past_interact"), egui::Sense::click());
-                    let col = if resp.clicked() {
-                        egui::Color32::BLUE //.gamma_multiply(0.5)
-                    } else {
-                        egui::Color32::RED.gamma_multiply(0.5)
-                    };
-                    past_resp = Some(resp);
+}
 
-                    right_paint(col);
-                } else if ui.memory_mut(|mem| {
-                    mem.data.get_temp::<egui::Id>(egui::Id::new("drag line"))
-                        == Some(id.with("past_interact"))
-                }) {
-                    right_paint(egui::Color32::BLUE);
-                    past_resp = None;
-                } else {
-                    past_resp = None;
-                }
-            }
-            {
-                let mut out = epaint::Mesh::default();
-                let mut top = min;
-                top.x += size.x;
-                let mut bot = top;
-                bot.y += size.y;
-                let rect = egui::Rect::from_min_max(top, bot + (2.0 * s, 0.0).into());
-                let left_paint = |col| {
-                    let transp = egui::Color32::TRANSPARENT;
-                    out.colored_vertex(epaint::pos2(top.x, top.y), col);
-                    out.colored_vertex(epaint::pos2(top.x + s, top.y - s), transp);
-                    out.colored_vertex(epaint::pos2(bot.x + s, bot.y + s), transp);
-                    out.colored_vertex(epaint::pos2(bot.x, bot.y), col);
-                    out.add_triangle(0, 1, 2);
-                    out.add_triangle(0, 2, 3);
-                    ui.painter().set(futur, out);
-                };
-                if ui
-                    .ctx()
-                    .pointer_hover_pos()
-                    .map_or(false, |x| rect.contains(x))
-                {
-                    let resp = ui.interact(rect, id.with("fut_interact"), egui::Sense::click());
-                    let col = if resp.clicked() {
-                        egui::Color32::BLUE //.gamma_multiply(0.5)
-                    } else {
-                        egui::Color32::GREEN.gamma_multiply(0.5)
-                    };
-                    fut_resp = Some(resp);
+type TrackingResultWithChangesProm = Promise<Result<TrackingResultWithChanges, String>>;
 
-                    left_paint(col);
-                } else if ui.memory_mut(|mem| {
-                    mem.data.get_temp::<egui::Id>(egui::Id::new("drag line"))
-                        == Some(id.with("fut_interact"))
-                }) {
-                    left_paint(egui::Color32::BLUE);
-                    fut_resp = None;
-                } else {
-                    fut_resp = None;
-                }
-            }
-            let response = prepared.end(ui);
-            (response, past_resp, fut_resp)
-        });
-    if area.response.hovered() {
-        let options = ui.ctx().input_mut(|inp| O {
-            id: options.id ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::I),
-            commit: options.commit ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::C),
-            file: options.file ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::F),
-            path: options.path ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::P),
-            kind: options.kind ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::K),
-            label: options.label ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::L),
-            size: options.size ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::S),
-            extra: options.extra ^ inp.consume_key(egui::Modifiers::NONE, egui::Key::Y),
-        });
-        ui.memory_mut(|mem| mem.data.insert_temp::<O>(id, options));
-        egui::Area::new("full".into())
-            .fixed_pos(p)
-            .anchor(egui::Align2::LEFT_BOTTOM, (0.0, 0.0))
-            .show(ui.ctx(), |ui| {
-                let text = if let Some(range) = &x.range {
-                    format!(
-                        "{}/{}:{:?}",
-                        &x.file.commit.id[..x.file.commit.id.len().min(6)],
-                        x.file.file_path,
-                        range
-                    )
-                } else {
-                    format!(
-                        "{}{}",
-                        &x.file.commit.id[..x.file.commit.id.len().min(6)],
-                        x.file.file_path
-                    )
-                };
-                ui.label(egui::RichText::new(text).background_color(egui::Color32::GRAY))
-            });
+fn show_ser_view_of_tracking(
+    ui: &mut egui::Ui,
+    flags: &Flags,
+    col: usize,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+    attached: &mut AttachedImpl<'_>,
+    curr_view: &mut ColView<'_>,
+) {
+    let relative = col as isize - attached.origin_index as isize;
+    let is_origin = relative == 0;
+    let res_impl = &attached.res_impl;
+    let api_addr = res_impl.api_addr;
+    let Some(te) = show_code_view(ui, api_addr, curr_view, fetched_files) else {
+        return;
+    };
+    let offset = 0;
+    if te.response.is_pointer_button_down_on() {
+        return;
     }
-    area
+    let Some(bb) = &te.cursor_range else { return };
+    let s = te.galley.text();
+    let r = bb.as_sorted_char_range();
+    let r = Range {
+        start: offset + byte_index_from_char_index(s, r.start),
+        end: offset + byte_index_from_char_index(s, r.end),
+    };
+
+    let curr = if curr_view.matcheds.get(0).is_some() {
+        curr_view.matcheds.get_mut(0)
+    } else {
+        curr_view.original_targets.get_mut(0)
+    };
+    let Some((curr, _)) = curr else {
+        return;
+    };
+
+    if curr.range == Some(r.clone()) {
+        return;
+    }
+    if is_origin {
+        curr.range = Some(r.clone());
+    }
+    if col == 0 {
+        attached.waiting.push((
+            col,
+            track(
+                ui.ctx(),
+                api_addr,
+                &curr.file.commit,
+                &curr.file.file_path,
+                &Some(r),
+                flags,
+            ),
+        ));
+    } else {
+        // TODO allow to reset tracking
+        attached.waiting.push((
+            col,
+            track(
+                ui.ctx(),
+                api_addr,
+                &curr.file.commit,
+                &curr.file.file_path,
+                &Some(r),
+                flags,
+            ),
+        ));
+    }
+}
+
+pub(crate) fn show_results(
+    ui: &mut egui::Ui,
+    api_addr: &str,
+    aspects: &mut ComputeConfigAspectViews,
+    store: Arc<FetchedHyperAST>,
+    long_tracking: &mut LongTacking,
+    fetched_files: &mut HashMap<FileIdentifier, RemoteFile>,
+) {
+    let mut res_impl =
+        LongTrackingResultsImpl::new(ui, api_addr, aspects, long_tracking, fetched_files);
+
+    egui::panel::TopBottomPanel::bottom("Timeline Map")
+        .frame(egui::Frame::side_top_panel(ui.style()).inner_margin(0.0))
+        .height_range(0.0..=ui.available_height() / 3.0)
+        .default_height(ui.available_height() / 5.0)
+        .resizable(true)
+        .show_inside(ui, |ui| {
+            show_timeline(
+                ui,
+                api_addr,
+                aspects,
+                &store,
+                long_tracking,
+                fetched_files,
+                &res_impl,
+            )
+        });
+
+    let mut ui = &mut res_impl.make_main_ui(ui);
+
+    show_trackings(
+        ui,
+        api_addr,
+        aspects,
+        &store,
+        long_tracking,
+        fetched_files,
+        &res_impl,
+    );
+
+    let LongTrackingResultsImpl {
+        timeline_window,
+        total_cols,
+        ..
+    } = res_impl;
+
+    if long_tracking.detatched_view {
+        let tracking_results = long_tracking.results.iter_mut().enumerate();
+        let tracking_results = tracking_results.filter_map(|(col, (_, res))| {
+            res.try_poll();
+            res.get_mut()
+                .map(|res| (col, res.content.track.results.as_mut()))
+        });
+        crate::app::detached_view::ui_detached(
+            ui,
+            store,
+            timeline_window,
+            total_cols,
+            &long_tracking.detatched_view_options,
+            &mut long_tracking.additionnal_links,
+            tracking_results,
+        );
+    }
 }
 
 #[derive(Default, Debug)]
@@ -1792,21 +1301,23 @@ fn show_code_view(
     }
 }
 
+type DeferedFocusScroll = (
+    f32,
+    usize,
+    egui::scroll_area::ScrollAreaOutput<Option<Vec<usize>>>,
+);
+
 pub(crate) fn show_tree_view(
     ui: &mut egui::Ui,
+    min_col: usize,
     api_addr: &str,
+    col: usize,
+    trigger: bool,
     tree_viewer: &mut Resource<FetchedView>,
     curr_view: &mut ColView<'_>,
-    trigger: bool,
     aspects: &mut ComputeConfigAspectViews,
-    col: usize,
-    min_col: usize,
     ports: &mut Attacheds,
-    defered_focus_scroll: &mut Option<(
-        f32,
-        usize,
-        egui::scroll_area::ScrollAreaOutput<Option<Vec<usize>>>,
-    )>,
+    defered_focus_scroll: &mut Option<DeferedFocusScroll>,
 ) -> Option<Vec<usize>> {
     let mut scroll_focus = None;
     let mut scroll = egui::ScrollArea::both()
@@ -1981,8 +1492,10 @@ pub(crate) fn show_tree_view(
         scroll.inner
     }
 }
+
 const SC_COPY: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::CTRL, egui::Key::C);
+
 fn show_commitid_info(
     tracked: Option<TrackingResultWithChanges>,
     ui: &mut egui::Ui,

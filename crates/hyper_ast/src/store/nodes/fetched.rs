@@ -127,6 +127,7 @@ impl From<crate::store::nodes::legion::NodeIdentifier> for NodeIdentifier {
     fn from(id: crate::store::nodes::legion::NodeIdentifier) -> Self {
         let id: u64 = unsafe { std::mem::transmute(id) };
         // WARN cast to smaller container
+        assert!(id <= u32::MAX as u64);
         let id = id as u32;
         Self(core::num::NonZeroU32::new(id).unwrap())
     }
@@ -792,14 +793,14 @@ impl NodeStore {
         HashedNodeRef {
             index: 0,
             s_ref: VariantRef::Typed {
-                entities: UNAILABLE_NODE,
+                entities: UNAVAILABLE_NODE,
             },
             phantom: PhantomData,
         }
     }
 }
 
-const UNAILABLE_NODE: &'static variants::Typed = &variants::Typed {
+const UNAVAILABLE_NODE: &'static variants::Typed = &variants::Typed {
     lang: "",
     rev: vec![],
     kind: vec![],
@@ -827,30 +828,54 @@ impl NodeStore {
 
     pub fn extend(&mut self, raw: SimplePacked<String>) {
         for (arch, entities) in raw.storages_arch.into_iter().zip(raw.storages_variants) {
-            self._extend_from_raw(arch, entities)
+            self._extend_from_raw(arch, entities).unwrap();
         }
     }
 
-    fn _extend_from_raw(&mut self, arch: Arch<String>, entities: RawVariant) {
+    fn _extend_from_raw(
+        &mut self,
+        arch: Arch<String>,
+        entities: RawVariant,
+    ) -> Result<u32, RawVariant> {
+        use hashbrown::hash_map::Entry::{Occupied, Vacant};
         match self.vindex.entry(arch) {
-            hashbrown::hash_map::Entry::Occupied(occ) => {
+            Occupied(occ) => {
+                let vid = *occ.get() as u32;
                 let var = &mut self.variants[*occ.get() as usize];
                 let mut offset = var.rev().len() as u32;
+                let revs = entities.rev();
+                // shortcut
+                if revs.len() == 1 {
+                    let ent = revs[0];
+                    if self.index.try_insert(ent, (vid, offset)).is_err() {
+                        return Ok(offset);
+                    };
+                    var.extend_raw(entities);
+                    offset += 1;
+                    return Ok(offset);
+                }
                 for ent in entities.rev() {
-                    self.index.insert(*ent, (*occ.get() as u32, offset));
+                    if self.index.try_insert(*ent, (vid, offset)).is_err() {
+                        unimplemented!();
+                        // return Err(entities);
+                    };
                     offset += 1;
                 }
                 var.extend_raw(entities);
+                return Ok(offset);
             }
-            hashbrown::hash_map::Entry::Vacant(vac) => {
-                let len = self.variants.len();
-                vac.insert(len as u32);
+            Vacant(vac) => {
+                let vid = self.variants.len() as u32;
+                vac.insert(vid);
                 let mut offset = 0;
                 for ent in entities.rev() {
-                    self.index.insert(*ent, (len as u32, offset));
+                    if self.index.insert(*ent, (vid, offset)).is_some() {
+                        unimplemented!("does not support modifications of variants");
+                    };
                     offset += 1;
                 }
                 self.variants.push(entities.into());
+                Ok(offset)
             }
         }
     }

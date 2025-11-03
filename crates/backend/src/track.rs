@@ -61,63 +61,69 @@ pub struct TrackingQuery {
     pub flags: Flags,
 }
 
+macro_rules! decl_flags { ($($(#[$m:meta])* $f:ident => $e:ident,)*) => {
 #[derive(serde::Deserialize, serde::Serialize, Default, Clone, Debug)]
 #[serde(default)]
-pub struct Flags {
+pub struct Flags {$(
     #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub upd: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub child: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub parent: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) exact_child: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) exact_parent: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) sim_child: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) sim_parent: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) meth: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) typ: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) top: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) file: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) pack: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) dependency: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) dependent: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) references: bool,
-    #[serde(deserialize_with = "deserialize_bool_from_anything")]
-    pub(crate) declaration: bool,
-}
+    $(#[$m])*
+    pub $f: bool,
+)*}
 
 impl Flags {
-    fn some(&self) -> bool {
-        self.upd
-            || self.child
-            || self.parent
-            || self.exact_child
-            || self.exact_parent
-            || self.sim_child
-            || self.sim_parent
-            || self.meth
-            || self.typ
-            || self.top
-            || self.file
-            || self.pack
-            || self.dependency
-            || self.dependent
-            || self.references
-            || self.declaration
+    fn some(&self) -> bool {$(
+        self.$f
+    )||*}
+}
+
+#[derive(EnumSetType, Debug)]
+pub enum FlagsE {$(
+    $(#[$m])*
+    $e,
+)*}
+
+impl From<&Flags> for EnumSet<FlagsE> {
+    fn from(val: &Flags) -> Self {
+        let mut r = EnumSet::new();
+        $(if val.$f {
+            r.insert(FlagsE::$e);
+        })*;
+        r
     }
 }
+
+}}
+
+decl_flags!(
+    /// stops on label update
+    upd => Upd,
+    /// stops when any descendant changes (.i.e, transitively)
+    child => Child,
+    /// stops when any ancestor changes (.i.e, transitively)
+    parent => Parent,
+    /// stops when children change,
+    /// only consider direct children kind and label
+    exact_child => ExactChild,
+    /// stops when parent changes,
+    /// only consider direct parent kind and label
+    exact_parent => ExactParent,
+    /// stops when any descendant changes significantly,
+    ///
+    sim_child => SimChild,
+    /// stops when any ancestor changes significantly,
+    ///
+    sim_parent => SimParent,
+    // TODO add beavior_child/parent which allow to ignore non-behavioral changes like local renames
+    meth => Meth,
+    typ => Typ,
+    top => Top,
+    file => File,
+    pack => Pack,
+    dependency => Dependency,
+    dependent => Dependent,
+    references => References,
+    declaration => Declaration,
+);
 
 #[derive(Deserialize, Serialize)]
 pub struct TrackingResult<IdN, Idx> {
@@ -317,6 +323,7 @@ pub fn track_code(
             &flags,
         ) {
             MappingResult::Direct { src: aaa, matches } => {
+                dbg!(&src_oid, &dst_oid, &commit);
                 let aaa = aaa.globalize(repository.spec, commit);
                 let (src, intermediary) = if let Some(src) = source {
                     (src, Some(aaa))
@@ -475,6 +482,7 @@ pub(crate) fn track_code_at_path(
         };
         match track_aux2(state.clone(), &repository, src_oid, dst_oid, &path, &flags) {
             MappingResult::Direct { src: aaa, matches } => {
+                dbg!(&src_oid, &dst_oid, &commit);
                 let aaa = aaa.globalize(repository.spec, commit);
                 let (src, intermediary) = if let Some(src) = source {
                     (src, Some(aaa))
@@ -629,6 +637,7 @@ pub(crate) fn track_code_at_path_with_changes(
         };
         match track_aux2(state.clone(), &repository, src_oid, dst_oid, &path, &flags) {
             MappingResult::Direct { src: aaa, matches } => {
+                dbg!(&src_oid, &dst_oid, &commit, &ori_oid);
                 let changes = changes::added_deleted(state, &repository, dst_oid, ori_oid.unwrap())
                     .map_err(|err| TrackingError {
                         compute_time: now.elapsed().as_secs_f64(),
@@ -961,6 +970,7 @@ fn track_aux(
     end: Option<usize>,
     flags: &Flags,
 ) -> MappingResult<IdN, Idx> {
+    dbg!(src_oid, dst_oid);
     let repositories = state.repositories.read().unwrap();
     let commit_src = repositories
         .get_commit(repo_handle.config(), &src_oid)

@@ -124,19 +124,23 @@ impl<HAST, Dsrc, Ddst, M> WithMappings for Mapper<HAST, Dsrc, Ddst, M> {
 impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
     pub fn split_mut(
         &mut self,
-    ) -> Mapping<Decompressible<HAST, &mut Dsrc>, Decompressible<HAST, &mut Ddst>, &mut M> {
+    ) -> Mapper<HAST, Decompressible<HAST, &mut Dsrc>, Decompressible<HAST, &mut Ddst>, &mut M>
+    {
         let hyperast = self.hyperast;
         let mapping = &mut self.mapping;
-        Mapping {
-            src_arena: Decompressible {
-                hyperast,
-                decomp: &mut mapping.src_arena,
+        Mapper {
+            hyperast,
+            mapping: Mapping {
+                src_arena: Decompressible {
+                    hyperast,
+                    decomp: &mut mapping.src_arena,
+                },
+                dst_arena: Decompressible {
+                    hyperast,
+                    decomp: &mut mapping.dst_arena,
+                },
+                mappings: &mut mapping.mappings,
             },
-            dst_arena: Decompressible {
-                hyperast,
-                decomp: &mut mapping.dst_arena,
-            },
-            mappings: &mut mapping.mappings,
         }
     }
 
@@ -189,6 +193,19 @@ impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
         }
     }
 }
+impl<HAST: Copy, Dsrc, Ddst, IdD> Mapper<HAST, Dsrc, Ddst, mapping_store::VecStore<IdD>> {
+    pub fn mirror(self) -> Mapper<HAST, Ddst, Dsrc, mapping_store::VecStore<IdD>> {
+        Mapper {
+            hyperast: self.hyperast,
+            mapping: Mapping {
+                src_arena: self.mapping.dst_arena,
+                dst_arena: self.mapping.src_arena,
+                mappings: self.mapping.mappings.mirror(),
+            },
+        }
+    }
+}
+
 // NOTE this is temporary, waiting for the refactoring of helpers
 // the refactoring is simple, do a spliting borrow, before accessing content
 // TODO remove these deref impls

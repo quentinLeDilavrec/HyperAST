@@ -77,10 +77,10 @@ impl Default for AppState {
 
 // pub(crate) type PartialDecompCache = DashMap<NodeIdentifier, DS<NodeIdentifier>>;
 pub(crate) type PartialDecompCache = clashmap::ClashMap<NodeIdentifier, DS<NodeIdentifier>>;
-pub(crate) type MappingAloneCache =
-    DashMap<(NodeIdentifier, NodeIdentifier), (MappingStage, VecStore<u32>)>;
-pub(crate) type MappingAloneCacheRef<'a> =
-    dashmap::mapref::one::Ref<'a, (NodeIdentifier, NodeIdentifier), (MappingStage, VecStore<u32>)>;
+pub(crate) type MappingAloneCache<IdN = NodeIdentifier, M = VecStore<u32>> =
+    DashMap<(IdN, IdN), (MappingStage, M)>;
+pub(crate) type MappingAloneCacheRef<'a, IdN = NodeIdentifier, M = VecStore<u32>> =
+    dashmap::mapref::one::Ref<'a, (IdN, IdN), (MappingStage, M)>;
 
 pub(crate) enum MappingStage {
     Subtree,

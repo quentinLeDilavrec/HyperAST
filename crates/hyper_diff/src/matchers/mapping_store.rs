@@ -230,6 +230,33 @@ impl<T: PrimInt + Debug> MonoMappingStore for VecStore<T> {
     }
 }
 
+#[rustfmt::skip]
+mod impl_vec_store_mut {
+    use num_traits::PrimInt; use std::fmt::Debug;
+    use super::{MappingStore, MonoIter, MonoMappingStore, VecStore};
+    impl<T: PrimInt + Debug> MappingStore for &mut VecStore<T> {
+        type Src = T; type Dst = T;
+        fn len(&self) -> usize                         { MappingStore::len(*self)                 }
+        fn capacity(&self) -> (usize, usize)           { MappingStore::capacity(*self)            }
+        fn link(&mut self, src: T, dst: T)             { MappingStore::link(*self, src, dst);     }
+        fn cut(&mut self, src: T, dst: T)              { MappingStore::cut(*self, src, dst);      }
+        fn is_src(&self, src: &T) -> bool              { MappingStore::is_src(*self, src)         }
+        fn is_dst(&self, dst: &T) -> bool              { MappingStore::is_dst(*self, dst)         }
+        fn topit(&mut self, left: usize, right: usize) { MappingStore::topit(*self, left, right); }
+        fn has(&self, src: &T, dst: &T) -> bool        { MappingStore::has(*self, src, dst)       }
+    }
+    impl<T: PrimInt + Debug> MonoMappingStore for &mut VecStore<T> {
+        type Iter<'a> = MonoIter<'a, T, T> where Self: 'a;
+        fn iter(&self) -> Self::Iter<'_>          { MonoMappingStore::iter(*self)                   }
+        fn get_src_unchecked(&self, dst: &T) -> T { MonoMappingStore::get_src_unchecked(*self, dst) }
+        fn get_dst_unchecked(&self, src: &T) -> T { MonoMappingStore::get_dst_unchecked(*self, src) }
+        fn get_src(&self, dst: &T) -> Option<T>   { MonoMappingStore::get_src(*self, dst)           }
+        fn get_dst(&self, src: &T) -> Option<T>   { MonoMappingStore::get_dst(*self, src)           }
+        fn link_if_both_unmapped(&mut self, t1: T, t2: T) -> bool {
+                                             MonoMappingStore::link_if_both_unmapped(*self, t1, t2) }
+    }
+}
+
 pub struct MonoIter<'a, T: 'a + PrimInt, U: 'a> {
     v: std::iter::Enumerate<core::slice::Iter<'a, U>>,
     _phantom: std::marker::PhantomData<*const T>,

@@ -1,5 +1,12 @@
-use hyper_diff::{decompressed_tree_store::lazy_post_order, matchers::Decompressible};
+use hyper_diff::{
+    decompressed_tree_store::{
+        Shallow,
+        lazy_post_order::{self, LazyPostOrder},
+    },
+    matchers::Decompressible,
+};
 use hyperast::position::position_accessors::{self, SolvedPosition};
+use mapping_store::MappingStore;
 
 use crate::MappingAloneCacheRef;
 
@@ -7,7 +14,7 @@ use super::*;
 
 type IdD = u32;
 
-type DecompressedTree = lazy_post_order::LazyPostOrder<super::IdN, IdD>;
+type DecompressedTree<IdN = super::IdN, IdD = self::IdD> = LazyPostOrder<IdN, IdD>;
 
 struct MappingTracker<'store, HAST> {
     stores: &'store HAST,
@@ -45,7 +52,6 @@ pub(super) fn do_tracking<P, C>(
     partial_decomps: &PartialDecompCache,
     mappings_alone: &MappingAloneCache,
     flags: &Flags,
-    // no_spaces_path_to_target: Vec<super::Idx>,
     target: &P,
     other_tr: super::IdN,
     postprocess_matching: &impl Fn(LocalPieceOfCode<super::IdN, super::Idx>) -> C,
@@ -57,17 +63,12 @@ where
         + position_accessors::OffsetPostionT<super::IdN, IdO = usize>
         + self::WithPreOrderOffsetsNoSpaces,
 {
-    // let (target_node, target_range, path_to_target) = (
-    //     target.node(),
-    //     target.start()..target.end(),
-    //     target.iter_offsets(),
-    // );
     let with_spaces_stores = &repositories.processor.main_stores;
     let tracker_nospace = MappingTracker {
         stores: &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores),
     };
 
-    let current_tr = target.root();
+    let target_tr = target.root();
 
     // NOTE: persists mappings, could also easily persist diffs,
     // but some compression on mappings could help
@@ -75,59 +76,36 @@ where
     // or encoding mappings more efficiently considering that most slices could simply by represented as ranges (ie. mapped identical subtrees)
     // or only storing the mapping costly to compute
 
-    if current_tr == other_tr {
+    if target_tr == other_tr {
         // if both tree are identical lets just take a shortcut
-        let nodes = tracker_nospace.size(&current_tr, &other_tr);
-        let (src, matches) = {
-            let c = compute_local2(target, with_spaces_stores);
-            // the shortcut, it's ok because roots/trees are identical
-            let matches = vec![c.clone()];
-            let src = c;
-            (src, matches)
-        };
-
+        let nodes = tracker_nospace.size(&target_tr, &other_tr);
+        let src = compute_local2(target, with_spaces_stores);
+        // the shortcut, it's ok because roots/trees are identical
+        let matches = vec![src.clone()];
         let matches = matches.into_iter().map(postprocess_matching).collect();
-        if flags.some() {
-            return MappingResult::Skipped {
-                nodes,
-                src,
-                next: matches,
-            };
+        return if flags.some() {
+            let next = matches;
+            MappingResult::Skipped { nodes, src, next }
         } else {
-            return MappingResult::Direct { src, matches };
-        }
+            MappingResult::Direct { src, matches }
+        };
     }
     let stores = &no_space::as_nospaces(with_spaces_stores);
-    let binding = crate::utils::bind_tree_pair(partial_decomps, &current_tr, &other_tr);
+    let binding = crate::utils::bind_tree_pair(partial_decomps, &target_tr, &other_tr);
     let mut locked = binding.lock();
-    let (src_tree, dst_tree) = locked.as_mut(stores);
+    let tree_pair = locked.as_mut(stores);
 
-    let hyperast = stores;
-    let mut mapper = Mapper {
-        hyperast,
-        mapping: hyper_diff::matchers::Mapping {
-            src_arena: Decompressible {
-                hyperast,
-                decomp: src_tree,
-            },
-            dst_arena: Decompressible {
-                hyperast,
-                decomp: dst_tree,
-            },
-            mappings: mapping_store::VecStore::default(),
-        },
-    };
+    let mappings = mapping_store::VecStore::default();
+    let mut mapper = Mapper::prep(stores, mappings, tree_pair);
     let fuller_mappings = if flags.some() {
-        // case where
-        let subtree_mappings = {
-            let hyperast = stores;
-            matching::top_down(
-                hyperast,
-                &mut mapper.mapping.src_arena,
-                &mut mapper.mapping.dst_arena,
-            )
-        };
+        // case where we want to track through multiple commits
+        let subtree_mappings = matching::top_down(
+            stores,
+            &mut mapper.mapping.src_arena,
+            &mut mapper.mapping.dst_arena,
+        );
         dbg!();
+        // let mut mapper = mapper.mirror();
         if let Some(value) = track_greedy(
             with_spaces_stores,
             stores,
@@ -138,26 +116,30 @@ where
             target,
             postprocess_matching,
         ) {
+            dbg!();
             return value;
         }
-        compute_mappings_full(stores, mappings_alone, &mut mapper, Some(subtree_mappings))
+        // let mut mapper = mapper.mirror();
+        use mapping_store::DefaultMultiMappingStore as MM;
+        compute_mappings_full::<_, _, MM<_>>(mappings_alone, &mut mapper, Some(subtree_mappings))
     } else {
-        compute_mappings_full(stores, mappings_alone, &mut mapper, None)
+        use mapping_store::DefaultMultiMappingStore as MM;
+        compute_mappings_full::<_, _, MM<_>>(mappings_alone, &mut mapper, None)
     };
     let fuller_mappings = &fuller_mappings.1;
 
-    let root = mapper.mapping.src_arena.root();
-    let mapping_target = mapper
-        .mapping
-        .src_arena
-        .child_decompressed(&root, target.iter_offsets_nospaces().copied());
+    let mapping_target = {
+        let root = mapper.src_arena.root();
+        let p = target.iter_offsets_nospaces().copied();
+        mapper.src_arena.child_decompressed(&root, p)
+    };
 
+    // let mut mapper = mapper.mirror();
     if let Some(mapped) = fuller_mappings.get_dst(&mapping_target) {
+        dbg!();
         return track_with_mappings(
             with_spaces_stores,
-            stores,
-            &mut mapper.mapping.src_arena,
-            &mut mapper.mapping.dst_arena,
+            &mut mapper,
             flags,
             target,
             mapping_target,
@@ -165,50 +147,25 @@ where
             postprocess_matching,
         );
     }
-    let Mapper {
-        mapping:
-            hyper_diff::matchers::Mapping {
-                src_arena: src_tree,
-                dst_arena: dst_tree,
-                ..
-            },
-        ..
-    } = mapper;
 
-    for parent_target in src_tree.parents(mapping_target) {
-        if let Some(mapped_parent) = fuller_mappings.get_dst(&parent_target) {
-            let fallback = {
-                let (path, path_ids) = {
-                    let mut dst_tree = dst_tree;
-                    let mapped_parent = dst_tree.decompress_to(&mapped_parent);
-                    assert_eq!(other_tr, dst_tree.original(&dst_tree.root()));
-                    let path = dst_tree.path(&dst_tree.root(), &mapped_parent);
-                    let mut path_ids = vec![dst_tree.original(&mapped_parent)];
-                    path_ids.extend(
-                        dst_tree
-                            .parents(mapped_parent)
-                            .map(|i| dst_tree.original(&i)),
-                    );
-                    path_ids.pop();
-                    assert_eq!(path.len(), path_ids.len());
-                    (
-                        path_with_spaces(other_tr, &mut path.iter().copied(), with_spaces_stores).0,
-                        path_ids,
-                    )
-                };
-                let (pos, mapped_node) =
-                    compute_position(other_tr, &mut path.iter().copied(), with_spaces_stores);
-                // assert_eq!(Some(&mapped_node), path_ids.last().or(Some(&other_tr)), "{:?} {:?} {:?} {:?}", mapped_node, other_tr, path, path_ids); // if it holds then ok to take the ids from the nospace repr.
-                // TODO WARN there is an issue there. Entity(2148976) Entity(2149024) [0, 38, 2] [Entity(2148976), Entity(2148992), Entity(2149008)]
-                // the list of ids is I believe sorted in reverse compered to the list of offsets,
-                // but as you can see the mapped node is the same (but at the begining of the array) so it should be correct to  use the path from the nospace repr.
-                LocalPieceOfCode::from_position(&pos, path, path_ids)
-            };
-            return MappingResult::Missing {
-                src: compute_local2(target, with_spaces_stores),
-                fallback: postprocess_matching(fallback),
-            };
+    for parent_target in mapper.mapping.src_arena.parents(mapping_target) {
+        let Some(mapped) = fuller_mappings.get_dst(&parent_target) else {
+            continue;
         };
+        let fallback = post_process_mapped2::<P, C>(
+            other_tr,
+            postprocess_matching,
+            with_spaces_stores,
+            &mut mapper.mapping.dst_arena,
+            mapped,
+        );
+        // assert_eq!(Some(&mapped_node), path_ids.last().or(Some(&other_tr)), "{:?} {:?} {:?} {:?}", mapped_node, other_tr, path, path_ids); // if it holds then ok to take the ids from the nospace repr.
+        // TODO WARN there is an issue there. Entity(2148976) Entity(2149024) [0, 38, 2] [Entity(2148976), Entity(2148992), Entity(2149008)]
+        // the list of ids is I believe sorted in reverse compered to the list of offsets,
+        // but as you can see the mapped node is the same (but at the begining of the array) so it should be correct to  use the path from the nospace repr.
+        let src = compute_local2(target, with_spaces_stores);
+        // TODO add fallback_src
+        return MappingResult::Missing { src, fallback };
     }
     // lets try
     unreachable!("At least roots should have been mapped")
@@ -240,15 +197,54 @@ where
     // }
 }
 
-fn track_with_mappings<C, P>(
+fn post_process_mapped2<P, C>(
+    other_tr: super::IdN,
+    postprocess_matching: &impl Fn(LocalPieceOfCode<super::IdN, super::Idx>) -> C,
     with_spaces_stores: &SimpleStores<TStore>,
-    stores: &NoSpaceStore<'_, '_>,
-    src_tree: &mut DecompressedTree,
-    dst_tree: &mut DecompressedTree,
+    dst_tree: &mut Decompressible<&NoSpaceStore<'_, '_>, &mut LazyPostOrder<super::IdN, IdD>>,
+    mapped: u32,
+) -> C
+where
+    P: position_accessors::SolvedPosition<super::IdN>
+        + position_accessors::RootedPosition<super::IdN>
+        + position_accessors::WithPreOrderOffsets<Idx = super::Idx>
+        + position_accessors::OffsetPostionT<super::IdN, IdO = usize>
+        + self::WithPreOrderOffsetsNoSpaces,
+{
+    let (path, path_ids) = {
+        let mapped_parent = dst_tree.decompress_to(&mapped);
+        assert_eq!(other_tr, dst_tree.original(&dst_tree.root()));
+        let path = dst_tree.path(&dst_tree.root(), &mapped_parent);
+        let mut path_ids = vec![dst_tree.original(&mapped_parent)];
+        path_ids.extend(
+            dst_tree
+                .parents(mapped_parent)
+                .map(|i| dst_tree.original(&i)),
+        );
+        path_ids.pop();
+        assert_eq!(path.len(), path_ids.len());
+        dbg!(&path_ids);
+        let path = path_with_spaces(other_tr, &mut path.iter().copied(), with_spaces_stores).0;
+        (path, path_ids)
+    };
+    let (pos, _) = compute_position(other_tr, &mut path.iter().copied(), with_spaces_stores);
+    let fallback = LocalPieceOfCode::from_position(&pos, path, path_ids);
+    let fallback = postprocess_matching(fallback);
+    fallback
+}
+
+fn track_with_mappings<P, C, M: MappingStore>(
+    with_spaces_stores: &SimpleStores<TStore>,
+    mapper: &mut Mapper<
+        &NoSpaceStore<'_, '_>,
+        Decompressible<&NoSpaceStore<'_, '_>, &mut LazyPostOrder<super::IdN, M::Src>>,
+        Decompressible<&NoSpaceStore<'_, '_>, &mut LazyPostOrder<super::IdN, M::Dst>>,
+        M,
+    >,
     flags: &Flags,
     target: &P,
-    mapping_target: IdD,
-    mapped: IdD,
+    mapping_target: M::Src,
+    mapped: M::Dst,
     postprocess_matching: &impl Fn(LocalPieceOfCode<super::IdN, super::Idx>) -> C,
 ) -> MappingResult<super::IdN, super::Idx, C>
 where
@@ -256,34 +252,10 @@ where
         + position_accessors::RootedPosition<super::IdN>
         + position_accessors::WithPreOrderOffsets<Idx = super::Idx>
         + position_accessors::OffsetPostionT<super::IdN, IdO = usize>,
+    M::Src: PrimInt,
+    M::Dst: PrimInt + Shallow<M::Dst>,
 {
-    let src_tree = Decompressible {
-        hyperast: stores,
-        decomp: src_tree,
-    };
-    let mut dst_tree = Decompressible {
-        hyperast: stores,
-        decomp: dst_tree,
-    };
-    let other_tr = dst_tree.original(&dst_tree.root());
-    let mapped = dst_tree.decompress_to(&mapped);
-    let path_no_spaces = dst_tree.path_rooted(&mapped);
-    let path_ids = {
-        let mut path_ids = vec![dst_tree.original(&mapped)];
-        path_ids.extend(dst_tree.parents(mapped).map(|i| dst_tree.original(&i)));
-        path_ids.pop();
-        path_ids
-    };
-    assert_eq!(path_no_spaces.len(), path_ids.len());
-    let (path, _) = path_with_spaces(
-        other_tr,
-        &mut path_no_spaces.iter().copied(),
-        with_spaces_stores,
-    );
-    let (pos, mapped_node) =
-        compute_position(other_tr, &mut path.iter().copied(), with_spaces_stores);
-    dbg!(&pos);
-    dbg!(&mapped_node);
+    let mapped_node = mapper.dst_arena.original(&mapped);
 
     let mut flagged = false;
     let mut triggered = false;
@@ -296,8 +268,8 @@ where
         flagged = true;
         dbg!();
 
-        let target_node = stores.node_store.resolve(target.node());
-        let mapped_node = stores.node_store.resolve(mapped_node);
+        let target_node = mapper.hyperast.node_store.resolve(target.node());
+        let mapped_node = mapper.hyperast.node_store.resolve(mapped_node);
         if flags.sim_child {
             triggered |= target_node.hash(&types::HashKind::structural())
                 != mapped_node.hash(&types::HashKind::structural());
@@ -320,45 +292,28 @@ where
         //     triggered |= target_ident != mapped_ident;
         // }
     }
+
     if flags.parent {
         flagged = true;
         dbg!();
-        let target_parent = src_tree.parent(&mapping_target);
-        let target_parent = target_parent.map(|x| src_tree.original(&x));
-        let mapped_parent = dst_tree.parent(&mapped);
-        let mapped_parent = mapped_parent.map(|x| dst_tree.original(&x));
+        let target_parent = mapper.src_arena.parent(&mapping_target);
+        let target_parent = target_parent.map(|x| mapper.src_arena.original(&x));
+        let mapped_parent = mapper.dst_arena.parent(&mapped);
+        let mapped_parent = mapped_parent.map(|x| mapper.dst_arena.original(&x));
         triggered |= target_parent != mapped_parent;
     }
-    // if flags.meth {
-    //     flagged = true;
-    //     dbg!();
-    // }
-    // if flags.typ {
-    //     flagged = true;
-    //     dbg!();
-    // }
-    // if flags.top {
-    //     flagged = true;
-    //     dbg!();
-    // }
-    // if flags.file {
-    //     flagged = true;
-    //     dbg!();
-    // }
-    // if flags.pack {
-    //     flagged = true;
-    //     dbg!();
-    // }
     // TODO add flags for artefacts (tests, prod code, build, lang, misc)
     // TODO add flags for similarity comps
-    let matches = vec![postprocess_matching(LocalPieceOfCode::from_position(
-        &pos,
-        path.clone(),
-        path_ids.clone(),
-    ))];
+
+    let matched = reconstruct_mapped(with_spaces_stores, &mut mapper.mapping.dst_arena, mapped);
+    let matched = postprocess_matching(matched);
+
+    let matches = vec![matched];
     let src = compute_local2(target, with_spaces_stores);
+    dbg!(target.root(), &src.path_ids);
     if flagged && !triggered {
-        let nodes = MappingTracker::new(stores).size(&other_tr, &target.root());
+        let other_tr = mapper.dst_arena.original(&mapper.dst_arena.root());
+        let nodes = MappingTracker::new(mapper.hyperast).size(&other_tr, &target.root());
         MappingResult::Skipped {
             nodes,
             src,
@@ -369,77 +324,114 @@ where
     }
 }
 
+fn reconstruct_mapped<IdD>(
+    with_spaces_stores: &SimpleStores<TStore>,
+    arena: &mut Decompressible<&NoSpaceStore<'_, '_>, &mut LazyPostOrder<super::IdN, IdD>>,
+    mapped: IdD,
+) -> LocalPieceOfCode<super::IdN, Idx>
+where
+    IdD: PrimInt + Shallow<IdD>,
+{
+    let tr = arena.original(&arena.root());
+    let matched = arena.decompress_to(&mapped);
+    let dst_tree = &arena;
+    let path_no_spaces = dst_tree.path_rooted(&matched);
+
+    dbg!(dst_tree.original(&matched));
+    let mut path_ids = vec![dst_tree.original(&matched)];
+    dbg!(
+        &(dst_tree.parents(matched))
+            .map(|i| dst_tree.original(&i))
+            .collect::<Vec<_>>()
+    );
+    path_ids.extend(dst_tree.parents(matched).map(|i| dst_tree.original(&i)));
+    path_ids.pop();
+
+    assert_eq!(path_no_spaces.len(), path_ids.len());
+    let (path, _) = path_with_spaces(tr, &mut path_no_spaces.iter().copied(), with_spaces_stores);
+    let offsets = &mut path.iter().copied();
+    let (pos, mapped_node) = compute_position(tr, offsets, with_spaces_stores);
+    LocalPieceOfCode::from_position(&pos, path.clone(), path_ids.clone())
+}
+
 type NoSpaceStore<'a, 'store> = hyperast::store::SimpleStores<
     TStore,
     no_space::NoSpaceNodeStoreWrapper<'store>,
     &'a hyperast::store::labels::LabelStore,
 >;
 
-fn compute_mappings_full<'store, 'alone, 'trees, 'mapper, 'rest, 's: 'trees>(
-    _stores: &'s NoSpaceStore<'rest, 'store>,
-    mappings_alone: &'alone MappingAloneCache,
-    mapper: &'mapper mut Mapper<
-        &'s NoSpaceStore<'rest, 'store>,
-        Decompressible<
-            &'s NoSpaceStore<'rest, 'store>,
-            &'trees mut lazy_post_order::LazyPostOrder<super::IdN, u32>,
-        >,
-        Decompressible<
-            &'s NoSpaceStore<'rest, 'store>,
-            &'trees mut lazy_post_order::LazyPostOrder<super::IdN, u32>,
-        >,
-        mapping_store::VecStore<u32>,
+fn compute_mappings_full<'store, 'alone, 'tree, 'rest, 's: 'tree, HAST: HyperAST + Copy, M, MM>(
+    mappings_alone: &'alone MappingAloneCache<HAST::IdN, M>,
+    mapper: &mut Mapper<
+        HAST,
+        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Src>>,
+        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Dst>>,
+        M,
     >,
-    partial: Option<mapping_store::MultiVecStore<u32>>,
-) -> MappingAloneCacheRef<'alone> {
-    let mappings_cache = mappings_alone;
-    let hyperast = mapper.hyperast;
-    match mappings_cache.entry((
+    partial: Option<MM>,
+) -> MappingAloneCacheRef<'alone, HAST::IdN, M>
+where
+    for<'t> types::LendT<'t, HAST>: WithHashs + WithStats,
+    HAST::IdN: Clone + Eq,
+    HAST::Label: Clone + Eq,
+    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    M: MonoMappingStore + Clone + Default,
+    MM: MultiMappingStore<Src = M::Src, Dst = M::Dst> + Default,
+    M::Src: PrimInt + Shallow<M::Src>,
+    M::Dst: PrimInt + Shallow<M::Dst>,
+    M::Src: std::hash::Hash + Debug,
+    M::Dst: std::hash::Hash + Debug,
+    HAST::IdN: std::hash::Hash + Debug,
+{
+    use dashmap::mapref::entry::Entry;
+    let entry = match mappings_alone.entry((
         mapper.src_arena.original(&mapper.src_arena.root()),
         mapper.dst_arena.original(&mapper.dst_arena.root()),
     )) {
-        dashmap::mapref::entry::Entry::Occupied(entry) => entry.into_ref().downgrade(),
-        dashmap::mapref::entry::Entry::Vacant(entry) => {
-            let mm = if let Some(mm) = partial {
-                use mapping_store::MappingStore;
-                mapper.mapping.mappings.topit(
-                    mapper.mapping.src_arena.len(),
-                    mapper.mapping.dst_arena.len(),
-                );
-                mm
-            } else {
-                use mapping_store::MappingStore;
-                use mapping_store::VecStore;
-                mapper.mapping.mappings.topit(
-                    mapper.mapping.src_arena.len(),
-                    mapper.mapping.dst_arena.len(),
-                );
+        Entry::Occupied(occ) => return occ.into_ref().downgrade(),
+        Entry::Vacant(vac) => vac,
+    };
+    let mm = if let Some(mm) = partial {
+        use mapping_store::MappingStore;
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
+        );
+        mm
+    } else {
+        use mapping_store::MappingStore;
+        use mapping_store::VecStore;
+        mapper.mapping.mappings.topit(
+            mapper.mapping.src_arena.len(),
+            mapper.mapping.dst_arena.len(),
+        );
 
-                let now = std::time::Instant::now();
-                let mm = matching::LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<
-                    mapping_store::DefaultMultiMappingStore<_>,
-                >(mapper);
-                let compute_multi_mapping_t = now.elapsed().as_secs_f64();
-                dbg!(compute_multi_mapping_t);
-                mm
-            };
+        let now = std::time::Instant::now();
+        let mm = matching::LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<MM>(mapper);
+        let compute_multi_mapping_t = now.elapsed().as_secs_f64();
+        dbg!(compute_multi_mapping_t);
+        mm
+    };
 
-            let now = std::time::Instant::now();
+    let now = std::time::Instant::now();
 
-            // matching::bottom_up_hiding(hyperast, &mm, mapper);
+    // matching::bottom_up_hiding(hyperast, &mm, mapper);
 
-            hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
-            hyper_diff::matchers::heuristic::gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher::<_, mapping_store::VecStore<_>, 200>::execute(mapper);
-            let bottom_up_hiding_t = now.elapsed().as_secs_f64();
-            dbg!(bottom_up_hiding_t);
+    use hyper_diff::matchers::heuristic::gt;
 
-            let value = (
-                crate::MappingStage::Bottomup,
-                mapper.mapping.mappings.clone(),
-            );
-            entry.insert(value).downgrade()
-        }
-    }
+    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+    LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
+
+    use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
+    LazyHybridBottomUpMatcher::<_, M, 200>::execute(mapper);
+    let bottom_up_t = now.elapsed().as_secs_f64();
+    log::info!("bottom_up_t: {}", bottom_up_t);
+
+    let value = (
+        crate::MappingStage::Bottomup,
+        mapper.mapping.mappings.clone(),
+    );
+    entry.insert(value).downgrade()
 }
 
 const CONST_NODE_COUNTING: Option<usize> = Some(500_000);
@@ -450,7 +442,6 @@ fn track_greedy<'s, C, P>(
     src_tree: &mut DecompressedTree,
     dst_tree: &mut DecompressedTree,
     subtree_mappings: &mapping_store::MultiVecStore<IdD>,
-    // no_spaces_path_to_target: &[u16],
     flags: &Flags,
     target: &P,
     postprocess_matching: &impl Fn(LocalPieceOfCode<super::IdN, super::Idx>) -> C,
@@ -480,125 +471,20 @@ where
     loop {
         // dbg!(path);
         let dsts = subtree_mappings.get_dsts(&curr);
-        let curr_flags = FlagsE::Upd | FlagsE::Child | FlagsE::SimChild; //  | FlagsE::ExactChild
-        let parent_flags = curr_flags | FlagsE::Parent | FlagsE::SimParent; //  | FlagsE::ExactParent
-        if dsts.is_empty() {
-            // continue through path_to_target
-            // dbg!(curr);
-        } else if path.is_empty() {
-            // need to check curr node flags
-            if flags.is_subset(curr_flags) {
-                // only trigger on curr and children changed
-                let nodes = CONST_NODE_COUNTING
-                    .unwrap_or_else(|| tracker_nospace.size(&other_tr, &current_tr));
-
-                return Some(MappingResult::Skipped {
-                    nodes,
-                    src: {
-                        let (pos, path_ids) = compute_position_and_nodes(
-                            current_tr,
-                            &mut target.iter_offsets(),
-                            with_spaces_stores,
-                        );
-
-                        LocalPieceOfCode::from_file_and_range(
-                            pos.file(),
-                            target.start()..target.end(),
-                            target.iter_offsets().collect(),
-                            path_ids,
-                        )
-                    },
-                    next: dsts
-                        .iter()
-                        .map(|x| {
-                            let path_dst = dst_tree.path_rooted(x);
-                            let (path_dst, _) = path_with_spaces(
-                                other_tr,
-                                &mut path_dst.iter().copied(),
-                                with_spaces_stores,
-                            );
-                            postprocess_matching(compute_local(
-                                other_tr,
-                                &path_dst,
-                                with_spaces_stores,
-                            ))
-                        })
-                        .collect(),
-                });
-            }
-            // also the type of src and dsts
-            // also check it file path changed
-            // can we test if parent changed ? at least we can ckeck some attributes
-        } else if path.len() == 1 {
-            // need to check parent node flags
-            if flags.is_subset(parent_flags) {
-                // only trigger on parent, curr and children changed
-                let nodes = CONST_NODE_COUNTING
-                    .unwrap_or_else(|| tracker_nospace.size(&other_tr, &current_tr));
-                return Some(MappingResult::Skipped {
-                    nodes,
-                    src: {
-                        let (pos, path_ids) = compute_position_and_nodes(
-                            current_tr,
-                            &mut target.iter_offsets(),
-                            with_spaces_stores,
-                        );
-
-                        let path = target.iter_offsets().collect();
-                        LocalPieceOfCode::from_position(&pos, path, path_ids)
-                    },
-                    next: dsts
-                        .iter()
-                        .map(|x| {
-                            let mut path_dst = dst_tree.path_rooted(x);
-                            path_dst.extend(path); // WARN with similarity it might not be possible to simply concat path...
-                            let (path_dst, _) = path_with_spaces(
-                                other_tr,
-                                &mut path_dst.iter().copied(),
-                                with_spaces_stores,
-                            );
-                            postprocess_matching(compute_local(
-                                other_tr,
-                                &path_dst,
-                                with_spaces_stores,
-                            ))
-                        })
-                        .collect(),
-                });
-            }
-            // also the type of src and dsts
-            // also check if file path changed
-            // can we test if parent changed ? at least we can ckeck some attributes
-        } else {
-            // need to check flags, the type of src and dsts
-            if flags.is_subset(parent_flags) {
-                // only trigger on parent, curr and children changed
-                let nodes = CONST_NODE_COUNTING
-                    .unwrap_or_else(|| tracker_nospace.size(&other_tr, &current_tr));
-                return Some(MappingResult::Skipped {
-                    nodes,
-                    src: compute_local2(target, with_spaces_stores),
-                    next: dsts
-                        .iter()
-                        .map(|x| {
-                            let mut path_dst = dst_tree.path_rooted(x);
-                            path_dst.extend(path); // WARN with similarity it might not be possible to simply concat path...
-                            let (path_dst, _) = path_with_spaces(
-                                other_tr,
-                                &mut path_dst.iter().copied(),
-                                with_spaces_stores,
-                            );
-                            postprocess_matching(compute_local(
-                                other_tr,
-                                &path_dst,
-                                with_spaces_stores,
-                            ))
-                        })
-                        .collect(),
-                });
-            }
-            // also check if file path changed
-            // can we test if parent changed ? at least we can ckeck some attributes
+        if let Some(value) = track_greedy_aux(
+            with_spaces_stores,
+            flags,
+            target,
+            &dst_tree,
+            current_tr,
+            other_tr,
+            &tracker_nospace,
+            dsts,
+            path,
+            postprocess_matching,
+        ) {
+            // found
+            return Some(value);
         }
 
         let Some(i) = path.first() else {
@@ -618,6 +504,125 @@ where
     None
 }
 
+fn track_greedy_aux<'s, C, P>(
+    with_spaces_stores: &'s SimpleStores<TStore>,
+    flags: EnumSet<FlagsE>,
+    target: &P,
+    dst_tree: &Decompressible<&NoSpaceStore<'_, '_>, &mut DecompressedTree>,
+    current_tr: super::IdN,
+    other_tr: super::IdN,
+    tracker_nospace: &MappingTracker<'s, NoSpaceStore<'_, '_>>,
+    mappeds: &[IdD],
+    // remaining path to `target`
+    path: &[super::Idx],
+    postprocess_matching: &impl Fn(LocalPieceOfCode<super::IdN, super::Idx>) -> C,
+) -> Option<MappingResult<super::IdN, super::Idx, C>>
+where
+    P: position_accessors::SolvedPosition<super::IdN>
+        + position_accessors::RootedPosition<super::IdN>
+        + position_accessors::WithPreOrderOffsets<Idx = super::Idx>
+        + position_accessors::OffsetPostionT<super::IdN, IdO = usize>
+        + self::WithPreOrderOffsetsNoSpaces,
+{
+    let curr_flags = FlagsE::Upd | FlagsE::Child | FlagsE::SimChild;
+    //  | FlagsE::ExactChild
+    let parent_flags = curr_flags | FlagsE::Parent | FlagsE::SimParent;
+    //  | FlagsE::ExactParent
+    if mappeds.is_empty() {
+        // no mappeds
+        // continue through path_to_target
+        // dbg!(curr);
+        return None;
+    }
+    if path.is_empty() && flags.is_subset(curr_flags) {
+        // only trigger on curr and children changed
+        let nodes =
+            CONST_NODE_COUNTING.unwrap_or_else(|| tracker_nospace.size(&other_tr, &current_tr));
+
+        let next = mappeds
+            .iter()
+            .map(|x| {
+                let path_dst = dst_tree.path_rooted(x);
+                let (path_dst, _) =
+                    path_with_spaces(other_tr, &mut path_dst.iter().copied(), with_spaces_stores);
+                postprocess_matching(compute_local(other_tr, &path_dst, with_spaces_stores))
+            })
+            .collect();
+        let src = compute_local2(target, with_spaces_stores);
+        // src: {
+        //     let (pos, path_ids) = compute_position_and_nodes(
+        //         current_tr,
+        //         &mut target.iter_offsets(),
+        //         with_spaces_stores,
+        //     );
+
+        //     LocalPieceOfCode::from_file_and_range(
+        //         pos.file(),
+        //         target.start()..target.end(),
+        //         target.iter_offsets().collect(),
+        //         path_ids,
+        //     )
+        // },
+        return Some(MappingResult::Skipped { nodes, src, next });
+        // also the type of src and dsts
+        // also check it file path changed
+        // can we test if parent changed ? at least we can check some attributes
+    }
+    if !flags.is_subset(parent_flags) {
+        // nothing to do on parents
+        return None;
+    }
+    if path.len() == 1 {
+        // only trigger on parent, curr and children changed
+        let nodes =
+            CONST_NODE_COUNTING.unwrap_or_else(|| tracker_nospace.size(&other_tr, &current_tr));
+        let next = mappeds
+            .iter()
+            .map(|x| {
+                let mut path_dst = dst_tree.path_rooted(x);
+                path_dst.extend(path); // WARN with similarity it might not be possible to simply concat path...
+                let (path_dst, _) =
+                    path_with_spaces(other_tr, &mut path_dst.iter().copied(), with_spaces_stores);
+                let local = compute_local(other_tr, &path_dst, with_spaces_stores);
+                dbg!(&local.path_ids);
+                postprocess_matching(local)
+            })
+            .collect();
+        let src = compute_local2(target, with_spaces_stores);
+        // src: {
+        //     let (pos, path_ids) = compute_position_and_nodes(
+        //         current_tr,
+        //         &mut target.iter_offsets(),
+        //         with_spaces_stores,
+        //     );
+
+        //     let path = target.iter_offsets().collect();
+        //     LocalPieceOfCode::from_position(&pos, path, path_ids)
+        // },
+        return Some(MappingResult::Skipped { nodes, src, next });
+        // also the type of src and dsts
+        // also check if file path changed
+        // can we test if parent changed ? at least we can ckeck some attributes
+    }
+    // need to check the type of src and dsts
+    // only trigger on parent, curr and children changed
+    let nodes = CONST_NODE_COUNTING.unwrap_or_else(|| tracker_nospace.size(&other_tr, &current_tr));
+    let next = mappeds
+        .iter()
+        .map(|x| {
+            let mut path_dst = dst_tree.path_rooted(x);
+            path_dst.extend(path); // WARN with similarity it might not be possible to simply concat path...
+            let (path_dst, _) =
+                path_with_spaces(other_tr, &mut path_dst.iter().copied(), with_spaces_stores);
+            postprocess_matching(compute_local(other_tr, &path_dst, with_spaces_stores))
+        })
+        .collect();
+    let src = compute_local2(target, with_spaces_stores);
+    return Some(MappingResult::Skipped { nodes, src, next });
+    // also check if file path changed
+    // can we test if parent changed ? at least we can ckeck some attributes
+}
+
 fn compute_local(
     tr: super::IdN,
     path: &[super::Idx],
@@ -629,91 +634,16 @@ fn compute_local(
     LocalPieceOfCode::from_position(&pos, path, path_ids)
 }
 
-fn compute_local2(
-    path: &(
-         impl position_accessors::WithPreOrderOffsets<Idx = super::Idx>
-         + position_accessors::RootedPosition<super::IdN>
-     ),
-    with_spaces_stores: &SimpleStores<TStore>,
-) -> LocalPieceOfCode<super::IdN, super::Idx> {
+fn compute_local2<P>(
+    path: &P,
+    store: &SimpleStores<TStore>,
+) -> LocalPieceOfCode<super::IdN, super::Idx>
+where
+    P: position_accessors::WithPreOrderOffsets<Idx = super::Idx>
+        + position_accessors::RootedPosition<super::IdN>,
+{
     let tr = path.root();
-    let (pos, path_ids) =
-        compute_position_and_nodes(tr, &mut path.iter_offsets(), with_spaces_stores);
+    let (pos, path_ids) = compute_position_and_nodes(tr, &mut path.iter_offsets(), store);
     let path = path.iter_offsets().collect();
     LocalPieceOfCode::from_position(&pos, path, path_ids)
-}
-
-#[derive(EnumSetType, Debug)]
-pub enum FlagsE {
-    Upd,
-    Child,
-    Parent,
-    ExactChild,
-    ExactParent,
-    SimChild,
-    SimParent,
-    Meth,
-    Typ,
-    Top,
-    File,
-    Pack,
-    Dependency,
-    Dependent,
-    References,
-    Declaration,
-}
-
-impl From<&Flags> for EnumSet<FlagsE> {
-    fn from(val: &Flags) -> Self {
-        let mut r = EnumSet::new();
-        if val.upd {
-            r.insert(FlagsE::Upd);
-        }
-        if val.child {
-            r.insert(FlagsE::Child);
-        }
-        if val.parent {
-            r.insert(FlagsE::Parent);
-        }
-        if val.exact_child {
-            r.insert(FlagsE::ExactChild);
-        }
-        if val.exact_parent {
-            r.insert(FlagsE::ExactParent);
-        }
-        if val.sim_child {
-            r.insert(FlagsE::SimChild);
-        }
-        if val.sim_parent {
-            r.insert(FlagsE::SimParent);
-        }
-        if val.meth {
-            r.insert(FlagsE::Meth);
-        }
-        if val.typ {
-            r.insert(FlagsE::Typ);
-        }
-        if val.top {
-            r.insert(FlagsE::Top);
-        }
-        if val.file {
-            r.insert(FlagsE::File);
-        }
-        if val.pack {
-            r.insert(FlagsE::Pack);
-        }
-        if val.dependency {
-            r.insert(FlagsE::Dependency);
-        }
-        if val.dependent {
-            r.insert(FlagsE::Dependent);
-        }
-        if val.references {
-            r.insert(FlagsE::References);
-        }
-        if val.declaration {
-            r.insert(FlagsE::Declaration);
-        }
-        r
-    }
 }

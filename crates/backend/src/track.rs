@@ -1,40 +1,29 @@
-use std::{fmt::Debug, thread::sleep, time::Duration};
-
 use axum::{Json, response::IntoResponse};
 use enumset::{EnumSet, EnumSetType};
-use hyper_diff::{
-    decompressed_tree_store::{
-        DecompressedWithParent, LazyDecompressedTreeStore, ShallowDecompressedTreeStore,
-    },
-    matchers::{
-        Mapper,
-        mapping_store::{self, MonoMappingStore, MultiMappingStore},
-    },
-};
-use hyperast::{
-    PrimInt,
-    position::{
-        compute_position, compute_position_and_nodes, compute_position_with_no_spaces,
-        compute_range, path_with_spaces,
-        position_accessors::{self, WithOffsets, WithPreOrderPath},
-        resolve_range,
-    },
-    store::{SimpleStores, defaults::NodeIdentifier, nodes::legion::HashedNodeRef},
-    types::{self, Childrn, HyperAST, NodeStore, WithChildren, WithHashs, WithStats},
-};
-use hyperast_vcs_git::{
-    TStore, git::Repo, multi_preprocessed, preprocessed::child_at_path_tracked,
-    processing::ConfiguredRepoTrait,
-};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_bool_from_anything;
+use std::{fmt::Debug, thread::sleep, time::Duration};
 use tokio::time::Instant;
 
-use crate::{
-    MappingAloneCache, PartialDecompCache, SharedState,
-    changes::{self, DstChanges, SrcChanges},
-    matching, no_space,
-};
+use hyperast::PrimInt;
+use hyperast::position::position_accessors::{self, WithOffsets, WithPreOrderPath};
+use hyperast::position::{compute_position_with_no_spaces, compute_range, resolve_range};
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast_vcs_git::git::Repo;
+use hyperast_vcs_git::preprocessed::child_at_path_tracked;
+use hyperast_vcs_git::processing::ConfiguredRepoTrait;
+use hyperast_vcs_git::{TStore, multi_preprocessed};
+
+use crate::SharedState;
+use crate::changes::{self, DstChanges, SrcChanges};
+
+mod compute;
+mod more;
+
+#[cfg(feature = "experimental")]
+mod my_dash;
+
+use more::TargetCodeElement;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct TrackingParam {
@@ -878,86 +867,6 @@ impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
     }
 }
 
-#[derive(Clone)]
-struct TargetCodeElement<IdN, Idx> {
-    start: usize,
-    end: usize,
-    path: Vec<Idx>,
-    path_no_spaces: Vec<Idx>,
-    root: IdN,
-    node: IdN,
-}
-
-impl<IdN: Clone, Idx> position_accessors::SolvedPosition<IdN> for TargetCodeElement<IdN, Idx> {
-    fn node(&self) -> IdN {
-        self.node.clone()
-    }
-}
-
-impl<IdN: Clone, Idx> position_accessors::RootedPosition<IdN> for TargetCodeElement<IdN, Idx> {
-    fn root(&self) -> IdN {
-        self.root.clone()
-    }
-}
-
-impl<IdN, Idx: PrimInt> position_accessors::WithPath<IdN> for TargetCodeElement<IdN, Idx> {}
-
-impl<IdN, Idx: PrimInt> position_accessors::WithPreOrderOffsets for TargetCodeElement<IdN, Idx> {
-    type It<'a>
-        = std::iter::Copied<std::slice::Iter<'a, Idx>>
-    where
-        Idx: 'a,
-        Self: 'a;
-
-    fn iter_offsets(&self) -> Self::It<'_> {
-        self.path.iter().copied()
-    }
-}
-
-impl<IdN, Idx: PrimInt> position_accessors::WithPreOrderPath<IdN> for TargetCodeElement<IdN, Idx> {
-    type ItPath = std::vec::IntoIter<(Idx, IdN)>;
-
-    fn iter_offsets_and_nodes(&self) -> Self::ItPath {
-        todo!()
-    }
-}
-
-impl<IdN, Idx: PrimInt> position_accessors::WithOffsets for TargetCodeElement<IdN, Idx> {
-    type Idx = Idx;
-}
-
-impl<IdN, Idx> position_accessors::OffsetPostionT<IdN> for TargetCodeElement<IdN, Idx> {
-    type IdO = usize;
-
-    fn offset(&self) -> Self::IdO {
-        self.start
-    }
-
-    fn len(&self) -> Self::IdO {
-        self.end - self.start
-    }
-
-    fn start(&self) -> Self::IdO {
-        self.start
-    }
-
-    fn end(&self) -> Self::IdO {
-        self.end
-    }
-}
-
-impl<IdN, Idx: PrimInt> compute::WithPreOrderOffsetsNoSpaces for TargetCodeElement<IdN, Idx> {
-    type It<'a>
-        = std::slice::Iter<'a, Idx>
-    where
-        Idx: 'a,
-        Self: 'a;
-
-    fn iter_offsets_nospaces(&self) -> Self::It<'_> {
-        self.path_no_spaces.iter()
-    }
-}
-
 fn track_aux(
     state: std::sync::Arc<crate::AppState>,
     repo_handle: &impl ConfiguredRepoTrait<
@@ -1107,9 +1016,3 @@ fn track_aux2(
         &postprocess_matching,
     )
 }
-
-mod compute;
-mod more;
-
-#[cfg(feature = "experimental")]
-mod my_dash;

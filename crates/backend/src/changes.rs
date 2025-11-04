@@ -1,18 +1,19 @@
-use hyperast_vcs_git::{SimpleStores, processing::ConfiguredRepoTrait};
 use serde::{Deserialize, Serialize};
-
 use std::fmt::Debug;
 
-use hyper_diff::{
-    decompressed_tree_store::ShallowDecompressedTreeStore,
-    matchers::{Decompressible, Mapper},
-};
-use hyperast::{
-    store::defaults::NodeIdentifier,
-    types::{Childrn, HyperAST, HyperType, WithChildren, WithStats},
-};
+use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
+use hyper_diff::matchers::{Decompressible, Mapper};
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast::types::{Childrn, HyperAST, HyperType, WithChildren, WithStats};
+use hyperast_vcs_git::{SimpleStores, processing::ConfiguredRepoTrait};
 
 use crate::{matching, no_space};
+
+pub(crate) type NoSpaceStore<'a, 'store> = hyperast::store::SimpleStores<
+    hyperast_vcs_git::TStore,
+    no_space::NoSpaceNodeStoreWrapper<'store>,
+    &'a hyperast::store::labels::LabelStore,
+>;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SrcChanges {

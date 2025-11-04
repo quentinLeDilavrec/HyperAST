@@ -1,6 +1,7 @@
 use axum::{Json, response::IntoResponse};
 use enumset::{EnumSet, EnumSetType};
 use hyper_diff::matchers::Mapping;
+use hyperast::PrimInt;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_bool_from_anything;
@@ -172,4 +173,94 @@ where
     cs_by_idx
         .find(|(_, x)| stores.resolve_type(x).eq(t))
         .map(|(i, x)| (x, i))
+}
+
+#[derive(Clone)]
+pub struct TargetCodeElement<IdN, Idx> {
+    pub start: usize,
+    pub end: usize,
+    pub path: Vec<Idx>,
+    pub path_no_spaces: Vec<Idx>,
+    pub root: IdN,
+    pub node: IdN,
+}
+
+use hyperast::position::position_accessors;
+
+pub trait WithPreOrderOffsetsNoSpaces: position_accessors::WithOffsets {
+    type It<'a>: Iterator<Item = &'a Self::Idx>
+    where
+        Self: 'a,
+        Self::Idx: 'a;
+    fn iter_offsets_nospaces(&self) -> Self::It<'_>;
+}
+
+impl<IdN: Clone, Idx> position_accessors::SolvedPosition<IdN> for TargetCodeElement<IdN, Idx> {
+    fn node(&self) -> IdN {
+        self.node.clone()
+    }
+}
+
+impl<IdN: Clone, Idx> position_accessors::RootedPosition<IdN> for TargetCodeElement<IdN, Idx> {
+    fn root(&self) -> IdN {
+        self.root.clone()
+    }
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPath<IdN> for TargetCodeElement<IdN, Idx> {}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPreOrderOffsets for TargetCodeElement<IdN, Idx> {
+    type It<'a>
+        = std::iter::Copied<std::slice::Iter<'a, Idx>>
+    where
+        Idx: 'a,
+        Self: 'a;
+
+    fn iter_offsets(&self) -> Self::It<'_> {
+        self.path.iter().copied()
+    }
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPreOrderPath<IdN> for TargetCodeElement<IdN, Idx> {
+    type ItPath = std::vec::IntoIter<(Idx, IdN)>;
+
+    fn iter_offsets_and_nodes(&self) -> Self::ItPath {
+        todo!()
+    }
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithOffsets for TargetCodeElement<IdN, Idx> {
+    type Idx = Idx;
+}
+
+impl<IdN, Idx> position_accessors::OffsetPostionT<IdN> for TargetCodeElement<IdN, Idx> {
+    type IdO = usize;
+
+    fn offset(&self) -> Self::IdO {
+        self.start
+    }
+
+    fn len(&self) -> Self::IdO {
+        self.end - self.start
+    }
+
+    fn start(&self) -> Self::IdO {
+        self.start
+    }
+
+    fn end(&self) -> Self::IdO {
+        self.end
+    }
+}
+
+impl<IdN, Idx: PrimInt> WithPreOrderOffsetsNoSpaces for TargetCodeElement<IdN, Idx> {
+    type It<'a>
+        = std::slice::Iter<'a, Idx>
+    where
+        Idx: 'a,
+        Self: 'a;
+
+    fn iter_offsets_nospaces(&self) -> Self::It<'_> {
+        self.path_no_spaces.iter()
+    }
 }

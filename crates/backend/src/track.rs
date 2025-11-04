@@ -18,12 +18,12 @@ use crate::SharedState;
 use crate::changes::{self, DstChanges, SrcChanges};
 
 mod compute;
+use compute::do_tracking;
 mod more;
+use more::{TargetCodeElement, shift_piece};
 
 #[cfg(feature = "experimental")]
 mod my_dash;
-
-use more::TargetCodeElement;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct TrackingParam {
@@ -184,12 +184,6 @@ impl IntoResponse for TrackingResultWithChanges<IdN, Idx> {
     }
 }
 
-// impl Display for TrackingResult {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         writeln!()
-//     }
-// }
-
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PieceOfCode<IdN = self::IdN, Idx = usize> {
     user: String,
@@ -221,12 +215,6 @@ where
     }
     seq.end()
 }
-
-// impl Display for PieceOfCode {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         todo!()
-//     }
-// }
 
 const MAX_NODES: usize = 200 * 4_000_000;
 
@@ -265,10 +253,7 @@ pub fn track_code(
         flags,
     } = query;
     let repo_specifier = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repo_handle = state
-        .repositories
-        .write()
-        .unwrap()
+    let repo_handle = (state.repositories.write().unwrap())
         .get_config(repo_specifier)
         .ok_or_else(|| TrackingError {
             compute_time: now.elapsed().as_secs_f64(),
@@ -287,10 +272,7 @@ pub fn track_code(
     let mut source = None;
     while node_processed < MAX_NODES {
         commits_processed += 1;
-        let commits = state
-            .repositories
-            .write()
-            .unwrap()
+        let commits = (state.repositories.write().unwrap())
             .pre_process_with_limit(&mut repository, "", &commit, 2)
             .map_err(|e| TrackingError {
                 compute_time: now.elapsed().as_secs_f64(),
@@ -310,15 +292,12 @@ pub fn track_code(
             start,
             end,
             &flags,
-        ) {
-            MappingResult::Direct { src: aaa, matches } => {
+        )
+        .into()
+        {
+            MappingResult::Direct { src, matches } => {
                 dbg!(&src_oid, &dst_oid, &commit);
-                let aaa = aaa.globalize(repository.spec, commit);
-                let (src, intermediary) = if let Some(src) = source {
-                    (src, Some(aaa))
-                } else {
-                    (aaa, None)
-                };
+                let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                 log::debug!("tracked {commits:?}");
                 return Ok(TrackingResult {
                     compute_time: now.elapsed().as_secs_f64(),
@@ -329,13 +308,8 @@ pub fn track_code(
                     matched: matches,
                 });
             }
-            MappingResult::Missing { src: aaa, fallback } => {
-                let aaa = aaa.globalize(repository.spec, commit);
-                let (src, intermediary) = if let Some(src) = source {
-                    (src, Some(aaa))
-                } else {
-                    (aaa, None)
-                };
+            MappingResult::Missing { src, fallback } => {
+                let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                 log::debug!("tracking miss {commits:?}");
                 return Ok(TrackingResult {
                     compute_time: now.elapsed().as_secs_f64(),
@@ -356,12 +330,7 @@ pub fn track_code(
                 node_processed += nodes;
                 dbg!(src_oid, dst_oid);
                 if before.as_ref() == Some(&dst_oid.to_string()) {
-                    let aaa = src.globalize(repository.spec, commit);
-                    let (src, intermediary) = if let Some(src) = source {
-                        (src, Some(aaa))
-                    } else {
-                        (aaa, None)
-                    };
+                    let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                     log::debug!("tracking skip {commits:?}");
                     return Ok(TrackingResult {
                         compute_time: now.elapsed().as_secs_f64(),
@@ -418,10 +387,7 @@ pub(crate) fn track_code_at_path(
         path,
     } = path;
     let repo_specifier = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repository = state
-        .repositories
-        .write()
-        .unwrap()
+    let repository = (state.repositories.write().unwrap())
         .get_config(repo_specifier)
         .ok_or_else(|| TrackingError {
             compute_time: now.elapsed().as_secs_f64(),
@@ -431,8 +397,6 @@ pub(crate) fn track_code_at_path(
         })?;
     let mut repository = repository.fetch();
     log::debug!("done cloning {}", repository.spec);
-    // let mut get_mut = state.write().unwrap();
-    // let state = get_mut.deref_mut();
     let mut commit = commit.clone();
     let mut node_processed = 0;
     let mut commits_processed = 1;
@@ -469,15 +433,10 @@ pub(crate) fn track_code_at_path(
         } else {
             commits[1]
         };
-        match track_aux2(state.clone(), &repository, src_oid, dst_oid, &path, &flags) {
-            MappingResult::Direct { src: aaa, matches } => {
+        match track_aux2(state.clone(), &repository, src_oid, dst_oid, &path, &flags).into() {
+            MappingResult::Direct { src, matches } => {
                 dbg!(&src_oid, &dst_oid, &commit);
-                let aaa = aaa.globalize(repository.spec, commit);
-                let (src, intermediary) = if let Some(src) = source {
-                    (src, Some(aaa))
-                } else {
-                    (aaa, None)
-                };
+                let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                 return Ok(TrackingResult {
                     compute_time: now.elapsed().as_secs_f64(),
                     commits_processed,
@@ -487,13 +446,8 @@ pub(crate) fn track_code_at_path(
                     matched: matches,
                 });
             }
-            MappingResult::Missing { src: aaa, fallback } => {
-                let aaa = aaa.globalize(repository.spec, commit);
-                let (src, intermediary) = if let Some(src) = source {
-                    (src, Some(aaa))
-                } else {
-                    (aaa, None)
-                };
+            MappingResult::Missing { src, fallback } => {
+                let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                 return Ok(TrackingResult {
                     compute_time: now.elapsed().as_secs_f64(),
                     commits_processed,
@@ -512,12 +466,7 @@ pub(crate) fn track_code_at_path(
             MappingResult::Skipped { nodes, src, next } => {
                 // TODO handle cases where there is no more commits
                 if before.is_some() {
-                    let aaa = src.globalize(repository.spec, commit);
-                    let (src, intermediary) = if let Some(src) = source {
-                        (src, Some(aaa))
-                    } else {
-                        (aaa, None)
-                    };
+                    let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                     return Ok(TrackingResult {
                         compute_time: now.elapsed().as_secs_f64(),
                         commits_processed,
@@ -576,10 +525,7 @@ pub(crate) fn track_code_at_path_with_changes(
         path,
     } = path;
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repo_handle = state
-        .repositories
-        .write()
-        .unwrap()
+    let repo_handle = (state.repositories.write().unwrap())
         .get_config(repo_spec)
         .ok_or_else(|| TrackingError {
             compute_time: now.elapsed().as_secs_f64(),
@@ -597,10 +543,7 @@ pub(crate) fn track_code_at_path_with_changes(
     let mut source = None;
     while node_processed < MAX_NODES {
         commits_processed += 1;
-        let commits = state
-            .repositories
-            .write()
-            .unwrap()
+        let commits = (state.repositories.write().unwrap())
             .pre_process_with_limit(&mut repository, "", &commit, 4)
             .map_err(|e| TrackingError {
                 compute_time: now.elapsed().as_secs_f64(),
@@ -624,8 +567,8 @@ pub(crate) fn track_code_at_path_with_changes(
                 message: "this commit has no parent".into(),
             });
         };
-        match track_aux2(state.clone(), &repository, src_oid, dst_oid, &path, &flags) {
-            MappingResult::Direct { src: aaa, matches } => {
+        match track_aux2(state.clone(), &repository, src_oid, dst_oid, &path, &flags).into() {
+            MappingResult::Direct { src, matches } => {
                 dbg!(&src_oid, &dst_oid, &commit, &ori_oid);
                 let changes = changes::added_deleted(state, &repository, dst_oid, ori_oid.unwrap())
                     .map_err(|err| TrackingError {
@@ -634,12 +577,7 @@ pub(crate) fn track_code_at_path_with_changes(
                         node_processed,
                         message: err,
                     })?;
-                let aaa = aaa.globalize(repository.spec, commit);
-                let (src, intermediary) = if let Some(src) = source {
-                    (src, Some(aaa))
-                } else {
-                    (aaa, None)
-                };
+                let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                 let tracking_result = TrackingResult {
                     compute_time: now.elapsed().as_secs_f64(),
                     commits_processed,
@@ -659,12 +597,7 @@ pub(crate) fn track_code_at_path_with_changes(
                         node_processed,
                         message: err,
                     })?;
-                let aaa = src.globalize(repository.spec, commit);
-                let (src, intermediary) = if let Some(src) = source {
-                    (src, Some(aaa))
-                } else {
-                    (aaa, None)
-                };
+                let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                 let tracking_result = TrackingResult {
                     compute_time: now.elapsed().as_secs_f64(),
                     commits_processed,
@@ -698,12 +631,7 @@ pub(crate) fn track_code_at_path_with_changes(
                                 node_processed,
                                 message: err,
                             })?;
-                    let aaa = src.globalize(repository.spec, commit);
-                    let (src, intermediary) = if let Some(src) = source {
-                        (src, Some(aaa))
-                    } else {
-                        (aaa, None)
-                    };
+                    let (src, intermediary) = shift_piece(&commit, source, src, repository.spec);
                     let tracking_result = TrackingResult {
                         compute_time: now.elapsed().as_secs_f64(),
                         commits_processed,
@@ -717,8 +645,6 @@ pub(crate) fn track_code_at_path_with_changes(
                 if source.is_none() {
                     source = Some(src.globalize(repository.spec.clone(), commit));
                 }
-                // commit = dst_oid.to_string();
-
                 if next.len() > 1 {
                     log::error!("multiple matches")
                 }
@@ -726,7 +652,6 @@ pub(crate) fn track_code_at_path_with_changes(
                     unreachable!()
                 } else {
                     let next = &next[0]; // TODO stop on branching ?
-                    // dbg!(next);
                     path = next.path.clone();
                     commit = next.commit.clone();
                 }
@@ -759,6 +684,24 @@ enum MappingResult<IdN, Idx, T = PieceOfCode<IdN, Idx>> {
     },
 }
 
+impl<IdN, Idx, T> Into<Result<MappingResult<IdN, Idx, T>, String>> for MappingResult<IdN, Idx, T> {
+    fn into(self) -> Result<MappingResult<IdN, Idx, T>, String> {
+        match self {
+            MappingResult::Error(e) => Err(e),
+            x => Ok(x),
+        }
+    }
+}
+
+impl<IdN, Idx, T> From<Result<MappingResult<IdN, Idx, T>, String>> for MappingResult<IdN, Idx, T> {
+    fn from(value: Result<MappingResult<IdN, Idx, T>, String>) -> Self {
+        match value {
+            Ok(x) => x,
+            Err(e) => MappingResult::Error(e),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 struct LocalPieceOfCode<IdN, Idx> {
     file: String,
@@ -782,15 +725,9 @@ impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
         path: Vec<Idx>,
         path_ids: Vec<IdN>,
     ) -> Self {
-        let std::ops::Range { start, end } = pos.range();
-        let file = pos.file().to_str().unwrap().to_string();
-        Self {
-            file,
-            start,
-            end,
-            path,
-            path_ids,
-        }
+        let range = pos.range();
+        let file = pos.file();
+        Self::from_file_and_range(file, range, path, path_ids)
     }
     pub(crate) fn from_file_and_range(
         file: &std::path::Path,
@@ -820,49 +757,29 @@ impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
             path.push(o);
             path_ids.push(i);
         }
-        Self {
-            file: pos.file().to_str().unwrap().to_owned(),
-            start: pos.start(),
-            end: pos.end(),
-            path,
-            path_ids,
-        }
+        Self::from_file_and_range(&pos.file(), pos.start()..pos.end(), path, path_ids)
     }
     pub(crate) fn globalize(self, spec: Repo, commit: impl ToString) -> PieceOfCode<IdN, Idx> {
-        let LocalPieceOfCode {
-            file,
-            start,
-            end,
-            path,
-            path_ids,
-        } = self;
         let commit = commit.to_string();
         PieceOfCode {
             user: spec.user().to_string(),
             name: spec.name().to_string(),
             commit,
-            path,
-            path_ids,
-            file,
-            start,
-            end,
+            path: self.path,
+            path_ids: self.path_ids,
+            file: self.file,
+            start: self.start,
+            end: self.end,
         }
     }
     fn map_path<Idx2, F: Fn(Idx) -> Idx2>(self, f: F) -> LocalPieceOfCode<IdN, Idx2> {
-        let LocalPieceOfCode {
-            file,
-            start,
-            end,
-            path,
-            path_ids,
-        } = self;
-        let path = path.into_iter().map(f).collect();
+        let path = self.path.into_iter().map(f).collect();
         LocalPieceOfCode {
-            file,
-            start,
-            end,
             path,
-            path_ids,
+            path_ids: self.path_ids,
+            file: self.file,
+            start: self.start,
+            end: self.end,
         }
     }
 }
@@ -878,16 +795,16 @@ fn track_aux(
     start: Option<usize>,
     end: Option<usize>,
     flags: &Flags,
-) -> MappingResult<IdN, Idx> {
+) -> Result<MappingResult<IdN, Idx>, String> {
     dbg!(src_oid, dst_oid);
     let repositories = state.repositories.read().unwrap();
     let commit_src = repositories
         .get_commit(repo_handle.config(), &src_oid)
-        .unwrap();
+        .ok_or_else(|| format!("{src_oid} is missing"))?;
     let src_tr = commit_src.ast_root;
     let commit_dst = repositories
         .get_commit(repo_handle.config(), &dst_oid)
-        .unwrap();
+        .ok_or_else(|| format!("{dst_oid} is missing"))?;
     let dst_tr = commit_dst.ast_root;
     let stores = &repositories.processor.main_stores;
 
@@ -897,7 +814,7 @@ fn track_aux(
         child_at_path_tracked(&repositories.processor.main_stores, src_tr, file.split("/"));
 
     let Some((file_node, offsets_to_file)) = file_node else {
-        return MappingResult::Error("not found".into());
+        return Err("not found".into());
     };
 
     dbg!(&offsets_to_file);
@@ -911,21 +828,9 @@ fn track_aux(
     let computed_range = compute_range(file_node, &mut offsets_in_file.into_iter(), stores);
     dbg!(computed_range.0, computed_range.1);
     dbg!(&computed_range.2);
-    let no_spaces_path_to_target = if false {
-        // TODO use this version
-        use hyperast::position;
-        use position::offsets;
-        let src = offsets::OffsetsRef::from(path_to_target.as_slice());
-        let src = src.with_root(src_tr);
-        let src = src.with_store(stores);
-        let no_spaces_path_to_target: offsets::Offsets<_, position::tags::TopDownNoSpace> =
-            src.compute_no_spaces::<_, offsets::Offsets<_, _>>();
-        no_spaces_path_to_target.into()
-    } else {
-        let (_, _, no_spaces_path_to_target) =
-            compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
-        no_spaces_path_to_target
-    };
+    let (_, _, no_spaces_path_to_target) =
+        compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
+    let no_spaces_path_to_target = no_spaces_path_to_target;
     let dst_oid = dst_oid; // WARN not sure what I was doing there commit_dst.clone();
     let target = TargetCodeElement::<IdN, Idx> {
         start: computed_range.0,
@@ -938,7 +843,7 @@ fn track_aux(
     let postprocess_matching = |p: LocalPieceOfCode<IdN, Idx>| {
         p.globalize(repo_handle.spec().clone(), dst_oid.to_string())
     };
-    compute::do_tracking(
+    do_tracking(
         &repositories,
         &state.partial_decomps,
         &state.mappings_alone,
@@ -947,6 +852,7 @@ fn track_aux(
         dst_tr,
         &postprocess_matching,
     )
+    .into()
 }
 
 fn track_aux2(
@@ -958,42 +864,22 @@ fn track_aux2(
     dst_oid: hyperast_vcs_git::git::Oid,
     path: &[Idx],
     flags: &Flags,
-) -> MappingResult<IdN, Idx> {
+) -> Result<MappingResult<IdN, Idx>, String> {
     let repositories = state.repositories.read().unwrap();
     let commit_src = repositories
         .get_commit(repo_handle.config(), &src_oid)
-        .unwrap();
+        .ok_or_else(|| format!("{src_oid} is missing"))?;
     let src_tr = commit_src.ast_root;
     let commit_dst = repositories
         .get_commit(repo_handle.config(), &dst_oid)
-        .unwrap();
+        .ok_or_else(|| format!("{dst_oid} is missing"))?;
     let dst_tr = commit_dst.ast_root;
     let stores = &repositories.processor.main_stores;
 
     let path_to_target: Vec<_> = path.to_vec();
     dbg!(&path_to_target);
-    let (pos, target_node, no_spaces_path_to_target): _ = if false {
-        // NOTE trying stuff
-        // TODO use this version
-        use hyperast::position;
-        use position::offsets;
-        use position::offsets_and_nodes;
-        let src = offsets::OffsetsRef::from(path_to_target.as_slice());
-        let src = src.with_root(src_tr);
-        let src = src.with_store(stores);
-        // let no_spaces_path_to_target: offsets::Offsets<_, position::tags::TopDownNoSpace> =
-        //     src.compute_no_spaces::<_, offsets::Offsets<_, _>>();
-        let position::CompoundPositionPreparer(pos, path) = src
-            .compute_no_spaces::<_, position::CompoundPositionPreparer<
-                position::Position,
-                offsets_and_nodes::StructuralPosition<_, _, position::tags::TopDownNoSpace>,
-            >>();
-        // no_spaces_path_to_target.into()
-        let (node, path) = path.into();
-        (pos, node, path)
-    } else {
-        compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores)
-    };
+    let (pos, target_node, no_spaces_path_to_target) =
+        compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
     let range = pos.range();
     let target = TargetCodeElement::<IdN, Idx> {
         start: range.start,
@@ -1006,7 +892,7 @@ fn track_aux2(
     let postprocess_matching = |p: LocalPieceOfCode<IdN, Idx>| {
         p.globalize(repo_handle.spec().clone(), dst_oid.to_string())
     };
-    compute::do_tracking(
+    do_tracking(
         &repositories,
         &state.partial_decomps,
         &state.mappings_alone,
@@ -1015,4 +901,5 @@ fn track_aux2(
         dst_tr,
         &postprocess_matching,
     )
+    .into()
 }

@@ -156,6 +156,23 @@ fn lazy_subtree_mapping<'a, 'b>(
     }
 }
 
+pub(super) fn shift_piece(
+    commit: &String,
+    source: Option<super::PieceOfCode<IdN, u16>>,
+    src: super::LocalPieceOfCode<IdN, u16>,
+    spec: hyperast_vcs_git::git::Repo,
+) -> (
+    super::PieceOfCode<IdN, u16>,
+    Option<super::PieceOfCode<IdN, u16>>,
+) {
+    let new = src.globalize(spec, commit);
+    if let Some(src) = source {
+        (src, Some(new))
+    } else {
+        (new, None)
+    }
+}
+
 use hyperast::types::NodeId;
 use hyperast::types::TypeStore;
 

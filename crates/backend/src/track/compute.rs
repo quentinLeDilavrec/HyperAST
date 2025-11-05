@@ -50,7 +50,7 @@ impl<'store, HAST> MappingTracker<'store, HAST> {
     }
 }
 
-pub(super) fn do_tracking<P, C>(
+pub(super) fn do_tracking<P, C: Debug>(
     repositories: &multi_preprocessed::PreProcessedRepositories,
     partial_decomps: &PartialDecompCache,
     mappings_alone: &MappingAloneCache,
@@ -101,6 +101,7 @@ where
     let mut mapper = Mapper::prep(stores, mappings, tree_pair);
     let fuller_mappings = if flags.some() {
         // case where we want to track through multiple commits
+        // and we do not need to descend fully
         let subtree_mappings = matching::top_down(
             stores,
             &mut mapper.mapping.src_arena,
@@ -116,15 +117,35 @@ where
             target,
             postprocess_matching,
         ) {
-            dbg!();
+            // enable considering updates added/removed (for visualization for example)
+            // TODO make a special category for updates
+            if crate::changes::UPD {
+                // NOTE I don't know why yet but in some cases the UPD feature seems to require to compute the mappings in both ways
+                // It happens when going through the greedy tracking
+                // maybe an issue with DashMaps ?
+                use crate::changes::continue_compute_mappings_full;
+                use mapping_store::DefaultMultiMappingStore as MM;
+                continue_compute_mappings_full::<_, _, MM<_>>(
+                    mappings_alone,
+                    &mut mapper,
+                    Some(subtree_mappings),
+                );
+            }
+
             return value;
         }
         // let mut mapper = mapper.mirror();
+        use crate::changes::continue_compute_mappings_full;
         use mapping_store::DefaultMultiMappingStore as MM;
-        compute_mappings_full::<_, _, MM<_>>(mappings_alone, &mut mapper, Some(subtree_mappings))
+        continue_compute_mappings_full::<_, _, MM<_>>(
+            mappings_alone,
+            &mut mapper,
+            Some(subtree_mappings),
+        )
     } else {
+        use crate::changes::continue_compute_mappings_full;
         use mapping_store::DefaultMultiMappingStore as MM;
-        compute_mappings_full::<_, _, MM<_>>(mappings_alone, &mut mapper, None)
+        continue_compute_mappings_full::<_, _, MM<_>>(mappings_alone, &mut mapper, None)
     };
     let fuller_mappings = &fuller_mappings.1;
 
@@ -354,6 +375,7 @@ where
     let mapped_parent = mapped_parent.map(|x| mapper.dst_arena.original(&x));
     target_parent != mapped_parent
 }
+
 fn reconstruct_mapped<IdD>(
     with_spaces_stores: &SimpleStores<TStore>,
     arena: &mut Decompressible<&NoSpaceStore<'_, '_>, &mut LazyPostOrder<IdN, IdD>>,
@@ -382,73 +404,6 @@ where
     let offsets = &mut path.iter().copied();
     let (pos, mapped_node) = compute_position(tr, offsets, with_spaces_stores);
     LocalPieceOfCode::from_position(&pos, path.clone(), path_ids.clone())
-}
-
-fn compute_mappings_full<'store, 'alone, 'tree, 'rest, 's: 'tree, HAST: HyperAST + Copy, M, MM>(
-    mappings_alone: &'alone MappingAloneCache<HAST::IdN, M>,
-    mapper: &mut Mapper<
-        HAST,
-        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Src>>,
-        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Dst>>,
-        M,
-    >,
-    partial: Option<MM>,
-) -> MappingAloneCacheRef<'alone, HAST::IdN, M>
-where
-    for<'t> types::LendT<'t, HAST>: WithHashs + WithStats,
-    HAST::IdN: Clone + Eq,
-    HAST::Label: Clone + Eq,
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
-    M: MonoMappingStore + Clone + Default,
-    MM: MultiMappingStore<Src = M::Src, Dst = M::Dst> + Default,
-    M::Src: PrimInt + Shallow<M::Src>,
-    M::Dst: PrimInt + Shallow<M::Dst>,
-    M::Src: std::hash::Hash + Debug,
-    M::Dst: std::hash::Hash + Debug,
-    HAST::IdN: std::hash::Hash + Debug,
-{
-    use dashmap::mapref::entry::Entry;
-    let entry = match mappings_alone.entry((
-        mapper.src_arena.original(&mapper.src_arena.root()),
-        mapper.dst_arena.original(&mapper.dst_arena.root()),
-    )) {
-        Entry::Occupied(occ) => return occ.into_ref().downgrade(),
-        Entry::Vacant(vac) => vac,
-    };
-    use mapping_store::MappingStore;
-    mapper.mapping.mappings.topit(
-        mapper.mapping.src_arena.len(),
-        mapper.mapping.dst_arena.len(),
-    );
-    let mm = if let Some(mm) = partial {
-        mm
-    } else {
-        let now = std::time::Instant::now();
-        let mm = matching::LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<MM>(mapper);
-        let compute_multi_mapping_t = now.elapsed().as_secs_f64();
-        dbg!(compute_multi_mapping_t);
-        mm
-    };
-
-    let now = std::time::Instant::now();
-
-    // matching::bottom_up_hiding(hyperast, &mm, mapper);
-
-    use hyper_diff::matchers::heuristic::gt;
-
-    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
-    LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
-
-    use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
-    LazyHybridBottomUpMatcher::<_, M, 200>::execute(mapper);
-    let bottom_up_t = now.elapsed().as_secs_f64();
-    log::info!("bottom_up_t: {}", bottom_up_t);
-
-    let value = (
-        crate::MappingStage::Bottomup,
-        mapper.mapping.mappings.clone(),
-    );
-    entry.insert(value).downgrade()
 }
 
 const CONST_NODE_COUNTING: Option<usize> = Some(500_000);

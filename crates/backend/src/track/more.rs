@@ -157,10 +157,10 @@ fn lazy_subtree_mapping<'a, 'b>(
 }
 
 pub(super) fn shift_piece(
-    commit: &String,
+    commit: hyperast_vcs_git::git::Oid,
     source: Option<super::PieceOfCode<IdN, u16>>,
     src: super::LocalPieceOfCode<IdN, u16>,
-    spec: hyperast_vcs_git::git::Repo,
+    spec: &hyperast_vcs_git::git::Repo,
 ) -> (
     super::PieceOfCode<IdN, u16>,
     Option<super::PieceOfCode<IdN, u16>>,
@@ -170,6 +170,15 @@ pub(super) fn shift_piece(
         (src, Some(new))
     } else {
         (new, None)
+    }
+}
+
+pub fn repo_config_error(now: Instant) -> super::TrackingError {
+    super::TrackingError {
+        compute_time: now.elapsed().as_secs_f64(),
+        commits_processed: 0,
+        node_processed: 0,
+        message: "missing config for repository".to_string(),
     }
 }
 

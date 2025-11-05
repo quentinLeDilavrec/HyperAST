@@ -7,7 +7,7 @@ use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{Childrn, HyperAST, HyperType, WithChildren, WithStats};
 use hyperast_vcs_git::{SimpleStores, processing::ConfiguredRepoTrait};
 
-use crate::{matching, no_space};
+use crate::{MappingStage, matching, no_space};
 
 pub(crate) type NoSpaceStore<'a, 'store> = hyperast::store::SimpleStores<
     hyperast_vcs_git::TStore,
@@ -17,26 +17,28 @@ pub(crate) type NoSpaceStore<'a, 'store> = hyperast::store::SimpleStores<
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SrcChanges {
-    user: String,
-    name: String,
-    commit: String,
+    pub user: String,
+    pub name: String,
+    pub commit: String,
     /// Global position of deleted elements
-    deletions: Vec<u32>, // TODO diff encode
+    pub deletions: Vec<u32>, // TODO diff encode
 }
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DstChanges {
-    user: String,
-    name: String,
-    commit: String,
+    pub user: String,
+    pub name: String,
+    pub commit: String,
     /// Global position of added elements
-    additions: Vec<u32>, // TODO diff encode
+    pub additions: Vec<u32>, // TODO diff encode
 }
+
+type RepoConfig = hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle;
+
+pub(crate) const UPD: bool = true;
 
 pub(crate) fn added_deleted(
     state: std::sync::Arc<crate::AppState>,
-    repo_handle: &impl ConfiguredRepoTrait<
-        Config = hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle,
-    >,
+    repo_handle: &impl ConfiguredRepoTrait<Config = RepoConfig>,
     src_oid: hyperast_vcs_git::git::Oid,
     dst_oid: hyperast_vcs_git::git::Oid,
 ) -> Result<(SrcChanges, DstChanges), String> {
@@ -52,6 +54,7 @@ pub(crate) fn added_deleted(
     let with_spaces_stores = &repositories.processor.main_stores;
     let stores = &no_space::as_nospaces(with_spaces_stores);
 
+    log::info!("added_deleted {} {}", src_oid, dst_oid);
     if src_tr == dst_tr {
         return Ok((
             SrcChanges {
@@ -68,140 +71,62 @@ pub(crate) fn added_deleted(
             },
         ));
     }
+    // // enable considering updates added/removed (for visualization for example)
+    // // TODO make a special category for updates
+    // if UPD {
+    //     // NOTE I don't know why yet but in some cases the UPD feature seems to require to compute the mappings in both ways
+    //     // It happens when going through the greedy tracking
+    //     // maybe an issue with DashMaps ?
+    //     compute_and_cache_full_diff(state.clone(), repo_handle.config(), dst_oid, src_oid);
+    // }
+    // NOTE the above trick has been moved to the greedy tracking branch
 
     let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &src_tr, &dst_tr);
 
     let mut updated = hashbrown::HashSet::<u32>::default();
     let mapped = {
-        let mappings_cache = &state.mappings_alone;
-        use hyper_diff::matchers::mapping_store::MappingStore;
-        use hyper_diff::matchers::mapping_store::VecStore;
+        let mut locked = binding.lock();
+        let tree_pair = locked.as_mut(stores);
 
-        // unsucceful attempt using a type specific Typestore to improve efficiency of diff
-        // #[repr(u8)]
-        // pub enum TStore {
-        //     Maven = 0,
-        //     Java = 1,
-        //     Cpp = 2,
-        // }
-
-        // impl Default for TStore {
-        //     fn default() -> Self {
-        //         Self::Maven
-        //     }
-        // }
-
-        // impl<'a> TypeStore<no_space::NoSpaceWrapper<'a, NodeIdentifier>> for &TStore {
-        //     type Ty = hyperast_vcs_git::MultiType;
-        //     const MASK: u16 = 0b1000_0000_0000_0000;
-
-        //     fn resolve_type(&self, n: &no_space::NoSpaceWrapper<'a, NodeIdentifier>) -> Self::Ty {
-        //         use hyperast::types::Typed;
-        //         n.get_type()
-        //     }
-
-        //     fn resolve_lang(
-        //         &self,
-        //         n: &no_space::NoSpaceWrapper<'a, NodeIdentifier>,
-        //     ) -> hyperast::types::LangWrapper<Self::Ty> {
-        //         todo!()
-        //     }
-
-        //     type Marshaled = hyperast::types::TypeIndex;
-
-        //     fn marshal_type(
-        //         &self,
-        //         n: &no_space::NoSpaceWrapper<'a, NodeIdentifier>,
-        //     ) -> Self::Marshaled {
-        //         todo!()
-        //     }
-
-        //     fn type_eq(
-        //         &self,
-        //         n: &no_space::NoSpaceWrapper<'a, NodeIdentifier>,
-        //         m: &no_space::NoSpaceWrapper<'a, NodeIdentifier>,
-        //     ) -> bool {
-        //         n.as_ref()
-        //             .get_component::<hyperast_gen_ts_cpp::types::Type>()
-        //             == m.as_ref()
-        //                 .get_component::<hyperast_gen_ts_cpp::types::Type>()
-        //     }
-        // }
-        // let tstore2 = TStore::default();
-        let hyperast = stores;
-        // let hyperast = hyperast.change_type_store_ref(&tstore2);
-        // let hyperast = &hyperast;
-        use hyper_diff::matchers::Mapping;
-
-        dbg!();
-        match mappings_cache.entry((src_tr, dst_tr)) {
-            dashmap::mapref::entry::Entry::Occupied(entry) => entry.into_ref().downgrade(),
-            dashmap::mapref::entry::Entry::Vacant(entry) => {
-                // std::collections::hash_map::Entry::Vacant(entry) => {
-                let mappings = VecStore::default();
-                let mut locked = binding.lock();
-                let (src_arena, dst_arena) = locked.as_mut(stores);
-                let src_arena = Decompressible {
-                    hyperast,
-                    decomp: src_arena,
-                };
-                let dst_arena = Decompressible {
-                    hyperast,
-                    decomp: dst_arena,
-                };
-                dbg!(src_arena.len());
-                dbg!(dst_arena.len());
-                let src_size = stores.node_store.resolve(src_tr).size();
-                let dst_size = stores.node_store.resolve(dst_tr).size();
-                dbg!(src_size);
-                dbg!(dst_size);
-                let mut mapper = Mapper {
-                    hyperast,
-                    mapping: Mapping {
-                        src_arena,
-                        dst_arena,
-                        mappings,
-                    },
-                };
-                dbg!();
-                dbg!(mapper.mapping.src_arena.len());
-                dbg!(mapper.mapping.dst_arena.len());
-                mapper.mapping.mappings.topit(
-                    mapper.mapping.src_arena.len(),
-                    mapper.mapping.dst_arena.len(),
-                );
-                matching::full2_gumtree_simple(&mut mapper);
-                let vec_store = mapper.mappings.clone();
-
-                for (i, x) in vec_store.src_to_dst.iter().enumerate() {
-                    if *x == 0 {
-                        continue;
-                    }
-                    let s = mapper.src_arena.original(&(i as u32));
-                    use hyperast::types::Labeled;
-                    let s = hyperast.resolve(&s);
-                    let s = s.try_get_label();
-                    let d = mapper.dst_arena.original(&(x - 1));
-                    let d = hyperast.resolve(&d);
-                    let d = d.try_get_label();
-                    if s != d {
-                        updated.insert(i as u32);
-                    }
+        let mappings = hyper_diff::matchers::mapping_store::VecStore::default();
+        let mut mapper = hyper_diff::matchers::Mapper::prep(stores, mappings, tree_pair);
+        use hyper_diff::matchers::mapping_store::DefaultMultiMappingStore as MM;
+        let mapped = crate::changes::continue_compute_mappings_full::<_, _, MM<_>>(
+            &state.mappings_alone,
+            &mut mapper,
+            None,
+        );
+        let vec_store = &mapped.1;
+        if UPD {
+            for (i, x) in vec_store.src_to_dst.iter().enumerate() {
+                if *x == 0 {
+                    continue;
                 }
-                dbg!();
-                entry
-                    .insert((crate::MappingStage::Bottomup, vec_store))
-                    .downgrade()
+                let s = mapper.src_arena.original(&(i as u32));
+                use hyperast::types::Labeled;
+                let s = stores.resolve(&s);
+                let s = s.try_get_label();
+                let d = mapper.dst_arena.original(&(x - 1));
+                let d = stores.resolve(&d);
+                let d = d.try_get_label();
+                if s != d {
+                    updated.insert(i as u32);
+                }
             }
         }
+        log::info!("mapped len: {}", mapped.1.len());
+        mapped
     };
+
+    let dst_to_src = &mapped.1.dst_to_src;
+    let src_to_dst = &mapped.1.src_to_dst;
     let unmapped_dst: Vec<_> = global_pos_with_spaces(
         &repositories.processor.main_stores,
         dst_tr,
-        (mapped.1.dst_to_src.iter().enumerate()).filter_map(|(i, x)| {
+        (dst_to_src.iter().enumerate()).filter_map(|(i, x)| {
             if *x == 0 {
                 Some(i as u32)
-            } else if updated.contains(&(x - 1)) {
+            } else if UPD && updated.contains(&(x - 1)) {
                 Some(i as u32)
             } else {
                 None
@@ -211,10 +136,10 @@ pub(crate) fn added_deleted(
     let unmapped_src: Vec<_> = global_pos_with_spaces(
         &repositories.processor.main_stores,
         src_tr,
-        (mapped.1.src_to_dst.iter().enumerate()).filter_map(|(i, x)| {
+        (src_to_dst.iter().enumerate()).filter_map(|(i, x)| {
             if *x == 0 {
                 Some(i as u32)
-            } else if updated.contains(&(i as u32)) {
+            } else if UPD && updated.contains(&(i as u32)) {
                 Some(i as u32)
             } else {
                 None
@@ -346,7 +271,6 @@ pub fn global_pos_with_spaces<It: Iterator<Item = u32>>(
                 }
                 index_no_spaces = ele.i_no_s + 1;
                 index_with_spaces = ele.i_w_s + 1;
-                // dbg!();
                 break;
             } else {
                 // index_no_spaces + ele.size_no_s < curr_no_space
@@ -363,4 +287,151 @@ pub fn global_pos_with_spaces<It: Iterator<Item = u32>>(
         }
     }
     res
+}
+
+use crate::MappingAloneCacheRef;
+use hyper_diff::decompressed_tree_store::Shallow;
+use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+use hyper_diff::matchers::mapping_store::MonoMappingStore;
+use hyper_diff::matchers::mapping_store::MultiMappingStore;
+use hyper_diff::matchers::mapping_store::{self, MappingStore};
+use hyperast::PrimInt;
+use hyperast::types;
+use types::WithHashs;
+
+pub fn continue_compute_mappings_full<'alone, 'tree, HAST: HyperAST + Copy, M, MM>(
+    mappings_alone: &'alone crate::MappingAloneCache<HAST::IdN, M>,
+    mapper: &mut hyper_diff::matchers::Mapper<
+        HAST,
+        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Src>>,
+        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Dst>>,
+        M,
+    >,
+    partial: Option<MM>,
+) -> MappingAloneCacheRef<'alone, HAST::IdN, M>
+where
+    for<'t> types::LendT<'t, HAST>: WithHashs + WithStats,
+    HAST::IdN: Clone + Eq,
+    HAST::Label: Clone + Eq,
+    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    M: MonoMappingStore + Clone + Default,
+    MM: MultiMappingStore<Src = M::Src, Dst = M::Dst> + Default,
+    M::Src: PrimInt + Shallow<M::Src>,
+    M::Dst: PrimInt + Shallow<M::Dst>,
+    M::Src: std::hash::Hash + Debug,
+    M::Dst: std::hash::Hash + Debug,
+    HAST::IdN: std::hash::Hash + Debug,
+{
+    use dashmap::mapref::entry::Entry;
+    use hyper_diff::matchers::heuristic::gt as matching;
+    match mappings_alone.entry((
+        mapper.src_arena.original(&mapper.src_arena.root()),
+        mapper.dst_arena.original(&mapper.dst_arena.root()),
+    )) {
+        Entry::Occupied(mut entry) => {
+            use mapping_store::MappingStore;
+            mapper.mapping.mappings.topit(
+                mapper.mapping.src_arena.len(),
+                mapper.mapping.dst_arena.len(),
+            );
+            let mm = if entry.get().0 == MappingStage::Bottomup {
+                return entry.into_ref().downgrade();
+            } else if let Some(mm) = partial {
+                mm
+            } else {
+                if entry.get().0 == MappingStage::Subtree {
+                    log::warn!("cannot store the multimappings in MappingAloneCache: wrong type");
+                }
+                let now = std::time::Instant::now();
+                let mm = LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<MM>(mapper);
+                let compute_multi_mapping_t = now.elapsed().as_secs_f64();
+                dbg!(compute_multi_mapping_t);
+                mm
+            };
+
+            let now = std::time::Instant::now();
+
+            // matching::bottom_up_hiding(hyperast, &mm, mapper);
+
+            use hyper_diff::matchers::heuristic::gt;
+
+            use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+            LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
+
+            use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
+            LazyHybridBottomUpMatcher::<_, M, 200>::execute(mapper);
+            let bottom_up_t = now.elapsed().as_secs_f64();
+            log::info!("bottom_up_t: {}", bottom_up_t);
+
+            let value = (
+                crate::MappingStage::Bottomup,
+                mapper.mapping.mappings.clone(),
+            );
+            entry.insert(value);
+            entry.into_ref().downgrade()
+        }
+        Entry::Vacant(entry) => {
+            use mapping_store::MappingStore;
+            mapper.mapping.mappings.topit(
+                mapper.mapping.src_arena.len(),
+                mapper.mapping.dst_arena.len(),
+            );
+            let mm = if let Some(mm) = partial {
+                mm
+            } else {
+                let now = std::time::Instant::now();
+                let mm = LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<MM>(mapper);
+                let compute_multi_mapping_t = now.elapsed().as_secs_f64();
+                dbg!(compute_multi_mapping_t);
+                mm
+            };
+
+            let now = std::time::Instant::now();
+
+            // matching::bottom_up_hiding(hyperast, &mm, mapper);
+
+            use hyper_diff::matchers::heuristic::gt;
+
+            use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+            LazyGreedySubtreeMatcher::<_>::filter_mappings(mapper, &mm);
+
+            use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
+            LazyHybridBottomUpMatcher::<_, M, 200>::execute(mapper);
+            let bottom_up_t = now.elapsed().as_secs_f64();
+            log::info!("bottom_up_t: {}", bottom_up_t);
+
+            let value = (
+                crate::MappingStage::Bottomup,
+                mapper.mapping.mappings.clone(),
+            );
+            entry.insert(value).downgrade()
+        }
+    }
+}
+
+fn compute_and_cache_full_diff(
+    state: crate::SharedState,
+    config: &hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle,
+    src_oid: hyperast_vcs_git::git::Oid,
+    dst_oid: hyperast_vcs_git::git::Oid,
+) {
+    let repositories = state.repositories.read().unwrap();
+    let commit_src = repositories.get_commit(&config, &src_oid).unwrap();
+    let src_tr = commit_src.ast_root;
+    let commit_dst = repositories.get_commit(&config, &dst_oid).unwrap();
+    let dst_tr = commit_dst.ast_root;
+    let with_spaces_stores = &repositories.processor.main_stores;
+    let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
+    let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &src_tr, &dst_tr);
+    let mut locked = binding.lock();
+    let tree_pair = locked.as_mut(stores);
+
+    let mappings = hyper_diff::matchers::mapping_store::VecStore::default();
+    let mut mapper = hyper_diff::matchers::Mapper::prep(stores, mappings, tree_pair);
+    use hyper_diff::matchers::mapping_store::DefaultMultiMappingStore as MM;
+    crate::changes::continue_compute_mappings_full::<_, _, MM<_>>(
+        &state.mappings_alone,
+        &mut mapper,
+        None,
+    );
 }

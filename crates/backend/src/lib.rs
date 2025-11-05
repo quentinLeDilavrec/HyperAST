@@ -82,6 +82,7 @@ pub(crate) type MappingAloneCache<IdN = NodeIdentifier, M = VecStore<u32>> =
 pub(crate) type MappingAloneCacheRef<'a, IdN = NodeIdentifier, M = VecStore<u32>> =
     dashmap::mapref::one::Ref<'a, (IdN, IdN), (MappingStage, M)>;
 
+#[derive(PartialEq, Eq)]
 pub(crate) enum MappingStage {
     Subtree,
     Bottomup,

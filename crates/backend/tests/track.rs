@@ -19,7 +19,7 @@ fn test_track_at_file_pos() -> Result<(), Box<dyn std::error::Error>> {
     let path = TrackingParam {
         user: "INRIA".to_string(),
         name: "spoon".to_string(),
-        commit: "5f250ead2df52d7fe26a3ed2bdd7a38355f764b1".to_string(),
+        commit: "5f250ead2df52d7fe26a3ed2bdd7a38355f764b1".parse().unwrap(),
         file: "src/main/java/spoon/SpoonModelBuilder.java".to_string(),
     };
     let mut flags = Flags::default();

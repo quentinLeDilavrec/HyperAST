@@ -186,8 +186,9 @@ fn _diff(
     use hyperast::types::WithStats;
     let mapped = {
         let mappings_cache = &state.mappings_alone;
-        use hyper_diff::matchers::mapping_store::MappingStore;
-        use hyper_diff::matchers::mapping_store::VecStore;
+        use hyper_diff::matchers::mapping_store;
+        use mapping_store::MappingStore;
+        use mapping_store::VecStore;
 
         let hyperast = stores;
         use hyper_diff::matchers::Mapping;

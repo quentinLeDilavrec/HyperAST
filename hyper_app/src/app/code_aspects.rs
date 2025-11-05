@@ -219,7 +219,7 @@ pub(crate) fn show(
 }
 
 impl ComputeConfigAspectViews {
-    fn on_action(&mut self, action: Action) {
+    pub(crate) fn on_action(&mut self, action: Action) {
         use hyperast_gen_ts_cpp::types::Type as Cpp;
         use hyperast_gen_ts_java::types::Type as Java;
         match action {
@@ -227,9 +227,17 @@ impl ComputeConfigAspectViews {
                 use hyperast::types::HyperType;
                 let k = &k.as_any();
                 if let Some(k) = k.downcast_ref::<Cpp>() {
-                    self.ser_opt_cpp.insert(k.to_owned());
+                    if self.ser_opt_cpp.contains(k) {
+                        self.ser_opt_cpp.remove(k);
+                    } else {
+                        self.ser_opt_cpp.insert(k.to_owned());
+                    }
                 } else if let Some(k) = k.downcast_ref::<Java>() {
-                    self.ser_opt_java.insert(k.to_owned());
+                    if self.ser_opt_java.contains(k) {
+                        self.ser_opt_java.remove(k);
+                    } else {
+                        self.ser_opt_java.insert(k.to_owned());
+                    }
                 }
             }
             Action::HideKind(k) => {

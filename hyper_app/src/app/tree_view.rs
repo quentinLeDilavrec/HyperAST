@@ -130,7 +130,7 @@ impl<'a> FetchedViewImpl<'a> {
                     //     assert_eq!("", label, "{:?} {:?} {:?}", root, cs.len(), node_store);
                     // }
                     drop(node_store);
-                    self.ui_both_impl(ui, kind, size as u32, label, cs.as_ref())
+                    self.ui_both_impl(ui, kind, size as u32, *root, label, cs.as_ref())
                 } else {
                     let cs = cs.0.to_vec();
                     drop(node_store);

@@ -51,7 +51,7 @@ impl Frmt {
         let mut format = theme.formats[self.format].clone();
         format.font_id = egui::FontId::monospace(self.size);
         format.background = self.bg;
-        format.color = format.color.blend(self.fg);
+        format.color = format.color.lerp_to_gamma(self.fg, 0.3);
         format
     }
 }

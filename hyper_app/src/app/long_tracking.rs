@@ -1464,25 +1464,10 @@ pub(crate) fn show_tree_view(
                     None
                 }
                 Action::Clicked(p) => Some(p),
-                Action::SerializeKind(k) => {
-                    let k = &k.as_any();
-                    if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
-                        aspects.ser_opt_cpp.insert(*k);
-                    } else if let Some(k) = k.downcast_ref::<hyperast_gen_ts_java::types::Type>() {
-                        aspects.ser_opt_java.insert(*k);
-                    }
+                a => {
+                    aspects.on_action(a);
                     None
                 }
-                Action::HideKind(k) => {
-                    let k = &k.as_any();
-                    if let Some(k) = k.downcast_ref::<hyperast_gen_ts_cpp::types::Type>() {
-                        aspects.hide_opt_cpp.insert(*k);
-                    } else if let Some(k) = k.downcast_ref::<hyperast_gen_ts_java::types::Type>() {
-                        aspects.hide_opt_java.insert(*k);
-                    }
-                    None
-                }
-                _ => None,
             }
         });
     if let Some(o) = scroll_focus {

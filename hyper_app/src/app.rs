@@ -795,7 +795,11 @@ impl HyperApp {
             //     r = HyperApp::default()
             // }
             if r.data.api_addr.is_empty() {
-                r.data.api_addr = unsafe { prompt("API address", default_api_addr) };
+                if let Some(api_addr) = api_addr {
+                    r.data.api_addr = api_addr;
+                } else {
+                    r.data.api_addr = unsafe { prompt("API address", default_api_addr) };
+                }
             }
         } else {
             r = HyperApp::default();

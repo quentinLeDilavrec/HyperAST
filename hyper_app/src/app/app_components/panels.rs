@@ -9,7 +9,7 @@ use crate::app::{
     types::{self, Commit, Config, QueriedLang},
 };
 
-use super::{QueryDataVec, QueryId, utils_results_batched::ComputeError};
+use super::{QueryDataVec, QueryId, TabId, utils_results_batched::ComputeError};
 
 impl crate::HyperApp {
     pub(crate) fn show_left_panel(&mut self, ctx: &egui::Context) {
@@ -30,28 +30,25 @@ impl crate::HyperApp {
     fn show_left_panel_views_props(&mut self, ui: &mut egui::Ui) {
         for tile_id in self.tree.active_tiles() {
             let Some(&pane) = self.tree.tiles.get_pane(&tile_id) else {
-                // log::error!("{:?}", tile_id);
                 continue;
             };
-            let title = self.tabs[pane as usize].title(&self.data);
+            let title = self.tabs[pane].title(&self.data);
             use super::re_ui_collapse::SectionCollapsingHeader;
             SectionCollapsingHeader::with_id(ui.id().with(pane), title)
                 .default_open(false)
                 .show(ui, |ui| {
-                    if let super::Tab::ProjectSelection() = self.tabs[pane as usize] {
+                    if let super::Tab::ProjectSelection() = self.tabs[pane] {
                         show_projects_actions(ui, &mut self.data);
                         ui.indent("proj_list", |ui| {
                             let mut span = ui.full_span();
                             span.min += 10.0;
                             ui.full_span_scope(span, |ui| self.show_repositories(ui))
                         });
-                    } else if let super::Tab::QueryResults { id, format } =
-                        &mut self.tabs[pane as usize]
-                    {
+                    } else if let super::Tab::QueryResults { id, format } = &mut self.tabs[pane] {
                         selection_querying_result_format(ui, format);
-                    } else if let super::Tab::LocalQuery(id) = self.tabs[pane as usize] {
+                    } else if let super::Tab::LocalQuery(id) = self.tabs[pane] {
                         self.show_local_query_left_panel(ui, id);
-                    } else if let super::Tab::TreeAspect = self.tabs[pane as usize] {
+                    } else if let super::Tab::TreeAspect = self.tabs[pane] {
                         crate::app::code_aspects::show_config(
                             ui,
                             &mut self.data.aspects,
@@ -59,17 +56,13 @@ impl crate::HyperApp {
                             &self.data.api_addr,
                             self.data.store.clone(),
                         );
-                    } else if let super::Tab::TSG = self.tabs[pane as usize] {
+                    } else if let super::Tab::TSG = self.tabs[pane] {
                         crate::app::tsg::show_config(ui, &mut self.data.tsg);
-                    } else if let super::Tab::Smells = self.tabs[pane as usize] {
+                    } else if let super::Tab::Smells = self.tabs[pane] {
                         crate::app::smells::show_config(ui, &mut self.data.smells);
-                    } else if let super::Tab::LongTracking = self.tabs[pane as usize] {
+                    } else if let super::Tab::LongTracking = self.tabs[pane] {
                         crate::app::long_tracking::show_config(ui, &mut self.data.long_tracking);
                     }
-
-                    match &self.tabs[pane as usize] {
-                        _ => (),
-                    };
                 });
         }
     }
@@ -97,8 +90,7 @@ impl crate::HyperApp {
             });
             let query = &mut self.data.queries[qid];
             query.precomp = Some(qid);
-            let tid = self.tabs.len() as u16;
-            self.tabs.push(crate::app::Tab::LocalQuery(qid));
+            let tid = self.tabs.push(crate::app::Tab::LocalQuery(qid));
             let child = self.tree.tiles.insert_pane(tid);
             match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
                 Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
@@ -149,7 +141,7 @@ impl crate::HyperApp {
                             project: rid,
                             query: qid,
                             content: Default::default(),
-                            tab: u16::MAX,
+                            tab: TabId::INVALID,
                         });
                     }
                     (None, Some(&_id)) => {
@@ -180,17 +172,16 @@ impl crate::HyperApp {
             };
 
             fn update_tiles(
-                tabs: &mut Vec<crate::app::Tab>,
+                tabs: &mut crate::app::Tabs,
                 tree: &mut egui_tiles::Tree<crate::app::TabId>,
                 q_res: &mut super::QueryResults,
                 q_res_id: &u16,
             ) {
-                let tid = tabs.len() as u16;
-                q_res.tab = tid;
-                tabs.push(crate::app::Tab::QueryResults {
+                let tid = tabs.push(crate::app::Tab::QueryResults {
                     id: *q_res_id,
                     format: super::ResultFormat::Table,
                 });
+                q_res.tab = tid;
                 let tid = tree.tiles.insert_new(egui_tiles::Tile::Pane(tid));
                 tree.move_tile_to_container(tid, tree.root().unwrap(), usize::MAX, false);
             }
@@ -303,7 +294,7 @@ impl crate::HyperApp {
                             let synced = Self::sync_query_results(q_res);
                             if let Ok(true) = synced {
                                 self.save_interval = std::time::Duration::ZERO;
-                                if q_res.tab == u16::MAX {
+                                if q_res.tab == TabId::INVALID {
                                     update_tiles(&mut self.tabs, &mut self.tree, q_res, q_res_id);
                                 }
                             }
@@ -328,7 +319,7 @@ impl crate::HyperApp {
                         // finally, if unassigned pane then add it
                         else {
                             self.save_interval = std::time::Duration::ZERO;
-                            if q_res.tab == u16::MAX {
+                            if q_res.tab == TabId::INVALID {
                                 update_tiles(&mut self.tabs, &mut self.tree, q_res, q_res_id);
                             }
                             compute_button = ui.add(egui::Button::new("⏵"));

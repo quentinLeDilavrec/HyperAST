@@ -169,15 +169,12 @@ impl crate::HyperApp {
                         } else if resp.response.clicked() {
                             self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
                             self.selected_baseline = None;
-                            let tabid = self
-                                .data
-                                .queries_results
+                            let qres = (self.data.queries_results)
                                 .iter()
                                 .find(|x| x.project == repo_id && x.query.to_usize() == 0)
-                                .unwrap()
-                                .tab;
+                                .unwrap();
                             if let super::Tab::QueryResults { id, format } =
-                                &mut self.tabs[tabid as usize]
+                                &mut self.tabs[qres.tab]
                             {
                                 *format = crate::app::ResultFormat::Table
                             } else {
@@ -235,16 +232,15 @@ impl crate::HyperApp {
                                 Some((repo_id, cached.commits[after].to_string()));
                             // assert_eq!(self.data.queries.len(), 1); // need to retieve current query if multiple
 
-                            let tabid = (self.data.queries_results)
+                            let qres = (self.data.queries_results)
                                 .iter()
                                 .find(|x| {
                                     x.project == repo_id
                                         && self.data.queries[x.query].lang == "Java"
                                 })
-                                .unwrap()
-                                .tab;
+                                .unwrap();
                             if let super::Tab::QueryResults { id, format } =
-                                &mut self.tabs[tabid as usize]
+                                &mut self.tabs[qres.tab]
                             {
                                 *format = crate::app::ResultFormat::Hunks
                             } else {

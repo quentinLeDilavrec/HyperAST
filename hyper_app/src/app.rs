@@ -67,10 +67,10 @@ pub struct HyperApp {
 
     data: AppData,
 
-    layouts: HashMap<String, (Vec<Tab>, egui_tiles::Tree<TabId>)>,
+    layouts: HashMap<String, (Tabs, egui_tiles::Tree<TabId>)>,
 
     tree: egui_tiles::Tree<TabId>,
-    tabs: Vec<Tab>,
+    tabs: Tabs,
     maximized: Option<TabId>,
 
     #[serde(skip)]
@@ -596,7 +596,7 @@ type RemCodeId = usize;
 type RemTreeId = usize;
 type QResId = u16;
 
-#[derive(Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug)]
 enum Tab {
     RemoteQuery(QueryId),
     LocalQuery(LocalQueryId),
@@ -617,7 +617,7 @@ enum Tab {
     QueryResults { id: QResId, format: ResultFormat },
 }
 
-#[derive(Deserialize, Serialize, strum_macros::AsRefStr, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, strum_macros::AsRefStr, PartialEq, Eq, Debug)]
 enum ResultFormat {
     Table,
     List,
@@ -670,7 +670,7 @@ pub(crate) struct Sharing<T> {
 }
 
 impl SelectedConfig {
-    fn default_layout(&self) -> Vec<Tab> {
+    fn default_layout(&self) -> Tabs {
         match self {
             SelectedConfig::Single => vec![Tab::Commits],
             SelectedConfig::Querying => vec![
@@ -698,6 +698,7 @@ impl SelectedConfig {
             SelectedConfig::LongTracking => vec![Tab::LongTracking],
             SelectedConfig::Aspects => vec![Tab::ProjectSelection(), Tab::TreeAspect],
         }
+        .into()
     }
 }
 
@@ -712,7 +713,7 @@ impl Default for HyperApp {
             save_interval: std::time::Duration::from_secs(20),
             data: Default::default(),
             layouts: HashMap::default(),
-            tree: egui_tiles::Tree::new_grid("my_tree", (0..tabs.len() as u16).collect()),
+            tree: egui_tiles::Tree::new_grid("my_tree", tabs.enumerate().map(|(i, _)| i).collect()),
             tabs,
             maximized: Default::default(),
             cmd_palette: CommandPalette::default(),
@@ -881,11 +882,11 @@ struct CodeView {
     generation: u64,
 }
 
-type TabId = u16;
+utils::typed_vec!(Tabs, Tab, TabId(u16));
 
 struct MyTileTreeBehavior<'a> {
     data: &'a mut AppData,
-    tabs: &'a mut Vec<Tab>,
+    tabs: &'a mut Tabs,
     maximized: &'a mut Option<TabId>,
     edited: bool,
     selected_commit: &'a mut Option<(ProjectId, String)>,
@@ -901,7 +902,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         tile_id: egui_tiles::TileId,
         pane: &mut TabId,
     ) -> egui_tiles::UiResponse {
-        match &mut self.tabs[*pane as usize] {
+        match &mut self.tabs[*pane] {
             Tab::Commits => {
                 egui::ScrollArea::both()
                     .auto_shrink([false; 2])
@@ -1569,7 +1570,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 
     fn tab_title_for_pane(&mut self, pane: &TabId) -> egui::WidgetText {
-        self.tabs[*pane as usize].title(&self.data).into()
+        self.tabs[*pane].title(&self.data).into()
     }
 
     fn top_bar_right_ui(
@@ -1591,7 +1592,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         // let Some(space_view) = self.viewport_blueprint.space_views.get(&space_view_id) else {
         //     return;
         // };
-        let Some(space_view) = self.tabs.get(space_view_id as usize) else {
+        let Some(space_view) = self.tabs.get(space_view_id) else {
             return;
         };
         let num_space_views = tiles.tiles().filter(|tile| tile.is_pane()).count();
@@ -1659,7 +1660,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         let egui_tiles::Tile::Pane(tid) = tile else {
             return false;
         };
-        let Some(space_view) = self.tabs.get(*tid as usize) else {
+        let Some(space_view) = self.tabs.get(*tid) else {
             return false;
         };
         if let Tab::MarkdownStatic(0) = space_view {
@@ -1921,7 +1922,7 @@ fn update_queries_differential_results(
 
 fn compute_queries_differential_results(
     ui: &mut egui::Ui,
-    pane: &mut u16,
+    pane: &mut TabId,
     proj_id: ProjectId,
     qid: QueryId,
     data: &mut AppData,
@@ -2326,7 +2327,7 @@ impl eframe::App for HyperApp {
                 let mut maximized = self.maximized;
 
                 if let Some(space_view_id) = self.maximized {
-                    if let Tab::Empty = self.tabs[space_view_id as usize] {
+                    if let Tab::Empty = self.tabs[space_view_id] {
                         maximized = None;
                     } else if let Some(tile_id) = self.tree.tiles.find_pane(&space_view_id) {
                         if !self.tree.tiles.is_visible(tile_id) {
@@ -2414,8 +2415,7 @@ impl eframe::App for HyperApp {
                     let qid = self.data.queries.push(crate::app::QueryData {
                         ..Default::default()
                     });
-                    let tid = self.tabs.len() as u16;
-                    self.tabs.push(crate::app::Tab::LocalQuery(qid));
+                    let tid = self.tabs.push(crate::app::Tab::LocalQuery(qid));
                     let child = self.tree.tiles.insert_pane(tid);
                     match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
                         Some(egui_tiles::Tile::Container(c)) => c.add_child(child),

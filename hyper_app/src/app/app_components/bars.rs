@@ -56,12 +56,11 @@ impl crate::HyperApp {
                         .add(egui::Label::new(title).sense(egui::Sense::click()))
                         .clicked()
                     {
-                        if let Some(tid) = self
+                        if let Some((tid, _)) = self
                             .tabs
-                            .iter()
-                            .position(|x| x == &super::Tab::MarkdownStatic(0))
+                            .enumerate()
+                            .find(|(_, x)| *x == &super::Tab::MarkdownStatic(0))
                         {
-                            let tid = tid as u16;
                             if let Some(child) = self.tree.tiles.find_pane(&tid) {
                                 if !self.tree.is_visible(child)
                                     || !self.tree.active_tiles().contains(&child)
@@ -82,8 +81,7 @@ impl crate::HyperApp {
                                 };
                             }
                         } else if self.maximized.is_none() {
-                            let tid = self.tabs.len() as u16;
-                            self.tabs.push(super::Tab::MarkdownStatic(0));
+                            let tid = self.tabs.push(super::Tab::MarkdownStatic(0));
                             if self.maximized.is_none() {
                                 let child = self.tree.tiles.insert_pane(tid);
                                 match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
@@ -122,7 +120,7 @@ impl crate::HyperApp {
                                             let tabs = s.default_layout();
                                             let tree = egui_tiles::Tree::new_grid(
                                                 "my_tree",
-                                                (0..tabs.len() as u16).collect(),
+                                                tabs.enumerate().map(|(i, _)| i).collect(),
                                             );
                                             (tabs, tree)
                                         });

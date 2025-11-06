@@ -55,13 +55,13 @@ where
     C: From<(EditorInfo<String>, String)> + egui_addon::code_editor::CodeHolder,
 {
     fn from(value: &example_scripts::Scripts) -> Self {
-        let mut description: C = (INFO_DESCRIPTION.copied(), value.description.into()).into();
+        let mut description: C = (INFO_DESCRIPTION.into(), value.description.into()).into();
         description.set_lang("md");
         Self {
             description, // TODO config with markdown, not js
-            init: (INFO_INIT.copied(), value.init.into()).into(),
-            filter: (INFO_FILTER.copied(), value.filter.into()).into(),
-            accumulate: (INFO_ACCUMULATE.copied(), value.accumulate.into()).into(),
+            init: (INFO_INIT.into(), value.init.into()).into(),
+            filter: (INFO_FILTER.into(), value.filter.into()).into(),
+            accumulate: (INFO_ACCUMULATE.into(), value.accumulate.into()).into(),
         }
     }
 }

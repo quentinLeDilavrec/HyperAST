@@ -75,11 +75,11 @@ where
     C: From<(EditorInfo<String>, String)> + egui_addon::code_editor::CodeHolder,
 {
     fn from(value: &example_queries::Query) -> Self {
-        let mut description: C = (INFO_DESCRIPTION.copied(), value.description.into()).into();
+        let mut description: C = (INFO_DESCRIPTION.into(), value.description.into()).into();
         description.set_lang("md");
         Self {
             description, // TODO config with markdown, not js
-            query: (INFO_QUERY.copied(), value.query.into()).into(),
+            query: (INFO_QUERY.into(), value.query.into()).into(),
         }
     }
 }

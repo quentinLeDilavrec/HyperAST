@@ -137,7 +137,7 @@ impl Default for QueryData {
             name: "new".to_string(),
             lang: "Java".to_string(),
             query: code_editor::CodeEditor::new(
-                code_editor::EditorInfo::default().copied(),
+                code_editor::EditorInfo::default().into(),
                 r#""#.to_string(),
             ),
             results: vec![],
@@ -536,7 +536,7 @@ impl Default for AppData {
                 name: "simple".to_string(),
                 lang: "Java".to_string(),
                 query: code_editor::CodeEditor::new(
-                    code_editor::EditorInfo::default().copied(),
+                    code_editor::EditorInfo::default().into(),
                     r#"(try_statement
   (block
     (expression_statement

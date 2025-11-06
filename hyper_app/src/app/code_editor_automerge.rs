@@ -149,7 +149,7 @@ function f() { return 2; }
             parser: egui_addon::code_editor::default_parser(),
             languages,
             lang,
-            info: EditorInfo::default().copied(),
+            info: EditorInfo::default().into(),
         }
     }
 }

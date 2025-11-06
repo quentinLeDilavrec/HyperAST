@@ -90,7 +90,7 @@ impl crate::HyperApp {
                 name: "precomp".to_string(),
                 lang: self.data.queries[qid].lang.to_string(),
                 query: egui_addon::code_editor::CodeEditor::new(
-                    egui_addon::code_editor::EditorInfo::default().copied(),
+                    egui_addon::code_editor::EditorInfo::default().into(),
                     r#"translation_unit"#.to_string(),
                 ),
                 ..Default::default()

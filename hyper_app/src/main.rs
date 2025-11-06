@@ -52,7 +52,8 @@ fn main() -> eframe::Result<()> {
 fn main() {
     use egui_addon::Lang;
     use wasm_bindgen::prelude::*;
-    let api_addr = None;
+    // let api_addr = None;
+    let api_addr = Some(ADDR.into());
     // let api_addr = std::env::args()
     //     .collect::<Vec<_>>()
     //     .get(0)

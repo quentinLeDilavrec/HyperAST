@@ -110,17 +110,18 @@ impl Default for EditorInfo<&'static str> {
         }
     }
 }
-impl EditorInfo<&'static str> {
-    pub fn copied(&self) -> EditorInfo<String> {
+impl From<EditorInfo<&'static str>> for EditorInfo<String> {
+    fn from(value: EditorInfo<&'static str>) -> Self {
         EditorInfo {
-            title: self.title.to_string(),
-            short: self.short.to_string(),
-            long: self.long.to_string(),
+            title: value.title.to_string(),
+            short: value.short.to_string(),
+            long: value.long.to_string(),
         }
     }
 }
+
 pub fn default_info() -> EditorInfo<String> {
-    EditorInfo::default().copied()
+    EditorInfo::default().into()
 }
 
 #[cfg(feature = "ts_highlight")]
@@ -157,7 +158,7 @@ function f() { return 2; }
             parser: default_parser(),
             languages: Default::default(),
             lang,
-            info: EditorInfo::default().copied(),
+            info: EditorInfo::default().into(),
         }
     }
 }

@@ -1990,78 +1990,66 @@ impl<'a> MyTileTreeBehavior<'a> {
                 continue;
             };
             ui.label(format!("{}/{}", r.user, r.name));
+
+            let mut to_fetch = HashSet::default();
+            let api_addr = &self.data.api_addr;
+            let commit_md = &self.data.fetched_commit_metadata;
             for commit_oid in c.iter_mut() {
-                fn f(
-                    ui: &mut egui::Ui,
-                    repo: &Repo,
-                    id: &types::CommitId,
-                    fetched_commit_metadata: &CommitMdStore,
-                    to_fetch: &mut HashSet<String>,
-                    d: usize,
-                ) {
-                    let limit = 20;
-                    if let Some(res) = fetched_commit_metadata.get(id) {
-                        match res {
-                            Ok(md) => {
-                                ui.label(format!("{}: {} {:?}", &id[..6], md.time, md.parents));
-                                if d < limit {
-                                    for id in &md.parents {
-                                        f(ui, repo, id, fetched_commit_metadata, to_fetch, d + 1);
-                                    }
-                                    for (i, a) in md.ancestors.iter().enumerate() {
-                                        let i = i + 2;
-                                        if d + i * i >= limit {
-                                            break;
-                                        }
-                                        if fetched_commit_metadata.is_absent(a.as_str()) {
-                                            to_fetch.insert(a.to_string());
-                                        }
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                ui.error_label(err);
-                            }
-                        }
-                    } else {
-                        ui.horizontal(|ui| {
-                            ui.label("fetching");
-                            ui.add_space(2.0);
-                            ui.label(id);
-                            ui.add_space(2.0);
-                            ui.spinner();
-                            ui.label(to_fetch.len().to_string());
-                        });
-                        to_fetch.insert(id.to_string());
-                    }
-                }
-                let mut to_fetch = HashSet::default();
+                show_commits_as_tree(ui, r, commit_oid, commit_md, &mut to_fetch, 0);
+            }
 
-                f(
-                    ui,
-                    r,
-                    commit_oid,
-                    &self.data.fetched_commit_metadata,
-                    &mut to_fetch,
-                    0,
-                );
-
-                for id in to_fetch {
-                    let repo = r.clone();
-                    let commit = Commit { repo, id };
-                    let v = fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                    self.data.fetched_commit_metadata.insert(commit.id, v);
-                }
+            let commit_md = &mut self.data.fetched_commit_metadata;
+            for id in to_fetch {
+                let repo = r.clone();
+                let commit = Commit { repo, id };
+                let v = fetch_commit(ui.ctx(), api_addr, &commit);
+                commit_md.insert(commit.id, v);
             }
         }
-        // if self.data.fetched_commit_metadata.try_poll_all_waiting(|x| {
-        //     x.map(|x| {
-        //         let selected_projects = &mut self.data.selected_code_data;
-        //         poll_md_with_pr(x, selected_projects)
-        //     })
-        // }) {
-        //     //
-        // }
+    }
+}
+
+fn show_commits_as_tree(
+    ui: &mut egui::Ui,
+    repo: &Repo,
+    id: &types::CommitId,
+    commit_md: &CommitMdStore,
+    to_fetch: &mut HashSet<String>,
+    d: usize,
+) {
+    let limit = 20;
+    let Some(res) = commit_md.get(id) else {
+        ui.horizontal(|ui| {
+            ui.label("fetching");
+            ui.add_space(2.0);
+            ui.label(id);
+            ui.add_space(2.0);
+            ui.spinner();
+            ui.label(to_fetch.len().to_string());
+        });
+        to_fetch.insert(id.to_string());
+        return;
+    };
+    if let Err(err) = res {
+        ui.error_label(err);
+        return;
+    }
+    let Ok(md) = res else { unreachable!() };
+    ui.label(format!("{}: {} {:?}", &id[..6], md.time, md.parents));
+    if d >= limit {
+        return;
+    }
+    for id in &md.parents {
+        show_commits_as_tree(ui, repo, id, commit_md, to_fetch, d + 1);
+    }
+    for (i, a) in md.ancestors.iter().enumerate() {
+        let i = i + 2;
+        if d + i * i >= limit {
+            break;
+        }
+        if commit_md.is_absent(a.as_str()) {
+            to_fetch.insert(a.to_string());
+        }
     }
 }
 

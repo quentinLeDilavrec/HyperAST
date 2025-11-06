@@ -907,62 +907,20 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             }
             Tab::LocalQuery(id) => {
                 let query = &mut self.data.queries[*id as usize];
-                ui.painter().rect_filled(
-                    ui.available_rect_before_wrap(),
-                    ui.visuals().window_corner_radius,
-                    ui.visuals().extreme_bg_color,
-                );
-
-                let code = &mut query.query.code;
-                let language = "rs";
-                let theme =
-                    egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx(), ui.style());
-
-                const EDIT_AWARE: bool = false;
-                egui::ScrollArea::both()
-                    .auto_shrink([false, false])
+                egui::Frame::NONE
+                    .outer_margin(egui::Margin::symmetric(5, 2))
+                    // .inner_margin(egui::Margin::same(15))
                     .show(ui, |ui| {
-                        if EDIT_AWARE {
-                            // some issues on cursor behavior, like lising focus on arrow key press
-                            use code_editor::generic_text_edit::TextEdit;
-                            ui.add_sized(
-                                ui.available_size(),
-                                TextEdit::multiline(code)
-                                    .code_editor()
-                                    .frame(false)
-                                    .desired_width(f32::INFINITY)
-                                    .layouter(&mut |ui, string, _wrap_width| {
-                                        let layout_job =
-                                            egui_extras::syntax_highlighting::highlight(
-                                                ui.ctx(),
-                                                ui.style(),
-                                                &theme,
-                                                string.as_str(),
-                                                language,
-                                            );
-                                        ui.fonts(|f| f.layout_job(layout_job))
-                                    }),
-                            );
-                        } else {
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::TextEdit::multiline(&mut code.string)
-                                    .code_editor()
-                                    .frame(false)
-                                    .desired_width(f32::INFINITY)
-                                    .layouter(&mut |ui, string, _wrap_width| {
-                                        let layout_job =
-                                            egui_extras::syntax_highlighting::highlight(
-                                                ui.ctx(),
-                                                ui.style(),
-                                                &theme,
-                                                string.as_ref(),
-                                                language,
-                                            );
-                                        ui.fonts(|f| f.layout_job(layout_job))
-                                    }),
-                            );
-                        }
+                        ui.painter().rect_filled(
+                            ui.available_rect_before_wrap(),
+                            ui.visuals().window_corner_radius,
+                            ui.visuals().extreme_bg_color,
+                        );
+                        egui::ScrollArea::both()
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                show_local_query(query, ui);
+                            });
                     });
 
                 // egui_addon::code_editor::show_edit_syntect(ui, &mut query.query.code);
@@ -1730,6 +1688,53 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             }
             _ => (),
         }
+    }
+}
+
+fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
+    let code = &mut query.query.code;
+    let language = "rs";
+    let theme = egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx(), ui.style());
+
+    const EDIT_AWARE: bool = false;
+    if EDIT_AWARE {
+        // some issues on cursor behavior, like lising focus on arrow key press
+        use code_editor::generic_text_edit::TextEdit;
+        ui.add_sized(
+            ui.available_size(),
+            TextEdit::multiline(code)
+                .code_editor()
+                .frame(false)
+                .desired_width(f32::INFINITY)
+                .layouter(&mut |ui, string, _wrap_width| {
+                    let layout_job = egui_extras::syntax_highlighting::highlight(
+                        ui.ctx(),
+                        ui.style(),
+                        &theme,
+                        string.as_str(),
+                        language,
+                    );
+                    ui.fonts(|f| f.layout_job(layout_job))
+                }),
+        );
+    } else {
+        ui.add_sized(
+            ui.available_size(),
+            egui::TextEdit::multiline(&mut code.string)
+                .code_editor()
+                .frame(false)
+                .desired_width(f32::INFINITY)
+                .layouter(&mut |ui, string, _wrap_width| {
+                    let layout_job = egui_extras::syntax_highlighting::highlight(
+                        ui.ctx(),
+                        ui.style(),
+                        &theme,
+                        string.as_ref(),
+                        language,
+                    );
+                    ui.fonts(|f| f.layout_job(layout_job))
+                }),
+        );
     }
 }
 

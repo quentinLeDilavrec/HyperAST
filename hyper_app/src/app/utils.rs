@@ -185,3 +185,129 @@ pub(crate) fn prepare_paste(
     }
     None
 }
+
+macro_rules! typed_vec {
+    ($vis:vis $name:ident, $item:ty, $id:ident($ty:ty)) => {
+        #[repr(transparent)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        $vis struct $id($ty);
+
+        impl $id {
+            const INVALID: $id = $id(<$ty>::MAX);
+            // TODO try to avoid it
+            $vis fn to_usize(&self) -> usize {
+                self.0 as usize
+            }
+        }
+
+        #[derive(Debug, Default)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        $vis struct $name(Vec<$item>);
+
+        impl $name {
+            $vis fn new() -> Self {
+                Self(Vec::new())
+            }
+
+            #[track_caller]
+            $vis fn push(&mut self, value: $item) -> $id {
+                debug_assert!(self.0.len() < <$ty>::MAX as usize);
+                let id = $id(self.0.len() as $ty);
+                self.0.push(value);
+                id
+            }
+
+            #[track_caller]
+            $vis fn get(&self, idx: $id) -> Option<&$item> {
+                let idx = idx.0 as usize;
+                self.0.get(idx)
+            }
+
+            #[track_caller]
+            $vis fn get_mut(&mut self, idx: $id) -> Option<&mut $item> {
+                let idx = idx.0 as usize;
+                self.0.get_mut(idx)
+            }
+
+            $vis fn enumerate(&self) -> impl Iterator<Item = ($id, &$item)> {
+                self.0.iter().enumerate().map(|(i, v)| ($id(i as $ty), v))
+            }
+        }
+
+        impl std::ops::Index<$id> for $name {
+            type Output = $item;
+            #[track_caller]
+            fn index(&self, idx: $id) -> &Self::Output {
+                let idx = idx.0 as usize;
+                debug_assert!(idx < self.0.len());
+                &self.0[idx]
+            }
+        }
+
+        impl std::ops::Index<$id> for &$name {
+            type Output = $item;
+            #[track_caller]
+            fn index(&self, idx: $id) -> &Self::Output {
+                let idx = idx.0 as usize;
+                debug_assert!(idx < self.0.len());
+                &self.0[idx]
+            }
+        }
+
+        impl std::ops::IndexMut<$id> for $name {
+            #[track_caller]
+            fn index_mut(&mut self, idx: $id) -> &mut Self::Output {
+                let idx = idx.0 as usize;
+                debug_assert!(idx < self.0.len());
+                &mut self.0[idx]
+            }
+        }
+
+        // impl std::ops::Deref for $name {
+        //     type Target = Vec<$item>;
+        //     fn deref(&self) -> &Self::Target {
+        //         &self.0
+        //     }
+        // }
+        // impl std::ops::DerefMut for $name {
+        //     fn deref_mut(&mut self) -> &mut Self::Target {
+        //         &mut self.0
+        //     }
+        // }
+
+        impl From<Vec<$item>> for $name {
+            fn from(vec: Vec<$item>) -> Self {
+                Self(vec)
+            }
+        }
+    };
+}
+pub(crate) use typed_vec;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    typed_vec!(Users, User, UserId(u16));
+
+    #[derive(Debug)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct User {
+        pub name: String,
+    }
+
+    #[test]
+    fn test_name() {
+        let mut users = Users::new();
+        let user_id = users.push(User {
+            name: "John".to_string(),
+        });
+        assert_eq!(users[user_id].name, "John");
+        users[user_id].name = "Jane".to_string();
+        assert_eq!(users[user_id].name, "Jane");
+        let user_id2 = users.push(User {
+            name: "Jane Doe".to_string(),
+        });
+        assert_eq!(users[user_id2].name, "Jane Doe");
+    }
+}

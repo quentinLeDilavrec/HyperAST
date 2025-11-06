@@ -1,3 +1,5 @@
+use std::ops::IndexMut;
+
 use egui::Widget;
 use re_ui::{DesignTokens, UiExt};
 
@@ -7,7 +9,7 @@ use crate::app::{
     types::{self, Commit, Config, QueriedLang},
 };
 
-use super::utils_results_batched::ComputeError;
+use super::{QueryDataVec, QueryId, utils_results_batched::ComputeError};
 
 impl crate::HyperApp {
     pub(crate) fn show_left_panel(&mut self, ctx: &egui::Context) {
@@ -71,71 +73,29 @@ impl crate::HyperApp {
                 });
         }
     }
-    fn show_local_query_left_panel(&mut self, ui: &mut egui::Ui, id: u16) {
-        let query = &mut self.data.queries[id as usize];
+    fn show_local_query_left_panel(&mut self, ui: &mut egui::Ui, qid: QueryId) {
+        let query = &mut self.data.queries[qid];
         ui.horizontal(|ui| {
             ui.label("name: ");
             ui.text_edit_singleline(&mut query.name);
         });
-        egui::ComboBox::new((ui.id(), "Lang", id), "Lang")
-            .selected_text(query.lang.as_str())
-            .show_ui(ui, |ui| {
-                let v = "Cpp";
-                if ui.selectable_label(v == query.lang, v).clicked() {
-                    if query.lang != v {
-                        query.lang = v.to_string()
-                    }
-                }
-                let v = "Java";
-                if ui.selectable_label(v == query.lang, v).clicked() {
-                    if query.lang != v {
-                        query.lang = v.to_string()
-                    }
-                }
-            });
 
-        let sel_precomp = if let Some(id) = query.precomp.clone() {
-            self.data.queries[id as usize].name.to_string()
-        } else {
-            "<none>".to_string()
-        };
-        let mut create_q = false;
-        egui::ComboBox::new((ui.id(), "Precomp", id), "Precomp")
-            .selected_text(sel_precomp)
-            .show_ui(ui, |ui| {
-                create_q = ui.button("new").clicked();
-                let mut precomp = None;
-                for (i, q) in self.data.queries.iter().enumerate() {
-                    let v = &q.name;
-                    if ui.selectable_label(i == id as usize, v).clicked() {
-                        if i == id as usize {
-                            precomp = Some(i);
-                        }
-                    }
-                }
-                let query = &mut self.data.queries[id as usize];
-                if let Some(precomp) = precomp {
-                    query.precomp = Some(precomp as u16);
-                }
-                if ui
-                    .selectable_label(query.precomp.is_none(), "<none>")
-                    .clicked()
-                {
-                    query.precomp = None;
-                }
-            });
-        if create_q {
-            self.data.queries.push(crate::app::QueryData {
+        show_lang_selector(ui, qid, &mut query.lang);
+
+        let create_q =
+            show_precomp_selector(ui, qid, query.precomp.clone(), &mut self.data.queries);
+
+        if create_q.inner.map_or(false, |x| x.clicked()) {
+            let qid = self.data.queries.push(crate::app::QueryData {
                 name: "precomp".to_string(),
-                lang: self.data.queries[id as usize].lang.to_string(),
+                lang: self.data.queries[qid].lang.to_string(),
                 query: egui_addon::code_editor::CodeEditor::new(
                     egui_addon::code_editor::EditorInfo::default().copied(),
                     r#"translation_unit"#.to_string(),
                 ),
                 ..Default::default()
             });
-            let qid = self.data.queries.len() as u16 - 1;
-            let query = &mut self.data.queries[id as usize];
+            let query = &mut self.data.queries[qid];
             query.precomp = Some(qid);
             let tid = self.tabs.len() as u16;
             self.tabs.push(crate::app::Tab::LocalQuery(qid));
@@ -145,7 +105,7 @@ impl crate::HyperApp {
                 _ => todo!(),
             };
         }
-        let query = &mut self.data.queries[id as usize];
+        let query = &mut self.data.queries[qid];
         egui::Slider::new(&mut query.commits, 1..=100)
             .text("#commits")
             .clamping(egui::SliderClamping::Never)
@@ -187,7 +147,7 @@ impl crate::HyperApp {
                         r.push(qrid);
                         self.data.queries_results.push(super::QueryResults {
                             project: rid,
-                            query: id,
+                            query: qid,
                             content: Default::default(),
                             tab: u16::MAX,
                         });
@@ -204,7 +164,7 @@ impl crate::HyperApp {
             }
             *q_res_ids = r;
         }
-        let query_data = &self.data.queries[id as usize];
+        let query_data = &self.data.queries[qid];
         let q_res_ids = &query_data.results;
         ui.style_mut().spacing.item_spacing = egui::vec2(3.0, 2.0);
         for q_res_id in q_res_ids {
@@ -379,7 +339,7 @@ impl crate::HyperApp {
                             repo.name,
                             &c[..6.min(c.len())]
                         ));
-                        let query_data = &self.data.queries[q_res.query as usize];
+                        let query_data = &self.data.queries[q_res.query];
                         // let current_lang = &query_data.lang;
                         let w = &mut ui.style_mut().visuals.widgets;
                         w.hovered.weak_bg_fill = _n;
@@ -414,7 +374,7 @@ impl crate::HyperApp {
             if compute_button.clicked() {
                 let (repo, mut commit_slice) =
                     self.data.selected_code_data.get_mut(q_res.project).unwrap();
-                let query_data = &self.data.queries[q_res.query as usize];
+                let query_data = &self.data.queries[q_res.query];
                 let language = query_data.lang.to_string();
                 let query = query_data.query.as_ref().to_string();
                 wasm_rs_dbg::dbg!(&query);
@@ -425,10 +385,7 @@ impl crate::HyperApp {
                 };
                 let max_matches = query_data.max_matches;
                 let timeout = query_data.timeout;
-                let precomp = query_data
-                    .precomp
-                    .clone()
-                    .map(|id| &self.data.queries[id as usize]);
+                let precomp = query_data.precomp.clone().map(|id| &self.data.queries[id]);
                 let precomp = precomp.map(|p| p.query.as_ref().to_string());
                 let prom = querying::remote_compute_query_aux(
                     ui.ctx(),
@@ -675,6 +632,65 @@ impl crate::HyperApp {
                 }
             });
     }
+}
+
+fn show_precomp_selector(
+    ui: &mut egui::Ui,
+    qid: QueryId,
+    precomp: Option<QueryId>,
+    queries: &mut QueryDataVec,
+) -> egui::InnerResponse<Option<egui::Response>> {
+    let sel_precomp = if let Some(id) = precomp {
+        queries[id].name.to_string()
+    } else {
+        "<none>".to_string()
+    };
+
+    let mut create_q = egui::ComboBox::new((ui.id(), "Precomp", qid), "Precomp")
+        .selected_text(sel_precomp)
+        .show_ui(ui, |ui| {
+            let create_q = ui.button("new");
+            let mut precomp = None;
+            for (i, q) in queries.enumerate() {
+                let v = &q.name;
+                if ui.selectable_label(i == qid, v).clicked() {
+                    if i == qid {
+                        precomp = Some(i);
+                    }
+                }
+            }
+            let query = &mut queries[qid];
+            if let Some(precomp) = precomp {
+                query.precomp = Some(precomp as QueryId);
+            }
+            if ui
+                .selectable_label(query.precomp.is_none(), "<none>")
+                .clicked()
+            {
+                query.precomp = None;
+            }
+            create_q
+        });
+    create_q
+}
+
+fn show_lang_selector(ui: &mut egui::Ui, id: impl std::hash::Hash, lang: &mut String) {
+    egui::ComboBox::new((ui.id(), "Lang", id), "Lang")
+        .selected_text(lang.as_str())
+        .show_ui(ui, |ui| {
+            let v = "Cpp";
+            if ui.selectable_label(v == lang, v).clicked() {
+                if lang != v {
+                    *lang = v.to_string()
+                }
+            }
+            let v = "Java";
+            if ui.selectable_label(v == lang, v).clicked() {
+                if lang != v {
+                    *lang = v.to_string()
+                }
+            }
+        });
 }
 
 fn selection_querying_result_format(ui: &mut egui::Ui, format: &mut super::ResultFormat) {

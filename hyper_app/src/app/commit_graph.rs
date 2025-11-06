@@ -173,7 +173,7 @@ impl crate::HyperApp {
                                 .data
                                 .queries_results
                                 .iter()
-                                .find(|x| x.project == repo_id && x.query == 0)
+                                .find(|x| x.project == repo_id && x.query.to_usize() == 0)
                                 .unwrap()
                                 .tab;
                             if let super::Tab::QueryResults { id, format } =
@@ -235,18 +235,11 @@ impl crate::HyperApp {
                                 Some((repo_id, cached.commits[after].to_string()));
                             // assert_eq!(self.data.queries.len(), 1); // need to retieve current query if multiple
 
-                            for q in &self.data.queries {
-                                dbg!(&q.lang);
-                                dbg!(&q.name);
-                                dbg!(q.max_matches);
-                            }
-                            let tabid = self
-                                .data
-                                .queries_results
+                            let tabid = (self.data.queries_results)
                                 .iter()
                                 .find(|x| {
                                     x.project == repo_id
-                                        && self.data.queries[x.query as usize].lang == "Java"
+                                        && self.data.queries[x.query].lang == "Java"
                                 })
                                 .unwrap()
                                 .tab;

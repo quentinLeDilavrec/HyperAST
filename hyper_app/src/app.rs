@@ -118,7 +118,8 @@ enum BottomPanelConfig {
 }
 
 /// See [`querying::QueryContent`]
-#[derive(Deserialize, Serialize)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct QueryData {
     name: String,
     lang: String,
@@ -410,7 +411,7 @@ pub(crate) struct AppData {
     smells_context: smells::Context,
 
     code_views: Vec<CodeView>,
-    queries: Vec<QueryData>,
+    queries: QueryDataVec,
     queries_results: Vec<QueryResults>,
     queries_differential_results: Option<QueriesDifferentialResults>,
     // #[serde(skip)]
@@ -561,7 +562,8 @@ impl Default for AppData {
                     .to_string(),
                 ),
                 ..Default::default()
-            }],
+            }]
+            .into(),
             queries_results: vec![],
             queries_differential_results: None,
             compute_single_result: Default::default(),
@@ -587,8 +589,8 @@ impl Default for AppData {
 }
 
 pub(crate) use commit::ProjectId;
-type LocalQueryId = u16;
-type QueryId = u16;
+utils::typed_vec!(QueryDataVec, QueryData, QueryId(u16));
+type LocalQueryId = QueryId;
 type DiffId = usize;
 type RemCodeId = usize;
 type RemTreeId = usize;
@@ -629,8 +631,12 @@ impl Tab {
         match self {
             Tab::RemoteQuery(_) => "Query".into(),
             Tab::LocalQuery(id) => {
-                let name = &data.queries[*id as usize].name;
-                format!("Local Query: {name}").into()
+                if let Some(q) = data.queries.get(*id) {
+                    let name = &q.name;
+                    format!("Local Query: {name}").into()
+                } else {
+                    "Local Query".into()
+                }
             }
             Tab::Diff(_) => "Diff".into(),
             Tab::CodeTree(_) => "Remote Tree".into(),
@@ -678,7 +684,7 @@ impl SelectedConfig {
                 // Tab::CodeTree(0),
                 // Tab::CodeFile(1),
                 // Tab::Commits,
-                Tab::LocalQuery(0),
+                Tab::LocalQuery(QueryId::INVALID),
                 // Tab::QueryResults {
                 //     id: 0,
                 //     format: ResultFormat::Json,
@@ -690,7 +696,7 @@ impl SelectedConfig {
             SelectedConfig::Diff => vec![Tab::Diff(0)],
             SelectedConfig::Tracking => vec![Tab::CodeTree(0)],
             SelectedConfig::LongTracking => vec![Tab::LongTracking],
-            SelectedConfig::Aspects => vec![Tab::TreeAspect],
+            SelectedConfig::Aspects => vec![Tab::ProjectSelection(), Tab::TreeAspect],
         }
     }
 }
@@ -909,8 +915,13 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     });
                 Default::default()
             }
-            Tab::LocalQuery(id) => {
-                let query = &mut self.data.queries[*id as usize];
+            Tab::LocalQuery(qid) => {
+                let Some(query) = self.data.queries.get_mut(*qid) else {
+                    if let Some((id, _)) = self.data.queries.enumerate().next() {
+                        *qid = id;
+                    }
+                    return Default::default();
+                };
                 egui::Frame::NONE
                     .outer_margin(egui::Margin::symmetric(5, 2))
                     // .inner_margin(egui::Margin::same(15))
@@ -946,7 +957,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     match promise.ready() {
                         Some(Ok(res)) => match &res.content {
                             Some(Ok(res)) => {
-                                if let Some(query_bad) = &res.bad.get(*id as usize) {
+                                if let Some(query_bad) = &res.bad.get(id.to_usize()) {
                                     smells::show_query(query_bad, ui);
                                 }
                             }
@@ -1219,7 +1230,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             unreachable!()
                         };
 
-                        let qid = 0; //q_res.1 as usize;
+                        let qid = QueryId::INVALID; // TODO q_res.1 as usize;
                         if let Some(differential) = &mut data.queries_differential_results {
                             let (absent, new) = update_queries_differential_results(
                                 ui,
@@ -1284,7 +1295,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             unreachable!()
                         };
 
-                        let qid = 0; //q_res.1 as usize;
+                        let qid = QueryId::INVALID; // TODO q_res.1 as usize;
                         if let Some(differential) = &mut data.queries_differential_results {
                             let (absent, new) = update_queries_differential_results(
                                 ui,
@@ -1884,9 +1895,9 @@ fn show_hunks(
 
 fn update_queries_differential_results(
     ui: &mut egui::Ui,
-    queries: &Vec<QueryData>,
+    queries: impl std::ops::Index<QueryId, Output = QueryData>,
     selected_baseline: &String,
-    qid: usize,
+    qid: QueryId,
     differential: &mut QueriesDifferentialResults,
 ) -> (bool, bool) {
     if differential.2.is_waiting() {
@@ -1912,7 +1923,7 @@ fn compute_queries_differential_results(
     ui: &mut egui::Ui,
     pane: &mut u16,
     proj_id: ProjectId,
-    qid: usize,
+    qid: QueryId,
     data: &mut AppData,
     selected_baseline: &String,
     selected_commit: &(ProjectId, String),
@@ -1948,7 +1959,7 @@ fn compute_queries_differential_results(
     let precomp = data.queries[qid]
         .precomp
         .clone()
-        .map(|id| &data.queries[id as usize]);
+        .map(|qid| &data.queries[qid]);
     let precomp = precomp.map(|p| p.query.as_ref().to_string());
     let hash = hash((&query, selected_baseline.clone()));
     let prom = querying::remote_compute_query_differential(
@@ -1968,7 +1979,7 @@ fn compute_queries_differential_results(
             timeout,
         },
     );
-    data.queries_differential_results = Some((pid, 0, Default::default(), *pane, hash));
+    data.queries_differential_results = Some((pid, qid, Default::default(), *pane, hash));
     let res = data.queries_differential_results.as_mut().unwrap();
     res.2.buffer(prom);
     None
@@ -2400,10 +2411,9 @@ impl eframe::App for HyperApp {
                     self.persistance = true;
                 }
                 UICommand::NewQuery => {
-                    self.data.queries.push(crate::app::QueryData {
+                    let qid = self.data.queries.push(crate::app::QueryData {
                         ..Default::default()
                     });
-                    let qid = self.data.queries.len() as u16 - 1;
                     let tid = self.tabs.len() as u16;
                     self.tabs.push(crate::app::Tab::LocalQuery(qid));
                     let child = self.tree.tiles.insert_pane(tid);

@@ -1117,23 +1117,21 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     .auto_shrink([false, false])
                     .show_viewport(ui, |ui, _viewport| {
                         ui.set_height(3_000.0);
-                        {
-                            let mut imp = tree_view::FetchedViewImpl::new(
-                                self.data.store.clone(),
-                                &self.data.aspects,
-                                code_view.prefill_cache.take(),
-                                vec![],
-                                None,
-                                path.iter().map(|x| *x as usize).collect(),
-                                ui.id(),
-                                None,
-                                None,
-                            );
-                            let r = imp.show(ui, &self.data.api_addr, &root);
-                            // wasm_rs_dbg::dbg!(&imp);
-                            code_view.prefill_cache = imp.prefill_cache;
-                            r
-                        };
+                        let mut imp = tree_view::FetchedViewImpl::new(
+                            self.data.store.clone(),
+                            &self.data.aspects,
+                            code_view.prefill_cache.take(),
+                            vec![],
+                            None,
+                            path.iter().map(|x| *x as usize).collect(),
+                            ui.id().with(&commit),
+                            Some(&[100, 1000]),
+                            Some(&[100, 1000]),
+                        );
+                        let r = imp.show(ui, &self.data.api_addr, &root);
+                        // wasm_rs_dbg::dbg!(&imp);
+                        code_view.prefill_cache = imp.prefill_cache;
+                        r;
                     });
                 Default::default()
             }
@@ -1261,19 +1259,45 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
 
                         let qid = 0; //q_res.1 as usize;
                         if let Some(differential) = &mut data.queries_differential_results {
-                            if update_queries_differential_results(
+                            let (absent, new) = update_queries_differential_results(
                                 ui,
                                 &data.queries,
                                 selected_baseline,
                                 qid,
                                 differential,
-                            ) {
+                            );
+                            if absent {
+                                wasm_rs_dbg::dbg!(new);
                                 data.queries_differential_results = None;
-                            } else if let Some(Ok(x)) = differential.2.get() {
-                                let fetched_files = &mut data.fetched_files;
-                                let api_addr = &data.api_addr;
-                                show_hunks(ui, fetched_files, api_addr, x, selected_commit);
+                                return Default::default();
                             }
+                            let Some(Ok(x)) = differential.2.get() else {
+                                return Default::default();
+                            };
+
+                            if new {
+                                wasm_rs_dbg::dbg!(x.results.len());
+                                let store = &data.store;
+                                let mut node_store = store.node_store.read().unwrap();
+                                let mut pending = store.nodes_pending.lock().unwrap();
+                                let mut waiting = store.nodes_waiting.lock().unwrap();
+                                let waiting = waiting.get_or_insert_default();
+                                for x in (x.results.iter())
+                                    .flat_map(|x| x.0.path_ids.iter().chain(x.1.path_ids.iter()))
+                                    .copied()
+                                {
+                                    if pending.iter().any(|y| y.contains(&x))
+                                        || node_store.contains(x)
+                                    {
+                                        continue;
+                                    }
+                                    wasm_rs_dbg::dbg!(x);
+                                    waiting.insert(x);
+                                }
+                            }
+                            let fetched_files = &mut data.fetched_files;
+                            let api_addr = &data.api_addr;
+                            show_hunks(ui, fetched_files, api_addr, x, selected_commit);
                         } else if let Some(value) = compute_queries_differential_results(
                             ui,
                             pane,
@@ -1300,61 +1324,102 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
 
                         let qid = 0; //q_res.1 as usize;
                         if let Some(differential) = &mut data.queries_differential_results {
-                            if update_queries_differential_results(
+                            let (absent, new) = update_queries_differential_results(
                                 ui,
                                 &data.queries,
                                 selected_baseline,
                                 qid,
                                 differential,
-                            ) {
+                            );
+                            if absent {
+                                wasm_rs_dbg::dbg!(new);
                                 data.queries_differential_results = None;
-                            } else if let Some(Ok(x)) = differential.2.get_mut() {
-                                let fetched_files = &mut data.fetched_files;
-                                let api_addr = &data.api_addr;
-
-                                let aspects = &mut data.aspects;
-                                let selected_projects = &mut data.selected_code_data;
-                                let long_tacking = &mut data.long_tracking;
-                                let store = data.store.clone();
-
-                                let rect = ui.clip_rect();
-                                use egui_addon::InteractiveSplitter;
-                                InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
-                                    ui1.set_clip_rect(ui1.max_rect().intersect(rect));
-                                    ui2.set_clip_rect(ui2.max_rect().intersect(rect));
-                                    let commit = selected_commit;
-                                    ui2.push_id(commit, |ui| {
-                                        show_tree_view(
-                                            ui,
-                                            aspects,
-                                            selected_projects,
-                                            long_tacking,
-                                            store,
-                                            commit,
-                                            api_addr,
-                                            x,
-                                            true,
-                                        );
-                                        ui.separator();
-                                    });
-                                    let commit = &(selected_commit.0, selected_baseline.clone());
-                                    ui1.push_id(commit, |ui| {
-                                        let store = data.store.clone();
-                                        show_tree_view(
-                                            ui,
-                                            aspects,
-                                            selected_projects,
-                                            long_tacking,
-                                            store,
-                                            commit,
-                                            api_addr,
-                                            x,
-                                            false,
-                                        );
-                                        ui.separator();
-                                    });
-                                });
+                                return Default::default();
                             }
+                            let Some(Ok(x)) = differential.2.get_mut() else {
+                                return Default::default();
+                            };
+                            if new {
+                                wasm_rs_dbg::dbg!(x.results.len());
+                                let store = &data.store;
+                                let mut node_store = store.node_store.read().unwrap();
+                                let mut pending = store.nodes_pending.lock().unwrap();
+                                let mut waiting = store.nodes_waiting.lock().unwrap();
+                                let waiting = waiting.get_or_insert_default();
+                                for x in (x.results.iter())
+                                    .flat_map(|x| x.0.path_ids.iter().chain(x.1.path_ids.iter()))
+                                    .copied()
+                                {
+                                    if pending.iter().any(|y| y.contains(&x))
+                                        || node_store.contains(x)
+                                    {
+                                        continue;
+                                    }
+                                    wasm_rs_dbg::dbg!(x);
+                                    waiting.insert(x);
+                                }
+                            }
+                            let fetched_files = &mut data.fetched_files;
+                            let api_addr = &data.api_addr;
+
+                            let aspects = &mut data.aspects;
+                            let selected_projects = &mut data.selected_code_data;
+                            let long_tacking = &mut data.long_tracking;
+                            let store = data.store.clone();
+
+                            let rect = ui.clip_rect();
+                            use egui_addon::InteractiveSplitter;
+                            InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
+                                ui1.set_clip_rect(ui1.max_rect().intersect(rect));
+                                ui2.set_clip_rect(ui2.max_rect().intersect(rect));
+                                let commit = selected_commit;
+
+                                let left_side = true;
+                                let mut curr_view = long_tracking::ColView::default();
+                                (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(
+                                    |(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i),
+                                ));
+                                // curr_view.deletions =
+                                //     Some(&[100, 1000, 2000, 3000, 10000, 20000, 100000]);
+
+                                let bl = &(selected_commit.0, selected_baseline.clone());
+                                ui2.push_id((commit, bl), |ui| {
+                                    show_tree_view(
+                                        ui,
+                                        aspects,
+                                        selected_projects,
+                                        long_tacking,
+                                        store,
+                                        commit,
+                                        api_addr,
+                                        &mut curr_view,
+                                    );
+                                    ui.separator();
+                                });
+                                let left_side = false;
+                                let mut curr_view = long_tracking::ColView::default();
+                                curr_view
+                                    .matcheds
+                                    .extend(x.results.iter_mut().enumerate().map(|(i, x)| {
+                                        (if left_side { &mut x.0 } else { &mut x.1 }, i)
+                                    }));
+                                // curr_view.additions =
+                                //     Some(&[100, 1000, 2000, 3000, 10000, 20000, 100000]);
+                                ui1.push_id((bl, commit), |ui| {
+                                    let store = data.store.clone();
+                                    show_tree_view(
+                                        ui,
+                                        aspects,
+                                        selected_projects,
+                                        long_tacking,
+                                        store,
+                                        bl,
+                                        api_addr,
+                                        &mut curr_view,
+                                    );
+                                    ui.separator();
+                                });
+                            });
                         } else if let Some(value) = compute_queries_differential_results(
                             ui,
                             pane,
@@ -1676,8 +1741,7 @@ fn show_tree_view(
     store: Arc<FetchedHyperAST>,
     commit: &(ProjectId, String),
     api_addr: &String,
-    x: &mut DetailsResults,
-    left_side: bool,
+    curr_view: &mut long_tracking::ColView<'_>,
 ) {
     let i = 0;
 
@@ -1689,7 +1753,8 @@ fn show_tree_view(
     };
     let tree_viewer = long_tacking.tree_viewer.entry(curr_commit.clone());
     let tree_viewer = tree_viewer.or_insert_with(|| utils_poll::Buffered::default());
-    let trigger = tree_viewer.try_poll();
+    tree_viewer.try_poll();
+    let trigger = true;
     let Some(tree_viewer) = tree_viewer.get_mut() else {
         if !tree_viewer.is_waiting() {
             tree_viewer.buffer(code_aspects::remote_fetch_node_old(
@@ -1706,13 +1771,6 @@ fn show_tree_view(
     let Ok(tree_viewer) = tree_viewer else {
         return Default::default();
     };
-    let mut curr_view = long_tracking::ColView::default();
-    curr_view.matcheds.extend(
-        x.results
-            .iter_mut()
-            .enumerate()
-            .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
-    );
     let col = 0;
     let min_col = 0;
     let mut attacheds: long_tracking::Attacheds = vec![];
@@ -1724,7 +1782,7 @@ fn show_tree_view(
         col,
         trigger,
         tree_viewer,
-        &mut curr_view,
+        curr_view,
         aspects,
         &mut attacheds,
         &mut defered_focus_scroll,
@@ -1739,7 +1797,8 @@ fn show_tree_view(
             .map(|p| p.min.y)
             .unwrap_or(ui.max_rect().height() / 2000.0);
         let g_o: f32 = 50.0;
-        scroll.state.offset = (0.0, (o - g_o).max(0.0)).into();
+        wasm_rs_dbg::dbg!(o, g_o);
+        scroll.state.offset = (0.0, (o - g_o)).into();
         scroll.state.store(ui.ctx(), scroll.id);
     }
 }
@@ -1820,15 +1879,15 @@ fn update_queries_differential_results(
     selected_baseline: &String,
     qid: usize,
     differential: &mut QueriesDifferentialResults,
-) -> bool {
+) -> (bool, bool) {
     if differential.2.is_waiting() {
         ui.spinner();
     }
-    differential.2.try_poll_with(|x| {
+    let new = differential.2.try_poll_with(|x| {
         x.map_err(|e| querying::QueryingError::NetworkError(e))
             .and_then(|x| x.content.unwrap())
     });
-    if !differential.2.is_present() && !differential.2.is_waiting() {
+    let absent = if !differential.2.is_present() && !differential.2.is_waiting() {
         true
     } else if let Some(Err(_)) = differential.2.get() {
         true
@@ -1836,7 +1895,8 @@ fn update_queries_differential_results(
         true
     } else {
         false
-    }
+    };
+    (absent, new)
 }
 
 fn compute_queries_differential_results(

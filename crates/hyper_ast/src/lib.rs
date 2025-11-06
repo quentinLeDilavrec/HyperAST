@@ -16,7 +16,12 @@ pub mod types;
 pub mod usage;
 pub mod utils;
 
-pub trait PrimInt: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {}
+pub trait PrimInt: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {
+    #[track_caller]
+    fn cast<T: PrimInt>(&self) -> T {
+        num::cast(*self).unwrap()
+    }
+}
 impl<T> PrimInt for T where T: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {}
 
 mod slice_interning;

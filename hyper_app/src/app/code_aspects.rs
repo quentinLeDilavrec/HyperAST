@@ -275,14 +275,21 @@ impl Debug for Focus<'_> {
     }
 }
 
-impl<'a> From<(&'a [usize], &'a [NodeIdentifier])> for Focus<'a> {
-    fn from(value: (&'a [usize], &'a [NodeIdentifier])) -> Self {
-        Focus {
-            offsets: value.0,
-            ids: value.1,
+impl<'a> Focus<'a> {
+    pub fn new(offsets: &'a [usize], ids: &'a [NodeIdentifier]) -> Self {
+        if offsets.len() < ids.len() {
+            panic!("offsets.len() < ids.len(): {} {}", offsets.len(), ids.len());
         }
+        Focus { offsets, ids }
     }
 }
+
+// impl<'a> From<(&'a [usize], &'a [NodeIdentifier])> for Focus<'a> {
+//     fn from((offsets, ids): (&'a [usize], &'a [NodeIdentifier])) -> Self {
+//         assert!(offsets.is_empty() > ids.is_empty());
+//         Focus { offsets, ids }
+//     }
+// }
 
 impl Focus<'_> {
     pub fn is_empty(&self) -> bool {
@@ -411,7 +418,12 @@ pub(super) fn remote_fetch_nodes_by_ids(
         store.nodes_pending.lock().unwrap().pop_front();
         let res = Resource::<FetchedNodes>::from_resp(response);
         let mut node_store = store.node_store.write().unwrap();
-        node_store.extend(res.content.unwrap().node_store);
+        let mut raw = res.content.unwrap().node_store;
+        // Hack
+        for x in &mut raw.storages_variants {
+            x.remove_if(|id| node_store.contains(*id));
+        }
+        node_store.extend(raw);
         Resource {
             response: res.response,
             content: Some(()),

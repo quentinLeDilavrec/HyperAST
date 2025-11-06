@@ -104,11 +104,18 @@ impl<'a> FetchedViewImpl<'a> {
         let id = ui.id().with(&self.path);
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
+        self.additions_deletions_compute(size);
+        let no_change = self.additions.is_none() && self.deletions.is_none();
+        let add = self.additions.unwrap_or_default();
+        let del = self.deletions.unwrap_or_default();
         if self.focus.is_some() {
+            load_with_default_open.set_open(true)
+        } else if self.open_changed
+            && (!add.is_empty() || !del.is_empty() || !self.hightlights.is_empty())
+        {
             load_with_default_open.set_open(true)
         }
 
-        self.additions_deletions_compute(size);
         ui.spacing_mut().icon_spacing /= 2.0;
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
@@ -128,9 +135,6 @@ impl<'a> FetchedViewImpl<'a> {
                 };
                 let mut label = egui::RichText::new(label);
                 let text = format!("{} ", kind);
-                let no_change = self.additions.is_none() && self.deletions.is_none();
-                let add = self.additions.unwrap_or_default();
-                let del = self.deletions.unwrap_or_default();
                 let rt = egui::RichText::new(text).monospace();
                 let gp = self.global_pos.as_ref();
                 let rt = if no_change || gp.is_none() {
@@ -241,16 +245,20 @@ impl<'a> FetchedViewImpl<'a> {
 
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
+        let no_change = self.additions.is_none() && self.deletions.is_none();
+        let add = self.additions.unwrap_or_default();
+        let del = self.deletions.unwrap_or_default();
         if self.focus.is_some() {
+            load_with_default_open.set_open(true)
+        } else if self.open_changed
+            && (!add.is_empty() || !del.is_empty() || !self.hightlights.is_empty())
+        {
             load_with_default_open.set_open(true)
         }
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
                 // ui.label(format!("{}: {}", kind, label));
                 {
-                    let no_change = self.additions.is_none() && self.deletions.is_none();
-                    let add = self.additions.unwrap_or_default();
-                    let del = self.deletions.unwrap_or_default();
                     let text = format!("{}:", kind);
                     let rt = egui::RichText::new(text).monospace();
                     let gp = self.global_pos.as_ref();
@@ -1034,6 +1042,7 @@ impl<'a> FetchedViewImpl<'a> {
                     additions,
                     deletions,
                     global_pos: None,
+                    open_changed: true,
                 }
             }
         } else if i == prefill_old.children.len() {
@@ -1057,6 +1066,7 @@ impl<'a> FetchedViewImpl<'a> {
                 additions,
                 deletions,
                 global_pos: None,
+                open_changed: true,
             }
         } else {
             FetchedViewImpl {
@@ -1072,6 +1082,7 @@ impl<'a> FetchedViewImpl<'a> {
                 additions,
                 deletions,
                 global_pos: None,
+                open_changed: true,
             }
         };
         let _size;
@@ -1126,10 +1137,12 @@ impl<'a> FetchedViewImpl<'a> {
             }
             if let Some(focus) = &imp.focus {
                 wasm_rs_dbg::dbg!(&focus);
+                imp.draw_count += 1;
                 if let Some(x) = self.focus.as_ref().unwrap().ids.first() {
                     imp.additions = None;
                     imp.deletions = None;
-                    let a = imp.ui_non_loaded(ui, *c, *focus.offsets.first().unwrap_or(&0), *x);
+                    let offset = focus.offsets.first().copied();
+                    let a = imp.ui_non_loaded(ui, *c, offset.unwrap_or(0), *x);
                     match a {
                         Action::PartialFocused(x) => Action::PartialFocused(x),
                         Action::Focused(x) => Action::PartialFocused(x),
@@ -1152,11 +1165,29 @@ impl<'a> FetchedViewImpl<'a> {
                         x => panic!("{:?}", x),
                     }
                 }
+            } else if self.open_changed
+                && (!self.additions.unwrap_or_default().is_empty()
+                    || !self.deletions.unwrap_or_default().is_empty()
+                    || !self.hightlights.is_empty())
+            {
+                let mut prefill = if let Some(prefill_cache) = imp.prefill_cache.take() {
+                    prefill_cache
+                } else {
+                    PrefillCache::default()
+                };
+                imp.draw_count += 1;
+                ui.horizontal(|ui| {
+                    egui::Spinner::new().color(egui::Color32::LIGHT_BLUE).ui(ui);
+                    ui.label(c.to_string());
+                });
+                prefill.head = ui.available_rect_before_wrap().min.y - min.y;
+                imp.prefill_cache = Some(prefill);
+                Action::PartialFocused(ui.available_rect_before_wrap().min.y)
             } else {
                 let min = ui.available_rect_before_wrap().min;
                 imp.draw_count += 1;
                 ui.horizontal(|ui| {
-                    ui.spinner();
+                    egui::Spinner::new().ui(ui);
                     ui.label(c.to_string());
                 });
                 let mut prefill = if let Some(prefill_cache) = imp.prefill_cache.take() {

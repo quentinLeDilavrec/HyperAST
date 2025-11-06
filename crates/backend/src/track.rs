@@ -14,6 +14,8 @@ use hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle;
 use hyperast_vcs_git::{TStore, multi_preprocessed};
 
 use crate::changes::{DstChanges, SrcChanges, added_deleted};
+use crate::utils::PieceOfCode;
+use crate::utils::{LocalPieceOfCode, string_to_oid};
 use crate::{SharedState, track};
 
 mod compute;
@@ -23,7 +25,6 @@ use more::{TargetCodeElement, repo_config_error, shift_piece};
 
 #[cfg(feature = "experimental")]
 mod my_dash;
-
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct TrackingParam {
     pub user: String,
@@ -203,52 +204,6 @@ impl IntoResponse for TrackingResultWithChanges<IdN, Idx> {
         resp
     }
 }
-
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
-pub struct PieceOfCode<IdN = self::IdN, Idx = usize> {
-    user: String,
-    name: String,
-    #[serde(deserialize_with = "string_to_oid")]
-    #[serde(serialize_with = "oid_to_string")]
-    commit: Oid,
-    path: Vec<Idx>,
-    file: String,
-    start: usize,
-    end: usize,
-    #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>"))]
-    #[serde(serialize_with = "custom_ser")]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    path_ids: Vec<IdN>, // WARN this is not fetched::NodeIdentifier
-}
-
-fn oid_to_string<S: serde::Serializer>(x: &Oid, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.collect_str(x)
-}
-fn string_to_oid<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Oid, D::Error> {
-    let s = <&str as serde::Deserialize>::deserialize(deserializer)?;
-    Oid::from_str(s).map_err(|e| serde::de::Error::custom(e))
-}
-
-fn custom_ser<IdN: Clone + Into<self::IdN>, S>(
-    x: &Vec<IdN>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::ser::SerializeSeq;
-    let mut seq = serializer.serialize_seq(Some(x.len()))?;
-    for element in x {
-        let element: self::IdN = element.clone().into();
-        let id: u64 = unsafe { std::mem::transmute(element) };
-        if id > u32::MAX as u64 {
-            log::error!("node ids are too big, it will lead to bugs when used")
-        }
-        seq.serialize_element(&id)?;
-    }
-    seq.end()
-}
-
 const MAX_NODES: usize = 200 * 4_000_000;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -587,87 +542,6 @@ impl<IdN, Idx, T> From<Result<MappingResult<IdN, Idx, T>, String>> for MappingRe
         match value {
             Ok(x) => x,
             Err(e) => MappingResult::Error(e),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Debug)]
-struct LocalPieceOfCode<IdN, Idx> {
-    file: String,
-    start: usize,
-    end: usize,
-    path: Vec<Idx>,
-    path_ids: Vec<IdN>,
-}
-
-impl<'a, S, IdN: Clone, Idx: Clone> From<(&S, &'a LocalPieceOfCode<IdN, Idx>)>
-    for LocalPieceOfCode<IdN, Idx>
-{
-    fn from((_, p): (&S, &'a LocalPieceOfCode<IdN, Idx>)) -> Self {
-        p.clone()
-    }
-}
-
-impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
-    pub(crate) fn from_position(
-        pos: &hyperast::position::Position,
-        path: Vec<Idx>,
-        path_ids: Vec<IdN>,
-    ) -> Self {
-        let range = pos.range();
-        let file = pos.file();
-        Self::from_file_and_range(file, range, path, path_ids)
-    }
-    pub(crate) fn from_file_and_range(
-        file: &std::path::Path,
-        range: std::ops::Range<usize>,
-        path: Vec<Idx>,
-        path_ids: Vec<IdN>,
-    ) -> Self {
-        let std::ops::Range { start, end } = range;
-        let file = file.to_str().unwrap().to_string();
-        Self {
-            file,
-            start,
-            end,
-            path,
-            path_ids,
-        }
-    }
-    pub(crate) fn from_pos<P>(pos: &P) -> Self
-    where
-        P: position_accessors::WithOffsets<Idx = Idx>
-            + position_accessors::WithPreOrderPath<IdN>
-            + position_accessors::FileAndOffsetPostionT<IdN, IdO = usize>,
-    {
-        let mut path = vec![];
-        let mut path_ids = vec![];
-        for (o, i) in pos.iter_offsets_and_nodes() {
-            path.push(o);
-            path_ids.push(i);
-        }
-        Self::from_file_and_range(&pos.file(), pos.start()..pos.end(), path, path_ids)
-    }
-    pub(crate) fn globalize(self, spec: &Repo, commit: Oid) -> PieceOfCode<IdN, Idx> {
-        PieceOfCode {
-            user: spec.user().to_string(),
-            name: spec.name().to_string(),
-            commit: commit,
-            path: self.path,
-            path_ids: self.path_ids,
-            file: self.file,
-            start: self.start,
-            end: self.end,
-        }
-    }
-    fn map_path<Idx2, F: Fn(Idx) -> Idx2>(self, f: F) -> LocalPieceOfCode<IdN, Idx2> {
-        let path = self.path.into_iter().map(f).collect();
-        LocalPieceOfCode {
-            path,
-            path_ids: self.path_ids,
-            file: self.file,
-            start: self.start,
-            end: self.end,
         }
     }
 }

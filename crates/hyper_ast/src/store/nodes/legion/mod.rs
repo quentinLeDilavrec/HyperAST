@@ -337,6 +337,16 @@ impl crate::types::lending::NodeStore<NodeIdentifier> for NodeStore {
     ) -> <Self as crate::types::lending::NLending<'_, NodeIdentifier>>::N {
         crate::types::lending::NodeStore::resolve(&self.inner, id)
     }
+
+    fn try_resolve(
+        &self,
+        id: &NodeIdentifier,
+    ) -> Option<crate::types::LendN<'_, Self, NodeIdentifier>> {
+        (self.inner.internal)
+            .entry_ref(*id)
+            .map(HashedNodeRef::new)
+            .ok()
+    }
 }
 
 impl crate::types::NStoreRefAssoc for NodeStore {
@@ -357,6 +367,12 @@ impl crate::types::lending::NodeStore<NodeIdentifier> for NodeStoreInner {
             .map(HashedNodeRef::new)
             .unwrap()
     }
+    fn try_resolve(
+        &self,
+        id: &NodeIdentifier,
+    ) -> Option<crate::types::LendN<'_, Self, NodeIdentifier>> {
+        self.internal.entry_ref(*id).map(HashedNodeRef::new).ok()
+    }
 }
 
 impl<'a> crate::types::lending::NLending<'a, NodeIdentifier> for &NodeStoreInner {
@@ -372,6 +388,12 @@ impl crate::types::lending::NodeStore<NodeIdentifier> for &NodeStoreInner {
             .entry_ref(*id)
             .map(HashedNodeRef::new)
             .unwrap()
+    }
+    fn try_resolve(
+        &self,
+        id: &NodeIdentifier,
+    ) -> Option<crate::types::LendN<'_, Self, NodeIdentifier>> {
+        self.internal.entry_ref(*id).map(HashedNodeRef::new).ok()
     }
 }
 

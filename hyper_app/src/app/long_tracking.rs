@@ -11,6 +11,8 @@ use egui_addon::egui_utils::highlight_byte_range;
 use hyperast::store::nodes::fetched::NodeIdentifier;
 use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
 
+use crate::app::code_aspects::Focus;
+
 use super::code_aspects::{FetchedView, HightLightHandle, remote_fetch_node_old};
 use super::code_tracking::{
     FetchedFiles, RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
@@ -1351,6 +1353,7 @@ pub(crate) fn show_tree_view(
                     screen_pos: b_p,
                 });
             }
+            wasm_rs_dbg::dbg!((curr_view.left_commit.is_none(), curr_view.matcheds.len()));
             let a = if curr_view.matcheds.len() == 1 {
                 let Some((foc, i)) = curr_view.matcheds.get(0) else {
                     unreachable!()
@@ -1365,7 +1368,7 @@ pub(crate) fn show_tree_view(
                 if trigger {
                     let mut pi = foc.path_ids.clone();
                     pi.reverse();
-                    focus = Some((&foc.path[..], &pi[..]).into());
+                    focus = Some(Focus::new(&foc.path[..], &pi[..]));
                     let id = ui.id();
                     let a = content.show(
                         ui,
@@ -1397,7 +1400,7 @@ pub(crate) fn show_tree_view(
                     let mut pi = foc.path_ids.clone();
                     pi.reverse();
                     if bool {
-                        focus = Some((&foc.path[..], &pi[..]).into());
+                        focus = Some(Focus::new(&foc.path[..], &pi[..]));
                     }
                     let a = content.show(
                         ui,
@@ -1460,6 +1463,7 @@ pub(crate) fn show_tree_view(
             }
             match a {
                 Action::Focused(p) => {
+                    dbg!(p);
                     scroll_focus = Some(p);
                     None
                 }

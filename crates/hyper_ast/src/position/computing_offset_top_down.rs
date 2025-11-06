@@ -106,18 +106,18 @@ pub fn compute_position_and_nodes<'store, HAST, It: Iterator>(
     stores: &'store HAST,
 ) -> (Position, Vec<HAST::IdN>)
 where
-    It::Item: Clone,
+    It::Item: crate::types::PrimInt,
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT:
-        WithSerialization + WithChildren<ChildIdx = It::Item>,
+    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
 {
     let mut offset = 0;
     let mut x = root;
     let mut path_ids = vec![];
     let mut path = vec![];
     for o in &mut *offsets {
+        let o = o.cast();
         let b = stores.resolve(&x);
 
         let t = stores.resolve_type(&x);
@@ -130,7 +130,7 @@ where
             break;
         };
         if !t.is_directory() {
-            for y in cs.before(o.clone()).iter_children() {
+            for y in cs.before(o).iter_children() {
                 let b = stores.resolve(&y);
                 offset += b
                     .try_bytes_len()
@@ -140,7 +140,9 @@ where
                     .unwrap();
             }
         }
-        let Some(a) = cs.get(o) else { break };
+        let Some(a) = cs.get(o) else {
+            break;
+        };
         x = a.clone();
         path_ids.push(x.clone());
     }

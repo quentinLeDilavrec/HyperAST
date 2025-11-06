@@ -1,6 +1,10 @@
-use crate::{SharedState, smells::globalize};
 use axum::{Json, response::IntoResponse};
 use http::{HeaderMap, StatusCode};
+use serde::{Deserialize, Serialize};
+use std::time::Instant;
+
+use hyperast_vcs_git::git::Oid;
+
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use hyper_diff::matchers::mapping_store::{MappingStore, VecStore};
@@ -8,17 +12,19 @@ use hyper_diff::matchers::similarity_metrics::SimilarityMeasure;
 use hyper_diff::matchers::{Decompressible, mapping_store::MultiMappingStore};
 use hyper_diff::matchers::{Mapper, Mapping};
 use hyperast::nodes::TextSerializer;
-use hyperast::position::StructuralPosition;
-use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
+use hyperast::position::position_accessors::{
+    SolvedPosition, WithFullPostOrderPath, WithPreOrderOffsets,
+};
+use hyperast::position::{StructuralPosition, compute_position_and_nodes};
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{
     Children, Childrn, HyperAST, HyperType, Labeled, Typed, WithChildren, WithStats,
 };
 use hyperast_vcs_git::TStore;
-use hyperast_vcs_git::git::Oid;
-use serde::{Deserialize, Serialize};
-use std::time::Instant;
+
+use crate::SharedState;
+use crate::utils::{Arena, IdD, IdN, LocalPieceOfCode, NoS, PieceOfCode, Position, remap};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Param {
@@ -595,7 +601,7 @@ fn aux_default<T>(
 #[derive(Serialize)]
 pub struct ComputeResultsDifferential {
     pub prepare_time: f64,
-    pub results: Vec<(crate::smells::CodeRange, crate::smells::CodeRange)>,
+    pub results: Vec<(PieceOfCode, PieceOfCode)>,
 }
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ParamDifferential {
@@ -900,13 +906,11 @@ pub fn differential(
         // );
         // ```
 
-        let mut baseline_candidates = baseline_results
-            .iter()
+        let mut baseline_candidates = (baseline_results.iter())
             .map(|a| remap(stores, a, &mut mapper.src_arena, current_tr))
             .collect::<Vec<_>>();
         baseline_candidates.sort();
-        let mut other_candidates = other_results
-            .iter()
+        let mut other_candidates = (other_results.iter())
             .map(|a| remap(stores, a, &mut mapper.dst_arena, other_tr))
             .collect::<hashbrown::HashSet<_>>();
         for a in &baseline_candidates {
@@ -1002,9 +1006,15 @@ pub fn differential(
         let baseline_pos = p.make_position(stores);
         let mut pos = baseline_pos.clone();
         pos.set_len(1);
+        let path_ids = p.iter_nodes().map(|x| x).collect();
+        let offsets = p.iter_offsets().map(|x| x as usize).collect();
+        let bl_pos = LocalPieceOfCode::from_position(&baseline_pos, offsets, path_ids);
+        let path_ids = vec![]; // TODO
+        let offsets = p.iter_offsets().map(|x| x as usize).collect();
+        let other_pos = LocalPieceOfCode::from_position(&pos, offsets, path_ids);
         (
-            globalize(&repo, baseline, (baseline_pos, p.iter_offsets().collect())),
-            globalize(&repo, commit, (pos, p.iter_offsets().collect())),
+            bl_pos.globalize(&repo.spec, baseline),
+            other_pos.globalize(&repo.spec, commit),
         )
     });
     let other_results = other_results.into_iter().map(|p| {
@@ -1012,10 +1022,15 @@ pub fn differential(
         let other_pos = p.make_position(stores);
         let mut pos = other_pos.clone();
         pos.set_len(1);
-        (
-            globalize(&repo, baseline, (pos, p.iter_offsets().collect())),
-            globalize(&repo, commit, (other_pos, p.iter_offsets().collect())),
-        )
+        let path_ids = vec![]; // TODO;
+        let offsets = p.iter_offsets().map(|x| x as usize).collect();
+        let bl_pos = LocalPieceOfCode::from_position(&pos, offsets, path_ids);
+        let bl_pos = bl_pos.globalize(&repo.spec, baseline);
+        let path_ids = p.iter_nodes().map(|x| x).collect();
+        let offsets = p.iter_offsets().map(|x| x as usize).collect();
+        let other_pos = LocalPieceOfCode::from_position(&other_pos, offsets, path_ids);
+        let other_pos = other_pos.globalize(&repo.spec, commit);
+        (bl_pos, other_pos)
     });
     let results: Vec<(_, _)> = baseline_results.chain(other_results).collect();
 
@@ -1031,33 +1046,6 @@ pub fn differential(
     })
 }
 
-type Position = StructuralPosition<IdN, u16>;
-type Arena<'a, 'b> = Decompressible<&'a NoS<'a>, &'b mut LazyPostOrder<IdN, u32>>;
-
-fn remap(stores: &SimpleStores<TStore>, x: &Position, arena: &mut Arena, tr: IdN) -> u32 {
-    let (_, _, path) =
-        hyperast::position::compute_position_with_no_spaces(tr, &mut x.iter_offsets(), stores);
-    let mut src = arena.root();
-    for i in 0..path.len() {
-        use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore;
-        let cs = arena.decompress_children(&src);
-        let Some(s) = cs.get(path[i] as usize) else {
-            log::debug!("failed to remap at path {:?}.{:?}", &path[..i], &path[i..]);
-            return src;
-        };
-        src = *s;
-    }
-    src
-}
-
-type IdN = NodeIdentifier;
-
-type NoS<'a> = SimpleStores<
-    TStore,
-    hyperast_vcs_git::no_space::NoSpaceNodeStoreWrapper<'a>,
-    &'a hyperast::store::labels::LabelStore,
->;
-
 fn diferential_filter(
     repo: &hyperast_vcs_git::processing::ConfiguredRepo2,
     baseline: Oid,
@@ -1068,8 +1056,8 @@ fn diferential_filter(
     hyperast: &NoS,
     baseline_results: Vec<Position>,
     other_results: Vec<Position>,
-    subtree_mappings: hyper_diff::matchers::mapping_store::MultiVecStore<u32>,
-    mut mapper: Mapper<&NoS, Arena, Arena, impl MappingStore<Src = u32, Dst = u32>>,
+    subtree_mappings: hyper_diff::matchers::mapping_store::MultiVecStore<IdD>,
+    mut mapper: Mapper<&NoS, Arena, Arena, impl MappingStore<Src = IdD, Dst = IdD>>,
 ) -> (Vec<Position>, Vec<Position>) {
     let baseline_results: Vec<_> = baseline_results
         .into_iter()
@@ -1081,7 +1069,15 @@ fn diferential_filter(
                 x,
                 |node| subtree_mappings.is_src(&node),
                 |node| mapper.mapping.mappings.is_src(&node),
-                |pos| globalize(repo, baseline, pos),
+                |pos| {
+                    let offsets = pos.1.clone();
+                    let pos = LocalPieceOfCode::from_root_and_offsets(stores, current_tr, offsets);
+                    // let offsets = pos.1.iter().map(|x| *x as usize).collect();
+                    // let (pos, path_ids) =
+                    //     compute_position_and_nodes(current_tr, &mut pos.1.iter().copied(), stores);
+                    // let pos = LocalPieceOfCode::from_position(&pos, offsets, path_ids);
+                    pos.globalize(&repo.spec, baseline)
+                },
             )
         })
         .collect();
@@ -1096,7 +1092,11 @@ fn diferential_filter(
                 x,
                 |node| subtree_mappings.is_dst(&node),
                 |node| mapper.mapping.mappings.is_dst(&node),
-                |pos| globalize(repo, commit, pos),
+                |pos| {
+                    let offsets = pos.1.iter().map(|x| *x as usize).collect();
+                    let pos = LocalPieceOfCode::from_position(&pos.0, offsets, vec![]);
+                    pos.globalize(&repo.spec, commit)
+                },
             )
         })
         .collect();
@@ -1115,7 +1115,7 @@ fn filtering_pred(
     x: &Position,
     is_subtree_mapped: impl Fn(u32) -> bool,
     is_mapped: impl Fn(u32) -> bool,
-    globalize: impl Fn(crate::smells::Pos) -> crate::smells::CodeRange,
+    globalize: impl Fn(crate::smells::Pos) -> PieceOfCode,
 ) -> bool {
     log::trace!("filtering");
     let (_, _x, path) =

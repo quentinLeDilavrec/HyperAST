@@ -94,6 +94,16 @@ pub fn fetch(mut state: SharedState, path: Parameters) -> Result<FetchedNodes, S
         Ok(x) => dbg!(x),
         Err(x) => dbg!(x),
     };
+    if (repositories.processor.main_stores)
+        .node_store
+        .try_resolve(curr)
+        .is_none()
+    {
+        return Ok(FetchedNodes {
+            node_store: Default::default(),
+            root: vec![],
+        });
+    }
     let ids = vec![curr];
     let node_store = extract_nodes(&ids, &repositories.processor.main_stores);
     dbg!(&ids);

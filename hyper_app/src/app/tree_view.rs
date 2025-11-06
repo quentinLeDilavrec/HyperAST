@@ -71,6 +71,7 @@ pub(crate) struct FetchedViewImpl<'a> {
     additions: Option<&'a [u32]>,
     deletions: Option<&'a [u32]>,
     global_pos: Option<u32>,
+    open_changed: bool,
 }
 
 impl<'a> Debug for FetchedViewImpl<'a> {
@@ -108,6 +109,7 @@ impl<'a> FetchedViewImpl<'a> {
             additions,
             deletions,
             global_pos: None,
+            open_changed: true,
         }
     }
 

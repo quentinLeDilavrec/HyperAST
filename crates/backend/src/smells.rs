@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
 use crate::SharedState;
+use crate::utils::{LocalPieceOfCode, PieceOfCode};
 
 pub(crate) mod matching;
 
@@ -82,27 +83,16 @@ pub struct ExamplesResults {
     pub prepare_time: f64,
     pub search_time: f64,
     examples: Vec<ExamplesValue>,
-    moves: Vec<(CodeRange, CodeRange)>,
+    moves: Vec<(PieceOfCode, PieceOfCode)>,
 }
 
 #[derive(Deserialize, Clone, Serialize)]
-pub struct ExamplesValue {
-    before: CodeRange,
-    after: CodeRange,
-    deletes: Vec<Range<usize>>,
-    inserts: Vec<Range<usize>>,
-    moves: Vec<(Range<usize>, Range<usize>)>,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub(crate) struct CodeRange {
-    user: String,
-    name: String,
-    commit: String,
-    file: String,
-    start: usize,
-    end: usize,
-    path: Vec<Idx>,
+pub struct ExamplesValue<Idx = usize> {
+    before: PieceOfCode,
+    after: PieceOfCode,
+    deletes: Vec<Range<Idx>>,
+    inserts: Vec<Range<Idx>>,
+    moves: Vec<(Range<Idx>, Range<Idx>)>,
 }
 
 pub(crate) fn smells(
@@ -182,14 +172,14 @@ pub(crate) fn smells(
         .into_iter()
         .enumerate()
         .map(|(i, e)| {
-            assert_eq!(&e.before.commit, &dst_oid.to_string());
+            assert_eq!(e.before.commit, dst_oid);
             assert!(!e.before.path.is_empty());
             let (_, from) = hyperast::position::compute_position(
                 dst_tr,
-                &mut e.before.path.iter().copied(),
+                &mut e.before.path.iter().map(|x| *x as u16),
                 with_spaces_stores,
             );
-            (from, i)
+            (from, i as Idx)
         })
         .fold(Default::default(), |mut acc, x| {
             acc.entry(x.0).or_default().push(x.1);
@@ -250,6 +240,7 @@ pub(crate) fn smells(
                 .copied()
                 .collect::<HashSet<_>>()
                 .into_iter()
+                .map(|x| x as usize)
                 .collect(),
             matches: *v,
             additional: vec![],
@@ -318,8 +309,18 @@ pub(crate) fn smells_ex_from_diffs(
     let examples = focuses
         .iter()
         .map(|(l, r)| {
-            let after = globalize(&repository, src_oid, l.clone());
-            let before = globalize(&repository, dst_oid, r.clone());
+            let after = LocalPieceOfCode::from_position(
+                &l.0,
+                l.1.iter().map(|x| *x as usize).collect(),
+                vec![],
+            );
+            let after = after.globalize(&repository.spec, src_oid);
+            let before = LocalPieceOfCode::from_position(
+                &r.0,
+                r.1.iter().map(|x| *x as usize).collect(),
+                vec![],
+            );
+            let before = before.globalize(&repository.spec, dst_oid);
             let deletes = deletes
                 .iter()
                 .filter(|x| x.0.file() == l.0.file())
@@ -347,9 +348,13 @@ pub(crate) fn smells_ex_from_diffs(
     let moves: Vec<_> = moves
         .into_iter()
         .map(|(l, r)| {
+            let after = l.1.iter().map(|x| *x as usize).collect();
+            let after = LocalPieceOfCode::from_position(&l.0, after, vec![]);
+            let before = r.1.iter().map(|x| *x as usize).collect();
+            let before = LocalPieceOfCode::from_position(&r.0, before, vec![]);
             (
-                globalize(&repository, src_oid, l),
-                globalize(&repository, dst_oid, r),
+                after.globalize(&repository.spec, src_oid),
+                before.globalize(&repository.spec, dst_oid),
             )
         })
         .collect();
@@ -370,21 +375,21 @@ pub(crate) fn smells_ex_from_diffs(
     }))
 }
 
-pub(crate) fn globalize(
-    repository: &hyperast_vcs_git::processing::ConfiguredRepo2,
-    oid: hyperast_vcs_git::git::Oid,
-    p: Pos,
-) -> CodeRange {
-    CodeRange {
-        user: repository.spec.user().to_string(),
-        name: repository.spec.name().to_string(),
-        commit: oid.to_string(),
-        file: p.0.file().to_str().unwrap().to_owned(),
-        start: p.0.range().start,
-        end: p.0.range().end,
-        path: p.1,
-    }
-}
+// pub(crate) fn globalize(
+//     repository: &hyperast_vcs_git::processing::ConfiguredRepo2,
+//     oid: hyperast_vcs_git::git::Oid,
+//     p: Pos,
+// ) -> PieceOfCode {
+//     PieceOfCode {
+//         user: repository.spec.user().to_string(),
+//         name: repository.spec.name().to_string(),
+//         commit: oid.to_string(),
+//         file: p.0.file().to_str().unwrap().to_owned(),
+//         start: p.0.range().start,
+//         end: p.0.range().end,
+//         path: p.1,
+//     }
+// }
 
 pub(crate) struct Diff {
     // actions: Option<ActionsVec<SimpleAction<LabelIdentifier, CompressedTreePath<Idx>, NodeIdentifier>>>,

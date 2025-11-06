@@ -12,7 +12,7 @@ use strum_macros::EnumCount;
 use strum_macros::EnumIter;
 use strum_macros::EnumString;
 
-use crate::PrimInt;
+pub use crate::PrimInt;
 use crate::store::nodes::PolyglotHolder;
 
 pub trait HashKind: Copy + Deref {
@@ -768,6 +768,10 @@ pub mod lending {
 
     pub trait NodeStore<IdN>: for<'a> NLending<'a, IdN> {
         fn resolve(&self, id: &IdN) -> LendN<'_, Self, IdN>;
+        #[doc(hidden)]
+        fn try_resolve(&self, id: &IdN) -> Option<LendN<'_, Self, IdN>> {
+            Some(self.resolve(id))
+        }
         fn scoped<R>(&self, id: &IdN, f: impl Fn(&LendN<'_, Self, IdN>) -> R) -> R {
             f(&self.resolve(id))
         }

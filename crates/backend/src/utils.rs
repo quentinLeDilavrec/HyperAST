@@ -1,12 +1,32 @@
 use dashmap::SharedValue;
-use hyper_diff::decompressed_tree_store::lazy_post_order;
-use hyperast::{
-    store::defaults::NodeIdentifier,
-    types::{HyperAST, WithStats},
-};
 
-pub type LPO<T> = SharedValue<lazy_post_order::LazyPostOrder<T, u32>>;
-type IdN = NodeIdentifier;
+use hyperast_vcs_git::git::Repo;
+
+use hyper_diff::decompressed_tree_store::{Shallow, lazy_post_order};
+use hyperast::position::position_accessors::{self};
+use hyperast::store::{SimpleStores, defaults::NodeIdentifier};
+use hyperast::types::{self, HyperAST, PrimInt, TypeStore, WithStats};
+use hyperast_vcs_git::TStore;
+use hyperast_vcs_git::git::Oid;
+use num::ToPrimitive;
+
+pub(crate) type IdN = NodeIdentifier;
+pub(crate) type Idx = u16;
+pub(crate) type IdD = u32;
+
+pub type LPO<T> = SharedValue<lazy_post_order::LazyPostOrder<T, IdD>>;
+
+pub type Position = hyperast::position::StructuralPosition<IdN, Idx>;
+pub type Arena<'a, 'b, IdN = self::IdN, IdD = self::IdD> = hyper_diff::matchers::Decompressible<
+    &'a NoS<'a>,
+    &'b mut lazy_post_order::LazyPostOrder<IdN, IdD>,
+>;
+
+pub type NoS<'a> = SimpleStores<
+    hyperast_vcs_git::TStore,
+    hyperast_vcs_git::no_space::NoSpaceNodeStoreWrapper<'a>,
+    &'a hyperast::store::labels::LabelStore,
+>;
 
 /// CAUTION a cache should be used on a single HyperAST
 /// btw a given HyperAST can be used by multiple caches
@@ -90,7 +110,7 @@ impl
         &mut lazy_post_order::LazyPostOrder<IdN, u32>,
     )
     where
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithStats,
+        for<'t> <HAST as types::AstLending<'t>>::RT: WithStats,
     {
         use hyperast::types::DecompressedFrom;
         use hyperast::utils::make_hash;
@@ -199,4 +219,185 @@ pub(crate) fn handle_pre_processing_aux(
     }
 }
 
-// rw: impl Iterator<Item = git2::Oid>,
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+pub struct PieceOfCode<IdN = self::IdN, Idx = usize> {
+    pub user: String,
+    pub name: String,
+    #[serde(deserialize_with = "string_to_oid")]
+    #[serde(serialize_with = "oid_to_string")]
+    pub commit: Oid,
+    #[serde(default = "Vec::new")]
+    pub path: Vec<Idx>,
+    #[serde(default)]
+    pub file: String,
+    #[serde(default)]
+    pub start: usize,
+    #[serde(default)]
+    pub end: usize,
+    #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>"))]
+    #[serde(serialize_with = "custom_ser")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default = "Vec::new")]
+    pub path_ids: Vec<IdN>, // WARN this is not fetched::NodeIdentifier
+}
+
+pub(crate) fn oid_to_string<S: serde::Serializer>(
+    x: &Oid,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.collect_str(x)
+}
+
+pub(crate) fn string_to_oid<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Oid, D::Error> {
+    let s = <&str as serde::Deserialize>::deserialize(deserializer)?;
+    Oid::from_str(s).map_err(|e| serde::de::Error::custom(e))
+}
+
+fn custom_ser<IdN: Clone + Into<self::IdN>, S>(
+    x: &Vec<IdN>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeSeq;
+    let mut seq = serializer.serialize_seq(Some(x.len()))?;
+    for element in x {
+        let element: self::IdN = element.clone().into();
+        let id: u64 = unsafe { std::mem::transmute(element) };
+        if id > u32::MAX as u64 {
+            log::error!("node ids are too big, it will lead to bugs when used")
+        }
+        seq.serialize_element(&id)?;
+    }
+    seq.end()
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct LocalPieceOfCode<IdN, Idx> {
+    pub file: String,
+    pub start: usize,
+    pub end: usize,
+    pub path: Vec<Idx>,
+    pub path_ids: Vec<IdN>,
+}
+
+impl<'a, S, IdN: Clone, Idx: Clone> From<(&S, &'a LocalPieceOfCode<IdN, Idx>)>
+    for LocalPieceOfCode<IdN, Idx>
+{
+    fn from((_, p): (&S, &'a LocalPieceOfCode<IdN, Idx>)) -> Self {
+        p.clone()
+    }
+}
+
+impl<Idx> LocalPieceOfCode<IdN, Idx> {
+    pub(crate) fn from_root_and_offsets<TS: TypeStore>(
+        stores: &SimpleStores<TS>,
+        root: IdN,
+        path: Vec<impl PrimInt>,
+    ) -> Self
+    where
+        Idx: PrimInt,
+    {
+        use hyperast::position::compute_position_and_nodes;
+        let (pos, path_ids) = compute_position_and_nodes(root, &mut path.iter().copied(), stores);
+        let offsets = path.into_iter().map(|x| x.cast()).collect();
+        Self::from_position(&pos, offsets, path_ids)
+    }
+}
+impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
+    pub(crate) fn from_position(
+        pos: &hyperast::position::Position,
+        path: Vec<Idx>,
+        path_ids: Vec<IdN>,
+    ) -> Self {
+        let range = pos.range();
+        let file = pos.file();
+        Self::from_file_and_range(file, range, path, path_ids)
+    }
+    pub(crate) fn from_file_and_range(
+        file: &std::path::Path,
+        range: std::ops::Range<usize>,
+        path: Vec<Idx>,
+        path_ids: Vec<IdN>,
+    ) -> Self {
+        let std::ops::Range { start, end } = range;
+        let file = file.to_str().unwrap().to_string();
+        Self {
+            file,
+            start,
+            end,
+            path,
+            path_ids,
+        }
+    }
+    pub(crate) fn from_pos<P>(pos: &P) -> Self
+    where
+        P: position_accessors::WithOffsets<Idx = Idx>
+            + position_accessors::WithPreOrderPath<IdN>
+            + position_accessors::FileAndOffsetPostionT<IdN, IdO = usize>,
+    {
+        let mut path = vec![];
+        let mut path_ids = vec![];
+        for (o, i) in pos.iter_offsets_and_nodes() {
+            path.push(o);
+            path_ids.push(i);
+        }
+        Self::from_file_and_range(&pos.file(), pos.start()..pos.end(), path, path_ids)
+    }
+    pub(crate) fn globalize(self, spec: &Repo, commit: Oid) -> PieceOfCode<IdN, Idx> {
+        PieceOfCode {
+            user: spec.user().to_string(),
+            name: spec.name().to_string(),
+            commit: commit,
+            path: self.path,
+            path_ids: self.path_ids,
+            file: self.file,
+            start: self.start,
+            end: self.end,
+        }
+    }
+    fn map_path<Idx2, F: Fn(Idx) -> Idx2>(self, f: F) -> LocalPieceOfCode<IdN, Idx2> {
+        let path = self.path.into_iter().map(f).collect();
+        LocalPieceOfCode {
+            path,
+            path_ids: self.path_ids,
+            file: self.file,
+            start: self.start,
+            end: self.end,
+        }
+    }
+}
+
+pub(crate) fn remap<HAST: HyperAST, NoS, IdD>(
+    stores: &HAST,
+    x: &impl position_accessors::WithPreOrderOffsets,
+    arena: &mut hyper_diff::matchers::Decompressible<
+        NoS,
+        &mut lazy_post_order::LazyPostOrder<HAST::IdN, IdD>,
+    >,
+    tr: HAST::IdN,
+) -> IdD
+where
+    for<'t> types::LendT<'t, HAST>: types::WithSerialization,
+    IdD: PrimInt + Shallow<IdD>,
+    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    NoS: HyperAST<IdN = HAST::IdN> + Copy,
+    for<'t> types::LendT<'t, NoS>: types::WithStats,
+{
+    let (_, _, path) =
+        hyperast::position::compute_position_with_no_spaces(tr, &mut x.iter_offsets(), stores);
+    let mut src = arena.root();
+    for i in 0..path.len() {
+        use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore;
+        let cs = arena.decompress_children(&src);
+        let Some(s) = cs.get(path[i].to_usize().unwrap()) else {
+            log::debug!("failed to remap at path {:?}.{:?}", &path[..i], &path[i..]);
+            return src;
+        };
+        src = *s;
+    }
+    src
+}

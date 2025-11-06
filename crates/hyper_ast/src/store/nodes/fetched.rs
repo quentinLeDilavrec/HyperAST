@@ -424,6 +424,19 @@ macro_rules! variant_store {
 
                     }
                 }
+                pub fn remove_if(&mut self, predicate: impl Fn(&$rev) -> bool) {
+                    let mut i = 0;
+                    while i < self.rev.len() {
+                        if predicate(&self.rev[i]) {
+                            self.rev.remove(i);
+                            $(
+                                self.$d.remove(i);
+                            )*
+                        } else {
+                            i += 1;
+                        }
+                    }
+                }
             }
             )*
         }
@@ -534,6 +547,11 @@ macro_rules! variant_store {
             }
         }
         impl RawVariant {
+            pub fn remove_if(&mut self, predicate: impl Fn(&$rev) -> bool) {
+                match self {$(
+                    RawVariant::$c{ entities, ..} => entities.remove_if(predicate),
+                )*}
+            }
             pub fn rev(&self) -> &Vec<$rev> {
                 match self {$(
                     RawVariant::$c{ entities: variants::$c{rev, ..}, ..} => &rev,
@@ -661,7 +679,9 @@ impl SimplePackedBuilder {
         HAST::Label: Into<LabelIdentifier> + Clone,
     {
         use crate::types::NodeStore;
-        let node = store.node_store().resolve(id);
+        let Some(node) = store.node_store().try_resolve(id) else {
+            return;
+        };
         let ty = store.resolve_type(id);
         let id = id.clone().into();
         let lang = ty.get_lang();
@@ -771,7 +791,8 @@ pub struct SimplePacked<S> {
     // label_ids: Vec<LabelIdentifier>,
     // labels: Vec<String>,
     storages_arch: Vec<Arch<S>>,
-    storages_variants: Vec<RawVariant>,
+    #[doc(hidden)]
+    pub storages_variants: Vec<RawVariant>,
 }
 
 impl<'a> crate::types::NLending<'a, NodeIdentifier> for NodeStore {
@@ -788,6 +809,9 @@ impl NodeStore {
     pub fn try_resolve<T>(&self, id: NodeIdentifier) -> Option<HashedNodeRef<'_, T>> {
         let (variant, offset) = self.index.get(&id)?;
         Some(self.variants[*variant as usize].get(*offset))
+    }
+    pub fn contains(&self, id: NodeIdentifier) -> bool {
+        self.index.get(&id).is_some()
     }
     pub fn unavailable_node<T>(&self) -> HashedNodeRef<'_, T> {
         HashedNodeRef {
@@ -828,7 +852,7 @@ impl NodeStore {
 
     pub fn extend(&mut self, raw: SimplePacked<String>) {
         for (arch, entities) in raw.storages_arch.into_iter().zip(raw.storages_variants) {
-            self._extend_from_raw(arch, entities).unwrap();
+            if let Ok(_) = self._extend_from_raw(arch, entities) {}
         }
     }
 
@@ -856,8 +880,9 @@ impl NodeStore {
                 }
                 for ent in entities.rev() {
                     if self.index.try_insert(*ent, (vid, offset)).is_err() {
-                        unimplemented!();
-                        // return Err(entities);
+                        // unimplemented!();
+                        log::error!("redundant nodes: {}", revs.len());
+                        return Err(entities);
                     };
                     offset += 1;
                 }

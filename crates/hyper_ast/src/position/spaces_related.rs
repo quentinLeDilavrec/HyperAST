@@ -164,8 +164,7 @@ where
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT:
-        WithSerialization + WithChildren<ChildIdx = It::Item>,
+    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
 {
     let (pos, mut path_ids, no_spaces) =
         compute_position_and_nodes_with_no_spaces(root, offsets, stores);
@@ -181,8 +180,7 @@ where
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT:
-        WithSerialization + WithChildren<ChildIdx = It::Item>,
+    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
     It: Iterator,
     It::Item: Clone + PrimInt,
 {
@@ -192,6 +190,7 @@ where
     let mut no_spaces = vec![];
     let mut path = vec![];
     for o in &mut *offsets {
+        let o = o.cast();
         // dbg!(offset);
         let b = stores.node_store().resolve(&x);
         // dbg!(o.to_usize().unwrap());
@@ -224,7 +223,7 @@ where
             // }
             if let Some(a) = cs.get(o) {
                 x = a.clone();
-                no_spaces.push(no_s_idx);
+                no_spaces.push(no_s_idx.cast());
                 path_ids.push(x.clone());
             } else {
                 dbg!();

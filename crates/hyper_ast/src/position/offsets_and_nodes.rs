@@ -151,6 +151,12 @@ impl<IdN: Copy, Idx: PrimInt> super::position_accessors::RootedPosition<IdN>
     }
 }
 
+impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
+    pub fn iter_nodes(&self) -> impl Iterator<Item = IdN> {
+        self.parents.iter().rev().skip(1).rev().cloned()
+    }
+}
+
 impl<IdN: Copy, Idx: PrimInt> super::position_accessors::WithFullPostOrderPath<IdN>
     for StructuralPosition<IdN, Idx>
 {

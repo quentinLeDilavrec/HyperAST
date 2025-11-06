@@ -1421,10 +1421,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     .show(ui, |ui| {
                         show_project_selection(ui, &mut self.data);
 
-                        let data = &mut self.data;
-                        ui.center("project_top_left_actions", |ui| {
-                            show_projects_actions(ui, data)
-                        })
+                        ui.center("project_top_left_actions", |ui| self.data.show_actions(ui))
                     });
                 Default::default()
             }
@@ -2141,22 +2138,29 @@ fn poll_md_with_pr2(
     md
 }
 
-pub(crate) fn show_projects_actions(ui: &mut egui::Ui, data: &mut AppData) {
-    let multi = data.selected_code_data.len() > 1;
-
-    let button = egui::Button::new("Update the current set of Repositories");
-    if ui.add_enabled(false, button).clicked() {}
-    let button = egui::Button::new("Show Commit Graph");
-    if ui.add_enabled(true, button).clicked() {}
-    let button = egui::Button::new("Find code patterns from examples");
-    if ui.add_enabled(true, button).clicked() {}
-    let button = egui::Button::new(if multi {
-        "Query Repositories with tree-sitter-query"
-    } else {
-        "Query Repository with tree-sitter-query"
-    });
-    if ui.add_enabled(true, button).clicked() {}
-}
+const ACTIONS: &[fn(&mut AppData, &mut egui::Ui) -> egui::Response] = &[
+    |data, ui| {
+        let button = egui::Button::new("Update the current set of Repositories");
+        ui.add_enabled(false, button)
+    },
+    |data, ui| {
+        let button = egui::Button::new("Show Commit Graph");
+        ui.add_enabled(false, button)
+    },
+    |data, ui| {
+        let button = egui::Button::new("Find code patterns from examples");
+        ui.add_enabled(false, button)
+    },
+    |data, ui| {
+        let multi = data.selected_code_data.len() > 1;
+        let button = egui::Button::new(if multi {
+            "Query Repositories with tree-sitter-query"
+        } else {
+            "Query Repository with tree-sitter-query"
+        });
+        ui.add_enabled(true, button)
+    },
+];
 
 pub(crate) fn show_project_selection(ui: &mut egui::Ui, data: &mut AppData) {
     let mut rm = None;

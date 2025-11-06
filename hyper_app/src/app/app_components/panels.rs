@@ -5,7 +5,6 @@ use re_ui::{DesignTokens, UiExt};
 
 use crate::app::{
     querying::{self, ComputeConfigQuery},
-    show_projects_actions,
     types::{self, Commit, Config, QueriedLang},
 };
 
@@ -38,7 +37,7 @@ impl crate::HyperApp {
                 .default_open(false)
                 .show(ui, |ui| {
                     if let super::Tab::ProjectSelection() = self.tabs[pane] {
-                        show_projects_actions(ui, &mut self.data);
+                        self.data.show_actions(ui);
                         ui.indent("proj_list", |ui| {
                             let mut span = ui.full_span();
                             span.min += 10.0;
@@ -470,7 +469,14 @@ impl crate::HyperApp {
                 inner_margin: egui::Margin::symmetric(re_ui::DesignTokens::view_padding(), 0),
                 ..Default::default()
             })
-            .show_inside(ui, |ui| self.show_actions(ui));
+            .show_inside(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.strong("Actions");
+                    ui.horizontal_wrapped(|ui| {
+                        self.data.show_actions(ui);
+                    });
+                })
+            });
 
         // list_item::list_item_scope(ui, "testing stuff", |ui| {
         //     ui.list_item().show_hierarchical(

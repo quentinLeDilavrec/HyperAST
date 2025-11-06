@@ -5,28 +5,30 @@ use utils_egui::MyUiExt as _;
 mod bars;
 mod panels;
 
-impl super::HyperApp {
-    pub(crate) fn show_actions(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.strong("Actions");
-            // TODO show list of groups of actions, ok to type erase, just mut borrow AppData and an ui
-            trait AppActions {
-                fn ui(self, data: &mut AppData, ui: &mut egui::Ui) -> egui::Response;
-            }
+// TODO show list of groups of actions, ok to type erase, just mut borrow AppData and an ui
+trait AppActions {
+    fn ui(self, data: &mut AppData, ui: &mut egui::Ui) -> egui::Response;
+}
 
-            impl<F> AppActions for F
-            where
-                F: FnOnce(&mut AppData, &mut egui::Ui) -> egui::Response,
-            {
-                fn ui(self, data: &mut AppData, ui: &mut egui::Ui) -> egui::Response {
-                    self(data, ui)
-                }
-            }
-
-            ui.horizontal_wrapped(|ui| show_projects_actions(ui, &mut self.data))
-        });
+impl<F> AppActions for F
+where
+    F: FnOnce(&mut AppData, &mut egui::Ui) -> egui::Response,
+{
+    fn ui(self, data: &mut AppData, ui: &mut egui::Ui) -> egui::Response {
+        self(data, ui)
     }
+}
 
+impl super::AppData {
+    pub(crate) fn show_actions(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        ACTIONS.into_iter().fold(
+            ui.interact(egui::Rect::NOTHING, ui.next_auto_id(), egui::Sense::empty()),
+            |acc, f| acc.union(f.ui(self, ui)),
+        )
+    }
+}
+
+impl super::HyperApp {
     pub(crate) fn left_panel_mid_section_ui(&mut self, ui: &mut egui::Ui) {
         re_ui_collapse::SectionCollapsingHeader::new("Config").show(ui, |ui| {
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);

@@ -179,6 +179,7 @@ pub(crate) struct StreamedDataTable<H, R> {
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub(crate) struct Rows<R>(
+    /// hash of content
     pub(crate) u64,
     pub(crate) Vec<R>,
     #[serde(skip)]

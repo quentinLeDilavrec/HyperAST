@@ -379,7 +379,8 @@ impl ResultsPerCommit {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct QueryResults {
     project: ProjectId,
     query: QueryId,
@@ -412,7 +413,7 @@ pub(crate) struct AppData {
 
     code_views: Vec<CodeView>,
     queries: QueryDataVec,
-    queries_results: Vec<QueryResults>,
+    queries_results: QueryResultsVec,
     queries_differential_results: Option<QueriesDifferentialResults>,
     // #[serde(skip)]
     // results_per_commit: ResultsPerCommit,
@@ -564,7 +565,7 @@ impl Default for AppData {
                 ..Default::default()
             }]
             .into(),
-            queries_results: vec![],
+            queries_results: Default::default(),
             queries_differential_results: None,
             compute_single_result: Default::default(),
             querying_result: Default::default(),
@@ -594,7 +595,7 @@ type LocalQueryId = QueryId;
 type DiffId = usize;
 type RemCodeId = usize;
 type RemTreeId = usize;
-type QResId = u16;
+utils::typed_vec!(QueryResultsVec, QueryResults, QResId(u16));
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug)]
 enum Tab {
@@ -641,7 +642,7 @@ impl Tab {
             Tab::Diff(_) => "Diff".into(),
             Tab::CodeTree(_) => "Remote Tree".into(),
             Tab::CodeFile(_) => "Remote Code".into(),
-            Tab::QueryResults { id, .. } => format!("Query Results {id}").into(),
+            Tab::QueryResults { id, .. } => format!("Query Results {id:?}").into(),
             Tab::ProjectSelection() => "Projects Selection".into(),
             Tab::Commits => "Commits".into(),
             Tab::MarkdownStatic(_) => "Markdown View".into(),
@@ -1115,9 +1116,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     query: _,
                     content: res,
                     tab: _,
-                }) = self.data.queries_results.get_mut(*id as usize)
+                }) = self.data.queries_results.get_mut(*id)
                 else {
-                    ui.error_label(&format!("{} is not in the list of queries", id));
+                    ui.error_label(&format!("{:?} is not in the list of queries", id));
                     return Default::default();
                 };
                 let Some(res) = res.get_mut() else {
@@ -1626,10 +1627,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         });
 
         if let Tab::QueryResults { id, .. } = space_view {
-            let Some(QueryResults { content: res, .. }) =
-                self.data.queries_results.get_mut(*id as usize)
+            let Some(QueryResults { content: res, .. }) = self.data.queries_results.get_mut(*id)
             else {
-                ui.error_label(&format!("{} is not in the list of queries", id));
+                ui.error_label(&format!("{:?} is not in the list of queries", id));
                 return Default::default();
             };
             if let Some(Ok(res)) = res.get() {
@@ -1926,7 +1926,7 @@ fn compute_queries_differential_results(
     selected_baseline: &String,
     selected_commit: &(ProjectId, String),
 ) -> Option<egui_tiles::UiResponse> {
-    let pid: ProjectId = selected_commit.0;
+    let pid = selected_commit.0;
     if pid != proj_id {
         return Some(Default::default());
     }

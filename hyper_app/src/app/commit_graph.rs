@@ -107,15 +107,14 @@ impl crate::HyperApp {
             let r = r.clone();
 
             let results_per_commit: Option<&super::ResultsPerCommit> = {
-                if let Some(r) = self
-                    .data
-                    .queries_results
+                if let Some(r) = (self.data.queries_results)
                     .iter()
                     .find(|x| x.project == repo_id)
                 {
                     let qid = r.query;
                     if let Some(Ok(r)) = r.content.get() {
-                        let key = { (repo_id, qid, r.rows.lock().unwrap().0) };
+                        let content_hash = r.rows.lock().unwrap().0;
+                        let key = (repo_id, qid, content_hash);
                         Some(res_per_commit.get2(key, r))
                     } else {
                         None
@@ -420,7 +419,8 @@ impl crate::HyperApp {
             {
                 let qid = r.query;
                 if let Some(Ok(r)) = r.content.get() {
-                    let key = { (repo_id, qid, r.rows.lock().unwrap().0) };
+                    let content_hash = r.rows.lock().unwrap().0;
+                    let key = (repo_id, qid, content_hash);
                     res_per_commit.remove(key);
                 }
             }

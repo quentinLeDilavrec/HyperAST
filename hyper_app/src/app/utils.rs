@@ -230,6 +230,10 @@ macro_rules! typed_vec {
                 self.0.get_mut(idx)
             }
 
+            $vis fn iter(&self) -> impl Iterator<Item = &$item> {
+                self.0.iter()
+            }
+
             $vis fn enumerate(&self) -> impl Iterator<Item = ($id, &$item)> {
                 self.0.iter().enumerate().map(|(i, v)| ($id(i as $ty), v))
             }

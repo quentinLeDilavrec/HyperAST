@@ -4,6 +4,7 @@ use egui::Widget;
 use re_ui::{DesignTokens, UiExt};
 
 use crate::app::{
+    QResId,
     querying::{self, ComputeConfigQuery},
     types::{self, Commit, Config, QueriedLang},
 };
@@ -134,21 +135,20 @@ impl crate::HyperApp {
                 match (l.next(), it.next()) {
                     (None, None) => break,
                     (Some((rid, c)), None) => {
-                        let qrid: u16 = self.data.queries_results.len().try_into().unwrap();
-                        r.push(qrid);
-                        self.data.queries_results.push(super::QueryResults {
+                        let qrid = self.data.queries_results.push(super::QueryResults {
                             project: rid,
                             query: qid,
                             content: Default::default(),
                             tab: TabId::INVALID,
                         });
+                        r.push(qrid);
                     }
                     (None, Some(&_id)) => {
                         // nothing to do ProjectIds are valid for the duration of the session
                         // self.data.queries_results[id as usize].0 = u16::MAX;
                     }
                     (Some((i, _)), Some(&id)) => {
-                        self.data.queries_results[id as usize].project = i;
+                        self.data.queries_results[id].project = i;
                         r.push(id);
                     }
                 }
@@ -158,11 +158,11 @@ impl crate::HyperApp {
         let query_data = &self.data.queries[qid];
         let q_res_ids = &query_data.results;
         ui.style_mut().spacing.item_spacing = egui::vec2(3.0, 2.0);
-        for q_res_id in q_res_ids {
-            if *q_res_id == u16::MAX {
+        for &q_res_id in q_res_ids {
+            if q_res_id == QResId::INVALID {
                 continue;
             }
-            let q_res = &mut self.data.queries_results[*q_res_id as usize];
+            let q_res = &mut self.data.queries_results[q_res_id];
             let Some((repo, mut c)) = self.data.selected_code_data.get_mut(q_res.project) else {
                 continue;
             };
@@ -174,10 +174,10 @@ impl crate::HyperApp {
                 tabs: &mut crate::app::Tabs,
                 tree: &mut egui_tiles::Tree<crate::app::TabId>,
                 q_res: &mut super::QueryResults,
-                q_res_id: &u16,
+                q_res_id: QResId,
             ) {
                 let tid = tabs.push(crate::app::Tab::QueryResults {
-                    id: *q_res_id,
+                    id: q_res_id,
                     format: super::ResultFormat::Table,
                 });
                 q_res.tab = tid;
@@ -195,7 +195,7 @@ impl crate::HyperApp {
                     w.active.weak_bg_fill = d;
                     w.hovered.weak_bg_fill = n;
                     w.inactive.weak_bg_fill = d;
-                    let q_res = &mut self.data.queries_results[*q_res_id as usize];
+                    let q_res = &mut self.data.queries_results[q_res_id];
                     let compute_button;
                     if let Some(content) = q_res.content.get() {
                         match content {
@@ -299,7 +299,7 @@ impl crate::HyperApp {
                             }
                         }
                     } else {
-                        let q_res = &mut self.data.queries_results[*q_res_id as usize];
+                        let q_res = &mut self.data.queries_results[q_res_id];
                         let synced = Self::sync_query_results(q_res);
                         if let Err(Some(err)) = &synced {
                             let d = egui::Color32::DARK_RED;
@@ -359,7 +359,7 @@ impl crate::HyperApp {
                     compute_button
                 })
                 .inner;
-            let q_res = &mut self.data.queries_results[*q_res_id as usize];
+            let q_res = &mut self.data.queries_results[q_res_id];
 
             if compute_button.clicked() {
                 let (repo, mut commit_slice) =

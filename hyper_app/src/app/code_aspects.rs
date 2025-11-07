@@ -16,47 +16,40 @@ pub(crate) const WANTED: SelectedConfig = SelectedConfig::Aspects;
 pub(crate) fn show_config(
     ui: &mut egui::Ui,
     aspects: &mut ComputeConfigAspectViews,
-    aspects_result: &mut Option<FetchedViewProm>,
-    api_addr: &str,
-    store: Arc<FetchedHyperAST>,
-) {
-    super::show_repo_menu(ui, &mut aspects.commit.repo);
-    ui.push_id(ui.id().with("commit"), |ui| {
-        egui::TextEdit::singleline(&mut aspects.commit.id)
-            .clip_text(true)
-            .desired_width(150.0)
-            .desired_rows(1)
-            .hint_text("commit")
-            .interactive(true)
-            .show(ui)
-    });
-    ui.push_id(ui.id().with("path"), |ui| {
-        if egui::TextEdit::singleline(&mut aspects.path)
-            .clip_text(true)
-            .desired_width(150.0)
-            .desired_rows(1)
-            .hint_text("path")
-            .interactive(true)
-            .show(ui)
-            .response
-            .changed()
-        {
-            *aspects_result = Some(remote_fetch_node_old(
-                ui.ctx(),
-                api_addr,
-                store.clone(),
-                &aspects.commit,
-                &aspects.path,
-            ));
-        }
-        egui::TextEdit::singleline(&mut aspects.hightlight)
-            .clip_text(true)
-            .desired_width(150.0)
-            .desired_rows(1)
-            .hint_text("hightlight")
-            .interactive(true)
-            .show(ui)
-    });
+) -> (egui::Response, egui::Response, egui::Response) {
+    let (resp_repo, resp_commit) = ui
+        .horizontal_wrapped(|ui| {
+            (
+                ui.button(&aspects.commit.repo.user)
+                    | ui.label("/")
+                    | ui.button(&aspects.commit.repo.name)
+                    | ui.label("/"),
+                ui.button(&aspects.commit.id),
+            )
+        })
+        .inner;
+    let resp_repo = resp_repo.interact(egui::Sense::click());
+    let resp_commit = resp_commit.interact(egui::Sense::click());
+
+    let resp_path = egui::TextEdit::singleline(&mut aspects.path)
+        .id(ui.id().with("path"))
+        .clip_text(true)
+        .desired_width(150.0)
+        .desired_rows(1)
+        .hint_text("path")
+        .interactive(true)
+        .show(ui)
+        .response;
+
+    egui::TextEdit::singleline(&mut aspects.hightlight)
+        .id(ui.id().with("hightlight"))
+        .clip_text(true)
+        .desired_width(150.0)
+        .desired_rows(1)
+        .hint_text("hightlight")
+        .interactive(true)
+        .show(ui);
+
     ui.checkbox(&mut aspects.spacing, "Spacing");
     ui.checkbox(&mut aspects.syntax, "Syntax");
     ui.checkbox(&mut aspects.cst, "CST");
@@ -114,6 +107,7 @@ pub(crate) fn show_config(
     if let Some(rm) = rm {
         aspects.hide_opt_cpp.remove(&rm);
     }
+    (resp_repo, resp_commit, resp_path)
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]

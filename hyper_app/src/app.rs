@@ -86,7 +86,7 @@ pub struct HyperApp {
 
     #[serde(skip)]
     /// modal for project selection
-    modal_handler_projects: re_ui::modal::ModalHandler,
+    modal_handler_proj_or_commits: ProjectsOrCommitsModal,
 
     show_left_panel: bool,
     show_right_panel: bool,
@@ -106,6 +106,68 @@ pub struct HyperApp {
 
     selected_commit: Option<(ProjectId, String)>,
     selected_baseline: Option<String>,
+}
+
+#[derive(Default)]
+struct ProjectsOrCommitsModal {
+    modal_project: re_ui::modal::ModalHandler,
+    modal_commits: re_ui::modal::ModalHandler,
+    chosen_project: Option<ProjectId>,
+}
+
+impl ProjectsOrCommitsModal {
+    pub fn open_projects(&mut self) {
+        self.chosen_project = None;
+        self.modal_project.open();
+    }
+
+    pub fn open_commits(&mut self, project_id: ProjectId) {
+        self.chosen_project = Some(project_id);
+        self.modal_commits.open();
+    }
+    pub fn aux<R>(ui: &mut egui::Ui, txt: &str, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
+        let inner_margin = egui::Margin::same(re_ui::DesignTokens::view_padding());
+        let frame = egui::Frame {
+            inner_margin,
+            ..Default::default()
+        };
+        let stick_to_bottom = egui::ScrollArea::both()
+            .auto_shrink([false; 2])
+            .stick_to_bottom(true);
+        stick_to_bottom
+            .id_salt(txt)
+            .show(ui, |ui| frame.show(ui, f).inner)
+            .inner
+    }
+
+    pub fn ui(&mut self, ctx: &egui::Context, data: &mut AppData) {
+        self.modal_commits.ui(
+            ctx,
+            || re_ui::modal::ModalWrapper::new("Commit Selection"),
+            |ui, _close| {
+                let Some(project_id) = self.chosen_project else {
+                    return;
+                };
+                let cid = Self::aux(ui, "modal commits", |ui| {
+                    data.show_commits_selection(ui, project_id)
+                });
+                if let Some(cid) = cid {
+                    *_close = false;
+                    data.aspects.commit.id = cid;
+                }
+            },
+        );
+        self.modal_project.ui(
+            ctx,
+            || re_ui::modal::ModalWrapper::new("Project Selection"),
+            |ui, _close| {
+                if self.chosen_project.is_some() {
+                    return;
+                }
+                Self::aux(ui, "modal projects", |ui| show_project_selection(ui, data))
+            },
+        );
+    }
 }
 
 #[derive(Deserialize, Serialize, Default, strum_macros::AsRefStr, PartialEq, Eq)]
@@ -720,7 +782,7 @@ impl Default for HyperApp {
             cmd_palette: CommandPalette::default(),
             modal_handler: Default::default(),
             full_span_modal_handler: Default::default(),
-            modal_handler_projects: Default::default(),
+            modal_handler_proj_or_commits: Default::default(),
             show_left_panel: true,
             show_right_panel: true,
             show_bottom_panel: true,
@@ -1983,22 +2045,53 @@ fn compute_queries_differential_results(
     None
 }
 
-impl<'a> MyTileTreeBehavior<'a> {
+impl MyTileTreeBehavior<'_> {
     fn show_commits(&mut self, ui: &mut egui::Ui) {
         for i in self.data.selected_code_data.project_ids() {
-            let Some((r, mut c)) = self.data.selected_code_data.get_mut(i) else {
-                continue;
-            };
-            ui.label(format!("{}/{}", r.user, r.name));
+            self.data.show_commits(ui, i)
+        }
+    }
+}
+impl AppData {
+    fn show_commits(&mut self, ui: &mut egui::Ui, i: ProjectId) {
+        self._show_commits_selection::<false>(ui, i);
+    }
+    fn show_commits_selection(
+        &mut self,
+        ui: &mut egui::Ui,
+        i: ProjectId,
+    ) -> Option<types::CommitId> {
+        self._show_commits_selection::<true>(ui, i)
+    }
+    #[inline(always)]
+    fn _show_commits_selection<const BUTTON: bool>(
+        &mut self,
+        ui: &mut egui::Ui,
+        i: ProjectId,
+    ) -> Option<types::CommitId> {
+        let Some((r, mut c)) = self.selected_code_data.get_mut(i) else {
+            return None;
+        };
+        let mut clicked = None;
+        ui.label(format!("{}/{}", r.user, r.name));
 
+        let api_addr = &self.api_addr;
+        let commit_md = &mut self.fetched_commit_metadata;
+        commit_md.try_poll_all_waiting(|v| v.map(|x| x.0));
+        for commit_oid in c.iter_mut() {
             let mut to_fetch = HashSet::default();
-            let api_addr = &self.data.api_addr;
-            let commit_md = &self.data.fetched_commit_metadata;
-            for commit_oid in c.iter_mut() {
-                show_commits_as_tree(ui, r, commit_oid, commit_md, &mut to_fetch, 0);
-            }
+            let commit_md = &self.fetched_commit_metadata;
+            show_commits_as_tree::<true>(
+                ui,
+                r,
+                commit_oid,
+                commit_md,
+                &mut to_fetch,
+                0,
+                &mut clicked,
+            );
 
-            let commit_md = &mut self.data.fetched_commit_metadata;
+            let commit_md = &mut self.fetched_commit_metadata;
             for id in to_fetch {
                 let repo = r.clone();
                 let commit = Commit { repo, id };
@@ -2006,28 +2099,36 @@ impl<'a> MyTileTreeBehavior<'a> {
                 commit_md.insert(commit.id, v);
             }
         }
+        clicked
     }
 }
 
-fn show_commits_as_tree(
+fn show_commits_as_tree<const BUTTON: bool>(
     ui: &mut egui::Ui,
     repo: &Repo,
     id: &types::CommitId,
     commit_md: &CommitMdStore,
     to_fetch: &mut HashSet<String>,
     d: usize,
+    clicked: &mut Option<types::CommitId>,
 ) {
-    let limit = 20;
+    let limit = 100;
+    if d >= limit {
+        return;
+    }
     let Some(res) = commit_md.get(id) else {
+        let waiting = commit_md.len_waiting();
         ui.horizontal(|ui| {
             ui.label("fetching");
             ui.add_space(2.0);
             ui.label(id);
             ui.add_space(2.0);
             ui.spinner();
-            ui.label(to_fetch.len().to_string());
+            ui.label(waiting.to_string());
         });
-        to_fetch.insert(id.to_string());
+        if waiting < 10 && commit_md.is_absent(id.as_str()) {
+            to_fetch.insert(id.to_string());
+        }
         return;
     };
     if let Err(err) = res {
@@ -2035,19 +2136,24 @@ fn show_commits_as_tree(
         return;
     }
     let Ok(md) = res else { unreachable!() };
-    ui.label(format!("{}: {} {:?}", &id[..6], md.time, md.parents));
-    if d >= limit {
-        return;
+    let text = format!("{}: {} {:?}", &id[..6], md.time, md.parents);
+    if BUTTON {
+        if ui.button(text).clicked() {
+            *clicked = Some(id.to_string());
+        }
+    } else {
+        ui.label(text);
     }
     for id in &md.parents {
-        show_commits_as_tree(ui, repo, id, commit_md, to_fetch, d + 1);
+        show_commits_as_tree::<BUTTON>(ui, repo, id, commit_md, to_fetch, d + 1, clicked);
     }
+    let waiting = commit_md.len_waiting();
     for (i, a) in md.ancestors.iter().enumerate() {
         let i = i + 2;
         if d + i * i >= limit {
             break;
         }
-        if commit_md.is_absent(a.as_str()) {
+        if waiting < 10 && commit_md.is_absent(a.as_str()) {
             to_fetch.insert(a.to_string());
         }
     }
@@ -2435,5 +2541,7 @@ impl eframe::App for HyperApp {
                 }
             }
         }
+
+        self.modal_handler_proj_or_commits.ui(ctx, &mut self.data);
     }
 }

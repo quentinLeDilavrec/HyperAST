@@ -326,6 +326,10 @@ impl Default for SelectedProjects {
             &["56e12a0c0e0e69ea70863011b4f4ca3305e0542b"],
         );
         s.add_with_commit_slice(
+            ["official-stockfish", "Stockfish"].into(),
+            &["7f2eb10e93879bc569c7ddf6fb51d6f812cc477c"],
+        );
+        s.add_with_commit_slice(
             ["tree-sitter", "tree-sitter"].into(),
             &["800f2c41d0e35e4383172d7a67a16f3933b86039"],
         );
@@ -502,6 +506,13 @@ impl SelectedProjects {
 
     pub(crate) fn repositories(&mut self) -> impl Iterator<Item = &mut Repo> {
         self.repositories.iter_mut()
+    }
+
+    pub(crate) fn find(&mut self, repo: &Repo) -> Option<ProjectId> {
+        self.repositories
+            .iter()
+            .position(|r| r == repo)
+            .map(ProjectId)
     }
 }
 

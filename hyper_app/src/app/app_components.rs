@@ -147,7 +147,7 @@ impl super::HyperApp {
                 );
                 let resp = ui.add_enabled(true, button);
                 if resp.clicked() {
-                    self.modal_handler_projects.open();
+                    self.modal_handler_proj_or_commits.open_projects();
                 }
                 resp
             })
@@ -284,16 +284,6 @@ impl super::HyperApp {
                 }
             }
         }
-
-        self.modal_handler_projects.ui(
-            ui.ctx(),
-            || re_ui::modal::ModalWrapper::new("Project Selection"),
-            |ui, _| {
-                ui.push_id(ui.id().with("modal projects"), |ui| {
-                    show_project_selection(ui, &mut self.data)
-                })
-            },
-        );
     }
 
     fn show_repo_item(
@@ -583,13 +573,7 @@ impl super::HyperApp {
                         });
                         ui.separator();
                         show_menu(ui, selected, &code_aspects::WANTED, |ui| {
-                            code_aspects::show_config(
-                                ui,
-                                aspects,
-                                aspects_result,
-                                &api_addr,
-                                store.clone(),
-                            )
+                            code_aspects::show_config(ui, aspects)
                         });
                     });
 

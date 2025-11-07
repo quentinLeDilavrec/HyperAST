@@ -49,13 +49,27 @@ impl crate::HyperApp {
                     } else if let super::Tab::LocalQuery(id) = self.tabs[pane] {
                         self.show_local_query_left_panel(ui, id);
                     } else if let super::Tab::TreeAspect = self.tabs[pane] {
-                        crate::app::code_aspects::show_config(
-                            ui,
-                            &mut self.data.aspects,
-                            &mut self.data.aspects_result,
-                            &self.data.api_addr,
-                            self.data.store.clone(),
-                        );
+                        let (proj_resp, commit_resp, path_resp) =
+                            crate::app::code_aspects::show_config(ui, &mut self.data.aspects);
+                        if proj_resp.clicked() {
+                            self.modal_handler_proj_or_commits.open_projects();
+                        }
+                        if commit_resp.clicked() {
+                            let repo = &self.data.aspects.commit.repo;
+                            if let Some(proj) = self.data.selected_code_data.find(repo) {
+                                self.modal_handler_proj_or_commits.open_commits(proj);
+                            }
+                        }
+                        if path_resp.changed() {
+                            use crate::app::code_aspects::remote_fetch_node_old as fetch;
+                            self.data.aspects_result = Some(fetch(
+                                ui.ctx(),
+                                &self.data.api_addr,
+                                self.data.store.clone(),
+                                &self.data.aspects.commit,
+                                &self.data.aspects.path,
+                            ));
+                        }
                     } else if let super::Tab::TSG = self.tabs[pane] {
                         crate::app::tsg::show_config(ui, &mut self.data.tsg);
                     } else if let super::Tab::Smells = self.tabs[pane] {

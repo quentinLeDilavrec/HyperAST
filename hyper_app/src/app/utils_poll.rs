@@ -415,6 +415,10 @@ impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
         self.waiting.contains_key(k)
     }
 
+    pub fn len_waiting(&self) -> usize {
+        self.waiting.len()
+    }
+
     pub fn insert(&mut self, key: K, waiting: Promise<V2>) {
         self.waiting.insert(key, waiting);
     }

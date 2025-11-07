@@ -18,7 +18,6 @@ use super::code_tracking::{
     FetchedFiles, RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
 };
 use super::commit::{CommitMetadata, fetch_commit0};
-use super::show_commit_menu;
 use super::tree_view::{Action, store::FetchedHyperAST};
 use super::types::{
     CodeRange, Commit, ComputeConfigAspectViews, FileIdentifier, Resource, SelectedConfig,
@@ -126,23 +125,13 @@ impl Flags {
 
 pub(crate) const WANTED: SelectedConfig = SelectedConfig::LongTracking;
 
-pub(crate) fn show_config(ui: &mut egui::Ui, tracking: &mut LongTacking) {
-    show_commit_menu(ui, &mut tracking.origins[0].file.commit);
-    // let repo_changed = show_repo_menu(ui, &mut tracking.origins[0].file.commit.repo);
-    // let old = tracking.origins[0].file.commit.id.clone();
-    // let commit_te = egui::TextEdit::singleline(&mut tracking.origins[0].file.commit.id)
-    //     .clip_text(true)
-    //     .desired_width(150.0)
-    //     .desired_rows(1)
-    //     .hint_text("commit")
-    //     .id(ui.id().with("commit"))
-    //     .interactive(true)
-    //     .show(ui);
-    // if repo_changed || commit_te.response.changed() {
-    //     // todo!()
-    // } else {
-    //     assert_eq!(old, tracking.origins[0].file.commit.id.clone());
-    // };
+pub(crate) fn show_config(
+    ui: &mut egui::Ui,
+    tracking: &mut LongTacking,
+) -> (egui::Response, egui::Response) {
+    let commit = &tracking.origins[0].file.commit;
+    let (resp_repo, resp_commit) = commit.show_clickable(ui);
+
     ui.checkbox(&mut tracking.tree_view, "tree view");
     ui.checkbox(&mut tracking.ser_view, "serialized view");
     ui.checkbox(&mut tracking.detatched_view, "detatched view");
@@ -155,6 +144,7 @@ pub(crate) fn show_config(ui: &mut egui::Ui, tracking: &mut LongTacking) {
         egui::RichText::from("Triggers").font(egui::FontId::proportional(16.0)),
     ));
     tracking.flags.ui(ui);
+    (resp_repo, resp_commit)
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]

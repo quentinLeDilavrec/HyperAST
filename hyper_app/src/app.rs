@@ -54,7 +54,6 @@ mod utils_egui;
 mod utils_poll;
 mod utils_results_batched;
 pub(crate) use app_components::show_repo_menu;
-pub(crate) use utils_commit::show_commit_menu;
 mod commit_graph;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.

@@ -17,19 +17,7 @@ pub(crate) fn show_config(
     ui: &mut egui::Ui,
     aspects: &mut ComputeConfigAspectViews,
 ) -> (egui::Response, egui::Response, egui::Response) {
-    let (resp_repo, resp_commit) = ui
-        .horizontal_wrapped(|ui| {
-            (
-                ui.button(&aspects.commit.repo.user)
-                    | ui.label("/")
-                    | ui.button(&aspects.commit.repo.name)
-                    | ui.label("/"),
-                ui.button(&aspects.commit.id),
-            )
-        })
-        .inner;
-    let resp_repo = resp_repo.interact(egui::Sense::click());
-    let resp_commit = resp_commit.interact(egui::Sense::click());
+    let (resp_repo, resp_commit) = aspects.commit.show_clickable(ui);
 
     let resp_path = egui::TextEdit::singleline(&mut aspects.path)
         .id(ui.id().with("path"))

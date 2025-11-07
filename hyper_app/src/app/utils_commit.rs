@@ -289,39 +289,16 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
     }
 }
 
-pub(crate) fn show_commit_menu(ui: &mut egui::Ui, commit: &mut Commit) -> bool {
-    let mut mutex_guard = COMMIT_STRS.lock().unwrap();
-    let mut c = CommitTextBuffer::new(commit, "github.com".to_string(), &mut mutex_guard);
-    let ml = code_editor::generic_text_edit::TextEdit::multiline(&mut c)
-        // .margin(egui::Vec2::new(0.0, 0.0))
-        // .desired_width(40.0)
-        .id(ui.id().with("commit entry"))
-        .show(ui);
-
-    ml.response.changed()
-}
-
-pub(crate) fn show_commit_menu2(ui: &mut egui::Ui, commit: &mut Commit) -> bool {
-    let c = ui.ctx().memory_mut(|mem| {
-        let a = mem
-            .caches
-            .cache::<BorrowFrameCache<String, ComputeCommitStr>>()
-            .get(("github.com", commit));
-    });
-    let c = ui.ctx().memory_mut(|mem| {
-        let aaa = AAA {};
-        let a = mem
-            .caches
-            .cache::<BorrowFrameCache<String, ComputeCommitStr2>>()
-            .get(("github.com", commit, &aaa));
-    });
-    let mut mutex_guard = COMMIT_STRS.lock().unwrap();
-    let mut c = CommitTextBuffer::new(commit, "github.com".to_string(), &mut mutex_guard);
-    let ml = code_editor::generic_text_edit::TextEdit::multiline(&mut c)
-        // .margin(egui::Vec2::new(0.0, 0.0))
-        // .desired_width(40.0)
-        .id(ui.id().with("commit entry"))
-        .show(ui);
-
-    ml.response.changed()
+impl Commit {
+    pub fn show_clickable(&self, ui: &mut egui::Ui) -> (egui::Response, egui::Response) {
+        let show_repo = |ui: &mut egui::Ui| {
+            ui.button(&self.repo.user) | ui.label("/") | ui.button(&self.repo.name) | ui.label("/")
+        };
+        let (resp_repo, resp_commit) = ui
+            .horizontal_wrapped(|ui| (show_repo(ui), ui.button(&self.id)))
+            .inner;
+        let resp_repo = resp_repo.interact(egui::Sense::click());
+        let resp_commit = resp_commit.interact(egui::Sense::click());
+        (resp_repo, resp_commit)
+    }
 }

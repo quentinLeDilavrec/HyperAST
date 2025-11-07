@@ -200,6 +200,23 @@ pub(crate) fn show(
         .show_viewport(ui, add_content);
 }
 
+pub(crate) fn project_modal_handler(
+    data: &mut super::AppData,
+    pid: super::ProjectId,
+) -> super::ProjectId {
+    let projects = &mut data.selected_code_data;
+    let commit = Some(&data.aspects.commit);
+    use super::utils_commit::project_modal_handler;
+    let (repo, mut commits) = match project_modal_handler(pid, projects, commit) {
+        Ok(value) => value,
+        Err(value) => return value,
+    };
+    data.aspects.commit.repo = repo.clone();
+    data.aspects.commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    data.aspects_result = None;
+    super::ProjectId::INVALID
+}
+
 impl ComputeConfigAspectViews {
     pub(crate) fn on_action(&mut self, action: Action) {
         use hyperast_gen_ts_cpp::types::Type as Cpp;

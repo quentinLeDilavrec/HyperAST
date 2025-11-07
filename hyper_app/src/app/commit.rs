@@ -338,6 +338,10 @@ impl Default for SelectedProjects {
             &["0fe81768278678db4f66a297178c04f23452c682"],
         );
         s.add_with_commit_slice(
+            ["Marcono1234", "gson"].into(),
+            &["3d241ca0a6435cbf1fa1cdaed2af8480b99fecde"],
+        );
+        s.add_with_commit_slice(
             ["tree-sitter", "tree-sitter-cpp"].into(),
             &["ab1065fa23a43a447bd7e619a3af90253867af24"],
         );

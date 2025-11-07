@@ -2120,6 +2120,7 @@ impl AppData {
                 let repo = r.clone();
                 let commit = Commit { repo, id };
                 let v = fetch_commit(ui.ctx(), api_addr, &commit);
+
                 commit_md.insert(commit.id, v);
             }
         }

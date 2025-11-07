@@ -88,7 +88,6 @@ pub(crate) fn show_long_result(
             _ => (),
         },
         Err(error) => {
-            wasm_rs_dbg::dbg!();
             // This should only happen if the fetch API isn't available or something similar.
             ui.colored_label(
                 ui.visuals().error_fg_color,

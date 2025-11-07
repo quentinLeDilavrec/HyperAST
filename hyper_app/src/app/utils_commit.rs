@@ -302,3 +302,26 @@ impl Commit {
         (resp_repo, resp_commit)
     }
 }
+pub(crate) fn project_modal_handler<'a>(
+    pid: super::ProjectId,
+    projects: &'a mut super::SelectedProjects,
+    commit: Option<&Commit>,
+) -> Result<(&'a mut super::Repo, super::CommitSlice<'a>), super::ProjectId> {
+    use super::ProjectId;
+    if pid == ProjectId::INVALID {
+        let Some(commit) = commit else {
+            return Err(pid);
+        };
+        return Err(projects.find(&commit.repo).unwrap_or(ProjectId::INVALID));
+    }
+    let Some((repo, mut commits)) = projects.get_mut(pid) else {
+        return Err(ProjectId::INVALID);
+    };
+    let Some(commit) = commit else {
+        return Err(pid);
+    };
+    if &commit.repo == repo {
+        return Err(pid);
+    }
+    Ok((repo, commits))
+}

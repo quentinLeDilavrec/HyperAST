@@ -147,6 +147,26 @@ pub(crate) fn show_config(
     (resp_repo, resp_commit)
 }
 
+pub(crate) fn project_modal_handler(
+    data: &mut super::AppData,
+    pid: super::ProjectId,
+) -> super::ProjectId {
+    let projects = &mut data.selected_code_data;
+    let commit = data.long_tracking.origins.get(0);
+    let commit = commit.map(|x| &x.file.commit);
+    use super::utils_commit::project_modal_handler;
+    let (repo, mut commits) = match project_modal_handler(pid, projects, commit) {
+        Ok(value) => value,
+        Err(value) => return value,
+    };
+    data.long_tracking = Default::default();
+    let code = data.long_tracking.origins.get_mut(0).unwrap();
+    let commit = &mut code.file.commit;
+    commit.repo = repo.clone();
+    commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    super::ProjectId::INVALID
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 pub struct State {
     pub(crate) offset: f32,

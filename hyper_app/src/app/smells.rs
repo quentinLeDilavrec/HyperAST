@@ -124,6 +124,27 @@ impl Default for ComputeConfigQuery {
     }
 }
 
+pub(crate) fn project_modal_handler(
+    data: &mut super::AppData,
+    pid: super::ProjectId,
+) -> super::ProjectId {
+    let projects = &mut data.selected_code_data;
+    let commit = data.smells.commits.as_ref().map(|x| &x.commit);
+    use crate::app::utils_commit::project_modal_handler;
+    let (repo, mut commits) = match project_modal_handler(pid, projects, commit) {
+        Ok(value) => value,
+        Err(value) => return value,
+    };
+    data.smells = Default::default();
+    data.smells.commits = Some(Default::default());
+    data.smells_result = None;
+    data.smells_diffs_result = None;
+    let commit = &mut data.smells.commits.as_mut().unwrap().commit;
+    commit.repo = repo.clone();
+    commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    super::ProjectId::INVALID
+}
+
 // pub(crate) type Config = Sharing<ComputeConfigQuery>;
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(crate) struct Config {
@@ -221,87 +242,63 @@ pub enum DiffsError {
 
 pub(crate) const WANTED: SelectedConfig = SelectedConfig::Smells;
 
-pub(crate) fn show_config(ui: &mut egui::Ui, smells: &mut Config) {
+pub(crate) fn show_config(
+    ui: &mut egui::Ui,
+    smells: &mut Config,
+) -> (egui::Response, egui::Response) {
     use super::utils_egui::MyUiExt;
-    match &mut smells.commits {
-        Some(conf) => {
-            ui.label("Source of inital Examples:");
-            show_repo_menu(ui, &mut conf.commit.repo);
-            ui.push_id(ui.id().with("commit"), |ui| {
-                egui::TextEdit::singleline(&mut conf.commit.id)
-                    .clip_text(true)
-                    .desired_width(150.0)
-                    .desired_rows(1)
-                    .hint_text("commit")
-                    .interactive(true)
-                    .show(ui)
-            });
+    let Some(conf) = &mut smells.commits else {
+        return (ui.label(""), ui.label(""));
+    };
+    ui.label("Source of inital Examples:");
+    let (resp_repo, resp_commit) = conf.commit.show_clickable(ui);
 
-            ui.add_enabled_ui(true, |ui| {
-                ui.add(
-                    egui::Slider::new(&mut conf.len, 1..=200)
-                        .text("commits")
-                        .clamping(egui::SliderClamping::Always)
-                        .integer()
-                        .logarithmic(true),
-                );
-                // show_wip(ui, Some("only process one commit"));
-            });
-            let selected = &mut conf.config;
-            selected.show_combo_box(ui, "Repo Config");
+    ui.add(
+        egui::Slider::new(&mut conf.len, 1..=200)
+            .text("commits")
+            .clamping(egui::SliderClamping::Always)
+            .integer()
+            .logarithmic(true),
+    );
+    let selected = &mut conf.config;
+    selected.show_combo_box(ui, "Repo Config");
 
-            if ui
-                .add(egui::Button::new("🗖 Open Advanced Settings").selected(conf.advanced_open))
-                .clicked()
-            {
-                conf.advanced_open ^= true;
-            }
+    let adv_button = egui::Button::new("🗖 Open Advanced Settings").selected(conf.advanced_open);
+    if ui.add(adv_button).clicked() {
+        conf.advanced_open ^= true;
+    }
 
-            egui::Window::new("Interactive Finder's Advanced Settings")
-                .open(&mut conf.advanced_open)
-                .show(ui.ctx(), |ui| {
-                    ui.label("Query Generation:");
-                    egui::TextEdit::multiline(&mut conf.meta_gen)
-                        // .clip_text(true)
-                        // .desired_width(150.0)
-                        .desired_rows(1)
-                        .hint_text("the query configuring the query generation")
-                        .interactive(true)
-                        .show(ui);
-
-                    ui.label("Query Simplification:");
-                    egui::TextEdit::multiline(&mut conf.meta_simp)
-                        // .clip_text(true)
-                        // .desired_width(150.0)
-                        .desired_rows(1)
-                        .hint_text(
-                            "the query used to direct the simplification of generated queries",
-                        )
-                        .interactive(true)
-                        .show(ui);
-
-                    ui.checkbox(&mut conf.simple_matching, "Simple Matching");
-                    ui.checkbox(&mut conf.prepro_matching, "Incr. Matching");
-                });
+    let hint_text = "the query configuring the query generation";
+    let meta_gen = egui::TextEdit::multiline(&mut conf.meta_gen).hint_text(hint_text);
+    let hint_text = "the query used to direct the simplification of generated queries";
+    let meta_simp = egui::TextEdit::multiline(&mut conf.meta_simp).hint_text(hint_text);
+    egui::Window::new("Interactive Finder's Advanced Settings")
+        .open(&mut conf.advanced_open)
+        .show(ui.ctx(), |ui| {
+            ui.label("Query Generation:");
+            meta_gen.desired_rows(1).interactive(true).show(ui);
+            ui.label("Query Simplification:");
+            meta_simp.desired_rows(1).interactive(true).show(ui);
 
             ui.checkbox(&mut conf.simple_matching, "Simple Matching");
             ui.checkbox(&mut conf.prepro_matching, "Incr. Matching");
+        });
 
-            ui.label("#matches on entire commit:");
-            if ui
-                .double_ended_slider(
-                    &mut conf.wanted_matches.start,
-                    &mut conf.wanted_matches.end,
-                    smells.bad_matches_bounds.clone(),
-                )
-                .on_hover_text("displays only queries in the given range")
-                .changed()
-            {
-                smells.bads = None
-            };
-        }
-        None => (),
-    }
+    ui.checkbox(&mut conf.simple_matching, "Simple Matching");
+    ui.checkbox(&mut conf.prepro_matching, "Incr. Matching");
+
+    ui.label("#matches on entire commit:");
+    let double_ended_slider = ui.double_ended_slider(
+        &mut conf.wanted_matches.start,
+        &mut conf.wanted_matches.end,
+        smells.bad_matches_bounds.clone(),
+    );
+    let text = "displays only queries in the given range";
+    let slider_over = double_ended_slider.on_hover_text(text);
+    if slider_over.changed() {
+        smells.bads = None
+    };
+    (resp_repo, resp_commit)
 }
 
 pub(super) fn show_result(

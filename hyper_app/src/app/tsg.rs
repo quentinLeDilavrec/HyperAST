@@ -34,28 +34,21 @@ const INFO_DESCRIPTION: EditorInfo<&'static str> = EditorInfo {
 
 pub(crate) const WANTED: SelectedConfig = SelectedConfig::Tsg;
 
-pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigQuery>) {
-    show_repo_menu(ui, &mut single.content.commit.repo);
-    ui.push_id(ui.id().with("commit"), |ui| {
-        egui::TextEdit::singleline(&mut single.content.commit.id)
-            .clip_text(true)
-            .desired_width(150.0)
-            .desired_rows(1)
-            .hint_text("commit")
-            .interactive(true)
-            .show(ui)
-    });
+pub(crate) fn show_config(
+    ui: &mut egui::Ui,
+    single: &mut Sharing<ComputeConfigQuery>,
+) -> (egui::Response, egui::Response) {
+    use super::utils_egui::MyUiExt;
+    let (resp_repo, resp_commit) = single.content.commit.show_clickable(ui);
 
-    ui.add_enabled_ui(true, |ui| {
-        ui.add(
-            egui::Slider::new(&mut single.content.len, 1..=200)
-                .text("commits")
-                .clamping(egui::SliderClamping::Never)
-                .integer()
-                .logarithmic(true),
-        );
-        // show_wip(ui, Some("only process one commit"));
-    });
+    ui.add(
+        egui::Slider::new(&mut single.content.len, 1..=200)
+            .text("commits")
+            .clamping(egui::SliderClamping::Never)
+            .integer()
+            .logarithmic(true),
+    );
+
     let selected = &mut single.content.config;
     selected.show_combo_box(ui, "Repo Config");
 
@@ -68,6 +61,7 @@ pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigQ
             .interactive(true)
             .show(ui)
     });
+    (resp_repo, resp_commit)
 }
 
 impl<C> From<&example_queries::Query> for TsgEditor<C>
@@ -146,6 +140,23 @@ impl Default for ComputeConfigQuery {
             path: example_queries::EXAMPLES[0].path.to_string(),
         }
     }
+}
+
+pub(crate) fn project_modal_handler(
+    data: &mut super::AppData,
+    pid: super::ProjectId,
+) -> super::ProjectId {
+    let projects = &mut data.selected_code_data;
+    let commit = Some(&data.tsg.content.commit);
+    use crate::app::utils_commit::project_modal_handler;
+    let (repo, mut commits) = match project_modal_handler(pid, projects, commit) {
+        Ok(value) => value,
+        Err(value) => return value,
+    };
+    let commit = &mut data.tsg.content.commit;
+    commit.repo = repo.clone();
+    commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    super::ProjectId::INVALID
 }
 
 type QueryingContext = EditingContext<TsgEditor, TsgEditor<CodeEditor>>;

@@ -49,12 +49,13 @@ impl crate::HyperApp {
                     } else if let super::Tab::LocalQuery(id) = self.tabs[pane] {
                         self.show_local_query_left_panel(ui, id);
                     } else if let super::Tab::TreeAspect = self.tabs[pane] {
+                        use crate::app::code_aspects;
                         let (proj_resp, commit_resp, path_resp) =
-                            crate::app::code_aspects::show_config(ui, &mut self.data.aspects);
+                            code_aspects::show_config(ui, &mut self.data.aspects);
                         if proj_resp.clicked() {
                             let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
-                                .open_projects(aspects_project_modal_handler);
+                                .open_projects(code_aspects::project_modal_handler);
                         }
                         if commit_resp.clicked() {
                             let repo = &self.data.aspects.commit.repo;
@@ -74,20 +75,30 @@ impl crate::HyperApp {
                             ));
                         }
                     } else if let super::Tab::TSG = self.tabs[pane] {
-                        crate::app::tsg::show_config(ui, &mut self.data.tsg);
-                    } else if let super::Tab::Smells = self.tabs[pane] {
-                        crate::app::smells::show_config(ui, &mut self.data.smells);
-                    } else if let super::Tab::LongTracking = self.tabs[pane] {
-                        let (proj_resp, commit_resp) = crate::app::long_tracking::show_config(
-                            ui,
-                            &mut self.data.long_tracking,
-                        );
-                        // let commit = &data.long_tracking.origins[0].file.commit;
-
+                        use crate::app::tsg;
+                        let (proj_resp, commit_resp) = tsg::show_config(ui, &mut self.data.tsg);
                         if proj_resp.clicked() {
                             let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
-                                .open_projects(long_tracking_project_modal_handler);
+                                .open_projects(tsg::project_modal_handler);
+                        }
+                    } else if let super::Tab::Smells = self.tabs[pane] {
+                        use crate::app::smells;
+                        let (proj_resp, commit_resp) =
+                            smells::show_config(ui, &mut self.data.smells);
+                        if proj_resp.clicked() {
+                            let ctx = ui.ctx();
+                            self.modal_handler_proj_or_commits
+                                .open_projects(smells::project_modal_handler);
+                        }
+                    } else if let super::Tab::LongTracking = self.tabs[pane] {
+                        use crate::app::long_tracking;
+                        let (proj_resp, commit_resp) =
+                            long_tracking::show_config(ui, &mut self.data.long_tracking);
+                        if proj_resp.clicked() {
+                            let ctx = ui.ctx();
+                            self.modal_handler_proj_or_commits
+                                .open_projects(long_tracking::project_modal_handler);
                         }
                     }
                 });
@@ -657,54 +668,6 @@ impl crate::HyperApp {
             });
     }
 }
-
-fn long_tracking_project_modal_handler(data: &mut super::AppData, pid: ProjectId) -> ProjectId {
-    if pid == ProjectId::INVALID {
-        let commit = data.long_tracking.origins.get(0);
-        let Some(commit) = commit.map(|x| &x.file.commit) else {
-            return pid;
-        };
-        data.selected_code_data
-            .find(&commit.repo)
-            .unwrap_or(ProjectId::INVALID)
-    } else if let Some((repo, mut commits)) = data.selected_code_data.get_mut(pid) {
-        let commit = data.long_tracking.origins.get_mut(0);
-        let Some(commit) = commit.map(|x| &mut x.file.commit) else {
-            return pid;
-        };
-        if &commit.repo != repo {
-            data.long_tracking = Default::default();
-            let code = data.long_tracking.origins.get_mut(0).unwrap();
-            code.file.commit.repo = repo.clone();
-            code.file.commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
-            ProjectId::INVALID
-        } else {
-            pid
-        }
-    } else {
-        ProjectId::INVALID
-    }
-}
-
-fn aspects_project_modal_handler(data: &mut super::AppData, pid: ProjectId) -> ProjectId {
-    if pid == ProjectId::INVALID {
-        data.selected_code_data
-            .find(&data.aspects.commit.repo)
-            .unwrap_or(ProjectId::INVALID)
-    } else if let Some((repo, mut commits)) = data.selected_code_data.get_mut(pid) {
-        if &data.aspects.commit.repo != repo {
-            data.aspects.commit.repo = repo.clone();
-            data.aspects.commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
-            data.aspects_result = None;
-            ProjectId::INVALID
-        } else {
-            pid
-        }
-    } else {
-        ProjectId::INVALID
-    }
-}
-
 fn show_precomp_selector(
     ui: &mut egui::Ui,
     qid: QueryId,

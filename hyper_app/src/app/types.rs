@@ -1,8 +1,12 @@
-use egui_addon::code_editor;
-use hyperast::store::nodes::fetched::NodeIdentifier;
 use re_ui::UiExt;
-
 use std::{collections::HashSet, hash::Hash, ops::Range};
+
+use egui_addon::code_editor;
+
+use hyperast::{store::nodes::fetched::NodeIdentifier, types::TypeStore};
+
+type Cpp = hyperast_gen_ts_cpp::types::Type;
+type Java = hyperast_gen_ts_java::types::Type;
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub(crate) struct Repo {
@@ -110,23 +114,63 @@ pub(crate) struct ComputeConfigAspectViews {
     // pub(super) ser_opt_java_text: String,
     // TODO use an enum set btw...
     #[serde(skip)]
-    pub(super) ser_opt_cpp: HashSet<hyperast_gen_ts_cpp::types::Type>,
+    pub(super) ser_opt_cpp: TySet<Cpp>,
     #[serde(skip)]
-    pub(super) ser_opt_java: HashSet<hyperast_gen_ts_java::types::Type>,
+    pub(super) ser_opt_java: TySet<Java>,
     #[serde(skip)]
-    pub(super) hide_opt_cpp: HashSet<hyperast_gen_ts_cpp::types::Type>,
+    pub(super) hide_opt_cpp: TySet<Cpp>,
     #[serde(skip)]
-    pub(super) hide_opt_java: HashSet<hyperast_gen_ts_java::types::Type>,
+    pub(super) hide_opt_java: TySet<Java>,
+}
+
+pub struct TySet<Ty>(HashSet<Ty>);
+
+impl<Ty> std::ops::Deref for TySet<Ty> {
+    type Target = HashSet<Ty>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<Ty> std::ops::DerefMut for TySet<Ty> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<Ty> Default for TySet<Ty> {
+    fn default() -> Self {
+        Self(HashSet::default())
+    }
+}
+
+impl<Ty: Eq + Hash + Copy + 'static> TySet<Ty> {
+    pub fn toggle(&mut self, k: &dyn hyperast::types::HyperType) {
+        let k = &k.as_any();
+        if let Some(k) = k.downcast_ref::<Ty>() {
+            self._toggle(k);
+        }
+    }
+}
+impl<Ty: Eq + Hash + Copy> TySet<Ty> {
+    fn _toggle(&mut self, k: &Ty) {
+        if self.0.contains(k) {
+            self.0.remove(k);
+        } else {
+            self.0.insert(k.to_owned());
+        }
+    }
 }
 
 impl Default for ComputeConfigAspectViews {
     fn default() -> Self {
-        let mut ser_opt_cpp: HashSet<hyperast_gen_ts_cpp::types::Type> = Default::default();
-        ser_opt_cpp.insert(hyperast_gen_ts_cpp::types::Type::FunctionDeclarator);
-        let mut ser_opt_java: HashSet<hyperast_gen_ts_java::types::Type> = Default::default();
-        ser_opt_java.insert(hyperast_gen_ts_java::types::Type::MethodDeclaration);
-        let hide_opt_cpp: HashSet<hyperast_gen_ts_cpp::types::Type> = Default::default();
-        let hide_opt_java: HashSet<hyperast_gen_ts_java::types::Type> = Default::default();
+        let mut ser_opt_cpp = TySet::<Cpp>::default();
+        ser_opt_cpp.insert(Cpp::FunctionDeclarator);
+        let mut ser_opt_java = TySet::<Java>::default();
+        ser_opt_java.insert(Java::MethodDeclaration);
+        let hide_opt_cpp = TySet::<Cpp>::default();
+        let hide_opt_java = TySet::<Java>::default();
         Self {
             commit: Default::default(),
             path: "".into(),

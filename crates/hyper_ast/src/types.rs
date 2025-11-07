@@ -1327,6 +1327,13 @@ impl From<&'static dyn HyperType> for AnyType {
         Self(value)
     }
 }
+impl Deref for AnyType {
+    type Target = dyn HyperType;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
 
 impl HyperType for AnyType {
     fn generic_eq(&self, other: &dyn HyperType) -> bool

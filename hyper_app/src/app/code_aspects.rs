@@ -72,7 +72,7 @@ pub(crate) fn show_config(
     });
     ui.label("serialized Java:");
     let mut rm = None;
-    for x in &aspects.ser_opt_java {
+    for x in &*aspects.ser_opt_java {
         let button = &ui.button(x.to_str());
         if button.clicked() {
             rm = Some(x.clone());
@@ -83,7 +83,7 @@ pub(crate) fn show_config(
     }
     ui.label("serialized Cpp:");
     let mut rm = None;
-    for x in &aspects.ser_opt_cpp {
+    for x in &*aspects.ser_opt_cpp {
         let button = &ui.button(x.to_str());
         if button.clicked() {
             rm = Some(x.clone());
@@ -94,7 +94,7 @@ pub(crate) fn show_config(
     }
     ui.label("hidden Java:");
     let mut rm = None;
-    for x in &aspects.hide_opt_java {
+    for x in &*aspects.hide_opt_java {
         let button = &ui.button(x.to_str());
         if button.clicked() {
             rm = Some(x.clone());
@@ -105,7 +105,7 @@ pub(crate) fn show_config(
     }
     ui.label("hidden Cpp:");
     let mut rm = None;
-    for x in &aspects.hide_opt_cpp {
+    for x in &*aspects.hide_opt_cpp {
         let button = &ui.button(x.to_str());
         if button.clicked() {
             rm = Some(x.clone());
@@ -224,30 +224,12 @@ impl ComputeConfigAspectViews {
         use hyperast_gen_ts_java::types::Type as Java;
         match action {
             Action::SerializeKind(k) => {
-                use hyperast::types::HyperType;
-                let k = &k.as_any();
-                if let Some(k) = k.downcast_ref::<Cpp>() {
-                    if self.ser_opt_cpp.contains(k) {
-                        self.ser_opt_cpp.remove(k);
-                    } else {
-                        self.ser_opt_cpp.insert(k.to_owned());
-                    }
-                } else if let Some(k) = k.downcast_ref::<Java>() {
-                    if self.ser_opt_java.contains(k) {
-                        self.ser_opt_java.remove(k);
-                    } else {
-                        self.ser_opt_java.insert(k.to_owned());
-                    }
-                }
+                self.ser_opt_cpp.toggle(&*k);
+                self.ser_opt_java.toggle(&*k);
             }
             Action::HideKind(k) => {
-                use hyperast::types::HyperType;
-                let k = &k.as_any();
-                if let Some(k) = k.downcast_ref::<Cpp>() {
-                    self.hide_opt_cpp.insert(k.to_owned());
-                } else if let Some(k) = k.downcast_ref::<Java>() {
-                    self.hide_opt_java.insert(k.to_owned());
-                }
+                self.hide_opt_cpp.toggle(&*k);
+                self.hide_opt_java.toggle(&*k);
             }
             _ => (),
         }

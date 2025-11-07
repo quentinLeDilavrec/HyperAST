@@ -2597,5 +2597,16 @@ impl eframe::App for HyperApp {
         }
 
         self.modal_handler_proj_or_commits.ui(ctx, &mut self.data);
+
+        if self.data.aspects_result.is_none() {
+            use crate::app::code_aspects::remote_fetch_node_old as fetch;
+            self.data.aspects_result = Some(fetch(
+                ctx,
+                &self.data.api_addr,
+                self.data.store.clone(),
+                &self.data.aspects.commit,
+                &self.data.aspects.path,
+            ));
+        }
     }
 }

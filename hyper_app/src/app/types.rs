@@ -444,8 +444,7 @@ impl<T: serde::de::DeserializeOwned> Resource<T> {
 fn from_resp<T: serde::de::DeserializeOwned>(response: &ehttp::Response) -> Option<T> {
     let content_type = response.content_type().unwrap_or_default();
     let text = response.text()?;
-    let text = serde_json::from_str::<T>(text).unwrap();
-    Some(text)
+    serde_json::from_str::<T>(text).ok()
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]

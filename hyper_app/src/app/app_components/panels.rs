@@ -52,15 +52,24 @@ impl crate::HyperApp {
                         let (proj_resp, commit_resp, path_resp) =
                             crate::app::code_aspects::show_config(ui, &mut self.data.aspects);
                         if proj_resp.clicked() {
+                            let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
                                 .open_projects(|data, pid| {
                                     if pid == ProjectId::INVALID {
                                         data.selected_code_data
                                             .find(&data.aspects.commit.repo)
                                             .unwrap_or(ProjectId::INVALID)
-                                    } else if let Some(repo) = data.selected_code_data.get(pid) {
+                                    } else if let Some((repo, mut commits)) =
+                                        data.selected_code_data.get_mut(pid)
+                                    {
                                         if &data.aspects.commit.repo != repo {
                                             data.aspects.commit.repo = repo.clone();
+                                            data.aspects.commit.id = commits
+                                                .iter_mut()
+                                                .next()
+                                                .cloned()
+                                                .unwrap_or_default();
+                                            data.aspects_result = None;
                                             ProjectId::INVALID
                                         } else {
                                             pid
@@ -77,7 +86,7 @@ impl crate::HyperApp {
                                     .open_commits(proj, |data, cid| data.aspects.commit.id = cid);
                             }
                         }
-                        if path_resp.changed() {
+                        if path_resp.changed() && !self.data.aspects.commit.id.is_empty() {
                             use crate::app::code_aspects::remote_fetch_node_old as fetch;
                             self.data.aspects_result = Some(fetch(
                                 ui.ctx(),

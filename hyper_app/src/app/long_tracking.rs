@@ -37,7 +37,7 @@ type BufferedPerCommit<T> = HashMap<Commit, Buffered<T>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
-pub(crate) struct LongTacking {
+pub(crate) struct LongTracking {
     pub(crate) flags: Flags,
     pub(crate) ser_view: bool,
     pub(crate) tree_view: bool,
@@ -53,7 +53,7 @@ pub(crate) struct LongTacking {
     pub(crate) additionnal_links: Vec<[CodeRange; 2]>,
 }
 
-impl Default for LongTacking {
+impl Default for LongTracking {
     fn default() -> Self {
         Self {
             flags: Default::default(),
@@ -127,7 +127,7 @@ pub(crate) const WANTED: SelectedConfig = SelectedConfig::LongTracking;
 
 pub(crate) fn show_config(
     ui: &mut egui::Ui,
-    tracking: &mut LongTacking,
+    tracking: &mut LongTracking,
 ) -> (egui::Response, egui::Response) {
     let commit = &tracking.origins[0].file.commit;
     let (resp_repo, resp_commit) = commit.show_clickable(ui);
@@ -197,7 +197,7 @@ impl<'a> LongTrackingResultsImpl<'a> {
         ui: &mut egui::Ui,
         api_addr: &'a str,
         aspects: &mut ComputeConfigAspectViews,
-        long_tracking: &mut LongTacking,
+        long_tracking: &mut LongTracking,
         fetched_files: &mut FetchedFiles,
     ) -> Self {
         let w_id = ui.id().with("Tracking Timeline");
@@ -290,7 +290,7 @@ fn show_commit(
     col: usize,
     store: &Arc<FetchedHyperAST>,
     aspects: &mut ComputeConfigAspectViews,
-    long_tracking: &mut LongTacking,
+    long_tracking: &mut LongTracking,
     fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
@@ -383,7 +383,7 @@ fn show_timeline(
     api_addr: &str,
     aspects: &mut ComputeConfigAspectViews,
     store: &Arc<FetchedHyperAST>,
-    long_tracking: &mut LongTacking,
+    long_tracking: &mut LongTracking,
     fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
@@ -590,7 +590,7 @@ fn show_trackings(
     api_addr: &str,
     aspects: &mut ComputeConfigAspectViews,
     store: &Arc<FetchedHyperAST>,
-    long_tracking: &mut LongTacking,
+    long_tracking: &mut LongTracking,
     fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
@@ -710,7 +710,7 @@ impl<'a> AttachedImpl<'a> {
     fn ui(
         &mut self,
         ui: &mut egui::Ui,
-        long_tracking: &mut LongTacking,
+        long_tracking: &mut LongTracking,
         store: &Arc<FetchedHyperAST>,
         aspects: &mut ComputeConfigAspectViews,
         fetched_files: &mut FetchedFiles,
@@ -1117,7 +1117,7 @@ pub(crate) fn show_results(
     api_addr: &str,
     aspects: &mut ComputeConfigAspectViews,
     store: Arc<FetchedHyperAST>,
-    long_tracking: &mut LongTacking,
+    long_tracking: &mut LongTracking,
     fetched_files: &mut FetchedFiles,
 ) {
     let mut res_impl =

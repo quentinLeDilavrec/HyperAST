@@ -544,7 +544,7 @@ pub(crate) struct AppData {
     #[serde(skip)]
     store: Arc<FetchedHyperAST>,
 
-    long_tracking: long_tracking::LongTacking,
+    long_tracking: long_tracking::LongTracking,
 
     selected_code_data: SelectedProjects,
 
@@ -1841,7 +1841,7 @@ fn show_tree_view(
     ui: &mut egui::Ui,
     aspects: &mut types::ComputeConfigAspectViews,
     selected_projects: &mut SelectedProjects,
-    long_tacking: &mut long_tracking::LongTacking,
+    long_tacking: &mut long_tracking::LongTracking,
     store: Arc<FetchedHyperAST>,
     commit: &(ProjectId, String),
     api_addr: &String,

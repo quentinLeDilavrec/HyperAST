@@ -368,6 +368,9 @@ impl Default for SelectedProjects {
 #[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub(crate) struct ProjectId(usize);
+impl ProjectId {
+    pub const INVALID: Self = Self(usize::MAX);
+}
 
 impl SelectedProjects {
     fn empty() -> Self {

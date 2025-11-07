@@ -9,6 +9,14 @@ mod panels;
 trait AppActions {
     fn ui(self, data: &mut AppData, ui: &mut egui::Ui) -> egui::Response;
 }
+// impl<F> Widget for F
+// where
+//     F: FnOnce(&mut Ui) -> Response,
+// {
+//     fn ui(self, ui: &mut Ui) -> Response {
+//         self(ui)
+//     }
+// }
 
 impl<F> AppActions for F
 where
@@ -135,6 +143,7 @@ impl super::HyperApp {
         let content = list_item::LabelContent::new(label)
             .truncate(true)
             .with_buttons(|ui| {
+                ui.add_space(3.0);
                 let button = egui::Button::new("📋");
                 if ui.add_enabled(true, button).clicked() {
                     paste_trigered = true;
@@ -147,7 +156,8 @@ impl super::HyperApp {
                 );
                 let resp = ui.add_enabled(true, button);
                 if resp.clicked() {
-                    self.modal_handler_proj_or_commits.open_projects();
+                    self.modal_handler_proj_or_commits
+                        .open_projects(|data, pid| pid);
                 }
                 resp
             })
@@ -165,14 +175,20 @@ impl super::HyperApp {
                 .force_background(force_background)
                 .show_hierarchical_with_children(ui, id, true, content, |ui| {
                     //TODO(ab): this space is not desirable when the content actually is list items
-                    ui.add_space(4.0); // Add space only if there is a body to make minimized headers stick together.
+                    // ui.add_space(4.0); // Add space only if there is a body to make minimized headers stick together.
                     for i in self.data.selected_code_data.project_ids() {
                         let Some((r, commits)) = self.data.selected_code_data.get_mut(i) else {
                             continue;
                         };
-                        Self::show_repo_item(commits, r, ui, ui.id().with(i));
+
+                        let label = format!("github.com/{}/{}", r.user, r.name);
+
+                        let label = egui::RichText::new(label)
+                            .size(10.0)
+                            .line_height(Some(10.0));
+                        show_repo_item_buttons(commits, label, ui, ui.id().with(i));
                     }
-                    ui.add_space(4.0); // Same here
+                    // ui.add_space(4.0); // Same here
                 })
         });
 
@@ -185,274 +201,308 @@ impl super::HyperApp {
             }
         };
 
-        if let Some(paste) =
-            utils::prepare_paste(ui, paste_trigered, &mut self.capture_clip_into_repos)
-        {
-            self.capture_clip_into_repos = false;
-            if paste.contains("\n") {
-                let mut acc = vec![];
-                let mut bad = 0;
-                for paste in paste.split("\n") {
-                    match commit::validate_pasted_project_url(&paste) {
-                        Ok(x) => {
-                            acc.push(Ok(x));
-                        }
-                        Err(err) => {
-                            bad += 1;
-                            log::warn!("Wrong input from clipboard: {}:\n{}", err, paste);
-                            acc.push(Err(format!(
-                                "Wrong input from clipboard: {}:\n{}",
-                                err, paste
-                            )));
-                        }
-                    }
+        let paste = utils::prepare_paste(ui, paste_trigered, &mut self.capture_clip_into_repos);
+        let Some(paste) = paste else {
+            return;
+        };
+        self.capture_clip_into_repos = false;
+        Self::parse_pasted_repositories(paste, &mut self.notifs, &mut self.data);
+    }
+
+    fn parse_pasted_repositories(paste: String, notifs: &mut NotificationUi, data: &mut AppData) {
+        if !paste.contains("\n") {
+            Self::parse_pasted_repository(paste, notifs, data);
+            return;
+        }
+        let mut acc = vec![];
+        let mut bad = 0;
+        for paste in paste.split("\n") {
+            match commit::validate_pasted_project_url(&paste) {
+                Ok(x) => {
+                    acc.push(Ok(x));
                 }
-                if bad == 0 {
-                    for s in acc.chunks(5) {
-                        let text: String = s
-                            .into_iter()
-                            .filter_map(|x| x.as_ref().ok())
-                            .map(|(r, cs)| {
-                                if cs.is_empty() {
-                                    format!("github.com/{}/{}", r.user, r.name)
-                                } else {
-                                    cs.iter()
-                                        .map(|c| {
-                                            format!("\n\tgithub.com/{}/{}/{}", r.user, r.name, c)
-                                        })
-                                        .collect()
-                                }
-                            })
-                            .collect();
-                        self.notifs.success(format!("Succesfully added: {}", text));
-                    }
-                    for x in acc {
-                        let (repo, commits) = x.unwrap();
-                        self.data.selected_code_data.add(repo, commits);
-                    }
-                } else if bad == acc.len() {
-                    self.notifs.add_log(re_log::LogMsg {
-                        level: log::Level::Error,
-                        target: format!("clipboard"),
-                        msg: format!("Wrong input from clipboard:\n{}", paste),
-                    });
-                // } else if bad <= 2 && bad * 4 <= acc.len() { // TODO later if annoying
-                } else {
-                    let good: Vec<_> = acc
-                        .into_iter()
-                        .enumerate()
-                        .filter_map(|(i, x)| x.ok().map(|_| i))
-                        .collect();
-                    self.notifs.add_log(re_log::LogMsg {
-                        level: log::Level::Error,
-                        target: format!("clipboard"),
-                        msg: format!(
-                            "{bad} Wrong inputs from clipboard but {:?} could be accepted:\n{}",
-                            good, paste
-                        ),
-                    });
-                }
-            } else {
-                let result = commit::validate_pasted_project_url(&paste);
-                match result {
-                    Ok((repo, commits)) => {
-                        self.notifs.success(if commits.is_empty() {
-                            format!("Successfully added github.com/{}/{}", repo.user, repo.name)
-                        } else if commits.len() == 1 {
-                            format!(
-                                "Successfully added github.com/{}/{}/{}",
-                                repo.user, repo.name, commits[0]
-                            )
-                        } else {
-                            let commits: String =
-                                commits.iter().map(|c| format!("\n{}", c)).collect();
-                            format!(
-                                "Successfully added github.com/{}/{}{}",
-                                repo.user, repo.name, commits
-                            )
-                        });
-                        self.data.selected_code_data.add(repo, commits);
-                    }
-                    Err(err) => {
-                        log::warn!("Wrong input from clipboard: {}:\n{}", err, paste);
-                        self.notifs.add_log(re_log::LogMsg {
-                            level: log::Level::Warn,
-                            target: format!("clipboard"),
-                            msg: format!("Wrong input from clipboard: {}:\n{}", err, paste),
-                        });
-                    }
+                Err(err) => {
+                    bad += 1;
+                    log::warn!("Wrong input from clipboard: {}:\n{}", err, paste);
+                    acc.push(Err(format!(
+                        "Wrong input from clipboard: {}:\n{}",
+                        err, paste
+                    )));
                 }
             }
         }
+        if bad == 0 {
+            for s in acc.chunks(5) {
+                let f = |(r, cs): &(Repo, Vec<String>)| {
+                    if cs.is_empty() {
+                        format!("github.com/{}/{}", r.user, r.name)
+                    } else {
+                        cs.iter()
+                            .map(|c| format!("\n\tgithub.com/{}/{}/{}", r.user, r.name, c))
+                            .collect()
+                    }
+                };
+                let text: String = s
+                    .into_iter()
+                    .filter_map(|x| x.as_ref().ok())
+                    .map(f)
+                    .collect();
+                notifs.success(format!("Succesfully added: {}", text));
+            }
+            for x in acc {
+                let (repo, commits) = x.unwrap();
+                data.selected_code_data.add(repo, commits);
+            }
+        } else if bad == acc.len() {
+            notifs.add_log(re_log::LogMsg {
+                level: log::Level::Error,
+                target: format!("clipboard"),
+                msg: format!("Wrong input from clipboard:\n{}", paste),
+            });
+        // } else if bad <= 2 && bad * 4 <= acc.len() { // TODO later if annoying
+        } else {
+            let good: Vec<_> = (acc.into_iter().enumerate())
+                .filter_map(|(i, x)| x.ok().map(|_| i))
+                .collect();
+            notifs.add_log(re_log::LogMsg {
+                level: log::Level::Error,
+                target: format!("clipboard"),
+                msg: format!(
+                    "{bad} Wrong inputs from clipboard but {:?} could be accepted:\n{}",
+                    good, paste
+                ),
+            });
+        }
     }
 
-    fn show_repo_item(
-        mut commits: CommitSlice<'_>,
-        r: &mut Repo,
-        ui: &mut egui::Ui,
-        id: egui::Id,
-    ) -> list_item::ShowCollapsingResponse<()> {
-        let button_menu = |ui: &mut egui::Ui| {
-            let popup_id = ui.make_persistent_id("add_commit");
-            let button = egui::Button::new("commit");
-            let button = &ui.add_enabled(true, button);
-            if button.clicked() {
-                commits.push(Default::default());
-                ui.memory_mut(|mem| mem.open_popup(popup_id))
+    fn parse_pasted_repository(paste: String, notifs: &mut NotificationUi, data: &mut AppData) {
+        let result = commit::validate_pasted_project_url(&paste);
+        let msg = |repo: &Repo, commits: &[String]| {
+            let msg = format!("Successfully added github.com/{}/{}", repo.user, repo.name);
+            if commits.is_empty() {
+                msg
+            } else if commits.len() == 1 {
+                format!("{msg}/{}", commits[0])
+            } else {
+                let commits: String = commits.iter().map(|c| format!("\n{}", c)).collect();
+                format!("{msg}{}", commits)
             }
+        };
+        match result {
+            Ok((repo, commits)) => {
+                notifs.success(msg(&repo, &commits));
+                data.selected_code_data.add(repo, commits);
+            }
+            Err(err) => {
+                log::warn!("Wrong input from clipboard: {}:\n{}", err, paste);
+                notifs.add_log(re_log::LogMsg {
+                    level: log::Level::Warn,
+                    target: format!("clipboard"),
+                    msg: format!("Wrong input from clipboard: {}:\n{}", err, paste),
+                });
+            }
+        }
+    }
+}
+
+pub(crate) fn show_repo_item_buttons(
+    mut commits: CommitSlice<'_>,
+    label: impl Into<egui::WidgetText>,
+    ui: &mut egui::Ui,
+    id: egui::Id,
+) -> list_item::ShowCollapsingResponse<()> {
+    let button_menu = |ui: &mut egui::Ui| {
+        let button = egui::Button::new("commit");
+        let button = &ui.add_enabled(true, button);
+        let mut close_menu = false;
+        let popup_contents = |ui: &mut egui::Ui| {
+            let text = commits.last_mut().unwrap();
+            let singleline = &ui.text_edit_singleline(text);
+            if button.clicked() {
+                singleline.request_focus()
+            }
+            if singleline.lost_focus() {
+                if text.is_empty() {
+                    commits.pop();
+                }
+                ui.memory_mut(|mem| mem.close_popup());
+                close_menu = true;
+            }
+        };
+        let popup_id = ui.make_persistent_id("add_commit");
+        egui::popup::popup_above_or_below_widget(
+            ui,
+            popup_id,
+            button,
+            egui::AboveOrBelow::Below,
+            egui::popup::PopupCloseBehavior::CloseOnClickOutside,
+            popup_contents,
+        );
+        if close_menu {
+            ui.close_menu();
+        }
+        if button.clicked() {
+            commits.push(Default::default());
+            ui.memory_mut(|mem| mem.open_popup(popup_id))
+        }
+        let button = egui::Button::new("branch");
+        if ui.add_enabled(false, button).clicked() {
+            wasm_rs_dbg::dbg!("TODO add branch");
+        }
+        let button = egui::Button::new("commit range");
+        if ui.add_enabled(false, button).clicked() {
+            wasm_rs_dbg::dbg!("TODO add commit range");
+        }
+    };
+    let add_button = egui::Button::image(
+        re_ui::icons::ADD
+            .as_image()
+            .fit_to_exact_size(egui::Vec2::splat(12.0)),
+    );
+    let content = list_item::LabelContent::new(label)
+        .with_buttons(|ui| {
+            ui.add_space(4.0);
+            ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
+
+            egui::menu::menu_custom_button(ui, add_button, button_menu).response
+        })
+        .always_show_buttons(true);
+
+    let height: f32 = 16.0;
+    let response = _show_repo_item_header(ui, content, id, 16.0);
+    show_commits_items(ui, response, commits, id, true)
+}
+
+pub(crate) fn show_repo_item_custom(
+    repo_cb: impl FnOnce(&mut egui::Ui, &list_item::ContentContext<'_>),
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    height: f32,
+) -> list_item::ShowCollapsingResponse<()> {
+    let content = list_item::CustomContent::new(repo_cb);
+    _show_repo_item_header(ui, content, id, height)
+}
+
+pub(crate) fn _show_repo_item_header(
+    ui: &mut egui::Ui,
+    content: impl list_item::ListItemContent,
+    id: egui::Id,
+    height: f32,
+) -> list_item::ShowCollapsingResponse<()> {
+    let force_background = if ui.visuals().dark_mode {
+        DesignTokens::load().section_collapsing_header_color()
+    } else {
+        ui.visuals().widgets.active.weak_bg_fill
+    }
+    .gamma_multiply(0.6);
+
+    let default_open = true;
+
+    let list = list_item::ListItem::new()
+        .interactive(true)
+        // .force_background(force_background)
+        // .selected(true)
+        .with_height(height);
+    list_item::list_item_scope(ui, id, |ui| {
+        // list.show_flat(ui, content)
+        list.show_hierarchical_with_children(ui, id, default_open, content, |_| ())
+    })
+}
+
+pub(crate) fn show_commits_items(
+    ui: &mut egui::Ui,
+    response: list_item::ShowCollapsingResponse<()>,
+    mut commits: CommitSlice<'_>,
+    id: egui::Id,
+    indented: bool,
+) -> list_item::ShowCollapsingResponse<()> {
+    let height = 10.0;
+    let mut state = egui::collapsing_header::CollapsingState::load(ui.ctx(), id).unwrap();
+    let mut span = ui.full_span().shrink(height * 0.8);
+    span.min = span.max.min(span.min + height);
+    let body_response = ui.full_span_scope(span, |ui| {
+        if indented {
+            ui.spacing_mut().indent =
+                DesignTokens::small_icon_size().x + DesignTokens::text_to_icon_padding();
+            state.show_body_indented(&response.item_response, ui, |ui| {
+                show_commit_list(ui, commits, height)
+            })
+        } else {
+            state.show_body_unindented(ui, |ui| show_commit_list(ui, commits, height))
+        }
+    });
+
+    if response.item_response.clicked() {
+        // `show_hierarchical_with_children_unindented` already toggles on double-click,
+        // but we are _only_ a collapsing header, so we should also toggle on normal click:
+        if let Some(mut state) = egui::collapsing_header::CollapsingState::load(ui.ctx(), id) {
+            state.toggle(ui);
+            state.store(ui.ctx());
+        }
+    }
+    response
+}
+
+fn show_commit_list(ui: &mut egui::Ui, mut commits: CommitSlice<'_>, height: f32) {
+    ui.add_space(height * 0.5);
+    let button_size = egui::Vec2::splat(height);
+    let button_tint = ui.visuals().widgets.inactive.fg_stroke.color;
+    let remove_button = egui::ImageButton::new(
+        re_ui::icons::REMOVE
+            .as_image()
+            .fit_to_exact_size(button_size),
+    )
+    .tint(button_tint);
+    list_item::list_item_scope(ui, ui.id().with("commits"), |ui| {
+        let mut rm = None;
+        for (i, oid) in commits.iter_mut().enumerate() {
+            let text = egui::RichText::new(oid.as_str())
+                .size(height * 0.8)
+                .line_height(Some(height * 0.8));
+            let buttons = |ui: &mut egui::Ui| {
+                let resp = ui.add(remove_button.clone());
+                if resp.clicked() {
+                    rm = Some(i);
+                }
+                resp
+            };
+            let content = list_item::LabelContent::new(text).with_buttons(buttons);
+            let resp = list_item::ListItem::new()
+                .with_height(height)
+                .show_flat(ui, content);
             let mut close_menu = false;
+            let popup_contents = |ui: &mut egui::Ui| {
+                let singleline = &ui.text_edit_singleline(oid);
+                if resp.clicked() {
+                    singleline.request_focus()
+                }
+                if singleline.lost_focus() {
+                    ui.memory_mut(|mem| mem.close_popup());
+                    close_menu = true;
+                }
+            };
+            let popup_id = ui.make_persistent_id(format!("change_commit {i}"));
             egui::popup::popup_above_or_below_widget(
                 ui,
                 popup_id,
-                button,
+                &resp,
                 egui::AboveOrBelow::Below,
                 egui::popup::PopupCloseBehavior::CloseOnClickOutside,
-                |ui| {
-                    let text = commits.last_mut().unwrap();
-                    let singleline = &ui.text_edit_singleline(text);
-                    if button.clicked() {
-                        singleline.request_focus()
-                    }
-                    if singleline.lost_focus() {
-                        if text.is_empty() {
-                            commits.pop();
-                        }
-                        ui.memory_mut(|mem| mem.close_popup());
-                        close_menu = true;
-                    }
-                },
+                popup_contents,
             );
             if close_menu {
                 ui.close_menu();
             }
-
-            let button = egui::Button::new("branch");
-            if ui.add_enabled(false, button).clicked() {
-                wasm_rs_dbg::dbg!("TODO add branch");
-            }
-            let button = egui::Button::new("commit range");
-            if ui.add_enabled(false, button).clicked() {
-                wasm_rs_dbg::dbg!("TODO add commit range");
-            }
-        };
-        let label = format!("github.com/{}/{}", r.user, r.name);
-
-        let label = egui::RichText::new(label)
-            .size(10.0)
-            .line_height(Some(10.0));
-
-        let content = list_item::LabelContent::new(label)
-            .with_buttons(|ui| {
-                ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
-                let button = egui::Button::image(
-                    re_ui::icons::ADD
-                        .as_image()
-                        .fit_to_exact_size(egui::Vec2::splat(12.0)),
-                );
-                egui::menu::menu_custom_button(ui, button, button_menu).response
-            })
-            .always_show_buttons(true);
-
-        let force_background = if ui.visuals().dark_mode {
-            DesignTokens::load().section_collapsing_header_color()
-        } else {
-            ui.visuals().widgets.active.weak_bg_fill
-        }
-        .gamma_multiply(0.6);
-
-        let default_open = true;
-
-        let list = list_item::ListItem::new()
-            .interactive(true)
-            .force_background(force_background)
-            .with_height(16.0);
-        let response = list_item::list_item_scope(ui, id, |ui| {
-            list.show_hierarchical_with_children(ui, id, default_open, content, |_| ())
-        });
-        let mut add_children = |ui: &mut egui::Ui| {
-            ui.add_space(4.0);
-            list_item::list_item_scope(ui, ui.id().with("commits"), |ui| {
-                let mut rm = None;
-                for (i, oid) in commits.iter_mut().enumerate() {
-                    let text = egui::RichText::new(oid.as_str())
-                        .size(8.0)
-                        .line_height(Some(8.0));
-                    let buttons = |ui: &mut egui::Ui| {
-                        let resp = ui.add(
-                            egui::ImageButton::new(
-                                re_ui::icons::REMOVE
-                                    .as_image()
-                                    .fit_to_exact_size(egui::Vec2::splat(10.0)),
-                            )
-                            .tint(ui.visuals().widgets.inactive.fg_stroke.color),
-                        );
-                        if resp.clicked() {
-                            rm = Some(i);
-                        }
-                        resp
-                    };
-                    let content = list_item::LabelContent::new(text).with_buttons(buttons);
-                    let resp = list_item::ListItem::new()
-                        .with_height(10.0)
-                        .show_flat(ui, content);
-                    let popup_id = ui.make_persistent_id(format!("change_commit {i}"));
-                    if resp.clicked() {
-                        ui.memory_mut(|mem| mem.open_popup(popup_id))
-                    }
-
-                    let mut close_menu = false;
-                    egui::popup::popup_above_or_below_widget(
-                        ui,
-                        popup_id,
-                        &resp,
-                        egui::AboveOrBelow::Below,
-                        egui::popup::PopupCloseBehavior::CloseOnClickOutside,
-                        |ui| {
-                            let singleline = &ui.text_edit_singleline(oid);
-                            if resp.clicked() {
-                                singleline.request_focus()
-                            }
-                            if singleline.lost_focus() {
-                                ui.memory_mut(|mem| mem.close_popup());
-                                close_menu = true;
-                            }
-                        },
-                    );
-                    if close_menu {
-                        ui.close_menu();
-                    }
-                }
-                if let Some(j) = rm {
-                    ui.memory_mut(|mem| mem.close_popup());
-                    commits.remove(j);
-                }
-            });
-            ui.add_space(6.0);
-        };
-        let mut state = egui::collapsing_header::CollapsingState::load(ui.ctx(), id).unwrap();
-        let indented = true;
-        let mut span = ui.full_span().shrink(8.0);
-        span.min = span.max.min(span.min + 10.0);
-        let body_response = ui.full_span_scope(span, |ui| {
-            if indented {
-                ui.spacing_mut().indent =
-                    DesignTokens::small_icon_size().x + DesignTokens::text_to_icon_padding();
-                state.show_body_indented(&response.item_response, ui, |ui| add_children(ui))
-            } else {
-                state.show_body_unindented(ui, |ui| add_children(ui))
-            }
-        });
-
-        if response.item_response.clicked() {
-            // `show_hierarchical_with_children_unindented` already toggles on double-click,
-            // but we are _only_ a collapsing header, so we should also toggle on normal click:
-            if let Some(mut state) = egui::collapsing_header::CollapsingState::load(ui.ctx(), id) {
-                state.toggle(ui);
-                state.store(ui.ctx());
+            if resp.clicked() {
+                ui.memory_mut(|mem| mem.open_popup(popup_id))
             }
         }
-        response
-    }
+        if let Some(j) = rm {
+            ui.memory_mut(|mem| mem.close_popup());
+            commits.remove(j);
+        }
+    });
+    ui.add_space(height * 0.5);
 }
 
 impl super::HyperApp {

@@ -1,5 +1,8 @@
 use eframe::App;
+use egui::Widget;
 use egui::util::hash;
+use re_ui::UiExt;
+use re_ui::list_item::list_item_scope;
 use re_ui::{UiExt as _, notifications::NotificationUi};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -108,23 +111,39 @@ pub struct HyperApp {
     selected_baseline: Option<String>,
 }
 
-#[derive(Default)]
 struct ProjectsOrCommitsModal {
     modal_project: re_ui::modal::ModalHandler,
     modal_commits: re_ui::modal::ModalHandler,
     chosen_project: Option<ProjectId>,
+    commit_cb: fn(&mut AppData, types::CommitId),
+    project_cb: fn(&mut AppData, ProjectId) -> ProjectId,
+}
+
+impl Default for ProjectsOrCommitsModal {
+    fn default() -> Self {
+        Self {
+            modal_project: Default::default(),
+            modal_commits: Default::default(),
+            chosen_project: Default::default(),
+            commit_cb: |_, _| (),
+            project_cb: |_, _| ProjectId::INVALID,
+        }
+    }
 }
 
 impl ProjectsOrCommitsModal {
-    pub fn open_projects(&mut self) {
+    pub fn open_projects(&mut self, cb: fn(&mut AppData, ProjectId) -> ProjectId) {
         self.chosen_project = None;
         self.modal_project.open();
+        self.project_cb = cb;
     }
 
-    pub fn open_commits(&mut self, project_id: ProjectId) {
+    pub fn open_commits(&mut self, project_id: ProjectId, cb: fn(&mut AppData, types::CommitId)) {
         self.chosen_project = Some(project_id);
+        self.commit_cb = cb;
         self.modal_commits.open();
     }
+
     pub fn aux<R>(ui: &mut egui::Ui, txt: &str, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
         let inner_margin = egui::Margin::same(re_ui::DesignTokens::view_padding());
         let frame = egui::Frame {
@@ -153,7 +172,7 @@ impl ProjectsOrCommitsModal {
                 });
                 if let Some(cid) = cid {
                     *_close = false;
-                    data.aspects.commit.id = cid;
+                    (self.commit_cb)(data, cid);
                 }
             },
         );
@@ -164,7 +183,13 @@ impl ProjectsOrCommitsModal {
                 if self.chosen_project.is_some() {
                     return;
                 }
-                Self::aux(ui, "modal projects", |ui| show_project_selection(ui, data))
+                let mut pid = (self.project_cb)(data, ProjectId::INVALID);
+                Self::aux(ui, "modal projects", |ui| {
+                    show_project_selection(ui, data, &mut pid);
+                });
+                if pid != (self.project_cb)(data, pid) {
+                    *_close = false;
+                }
             },
         );
     }
@@ -759,7 +784,7 @@ impl SelectedConfig {
             SelectedConfig::Diff => vec![Tab::Diff(0)],
             SelectedConfig::Tracking => vec![Tab::CodeTree(0)],
             SelectedConfig::LongTracking => vec![Tab::LongTracking],
-            SelectedConfig::Aspects => vec![Tab::ProjectSelection(), Tab::TreeAspect],
+            SelectedConfig::Aspects => vec![Tab::TreeAspect],
         }
         .into()
     }
@@ -1482,7 +1507,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     .outer_margin(egui::Margin::same(5))
                     .inner_margin(egui::Margin::same(15))
                     .show(ui, |ui| {
-                        show_project_selection(ui, &mut self.data);
+                        show_project_selection(ui, &mut self.data, &mut ProjectId::INVALID);
 
                         ui.center("project_top_left_actions", |ui| self.data.show_actions(ui))
                     });
@@ -2256,47 +2281,77 @@ const ACTIONS: &[fn(&mut AppData, &mut egui::Ui) -> egui::Response] = &[
     },
 ];
 
-pub(crate) fn show_project_selection(ui: &mut egui::Ui, data: &mut AppData) {
+fn te<'a>(txt: &'a mut String, hint: &'static str) -> egui::TextEdit<'a> {
+    egui::TextEdit::singleline(txt)
+        .clip_text(false)
+        .background_color(egui::Color32::TRANSPARENT)
+        .desired_width(20.0)
+        .min_size((100.0, 0.0).into())
+        .id_salt(hint)
+        .hint_text(hint)
+}
+
+pub(crate) fn show_project_selection(
+    ui: &mut egui::Ui,
+    data: &mut AppData,
+    selected: &mut ProjectId,
+) {
+    let old_selected = *selected;
+    // *selected = ProjectId::INVALID;
     let mut rm = None;
-    for i in data.selected_code_data.project_ids() {
-        let Some((r, _)) = data.selected_code_data.get_mut(i) else {
+    let project_ids = data.selected_code_data.project_ids();
+    let mut add_contents = |ui: &mut egui::Ui, i: ProjectId, r: &mut Repo| {
+        ui.label("github.com");
+        ui.horizontal(|ui| {
+            ui.label("/");
+            ui.add(te(&mut r.user, "user").id(ui.id().with((i, "user"))));
+        });
+        ui.end_row();
+        ui.horizontal(|ui| {
+            ui.label("/");
+            ui.add(te(&mut r.name, "name").id(ui.id().with((i, "name"))));
+        });
+    };
+    let layout = egui::Layout::right_to_left(egui::Align::Center);
+    for i in project_ids {
+        let Some((r, commits)) = data.selected_code_data.get_mut(i) else {
             continue;
         };
-        ui.push_id(ui.id().with(i), |ui| {
-            ui.horizontal(|ui| {
-                ui.label("github.com");
-                ui.label("/");
-                ui.add(
-                    egui::TextEdit::singleline(&mut r.user)
-                        .id(ui.id().with("user"))
-                        .clip_text(false)
-                        .hint_text("user")
-                        .desired_width(0.0)
-                        .min_size((50.0, 0.0).into()),
-                );
-                ui.label("/");
-                ui.add(
-                    egui::TextEdit::singleline(&mut r.name)
-                        .id(ui.id().with("name"))
-                        .clip_text(false)
-                        .hint_text("name")
-                        .desired_width(0.0)
-                        .min_size((50.0, 0.0).into()),
-                );
-                if (&ui.button("➖").on_hover_text("remove repository")).clicked() {
-                    rm = Some(i);
-                }
-            });
-        });
+        let is_selected = old_selected == i;
+        let ui_builder = egui::UiBuilder::new().layout(layout);
+        use re_ui::list_item::ContentContext as CC;
+        let r = |ui: &mut egui::Ui, ctx: &CC<'_>| {
+            add_contents(ui, i, r);
+            let button = ui
+                .new_child(ui_builder.max_rect(ui.max_rect()))
+                .button("➖")
+                .on_hover_text("remove repository");
+            ui.advance_cursor_after_rect(button.rect);
+            if button.clicked() {
+                rm = Some(i);
+            }
+        };
 
-        ui.separator();
+        let id = ui.id().with(i);
+        let content = re_ui::list_item::CustomContent::new(r);
+
+        let list = re_ui::list_item::ListItem::new()
+            .interactive(true)
+            .selected(is_selected)
+            .with_height(22.0);
+        let r = re_ui::list_item::list_item_scope(ui, id, |ui| list.show_flat(ui, content));
+        if r.clicked() {
+            *selected = i;
+        }
     }
+
     if let Some(i) = rm {
         data.selected_code_data.remove(i);
     }
 
     ui.add_space(20.0);
-    if (&ui.button("➕").on_hover_text("add new repository")).clicked() {
+    let button = ui.button("➕").on_hover_text("add new repository");
+    if button.clicked() {
         data.selected_code_data.add(
             Repo {
                 user: Default::default(),
@@ -2305,7 +2360,6 @@ pub(crate) fn show_project_selection(ui: &mut egui::Ui, data: &mut AppData) {
             vec![],
         );
     }
-
     ui.add_space(40.0);
 }
 

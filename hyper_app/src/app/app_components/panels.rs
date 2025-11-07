@@ -4,7 +4,7 @@ use egui::Widget;
 use re_ui::{DesignTokens, UiExt};
 
 use crate::app::{
-    QResId,
+    ProjectId, QResId,
     querying::{self, ComputeConfigQuery},
     types::{self, Commit, Config, QueriedLang},
 };
@@ -52,12 +52,29 @@ impl crate::HyperApp {
                         let (proj_resp, commit_resp, path_resp) =
                             crate::app::code_aspects::show_config(ui, &mut self.data.aspects);
                         if proj_resp.clicked() {
-                            self.modal_handler_proj_or_commits.open_projects();
+                            self.modal_handler_proj_or_commits
+                                .open_projects(|data, pid| {
+                                    if pid == ProjectId::INVALID {
+                                        data.selected_code_data
+                                            .find(&data.aspects.commit.repo)
+                                            .unwrap_or(ProjectId::INVALID)
+                                    } else if let Some(repo) = data.selected_code_data.get(pid) {
+                                        if &data.aspects.commit.repo != repo {
+                                            data.aspects.commit.repo = repo.clone();
+                                            ProjectId::INVALID
+                                        } else {
+                                            pid
+                                        }
+                                    } else {
+                                        ProjectId::INVALID
+                                    }
+                                });
                         }
                         if commit_resp.clicked() {
                             let repo = &self.data.aspects.commit.repo;
                             if let Some(proj) = self.data.selected_code_data.find(repo) {
-                                self.modal_handler_proj_or_commits.open_commits(proj);
+                                self.modal_handler_proj_or_commits
+                                    .open_commits(proj, |data, cid| data.aspects.commit.id = cid);
                             }
                         }
                         if path_resp.changed() {

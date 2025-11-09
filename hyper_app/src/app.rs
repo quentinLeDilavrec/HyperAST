@@ -1199,7 +1199,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             Tab::QueryResults { id, format } => {
                 let Some(QueryResults {
                     project: proj_id,
-                    query: _,
+                    query,
                     content: res,
                     tab: _,
                 }) = self.data.queries_results.get_mut(*id)
@@ -1298,6 +1298,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         });
                     }
                     ResultFormat::Hunks => {
+                        let qid = *query;
                         let proj_id = *proj_id;
                         if show_hunks_header(
                             ui,
@@ -1317,8 +1318,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         let Some(selected_commit) = &self.selected_commit else {
                             unreachable!()
                         };
-
-                        let qid = QueryId::INVALID; // TODO q_res.1 as usize;
                         if let Some(differential) = &mut data.queries_differential_results {
                             let (absent, new) = update_queries_differential_results(
                                 ui,
@@ -1372,6 +1371,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         }
                     }
                     ResultFormat::Tree => {
+                        let qid = *query;
                         let proj_id = *proj_id;
 
                         let data = &mut *self.data;
@@ -1383,7 +1383,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             unreachable!()
                         };
 
-                        let qid = QueryId::INVALID; // TODO q_res.1 as usize;
                         if let Some(differential) = &mut data.queries_differential_results {
                             let (absent, new) = update_queries_differential_results(
                                 ui,

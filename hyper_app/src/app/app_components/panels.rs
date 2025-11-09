@@ -117,7 +117,7 @@ impl crate::HyperApp {
             show_precomp_selector(ui, qid, query.precomp.clone(), &mut self.data.queries);
 
         if create_q.inner.map_or(false, |x| x.clicked()) {
-            let qid = self.data.queries.push(crate::app::QueryData {
+            let precomp = self.data.queries.push(crate::app::QueryData {
                 name: "precomp".to_string(),
                 lang: self.data.queries[qid].lang.to_string(),
                 query: egui_addon::code_editor::CodeEditor::new(
@@ -127,8 +127,8 @@ impl crate::HyperApp {
                 ..Default::default()
             });
             let query = &mut self.data.queries[qid];
-            query.precomp = Some(qid);
-            let tid = self.tabs.push(crate::app::Tab::LocalQuery(qid));
+            query.precomp = Some(precomp);
+            let tid = self.tabs.push(crate::app::Tab::LocalQuery(precomp));
             let child = self.tree.tiles.insert_pane(tid);
             match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
                 Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
@@ -695,7 +695,7 @@ fn show_precomp_selector(
             }
             let query = &mut queries[qid];
             if let Some(precomp) = precomp {
-                query.precomp = Some(precomp as QueryId);
+                query.precomp = Some(precomp);
             }
             if ui
                 .selectable_label(query.precomp.is_none(), "<none>")

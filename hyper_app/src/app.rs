@@ -2041,10 +2041,9 @@ fn compute_queries_differential_results(
     };
     let max_matches = data.queries[qid].max_matches;
     let timeout = data.queries[qid].timeout;
-    let precomp = data.queries[qid]
-        .precomp
-        .clone()
-        .map(|qid| &data.queries[qid]);
+    let precomp = data.queries[qid].precomp.clone();
+    wasm_rs_dbg::dbg!(qid, &data.queries, precomp);
+    let precomp = precomp.map(|qid| &data.queries[qid]);
     let precomp = precomp.map(|p| p.query.as_ref().to_string());
     let hash = hash((&query, selected_baseline.clone()));
     let prom = querying::remote_compute_query_differential(

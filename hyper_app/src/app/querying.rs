@@ -130,28 +130,22 @@ pub(super) fn remote_compute_query(
         Config::MakeCpp => "Cpp",
     }
     .to_string();
-    let script = match &mut query_editors.current {
+    let query = match &mut query_editors.current {
         EditStatus::Shared(_, shared_script) | EditStatus::Sharing(shared_script) => {
             let code_editors = shared_script.lock().unwrap();
-            QueryContent {
-                language,
-                query: code_editors.query.code().to_string(),
-                precomp: None,
-                commits: single.content.len,
-                max_matches: u64::MAX,
-                timeout: u64::MAX,
-            }
+            code_editors.query.code().to_string()
         }
         EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
-            QueryContent {
-                language,
-                query: content.query.code().to_string(),
-                precomp: None,
-                commits: single.content.len,
-                max_matches: u64::MAX,
-                timeout: u64::MAX,
-            }
+            content.query.code().to_string()
         }
+    };
+    let script = QueryContent {
+        language,
+        query,
+        precomp: None,
+        commits: single.content.len,
+        max_matches: u64::MAX,
+        timeout: u64::MAX,
     };
     remote_compute_query_aux_old(ctx, api_addr, &single.content, script)
 }
@@ -621,11 +615,6 @@ impl Resource<Result<DetailsResults, QueryingError>> {
         if !content_type.starts_with("application/json") {
             return Err(format!("Wrong content type: {}", content_type));
         }
-        // let image = if content_type.starts_with("image/") {
-        //     RetainedImage::from_image_bytes(&response.url, &response.bytes).ok()
-        // } else {
-        //     None
-        // };
         if response.status != 200 {
             let Some(text) = response.text() else {
                 return Err("".to_string());
@@ -644,7 +633,6 @@ impl Resource<Result<DetailsResults, QueryingError>> {
         }
 
         let text = response.text();
-        // let colored_text = text.and_then(|text| syntax_highlighting(ctx, &response, text));
         let text = text.and_then(|text| {
             serde_json::from_str(text)
                 .inspect_err(|err| {

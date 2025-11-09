@@ -1506,7 +1506,8 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     .outer_margin(egui::Margin::same(5))
                     .inner_margin(egui::Margin::same(15))
                     .show(ui, |ui| {
-                        show_project_selection(ui, &mut self.data, &mut ProjectId::INVALID);
+                        let mut pid = ProjectId::INVALID;
+                        show_project_selection(ui, &mut self.data, &mut pid);
 
                         ui.center("project_top_left_actions", |ui| self.data.show_actions(ui))
                     });
@@ -2157,7 +2158,13 @@ fn show_commits_as_tree<const BUTTON: bool>(
         return;
     };
     if let Err(err) = res {
-        ui.error_label(err);
+        ui.horizontal(|ui| {
+            ui.error_label(err);
+            if ui.button("Retry").clicked() {
+                to_fetch.insert(id.to_string());
+            }
+        });
+
         return;
     }
     let Ok(md) = res else { unreachable!() };

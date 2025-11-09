@@ -118,7 +118,7 @@ impl Default for ComputeConfigQuery {
             len: 1,
             simple_matching: true,
             prepro_matching: true,
-            wanted_matches: Default::default(),
+            wanted_matches: usize::MAX..usize::MAX,
             advanced_open: false,
         }
     }
@@ -287,7 +287,14 @@ pub(crate) fn show_config(
     ui.checkbox(&mut conf.simple_matching, "Simple Matching");
     ui.checkbox(&mut conf.prepro_matching, "Incr. Matching");
 
+    if (smells.bad_matches_bounds) == (0..=0) {
+        return (resp_repo, resp_commit);
+    }
     ui.label("#matches on entire commit:");
+    if (conf.wanted_matches) == (usize::MAX..usize::MAX) {
+        smells.bads = None;
+        conf.wanted_matches = *smells.bad_matches_bounds.start()..*smells.bad_matches_bounds.end();
+    }
     let double_ended_slider = ui.double_ended_slider(
         &mut conf.wanted_matches.start,
         &mut conf.wanted_matches.end,
@@ -382,160 +389,22 @@ pub(super) fn show_central_panel(
         todo!();
     }
     if let Some(promise) = smells_result {
-        let Some(result) = promise.ready() else {
-            let center = ui.available_rect_before_wrap().center();
-            let conf = smells.commits.as_mut().unwrap();
-            let examples = smells.diffs.as_mut().unwrap();
-            show_examples(ui, api_addr, examples, fetched_files);
-            egui::Window::new("Actions")
-                .default_pos(center)
-                .pivot(egui::Align2::CENTER_CENTER)
-                .show(ui.ctx(), |ui| {
-                    if ui.button("Compute Queries").clicked() {
-                        *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                    }
-                    ui.spinner();
-                });
-            smells.bad_matches_bounds = std::ops::RangeInclusive::new(0, 0);
-            return;
-        };
-        match result {
-            Ok(resource) => match &resource.content {
-                Some(Ok(queries)) => {
-                    let conf = smells.commits.as_mut().unwrap();
-                    let examples = smells.diffs.as_mut().unwrap();
-                    let center = ui.available_rect_before_wrap().center();
-                    let id = ui.id();
-                    let tot_len = queries.bad.len();
-                    if smells.bads.is_none() {
-                        smells.bads = Some(
-                            (0..tot_len)
-                                .filter(|i| conf.wanted_matches.contains(&queries.bad[*i].matches))
-                                .collect(),
-                        )
-                    }
-                    let bads = smells.bads.as_ref().unwrap();
-                    let len = bads.len();
-                    if !queries.good.is_empty() {
-                        todo!("handle the queries matching the fixes")
-                    }
-
-                    if *smells.bad_matches_bounds.end() == 0 {
-                        let start = queries
-                            .bad
-                            .iter()
-                            .map(|x| x.matches)
-                            .min()
-                            .unwrap_or_default();
-                        let end = queries
-                            .bad
-                            .iter()
-                            .map(|x| x.matches)
-                            .max()
-                            .unwrap_or_default();
-                        smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
-                    }
-                    if tot_len == 0 {
-                        ui.colored_label(ui.visuals().error_fg_color, "No queries found");
-                        return;
-                    }
+        match show_smells_result(ui, api_addr, smells, fetched_files, promise) {
+            Some(value) => *smells_result = Some(value),
+            None => {
+                if let Some(examples) = &mut smells.diffs {
+                    let len = examples.examples.len();
                     if len == 0 {
-                        ui.colored_label(
-                            ui.visuals().error_fg_color,
-                            "No queries selected, change the hyperparameters",
-                        );
+                        ui.colored_label(ui.visuals().error_fg_color, "No changes found");
                         return;
                     }
-                    egui::ScrollArea::vertical()
-                        .scroll_bar_visibility(
-                            egui::scroll_area::ScrollBarVisibility::AlwaysVisible,
-                        )
-                        .show_rows(ui, H, len, |ui, rows| {
-                            let (mut rect, _) = ui.allocate_exact_size(
-                                egui::Vec2::new(
-                                    ui.available_width(),
-                                    H, // * (rows.end - rows.start) as f32,
-                                ),
-                                egui::Sense::hover(),
-                            );
-                            let top = rect.top();
-                            for i in rows.start..rows.end - 1 {
-                                let mut rect = {
-                                    let (t, b) = rect.split_top_bottom_at_y(
-                                        top + H * (i - rows.start + 1) as f32,
-                                    );
-                                    rect = b;
-                                    t
-                                };
-                                rect.bottom_mut().sub_assign(B);
-
-                                let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
-                                    rect.left_bottom(),
-                                    ui.pixels_per_point(),
-                                );
-                                let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
-                                    rect.right_bottom(),
-                                    ui.pixels_per_point(),
-                                );
-                                ui.painter().line_segment(
-                                    [line_pos_1, line_pos_2],
-                                    ui.visuals().window_stroke(),
-                                );
-                                rect.bottom_mut().sub_assign(B);
-                                let mut ui = ui.new_child(
-                                    egui::UiBuilder::new()
-                                        .max_rect(rect)
-                                        .layout(egui::Layout::top_down(egui::Align::Min)),
-                                );
-                                ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-                                ui.push_id(
-                                    id.with(bads[i])
-                                        .with("query_with_example")
-                                        .with(&resource.response.bytes),
-                                    |ui| {
-                                        let bad_query = &queries.bad[bads[i]];
-                                        // let example = &mut examples.examples[bad_query.examples];
-                                        show_query_with_example(
-                                            ui,
-                                            api_addr,
-                                            bad_query,
-                                            examples,
-                                            fetched_files,
-                                        );
-                                    },
-                                );
-                            }
-                        });
-                    egui::Window::new("Actions")
-                        .default_pos(center)
-                        .pivot(egui::Align2::CENTER_CENTER)
-                        .show(ui.ctx(), |ui| {
-                            if ui.button("Compute Queries").clicked() {
-                                *smells_result =
-                                    Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                            }
-                        });
+                    let conf = smells.commits.as_mut().unwrap();
+                    let center = ui.available_rect_before_wrap().center();
+                    show_examples(ui, api_addr, examples, fetched_files);
                     return;
-                    // smells.queries = Some(examples.clone());
                 }
-                Some(Err(error)) => {
-                    egui::Window::new("QueryError").show(ui.ctx(), |ui| {
-                        ui.label("Error");
-                        ui.label(format!("{:?}", error));
-                    });
-                }
-                _ => (),
-            },
-            Err(error) => {
-                // This should only happen if the fetch API isn't available or something similar.
-                egui::Window::new("QueryError").show(ui.ctx(), |ui| {
-                    ui.colored_label(
-                        ui.visuals().error_fg_color,
-                        if error.is_empty() { "Error" } else { error },
-                    );
-                });
             }
-        };
+        }
     }
     if let Some(promise) = smells_diffs_result {
         let Some(result) = promise.ready() else {
@@ -548,7 +417,7 @@ pub(super) fn show_central_panel(
                     smells.diffs = Some(examples.clone());
                 }
                 Some(Err(error)) => {
-                    egui::Window::new("QueryError").show(ui.ctx(), |ui| {
+                    egui::Window::new("QueryError3").show(ui.ctx(), |ui| {
                         ui.label("Error");
                         ui.label(format!("{:?}", error));
                     });
@@ -557,12 +426,15 @@ pub(super) fn show_central_panel(
             },
             Err(error) => {
                 // This should only happen if the fetch API isn't available or something similar.
-                egui::Window::new("QueryError").show(ui.ctx(), |ui| {
+                egui::Window::new("Diff Error").show(ui.ctx(), |ui| {
                     ui.colored_label(
                         ui.visuals().error_fg_color,
                         if error.is_empty() { "Error" } else { error },
                     );
                 });
+                if ui.button("retry").clicked() {
+                    *smells_diffs_result = None;
+                }
             }
         };
     }
@@ -586,9 +458,11 @@ pub(super) fn show_central_panel(
         return;
     }
     if let Some(conf) = &mut smells.commits {
-        ui.label(format!("{:?}", conf));
-        ui.spinner();
-        *smells_diffs_result = Some(fetch_examples_at_commits(ui.ctx(), api_addr, conf));
+        if smells_diffs_result.is_none() {
+            ui.label(format!("{:?}", conf));
+            ui.spinner();
+            *smells_diffs_result = Some(fetch_examples_at_commits(ui.ctx(), api_addr, conf));
+        }
         // TODO display when multiple possible choices
         // egui::Window::new("Actions").show(ui.ctx(), |ui| {
         //     if ui.button("Show diffs").clicked() {
@@ -597,6 +471,173 @@ pub(super) fn show_central_panel(
         // });
         return;
     }
+}
+
+fn show_smells_result(
+    ui: &mut egui::Ui,
+    api_addr: &str,
+    smells: &mut Config,
+    fetched_files: &mut FetchedFiles,
+    smells_result: &mut RemoteResult,
+) -> Option<RemoteResult> {
+    let Some(result) = smells_result.ready() else {
+        let mut _smells_result = None;
+        let center = ui.available_rect_before_wrap().center();
+        let conf = smells.commits.as_mut().unwrap();
+        let examples = smells.diffs.as_mut().unwrap();
+        show_examples(ui, api_addr, examples, fetched_files);
+        egui::Window::new("Actions")
+            .default_pos(center)
+            .pivot(egui::Align2::CENTER_CENTER)
+            .show(ui.ctx(), |ui| {
+                if ui.button("Compute Queries").clicked() {
+                    _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+                }
+                ui.spinner();
+            });
+        smells.bad_matches_bounds = 0..=0;
+        return None;
+    };
+    if let Err(error) = result {
+        // This should only happen if the fetch API isn't available or something similar.
+        let mut _smells_result = None;
+        let center = ui.available_rect_before_wrap().center();
+        let conf = smells.commits.as_mut().unwrap();
+        let examples = smells.diffs.as_mut().unwrap();
+        show_examples(ui, api_addr, examples, fetched_files);
+        egui::Window::new("Actions")
+            .default_pos(center)
+            .pivot(egui::Align2::CENTER_CENTER)
+            .show(ui.ctx(), |ui| {
+                ui.colored_label(
+                    ui.visuals().error_fg_color,
+                    if error.is_empty() { "Error" } else { error },
+                );
+                if ui.button("Retry Compute Queries").clicked() {
+                    _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+                }
+            });
+        return None;
+    };
+    let Ok(resource) = result else {
+        return None;
+    };
+    let Some(content) = &resource.content else {
+        return None;
+    };
+    if let Err(error) = content {
+        egui::Window::new("QueryError2").show(ui.ctx(), |ui| {
+            ui.label("Error");
+            ui.label(format!("{:?}", error));
+        });
+        return None;
+    };
+    let Ok(queries) = content else {
+        return None;
+    };
+    let conf = smells.commits.as_mut().unwrap();
+    let examples = smells.diffs.as_mut().unwrap();
+    let center = ui.available_rect_before_wrap().center();
+    let id = ui.id();
+    let tot_len = queries.bad.len();
+    let predicate = |i: &usize| conf.wanted_matches.contains(&queries.bad[*i].matches);
+    if smells.bads.is_none() {
+        smells.bads = Some((0..tot_len).filter(predicate).collect())
+    }
+    let bads = smells.bads.as_ref().unwrap();
+    let len = bads.len();
+    if !queries.good.is_empty() {
+        todo!("handle the queries matching the fixes")
+    }
+
+    if (smells.bad_matches_bounds) == (0..=0) {
+        let start = (queries.bad.iter())
+            .map(|x| x.matches)
+            .min()
+            .unwrap_or_default();
+        let end = (queries.bad.iter())
+            .map(|x| x.matches)
+            .max()
+            .unwrap_or_default();
+        smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
+    }
+    if tot_len == 0 {
+        let mut _smells_result = None;
+        egui::Window::new("Actions")
+            .default_pos(center)
+            .pivot(egui::Align2::CENTER_CENTER)
+            .show(ui.ctx(), |ui| {
+                ui.colored_label(ui.visuals().error_fg_color, "No queries found");
+                if ui.button("Retry Compute Queries").clicked() {
+                    _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+                }
+            });
+        return _smells_result;
+    }
+    if len == 0 {
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            "No queries selected, change the hyperparameters",
+        );
+        return None;
+    }
+    egui::ScrollArea::vertical()
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+        .show_rows(ui, H, len, |ui, rows| {
+            let (mut rect, _) = ui.allocate_exact_size(
+                egui::Vec2::new(
+                    ui.available_width(),
+                    H, // * (rows.end - rows.start) as f32,
+                ),
+                egui::Sense::hover(),
+            );
+            let top = rect.top();
+            for i in rows.start..rows.end - 1 {
+                let mut rect = {
+                    let (t, b) = rect.split_top_bottom_at_y(top + H * (i - rows.start + 1) as f32);
+                    rect = b;
+                    t
+                };
+                rect.bottom_mut().sub_assign(B);
+
+                let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
+                    rect.left_bottom(),
+                    ui.pixels_per_point(),
+                );
+                let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
+                    rect.right_bottom(),
+                    ui.pixels_per_point(),
+                );
+                ui.painter()
+                    .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
+                rect.bottom_mut().sub_assign(B);
+                let mut ui = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(rect)
+                        .layout(egui::Layout::top_down(egui::Align::Min)),
+                );
+                ui.set_clip_rect(rect.intersect(ui.clip_rect()));
+                ui.push_id(
+                    id.with(bads[i])
+                        .with("query_with_example")
+                        .with(&resource.response.bytes),
+                    |ui| {
+                        let bad_query = &queries.bad[bads[i]];
+                        show_query_with_example(ui, api_addr, bad_query, examples, fetched_files);
+                    },
+                );
+            }
+        });
+    let mut _smells_result = None;
+    egui::Window::new("Actions")
+        .default_pos(center)
+        .pivot(egui::Align2::CENTER_CENTER)
+        .show(ui.ctx(), |ui| {
+            if ui.button("Compute Queries").clicked() {
+                _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+            }
+        });
+    _smells_result
 }
 
 pub(crate) fn show_examples(

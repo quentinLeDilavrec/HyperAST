@@ -551,7 +551,7 @@ impl<Acc> Parents<Acc> {
             .find_map(|x| x.as_mut().visibility())
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.0.len()
     }
 }
@@ -962,15 +962,16 @@ pub mod utils_ts {
     /// so no need to keep a stack of cursors !
     /// NOTE from profiling it was taking about 30% of the runtime.
     pub struct PrePost2<C> {
-        has: super::zipped::Has,
-        cursor: C,
+        #[doc(hidden)]
+        pub has: super::zipped::Has,
+        pub cursor: C,
         pub stack: Vec<usize>,
         vis: bitvec::vec::BitVec,
         waiting: Option<Visibility>,
     }
 
-    impl<'a, C: super::parser::TreeCursor + Clone> PrePost2<C> {
-        pub fn new(cursor: &C) -> Self {
+    impl<C: super::parser::TreeCursor> PrePost2<C> {
+        pub fn new(cursor: C) -> Self {
             use bitvec::prelude::Lsb0;
             let mut vis = bitvec::bitvec![];
             vis.push(Visibility::Visible == Visibility::Hidden);
@@ -978,35 +979,29 @@ pub mod utils_ts {
             stack.reserve(30);
             Self {
                 has: super::zipped::Has::Down,
-                cursor: cursor.clone(),
+                cursor,
                 stack,
                 vis,
                 waiting: None,
             }
         }
+    }
 
+    impl<C: super::parser::TreeCursor> PrePost2<C> {
         pub fn current(&mut self) -> (Option<&C>, &mut super::zipped::Has) {
             (Some(&self.cursor), &mut self.has)
         }
 
         pub fn next(&mut self) -> Option<Visibility> {
-            // dbg!(self.vis.len());
             use super::zipped::Has;
-            // use crate::tree_gen::parser::Node;
             if self.vis.is_empty() {
                 return None;
             };
             assert_eq!(self.stack.len(), self.vis.len());
-            // let Some(cursor) = self.stack.last_mut() else {
-            //     return None;
-            // };
-            // let mut cursor = cursor.clone();
             if self.has != Has::Up {
                 if let Some(visibility) = self.cursor.goto_first_child_extended() {
-                    // dbg!(visibility);
                     let node = self.cursor.node();
                     self.stack.push(node.end_byte());
-                    // self.stack.push(cursor);
                     self.has = Has::Down;
                     self.vis.push(visibility == Visibility::Hidden);
                     return Some(visibility);
@@ -1024,12 +1019,10 @@ pub mod utils_ts {
                     } else {
                         Visibility::Visible
                     };
-                    // dbg!(vis);
                     Some(vis)
                 } else {
                     let vis = self.waiting.take().unwrap();
                     self.has = Has::Right;
-                    // dbg!(vis);
                     self.stack.push(node.end_byte());
                     self.vis.push(vis == Visibility::Hidden);
                     Some(vis)
@@ -1045,10 +1038,8 @@ pub mod utils_ts {
                     } else {
                         Visibility::Visible
                     };
-                    // dbg!(vis);
                     return Some(vis);
                 }
-                // dbg!(visibility);
                 self.stack.push(node.end_byte());
                 self.vis.push(visibility == Visibility::Hidden);
                 assert_eq!(self.stack.len(), self.vis.len());
@@ -1058,17 +1049,6 @@ pub mod utils_ts {
                 // NOTE do not need the visibility
                 // I don't have a good way of getting the correct one anyway
                 self.has = Has::Up;
-                // if self.stack.is_empty() {
-                //     self.stack.push(c);
-                //     None
-                //     // depends on usage
-                //     // let vis = if self.vis.pop().unwrap() {
-                //     //     Visibility::Hidden
-                //     // } else {
-                //     //     Visibility::Visible
-                //     // };
-                //     // Some(vis)
-                // } else {
                 if let Some(vis) = self.vis.last() {
                     let vis = if *vis {
                         Visibility::Hidden
@@ -1079,7 +1059,6 @@ pub mod utils_ts {
                 } else {
                     None
                 }
-                // }
             } else {
                 None
             }

@@ -261,6 +261,28 @@ impl LangRef<TType> for Lang {
 
 pub use hyperast::types::Role;
 
+macro_rules! is {
+    ($e:expr, $($p:ident $(if $guard:expr)?, )*) => {
+        match $e {$(
+            Type::$p $(if $guard)? => true,)*
+            _ => false
+        }
+    };
+}
+macro_rules! ty {
+    ($e:expr,
+        $([$g2:expr] => $v2:expr, )*
+        $($p:ident => $v:expr,)*
+        $(_ => $d:expr,)?
+    ) => {
+        match $e {
+            $(_ if $g2 => $v2,)*
+            $(Type::$p => $v,)*
+            $(_ => $d)?
+        }
+    }
+}
+
 impl HyperType for Type {
     fn generic_eq(&self, other: &dyn HyperType) -> bool
     where
@@ -407,20 +429,29 @@ impl HyperType for Type {
 
     fn as_shared(&self) -> hyperast::types::Shared {
         use hyperast::types::Shared;
-        if self.is_error() {
-            return Shared::Error;
-        }
-        match self {
-            x if x.is_type_declaration() => Shared::TypeDeclaration,
-            Type::LineComment => Shared::Comment,
-            Type::BlockComment => Shared::Comment,
-            Type::Identifier => Shared::Identifier,
-            Type::TypeIdentifier => Shared::Identifier,
-            Type::ScopedIdentifier => Shared::Identifier,
-            x if x.is_literal() => Shared::Literal,
-            x if x.is_fork() => Shared::Branch,
+        ty!(self,
+            [self.is_error()] => Shared::Error,
+            [self.is_type_declaration()] => Shared::TypeDeclaration,
+            [self.is_literal()] => Shared::Literal,
+            [self.is_fork()] => Shared::Branch,
+            LineComment => Shared::Comment,
+            BlockComment => Shared::Comment,
+            Identifier => Shared::Identifier,
+            TypeIdentifier => Shared::Identifier,
+            ScopedIdentifier => Shared::Identifier,
             _ => Shared::Other,
-        }
+        )
+        // match self {
+        //     x if x.is_type_declaration() => Shared::TypeDeclaration,
+        //     Type::LineComment => Shared::Comment,
+        //     Type::BlockComment => Shared::Comment,
+        //     Type::Identifier => Shared::Identifier,
+        //     Type::TypeIdentifier => Shared::Identifier,
+        //     Type::ScopedIdentifier => Shared::Identifier,
+        //     x if x.is_literal() => Shared::Literal,
+        //     x if x.is_fork() => Shared::Branch,
+        //     _ => Shared::Other,
+        // }
     }
 
     fn is_error(&self) -> bool {
@@ -468,57 +499,51 @@ impl TypeTrait for Type {
     type Lang = Java;
 
     fn is_fork(&self) -> bool {
-        match self {
-            Self::TernaryExpression => true,
-            Self::IfStatement => true,
-            Self::ForStatement => true,
-            Self::EnhancedForStatement => true,
-            Self::WhileStatement => true,
-            Self::CatchClause => true,
-            Self::SwitchLabel => true,
-            Self::TryStatement => true,
-            Self::TryWithResourcesStatement => true,
-            Self::DoStatement => true,
-            _ => false,
-        }
+        is!(
+            self,
+            TernaryExpression,
+            IfStatement,
+            ForStatement,
+            EnhancedForStatement,
+            WhileStatement,
+            CatchClause,
+            SwitchLabel,
+            TryStatement,
+            TryWithResourcesStatement,
+            DoStatement,
+        )
     }
 
     fn is_literal(&self) -> bool {
-        match self {
-            Self::_Literal => true,
-            Self::True => true,
-            Self::False => true,
-            Self::OctalIntegerLiteral => true,
-            Self::BinaryIntegerLiteral => true,
-            Self::DecimalIntegerLiteral => true,
-            Self::HexFloatingPointLiteral => true,
-            Self::DecimalFloatingPointLiteral => true,
-            Self::ClassLiteral => true,
-            Self::StringLiteral => true,
-            Self::CharacterLiteral => true,
-            Self::HexIntegerLiteral => true,
-            Self::NullLiteral => true,
-            _ => false,
-        }
+        is!(
+            self,
+            _Literal,
+            True,
+            False,
+            OctalIntegerLiteral,
+            BinaryIntegerLiteral,
+            DecimalIntegerLiteral,
+            HexFloatingPointLiteral,
+            DecimalFloatingPointLiteral,
+            ClassLiteral,
+            StringLiteral,
+            CharacterLiteral,
+            HexIntegerLiteral,
+            NullLiteral,
+        )
     }
     fn is_primitive(&self) -> bool {
-        match self {
-            Self::BooleanType => true,
-            Self::VoidType => true,
-            Self::FloatingPointType => true,
-            Self::IntegralType => true,
-            _ => false,
-        }
+        is!(self, BooleanType, VoidType, FloatingPointType, IntegralType,)
     }
     fn is_type_declaration(&self) -> bool {
-        match self {
-            Self::ClassDeclaration => true,
-            Self::EnumDeclaration => true,
-            Self::InterfaceDeclaration => true,
-            Self::AnnotationTypeDeclaration => true,
-            Self::EnumConstant => true, // TODO need more eval
-            _ => false,
-        }
+        is!(
+            self,
+            ClassDeclaration,
+            EnumDeclaration,
+            InterfaceDeclaration,
+            AnnotationTypeDeclaration,
+            EnumConstant, // TODO need more eval
+        )
     }
     // fn primitive_to_str(&self) -> &str {
     //     match self {
@@ -625,15 +650,16 @@ impl TypeTrait for Type {
     }
 
     fn is_parameter_list(&self) -> bool {
-        self == &Type::ResourceSpecification
-            || self == &Type::FormalParameters
-            || self == &Type::TypeParameters
+        is!(
+            self,
+            ResourceSpecification,
+            FormalParameters,
+            TypeParameters,
+        )
     }
 
     fn is_argument_list(&self) -> bool {
-        self == &Type::ArgumentList
-            || self == &Type::TypeArguments
-            || self == &Type::AnnotationArgumentList
+        is!(self, ArgumentList, TypeArguments, AnnotationArgumentList,)
     }
 
     fn is_expression(&self) -> bool {
@@ -657,7 +683,7 @@ impl TypeTrait for Type {
         || self == &Type::ArrayAccess
     }
     fn is_comment(&self) -> bool {
-        self == &Type::LineComment || self == &Type::BlockComment
+        is!(self, LineComment, BlockComment,)
     }
 }
 impl Type {
@@ -667,66 +693,69 @@ impl Type {
 
     pub fn literal_type(&self) -> &str {
         // TODO make the difference btw int/long and float/double
-        match self {
-            Self::_Literal => panic!(),
-            Self::True => "boolean",
-            Self::False => "boolean",
-            Self::OctalIntegerLiteral => "int",
-            Self::BinaryIntegerLiteral => "int",
-            Self::DecimalIntegerLiteral => "int",
-            Self::HexFloatingPointLiteral => "float",
-            Self::DecimalFloatingPointLiteral => "float",
-            Self::HexIntegerLiteral => "float",
-            // Self::ClassLiteral => "class",
-            Self::StringLiteral => "String",
-            Self::CharacterLiteral => "char",
-            Self::NullLiteral => "null",
+        ty!(self,
+            _Literal => panic!(),
+            True => "boolean",
+            False => "boolean",
+            OctalIntegerLiteral => "int",
+            BinaryIntegerLiteral => "int",
+            DecimalIntegerLiteral => "int",
+            HexFloatingPointLiteral => "float",
+            DecimalFloatingPointLiteral => "float",
+            HexIntegerLiteral => "float",
+            // ClassLiteral => "class",
+            StringLiteral => "String",
+            CharacterLiteral => "char",
+            NullLiteral => "null",
             _ => panic!(),
-        }
+        )
     }
 
     pub(crate) fn is_repeat(&self) -> bool {
-        self == &Type::ProgramRepeat1
-            || self == &Type::_StringLiteralRepeat1
-            || self == &Type::_MultilineStringLiteralRepeat1
-            || self == &Type::CastExpressionRepeat1
-            || self == &Type::InferredParametersRepeat1
-            || self == &Type::ArrayCreationExpressionRepeat1
-            || self == &Type::ArgumentListRepeat1
-            || self == &Type::TypeArgumentsRepeat1
-            || self == &Type::DimensionsRepeat1
-            || self == &Type::SwitchBlockRepeat1
-            || self == &Type::SwitchBlockStatementGroupRepeat1
-            || self == &Type::RecordPatternBodyRepeat1
-            || self == &Type::TryStatementRepeat1
-            || self == &Type::CatchTypeRepeat1
-            || self == &Type::ResourceSpecificationRepeat1
-            || self == &Type::ForStatementRepeat1
-            || self == &Type::AnnotationArgumentListRepeat1
-            || self == &Type::ElementValueArrayInitializerRepeat1
-            || self == &Type::ModuleBodyRepeat1
-            || self == &Type::RequiresModuleDirectiveRepeat1
-            || self == &Type::ExportsModuleDirectiveRepeat1
-            || self == &Type::ProvidesModuleDirectiveRepeat1
-            || self == &Type::EnumBodyRepeat1
-            || self == &Type::EnumBodyDeclarationsRepeat1
-            || self == &Type::ModifiersRepeat1
-            || self == &Type::TypeParametersRepeat1
-            || self == &Type::TypeBoundRepeat1
-            || self == &Type::TypeListRepeat1
-            || self == &Type::AnnotationTypeBodyRepeat1
-            || self == &Type::InterfaceBodyRepeat1
-            || self == &Type::_VariableDeclaratorListRepeat1
-            || self == &Type::ArrayInitializerRepeat1
-            || self == &Type::FormalParametersRepeat1
-            || self == &Type::ReceiverParameterRepeat1
-            || self == &Type::ArrayCreationExpressionRepeat2
-            || self == &Type::SwitchBlockRepeat2
-            || self == &Type::SwitchBlockStatementGroupRepeat2
-            || self == &Type::ForStatementRepeat2
-            || self == &Type::_MultilineStringFragmentToken1
-            || self == &Type::_MultilineStringFragmentToken2
-            || self == &Type::_EscapeSequenceToken1
+        is!(
+            self,
+            ProgramRepeat1,
+            _StringLiteralRepeat1,
+            _MultilineStringLiteralRepeat1,
+            CastExpressionRepeat1,
+            InferredParametersRepeat1,
+            ArrayCreationExpressionRepeat1,
+            ArgumentListRepeat1,
+            TypeArgumentsRepeat1,
+            DimensionsRepeat1,
+            SwitchBlockRepeat1,
+            SwitchBlockStatementGroupRepeat1,
+            RecordPatternBodyRepeat1,
+            TryStatementRepeat1,
+            CatchTypeRepeat1,
+            ResourceSpecificationRepeat1,
+            ForStatementRepeat1,
+            AnnotationArgumentListRepeat1,
+            ElementValueArrayInitializerRepeat1,
+            ModuleBodyRepeat1,
+            RequiresModuleDirectiveRepeat1,
+            ExportsModuleDirectiveRepeat1,
+            ProvidesModuleDirectiveRepeat1,
+            EnumBodyRepeat1,
+            EnumBodyDeclarationsRepeat1,
+            ModifiersRepeat1,
+            TypeParametersRepeat1,
+            TypeBoundRepeat1,
+            TypeListRepeat1,
+            AnnotationTypeBodyRepeat1,
+            InterfaceBodyRepeat1,
+            _VariableDeclaratorListRepeat1,
+            ArrayInitializerRepeat1,
+            FormalParametersRepeat1,
+            ReceiverParameterRepeat1,
+            ArrayCreationExpressionRepeat2,
+            SwitchBlockRepeat2,
+            SwitchBlockStatementGroupRepeat2,
+            ForStatementRepeat2,
+            _MultilineStringFragmentToken1,
+            _MultilineStringFragmentToken2,
+            _EscapeSequenceToken1,
+        )
     }
 }
 

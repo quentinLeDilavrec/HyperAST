@@ -123,18 +123,25 @@ impl Local {
 }
 
 pub struct Acc {
-    simple: BasicAccumulator<Type, NodeIdentifier>,
-    no_space: Vec<NodeIdentifier>,
+    pub(crate) simple: BasicAccumulator<Type, NodeIdentifier>,
     labeled: bool,
-    start_byte: usize,
-    end_byte: usize,
-    viz_cs_count: u32,
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
-    ana: Option<PartialAnalysis>,
-    padding_start: usize,
+    pub(crate) padding_start: usize,
+    pub(crate) start_byte: usize,
+    end_byte: usize,
+    // field for derived data (more experimental and prone to changes)
+    /// children that are not spaces
+    no_space: Vec<NodeIdentifier>,
+    /// At some point it will be used to make deduplication formatting independent
     indentation: Spaces,
+    /// supports retrieval of roles
     role: RoleAcc<crate::types::Role>,
+    /// aggregate of precomputed queries
     precomp_queries: PrecompQueries,
+    /// number of visible children (by tree-sitter definition)
+    viz_cs_count: u32,
+    /// aggregate of name resolution analysis (for now deprecated)
+    ana: Option<PartialAnalysis>,
 }
 
 pub type FNode = FullNode<BasicGlobalData, Local>;
@@ -268,6 +275,7 @@ where
     ) -> PreResult<<Self as TreeGen>::Acc> {
         let node = cursor.node();
         let Some(kind) = TS::try_obtain_type(&node) else {
+            log::warn!("Failed to obtain type of cpp node");
             return PreResult::Skip;
         };
         if HIDDEN_NODES {
@@ -279,14 +287,16 @@ where
                     return PreResult::Ignore;
                 }
             } else if kind.is_hidden() {
-                // dbg!(kind);
                 return PreResult::Ignore;
             }
         }
         if node.0.is_missing() {
-            // dbg!(kind);
-            // dbg!(node.0.start_byte());
-            // dbg!(node.0.end_byte());
+            log::info!(
+                "Missing node: {:?} {}-{}",
+                kind,
+                node.start_byte(),
+                node.end_byte()
+            );
             // must skip missing nodes, i.e., leafs added by tree-sitter to fix CST,
             // needed to avoid breaking invariant, as the node has no span:
             // `is_parent_hidden && parent.end_byte() <= acc.begin_byte()`
@@ -319,13 +329,25 @@ where
     ) -> <Self as TreeGen>::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
-        let indent = compute_indentation(
-            &self.line_break,
-            text,
-            node.start_byte(),
-            global.sum_byte_length(),
-            parent_indentation,
-        );
+        let indent = if node.start_byte() < global.sum_byte_length() {
+            let b = node.start_byte();
+            let a = b.saturating_sub(30);
+            let c = global.sum_byte_length();
+            let d = c.saturating_add(30);
+            let d = if d < text.len() { d } else { text.len() };
+            eprintln!("{}", std::str::from_utf8(&text[a..b]).unwrap());
+            eprintln!("{}", std::str::from_utf8(&text[b..c]).unwrap());
+            eprintln!("{}", std::str::from_utf8(&text[c..d]).unwrap());
+            panic!("broken monotonicity invariant")
+        } else {
+            compute_indentation(
+                &self.line_break,
+                text,
+                node.start_byte(),
+                global.sum_byte_length(),
+                parent_indentation,
+            )
+        };
         Acc {
             labeled: node.has_label(),
             start_byte: node.start_byte(),
@@ -347,11 +369,11 @@ where
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        mut acc: <Self as TreeGen>::Acc,
-    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+        mut acc: Self::Acc,
+    ) -> <Self::Acc as Accumulator>::Node {
         let spacing = get_spacing(
             acc.padding_start,
             acc.start_byte,
@@ -373,6 +395,12 @@ where
                     global: global.simple(),
                     local,
                 });
+                // dbg!(
+                //     global.sum_byte_length(),
+                //     acc.start_byte,
+                //     acc.end_byte,
+                //     acc.simple.kind.as_static_str()
+                // );
                 global.set_sum_byte_length(acc.end_byte);
             }
         }
@@ -438,7 +466,7 @@ where
             more,
         }
     }
-    fn make_spacing(
+    pub(crate) fn make_spacing(
         &mut self,
         spacing: Vec<u8>, //Space>,
     ) -> Local {
@@ -647,10 +675,10 @@ where
     type Global = SpacedGlobalData<'store>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        mut acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        mut acc: Self::Acc,
         label: Option<String>,
-    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+    ) -> <Self::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
         let own_line_count = label.as_ref().map_or(0, |l| {

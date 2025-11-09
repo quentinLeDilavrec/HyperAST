@@ -60,10 +60,7 @@ pub fn fetch(mut state: SharedState, path: Parameters) -> Result<FetchedNodes, S
     } = path;
     dbg!(&path);
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repo = state
-        .repositories
-        .read()
-        .unwrap()
+    let repo = (state.repositories.read().unwrap())
         .get_config(repo_spec)
         .ok_or_else(|| "missing config for repository".to_string())?;
     let mut repo = repo.fetch();

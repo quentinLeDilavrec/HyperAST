@@ -124,18 +124,12 @@ pub(crate) fn smells(
     };
 
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repo_handle = state
-        .repositories
-        .write()
-        .unwrap()
+    let repo_handle = (state.repositories.write().unwrap())
         .get_config(repo_spec)
         .ok_or_else(|| "missing config for repository".to_string())?;
     let mut repository = repo_handle.fetch();
     log::warn!("done cloning {}", repository.spec);
-    let commits = state
-        .repositories
-        .write()
-        .unwrap()
+    let commits = (state.repositories.write().unwrap())
         .pre_process_with_limit(&mut repository, "", &commit, 4)
         .map_err(|e| e.to_string())?;
     log::warn!(
@@ -189,6 +183,7 @@ pub(crate) fn smells(
         _,
         hyperast_gen_ts_java::types::TIdN<_>,
     >(sss, ex_map.keys().copied(), &meta_gen, &meta_simp);
+
     let bad: Vec<_> = query_lattice
         .iter_pretty()
         .filter(|x| 5 < x.1.len() && x.1.len() * 2 < ex_map.len())
@@ -419,15 +414,8 @@ mod tests {
         let language = "Java";
 
         let state = crate::AppState::default();
-        state
-            .repositories
-            .write()
-            .unwrap()
-            .register_config(repo_spec.clone(), config);
-        let repo = state
-            .repositories
-            .read()
-            .unwrap()
+        (state.repositories.write().unwrap()).register_config(repo_spec.clone(), config);
+        let repo = (state.repositories.read().unwrap())
             .get_config(repo_spec)
             .ok_or_else(|| "missing config for repository".to_string())?;
         let state = std::sync::Arc::new(state);

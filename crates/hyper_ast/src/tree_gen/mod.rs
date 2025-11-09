@@ -1010,9 +1010,12 @@ pub mod utils_ts {
 
             let _ = self.stack.pop().unwrap();
             let _ = self.vis.pop().unwrap();
+            // TODO check if it could be relaxed to self.has != Has::Down
             if self.has == Has::Up && self.waiting.is_some() && !self.stack.is_empty() {
                 let node = self.cursor.node();
-                if *self.stack.last().unwrap() <= node.start_byte() {
+                if *self.stack.last().unwrap() <= node.start_byte()
+                    && node.start_byte() < node.end_byte()
+                {
                     self.has = Has::Up;
                     let vis = if *self.vis.last().unwrap() {
                         Visibility::Hidden

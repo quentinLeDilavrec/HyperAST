@@ -225,7 +225,7 @@ fn top_bar_ui(app: &mut crate::HyperApp, ui: &mut egui::Ui) {
         });
         egui::global_theme_preference_switch(ui);
 
-        let resp = ui.toggle_value(&mut app.persistance, "persistance");
+        let resp = ui.toggle_value(&mut app.persistence, "persistance");
         if resp.changed() {
             app.save_interval = std::time::Duration::from_secs(0);
         }

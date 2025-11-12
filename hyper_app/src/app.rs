@@ -63,7 +63,7 @@ pub struct HyperApp {
     /// TODO make it dynamically extensible
     selected: types::SelectedConfig,
 
-    persistance: bool,
+    persistence: bool,
     save_interval: std::time::Duration,
 
     data: AppData,
@@ -795,7 +795,7 @@ impl Default for HyperApp {
         Self {
             // Example stuff:
             selected,
-            persistance: false,
+            persistence: false,
             save_interval: std::time::Duration::from_secs(20),
             data: Default::default(),
             layouts: HashMap::default(),
@@ -865,7 +865,7 @@ impl HyperApp {
             if let Some(s) = storage.get_string(eframe::APP_KEY) {
                 match serde_json::from_str::<HyperApp>(&s) {
                     Ok(_r) => {
-                        if _r.persistance {
+                        if _r.persistence {
                             r = _r;
                         } else {
                             r = HyperApp::default();
@@ -925,7 +925,7 @@ impl HyperApp {
             if let Some(s) = storage.get_string(eframe::APP_KEY) {
                 match serde_json::from_str::<HyperApp>(&s) {
                     Ok(_r) => {
-                        if _r.persistance {
+                        if _r.persistence {
                             r = _r;
                         } else {
                             r = HyperApp::default()
@@ -941,7 +941,7 @@ impl HyperApp {
                 r = HyperApp::default()
             }
             // r = eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-            if !r.persistance {
+            if !r.persistence {
                 r = HyperApp::default()
             }
             if r.data.api_addr.is_empty() {
@@ -2367,14 +2367,14 @@ impl eframe::App for HyperApp {
 
     /// Called by the framework to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        if !self.persistance {
+        if !self.persistence {
             if let Some(s) = storage.get_string(eframe::APP_KEY) {
                 match serde_json::from_str::<HyperApp>(&s) {
                     Ok(mut r) => {
-                        if r.persistance {
+                        if r.persistence {
                             log::info!("disabling persistence");
                             self.save_interval = std::time::Duration::from_secs(20);
-                            r.persistance = false;
+                            r.persistence = false;
                             match serde_json::to_string(&r) {
                                 Ok(s) => {
                                     storage.set_string(eframe::APP_KEY, s);
@@ -2556,7 +2556,7 @@ impl eframe::App for HyperApp {
                 UICommand::ToggleCommandPalette => self.cmd_palette.toggle(),
                 UICommand::PersistApp => {
                     self.save_interval = std::time::Duration::ZERO;
-                    self.persistance = true;
+                    self.persistence = true;
                 }
                 UICommand::NewQuery => {
                     let qid = self.data.queries.push(crate::app::QueryData {

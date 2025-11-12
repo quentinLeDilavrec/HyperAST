@@ -23,7 +23,8 @@ pub use store::{LabelIdentifier, NodeIdentifier};
 mod hyperast_layouter;
 
 mod pp;
-pub(crate) use pp::make_pp_code;
+pub(crate) use hyperast_layouter::AdvTheme;
+pub(crate) use pp::PPBuilder;
 
 mod ui_impl;
 
@@ -55,8 +56,10 @@ pub(crate) enum Action {
     HideKind(AnyType),
     PartialFocused(f32),
     Focused(f32),
-    Clicked(Vec<usize>),
+    Clicked(Offsets),
 }
+
+pub(crate) type Offsets = Vec<usize>;
 
 pub(crate) struct FetchedViewImpl<'a> {
     store: Arc<store::FetchedHyperAST>,
@@ -66,7 +69,7 @@ pub(crate) struct FetchedViewImpl<'a> {
     draw_count: usize,
     hightlights: Vec<HightLightHandle<'a>>,
     focus: Option<super::code_aspects::Focus<'a>>,
-    path: Vec<usize>,
+    path: Offsets,
     root_ui_id: egui::Id,
     additions: Option<&'a [u32]>,
     deletions: Option<&'a [u32]>,
@@ -91,7 +94,7 @@ impl<'a> FetchedViewImpl<'a> {
         take: Option<PrefillCache>,
         hightlights: Vec<HightLightHandle<'a>>,
         focus: Option<super::code_aspects::Focus<'a>>,
-        path: Vec<usize>,
+        path: Offsets,
         root_ui_id: egui::Id,
         additions: Option<&'a [u32]>,
         deletions: Option<&'a [u32]>,

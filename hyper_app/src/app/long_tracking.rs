@@ -32,7 +32,6 @@ type LongTrackingResults = VecDeque<(
     Buffered<Result<CommitMetadata, String>>,
     MultiBuffered<AccumulableTrackingResults, Result<TrackingResultWithChanges, String>>,
 )>;
-
 type BufferedPerCommit<T> = HashMap<Commit, Buffered<T>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -544,7 +543,6 @@ fn timeline_drag_box_vertical_handle(
         ui.style().visuals.widgets.hovered.fg_stroke // highly visible
     } else {
         ui.style().visuals.widgets.noninteractive.bg_stroke // dim
-        // egui::Stroke::NONE
     };
     let painter = ui.painter_at(ui.max_rect());
     painter.vline(line_x, rect.y_range(), stroke);
@@ -557,11 +555,6 @@ fn timeline_drag_box(
     rect: egui::Rect,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
-    let LongTrackingResultsImpl {
-        timeline_window,
-        viewport_width,
-        ..
-    } = *res_impl;
     let interactive_rect = egui::Rect::from_center_size(rect.center(), (40., 30.).into());
     let id = ui.id().with("map_drag");
     let layer_id = egui::LayerId::new(egui::Order::Foreground, ui.id().with("drag_handle"));
@@ -579,8 +572,8 @@ fn timeline_drag_box(
     let mult = if map_drag.dragged() {
         let delta = map_drag.drag_delta();
         if delta.x != 0.0 {
-            let x = delta.x / ui.max_rect().width() * viewport_width;
-            let max = viewport_width - timeline_window.width();
+            let x = delta.x / ui.max_rect().width() * res_impl.viewport_width;
+            let max = res_impl.viewport_width - res_impl.timeline_window.width();
             w_state.offset = (w_state.offset + x).clamp(0.0, max);
         }
         0.8
@@ -666,33 +659,28 @@ fn show_trackings(
         let mut min_left_x = 0.0;
         let l_bound = res_impl.viewport_x.min + (i + 1) as f32 * (col_width + spacing.x) - 15.0;
         let r_bound = l_bound + 25.0;
-        let mut f = |&(green, g_rect), &(blue, b_rect)| {
-            if cable {
-                let green: egui::Id = green;
-                let blue: egui::Id = blue;
-            }
-
-            if let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) {
-                let m_rect: egui::Rect = m_rect;
-                let src_rect: egui::Rect = src_rect;
-                let mut m_pos = m_rect.right_center();
-                let mut src_pos = src_rect.left_center();
-                let mut ctrl = (m_pos, src_pos);
-                ctrl.0.x = l_bound;
-                ctrl.1.x = r_bound;
-                use egui::NumExt;
-                m_pos.x = m_pos.x.at_most(l_bound);
-                src_pos.x = src_pos.x.at_least(r_bound);
-                let color = ui.style().visuals.text_color();
-                let link =
-                    epaint::PathShape::line(vec![m_pos, ctrl.0, ctrl.1, src_pos], (2.0, color));
-                ui.painter().add(link);
-            }
+        let mut render = |&(green, g_rect), &(blue, b_rect)| {
+            let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) else {
+                return;
+            };
+            let m_rect: egui::Rect = m_rect;
+            let src_rect: egui::Rect = src_rect;
+            let mut m_pos = m_rect.right_center();
+            let mut src_pos = src_rect.left_center();
+            let mut ctrl = (m_pos, src_pos);
+            ctrl.0.x = l_bound;
+            ctrl.1.x = r_bound;
+            use egui::NumExt;
+            m_pos.x = m_pos.x.at_most(l_bound);
+            src_pos.x = src_pos.x.at_least(r_bound);
+            let color = ui.style().visuals.text_color();
+            let link = epaint::PathShape::line(vec![m_pos, ctrl.0, ctrl.1, src_pos], (2.0, color));
+            ui.painter().add(link);
         };
         for (k, g) in greens {
             done.insert(k);
             if let Some(b) = blues.get(&k) {
-                f(g, b)
+                render(g, b)
             }
         }
         for (k, b) in blues {
@@ -700,7 +688,7 @@ fn show_trackings(
                 continue;
             }
             if let Some(g) = greens.get(&k) {
-                f(g, b)
+                render(g, b)
             }
         }
     }
@@ -1234,90 +1222,40 @@ fn show_code_view(
             false,
         )
         .2;
-    if let Some(egui::InnerResponse {
+    let Some(egui::InnerResponse {
         inner: Some(aa), ..
     }) = te
-    {
-        // ui.painter().debug_rect(
-        //     ui.max_rect(),
-        //     egui::Color32::RED,
-        //     format!("{:?}", curr.range),
-        // );
-        if let Some(range) = curr_view
-            .original_targets
-            .get(0)
-            .as_ref()
-            .and_then(|(x, _)| x.range.as_ref())
-        {
-            let te = &aa.inner; //&aa.inner.1;
-            let offset = 0; //aa.inner.0;
-            let range = range.start.saturating_sub(offset)..range.end.saturating_sub(offset);
-            let color = egui::Color32::RED.linear_multiply(0.1);
-            let rect = highlight_byte_range(ui, te, &range, color);
-            // if result_changed {
-            //         aa.content_size,
-            //         aa.state.offset.y,
-            //         aa.inner_rect.height(),
-            //         rect.top(),
-            //     );
-            //     pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-            // }
-        }
-        if let Some(
-            CodeRange {
-                range: Some(range), ..
-            },
-            ..,
-        ) = &curr_view.effective_targets.get(0).map(|x| &x.0)
-        {
-            let te = &aa.inner; //&aa.inner.1;
-            let offset = 0; //aa.inner.0;
-            let range = range.start.saturating_sub(offset)..range.end.saturating_sub(offset);
-            let color = egui::Color32::BLUE.linear_multiply(0.1);
-            // let rect = highlight_byte_range(ui, te, &range, color);
-            // if result_changed {
-            //         aa.content_size,
-            //         aa.state.offset.y,
-            //         aa.inner_rect.height(),
-            //         rect.top(),
-            //     );
-            //     pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-            // }
-        }
-        if let Some(
-            CodeRange {
-                range: Some(range), ..
-            },
-            ..,
-        ) = &curr_view.matcheds.get(0).map(|x| &x.0)
-        {
-            let te = &aa.inner; //&aa.inner.1;
-            let offset = 0; //aa.inner.0;
-            let range = range.start.saturating_sub(offset)..range.end.saturating_sub(offset);
-            let color = egui::Color32::GREEN.linear_multiply(0.1);
-            let rect = highlight_byte_range(ui, te, &range, color);
-            // if result_changed {
-            //         aa.content_size,
-            //         aa.state.offset.y,
-            //         aa.inner_rect.height(),
-            //         rect.top(),
-            //     );
-            //     pos_ratio = Some((rect.top() - aa.state.offset.y) / aa.inner_rect.height());
-            // }
-        }
-
-        let te = aa.inner; //&aa.inner.1;
-        Some(te)
-    } else {
-        None
+    else {
+        return None;
+    };
+    let first_ori = curr_view.original_targets.get(0);
+    if let Some(range) = first_ori.as_ref().and_then(|(x, _)| x.range.as_ref()) {
+        let te = &aa.inner;
+        let color = egui::Color32::RED.linear_multiply(0.1);
+        let rect = highlight_byte_range(ui, te, &range, color);
     }
+    // let first_targ = curr_view.effective_targets.get(0);
+    // let first_targ = first_targ.and_then(|x| x.0.range.as_ref());
+    // if let Some(range) = first_targ {
+    //     let te = &aa.inner;
+    //     let offset = 0;
+    //     let color = egui::Color32::BLUE.linear_multiply(0.1);
+    //     let rect = highlight_byte_range(ui, te, &range, color);
+    // }
+    let first_match = curr_view.matcheds.get(0);
+    let first_match = first_match.and_then(|x| x.0.range.as_ref());
+    if let Some(range) = first_match {
+        let te = &aa.inner;
+        let color = egui::Color32::GREEN.linear_multiply(0.1);
+        let rect = highlight_byte_range(ui, te, &range, color);
+    }
+
+    let te = aa.inner;
+    Some(te)
 }
 
-type DeferedFocusScroll = (
-    f32,
-    usize,
-    egui::scroll_area::ScrollAreaOutput<Option<Vec<usize>>>,
-);
+type ClickedNode = egui::scroll_area::ScrollAreaOutput<Option<super::tree_view::Offsets>>;
+type DeferedFocusScroll = (f32, usize, ClickedNode);
 
 pub(crate) fn show_tree_view(
     ui: &mut egui::Ui,
@@ -1330,14 +1268,20 @@ pub(crate) fn show_tree_view(
     aspects: &mut ComputeConfigAspectViews,
     ports: &mut Attacheds,
     defered_focus_scroll: &mut Option<DeferedFocusScroll>,
-) -> Option<Vec<usize>> {
+) -> Option<super::tree_view::Offsets> {
+    use egui::scroll_area::ScrollBarVisibility as Vis;
     let mut scroll_focus = None;
     let mut scroll = egui::ScrollArea::both()
         .auto_shrink([false, false])
+        .scroll_bar_visibility(if ui.max_rect().width() < 500. {
+            Vis::AlwaysHidden
+        } else {
+            Vis::VisibleWhenNeeded
+        })
         .show_viewport(ui, |ui, viewport| {
             ui.set_height(3_000.0);
-            ui.set_width(ui.available_width() - 15.0);
-            // ui.set_clip_rect(ui.ctx().screen_rect());
+            ui.set_max_width(500.);
+            ui.set_min_width(200.);
 
             let Some(content) = &mut tree_viewer.content else {
                 return None;
@@ -1363,7 +1307,6 @@ pub(crate) fn show_tree_view(
                     screen_pos: b_p,
                 });
             }
-            wasm_rs_dbg::dbg!((curr_view.left_commit.is_none(), curr_view.matcheds.len()));
             let a = if curr_view.matcheds.len() == 1 {
                 let Some((foc, i)) = curr_view.matcheds.get(0) else {
                     unreachable!()
@@ -1447,7 +1390,7 @@ pub(crate) fn show_tree_view(
                         screen_pos: g_p,
                     });
                 }
-                content.show(
+                let a = content.show(
                     ui,
                     api_addr,
                     aspects,
@@ -1456,7 +1399,12 @@ pub(crate) fn show_tree_view(
                     curr_view.additions,
                     curr_view.deletions,
                     "",
-                )
+                );
+                match a {
+                    Action::PartialFocused(_) => Action::Keep,
+                    Action::Focused(_) => Action::Keep,
+                    a => a,
+                }
             };
             // let a = content.show(ui, aspects, focus, hightlights, "");
             for (k, blue_pos) in blue_pos {

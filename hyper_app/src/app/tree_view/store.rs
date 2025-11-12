@@ -11,7 +11,7 @@ use hyperast::store::nodes::fetched;
 
 use fetched::FetchedLabels;
 use fetched::{HashedNodeRef, NodeStore};
-pub use hyperast::store::nodes::fetched::{LabelIdentifier, NodeIdentifier};
+pub use fetched::{LabelIdentifier, NodeIdentifier};
 
 #[derive(Default)]
 pub(crate) struct TStore;
@@ -44,8 +44,8 @@ pub struct FetchedHyperAST {
 }
 
 impl FetchedHyperAST {
-    pub(crate) fn read(&self) -> AcessibleFetchedHyperAST<'_> {
-        AcessibleFetchedHyperAST {
+    pub(crate) fn read(&self) -> LockedFetchedHyperAST<'_> {
+        LockedFetchedHyperAST {
             label_store: self.label_store.read().unwrap(),
             node_store: self.node_store.read().unwrap(),
             nodes_pending: self.nodes_pending.lock().unwrap(),
@@ -80,7 +80,7 @@ impl FetchedHyperAST {
     }
 }
 
-pub(crate) struct AcessibleFetchedHyperAST<'a> {
+pub(crate) struct LockedFetchedHyperAST<'a> {
     pub(crate) label_store: RwLockReadGuard<'a, FetchedLabels>,
     pub(crate) node_store: RwLockReadGuard<'a, NodeStore>,
     pub(crate) nodes_pending: MutexGuard<'a, VecDeque<HashSet<NodeIdentifier>>>,
@@ -89,11 +89,11 @@ pub(crate) struct AcessibleFetchedHyperAST<'a> {
     pub(crate) labels_waiting: RefCell<MutexGuard<'a, Option<HashSet<LabelIdentifier>>>>,
 }
 
-impl<'a, 'b> hyperast::types::NLending<'a, NodeIdentifier> for AcessibleFetchedHyperAST<'b> {
+impl<'a, 'b> hyperast::types::NLending<'a, NodeIdentifier> for LockedFetchedHyperAST<'b> {
     type N = HashedNodeRef<'a, NodeIdentifier>;
 }
 
-impl<'b> hyperast::types::NodeStore<NodeIdentifier> for AcessibleFetchedHyperAST<'b> {
+impl<'b> hyperast::types::NodeStore<NodeIdentifier> for LockedFetchedHyperAST<'b> {
     fn resolve(
         &self,
         id: &NodeIdentifier,
@@ -116,7 +116,7 @@ impl<'b> hyperast::types::NodeStore<NodeIdentifier> for AcessibleFetchedHyperAST
     }
 }
 
-impl<'b> hyperast::types::LabelStore<str> for AcessibleFetchedHyperAST<'b> {
+impl<'b> hyperast::types::LabelStore<str> for LockedFetchedHyperAST<'b> {
     type I = LabelIdentifier;
 
     fn get_or_insert<U: Borrow<str>>(&mut self, _node: U) -> Self::I {
@@ -146,11 +146,11 @@ impl<'b> hyperast::types::LabelStore<str> for AcessibleFetchedHyperAST<'b> {
     }
 }
 
-impl<'a, 'b> hyperast::types::TypeStore for AcessibleFetchedHyperAST<'b> {
+impl<'a, 'b> hyperast::types::TypeStore for LockedFetchedHyperAST<'b> {
     type Ty = AnyType;
 }
 
-impl<'a, 'b: 'a> hyperast::types::HyperASTShared for AcessibleFetchedHyperAST<'a>
+impl<'a, 'b: 'a> hyperast::types::HyperASTShared for LockedFetchedHyperAST<'a>
 where
     Self: 'b,
 {
@@ -159,11 +159,11 @@ where
     type Label = LabelIdentifier;
 }
 
-impl<'a, 'b> hyperast::types::AstLending<'a> for AcessibleFetchedHyperAST<'b> {
+impl<'a, 'b> hyperast::types::AstLending<'a> for LockedFetchedHyperAST<'b> {
     type RT = HashedNodeRef<'a, NodeIdentifier>;
 }
 
-impl<'a> hyperast::types::HyperAST for AcessibleFetchedHyperAST<'a> {
+impl<'a> hyperast::types::HyperAST for LockedFetchedHyperAST<'a> {
     type NS = Self;
 
     fn node_store(&self) -> &Self::NS {
@@ -204,10 +204,6 @@ impl<'a> hyperast::types::HyperAST for AcessibleFetchedHyperAST<'a> {
             }
             l => unreachable!("{}", l),
         }
-        // self.resolve_type(id)
-        // let ns = self.node_store();
-        // let n = ns.resolve(id);
-        // Self::TS::decompress_type(&n, std::any::TypeId::of::<<Self::TS as TypeStore>::Ty>())
     }
 }
 

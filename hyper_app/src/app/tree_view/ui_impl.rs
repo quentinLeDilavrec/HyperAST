@@ -9,7 +9,6 @@ use crate::app::code_aspects::Focus;
 use crate::app::code_aspects::HightLightHandle;
 use crate::app::long_tracking::TARGET_COLOR;
 
-use super::make_pp_code;
 use super::{Action, FetchedViewImpl, PrefillCache};
 use super::{CLIP_LEN, DEBUG_LAYOUT};
 
@@ -88,7 +87,6 @@ impl<'a> FetchedViewImpl<'a> {
         size: u32,
         nid: NodeIdentifier,
         label: LabelIdentifier,
-        // depth: usize,
         cs: &[NodeIdentifier],
     ) -> Action {
         if self.is_hidden(kind) {
@@ -193,7 +191,6 @@ impl<'a> FetchedViewImpl<'a> {
         for handle in &mut self.hightlights {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
-        // ui.label(format!("{:?}", show.body_response.map(|x| x.rect)));
         self.prefill_cache = Some(prefill);
 
         let interact = show.header_returned.interact(egui::Sense::click_and_drag());
@@ -257,44 +254,24 @@ impl<'a> FetchedViewImpl<'a> {
         }
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
-                // ui.label(format!("{}: {}", kind, label));
-                {
-                    let text = format!("{}:", kind);
-                    let rt = egui::RichText::new(text).monospace();
-                    let gp = self.global_pos.as_ref();
-                    let rt = if no_change || gp.is_none() {
-                        rt
-                    } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
-                        let tc = &ui.style().visuals.code_bg_color;
-                        rt.color(tc.lerp_to_gamma(c, 0.7))
-                    } else if let Some(c) = CC.select(!add.is_empty(), !del.is_empty()) {
-                        let tc = &ui.style().visuals.code_bg_color;
-                        rt.color(tc.lerp_to_gamma(c, 0.6))
-                    } else {
-                        rt.size(8.0).color(egui::Color32::GRAY)
-                    };
-                    ui.label(rt)
-                }
+                let text = format!("{}:", kind);
+                let rt = egui::RichText::new(text).monospace();
+                let gp = self.global_pos.as_ref();
+                let rt = if no_change || gp.is_none() {
+                    rt
+                } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
+                    let tc = &ui.style().visuals.code_bg_color;
+                    rt.color(tc.lerp_to_gamma(c, 0.7))
+                } else if let Some(c) = CC.select(!add.is_empty(), !del.is_empty()) {
+                    let tc = &ui.style().visuals.code_bg_color;
+                    rt.color(tc.lerp_to_gamma(c, 0.6))
+                } else {
+                    rt.size(8.0).color(egui::Color32::GRAY)
+                };
+                ui.label(rt)
             })
             .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size)))
             .into();
-        // let show = egui::CollapsingHeader::new(format!("{}", kind))
-        //     .id_source(id)
-        //     .default_open(depth < 1)
-        //     .show(ui, |ui| {
-        //         if egui::collapsing_header::CollapsingState::load(ui.ctx(), id)
-        //             .map_or(false, |x| x.is_open())
-        //         {
-        //             let o = self.store.children.cs_ofs[nid] as usize;
-        //             let cs = &self.store.children.children
-        //                 [o..o + self.store.children.cs_lens[nid] as usize]
-        //                 .to_vec();
-        //             self.children_ui(ui, depth, cs)
-        //         } else {
-        //             Action::Keep
-        //         }
-        //     });
-
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
         let mut rect = show.header_response.rect.union(
             show.body_response
@@ -315,7 +292,6 @@ impl<'a> FetchedViewImpl<'a> {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
 
-        // ui.label(format!("{:?}", show.body_response.map(|x| x.rect)));
         self.prefill_cache = Some(prefill);
 
         let interact = show.header_returned.interact(egui::Sense::click_and_drag());
@@ -429,13 +405,7 @@ impl<'a> FetchedViewImpl<'a> {
             load_with_default_open.set_open(true)
         }
         let show: FoldRet<_, _> = load_with_default_open
-            .show_header(ui, |ui| {
-                // ui.label(format!("{}: {}", kind, label));
-                ui.monospace(format!("waiting: {}", nid))
-                // .context_menu(|ui| {
-                //     ui.label(format!("{:?}", self.path));
-                // })
-            })
+            .show_header(ui, |ui| ui.monospace(format!("waiting: {}", nid)))
             .body(|ui| {
                 let mut act = Action::Keep;
                 let mut prefill_old = self.prefill_cache.take().unwrap_or_default();
@@ -482,7 +452,6 @@ impl<'a> FetchedViewImpl<'a> {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
 
-        // ui.label(format!("{:?}", show.body_response.map(|x| x.rect)));
         self.prefill_cache = Some(prefill);
         if show
             .header_returned
@@ -545,8 +514,6 @@ impl<'a> FetchedViewImpl<'a> {
             CC.select(
                 *add.first().unwrap_or(&u32::MAX) <= *gp,
                 *del.first().unwrap_or(&u32::MAX) <= *gp,
-                // add.binary_search(gp).is_ok(),
-                // del.binary_search(gp).is_ok()
             )
         }) {
             let tc = &ui.style().visuals.code_bg_color;
@@ -581,27 +548,9 @@ impl<'a> FetchedViewImpl<'a> {
             } else {
                 let mut label = egui::RichText::new(label).monospace();
                 let monospace = {
-                    // let no_change = self.additions.is_none() && self.deletions.is_none();
-                    // let add = self.additions.unwrap_or_default();
-                    // let del = self.deletions.unwrap_or_default();
-                    // let gp = self.global_pos.as_ref();
-                    // let text = format!("{}: ", kind);
-                    let text = format!(
-                        "{}: ",
-                        kind,
-                    );
+                    let text = format!("{}: ", kind,);
                     let mut rt = egui::RichText::new(text).monospace();
-                    // let rt = if no_change || gp.is_none() {
-                    //     rt
-                    // } else if let Some(c) = CC.select(add.last() == gp, del.last() == gp) {
-                    //     rt.color(c.gamma_multiply(0.95))
-                    // } else if let Some(c) = gp.and_then(|gp| CC.select(add.binary_search(gp).is_ok(), del.binary_search(gp).is_ok())) {
-                    //     rt.color(c.gamma_multiply(0.8))
-                    // } else {
-                    //     label = label.size(8.0);
-                    //     label = label.color(egui::Color32::GRAY);
-                    //     rt.size(8.0).color(egui::Color32::GRAY)
-                    // };
+
                     if let Some(color) = color {
                         label = label.color(color);
                         rt = rt.color(color);
@@ -611,22 +560,9 @@ impl<'a> FetchedViewImpl<'a> {
                         rt = rt.size(size);
                     }
                     ui.label(rt).interact(egui::Sense::click_and_drag())
-                }
-                // .context_menu(|ui| {
-                //     ui.label(format!("{:?}", self.path));
-                // })
-                ;
+                };
                 let rect1 = monospace.rect;
-                let indent = ui.indent(id, |ui| {
-                    ui.label(label).interact(egui::Sense::click())
-                    // .context_menu(|ui| {
-                    //     ui.label(format!("{:?}", self.path));
-                    // })
-                });
-                // let interaction = (
-                //     monospace.interact(egui::Sense::click()),
-                //     indent.inner.interact(egui::Sense::click()),
-                // );
+                let indent = ui.indent(id, |ui| ui.label(label).interact(egui::Sense::click()));
                 action = if monospace.drag_stopped() {
                     show_node_menu(ui, monospace, kind).unwrap_or_default()
                 } else if monospace.clicked() {
@@ -644,26 +580,6 @@ impl<'a> FetchedViewImpl<'a> {
                     let text = format!("{}: ", kind,);
                     let mut label = egui::RichText::new(label);
                     let mut rt = egui::RichText::new(text).monospace();
-                    // if let Some(gp) = &self.global_pos {
-                    //     if self.additions.is_some() || self.deletions.is_some() {
-                    //         let add = self.additions.unwrap_or_default();
-                    //         let del = self.deletions.unwrap_or_default();
-                    //         if add.binary_search(gp).is_ok() {
-                    //             if del.last() == Some(gp) {
-                    //                 rt = rt.color(egui::Color32::BLUE);
-                    //             } else {
-                    //                 rt = rt.color(egui::Color32::GREEN);
-                    //             }
-                    //         } else if del.binary_search(gp).is_ok() {
-                    //             rt = rt.color(egui::Color32::RED);
-                    //         } else {
-                    //             label = label.size(8.0);
-                    //             label = label.color(egui::Color32::GRAY);
-                    //             rt = rt.size(8.0);
-                    //             rt = rt.color(egui::Color32::GRAY);
-                    //         }
-                    //     }
-                    // }
                     if let Some(color) = color {
                         label = label.color(color);
                         rt = rt.color(color);
@@ -767,7 +683,7 @@ impl<'a> FetchedViewImpl<'a> {
                 *del.first().unwrap_or(&u32::MAX) <= *gp,
             )
         }) {
-            fg = c; //.gamma_multiply(0.3).to_opaque();
+            fg = c;
             bg = c.gamma_multiply(0.05);
         } else {
             font = 8.0;
@@ -779,28 +695,16 @@ impl<'a> FetchedViewImpl<'a> {
         let min = ui.available_rect_before_wrap().min;
         let theme = syntax_highlighter::simple::CodeTheme::from_memory(ui.ctx());
         // TODO fetch entire subtree, line breaks would also be useful
-        let layout_job = make_pp_code(self.store.clone(), ui.ctx(), nid, theme, font, fg, bg);
+        let adv_theme = super::hyperast_layouter::AdvTheme::from(theme);
+        let theme = adv_theme.fg(fg).bg(bg).size(font);
+        let ppbuilder = super::pp::PPBuilder::new(self.store.clone(), nid).theme(theme);
+        let layout_job = ppbuilder.compute_incr(ui.ctx());
         let galley = ui.fonts(|f| f.layout_job(layout_job));
 
         let size = galley.size();
         let resp = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
 
         let rect = egui::Rect::from_min_size(min, size);
-        // if self.additions.is_some() || self.deletions.is_some() {
-        //     let add = self.additions.unwrap_or_default();
-        //     let del = self.deletions.unwrap_or_default();
-        //     if add.is_empty() && del.is_empty() {
-        //         // ui.painter().debug_rect(rect, egui::Color32::GRAY, "");
-        //     } else if !add.is_empty() {
-        //         if !del.is_empty() {
-        //             ui.painter().debug_rect(rect, egui::Color32::BLUE, "");
-        //         } else {
-        //             ui.painter().debug_rect(rect, egui::Color32::GREEN, "");
-        //         }
-        //     } else if !del.is_empty() {
-        //         ui.painter().debug_rect(rect, egui::Color32::RED, "");
-        //     }
-        // }
         ui.painter_at(rect.expand(1.0))
             .galley(min, galley, egui::Color32::RED);
 
@@ -855,8 +759,6 @@ impl<'a> FetchedViewImpl<'a> {
             CC.select(
                 *add.first().unwrap_or(&u32::MAX) <= *gp,
                 *del.first().unwrap_or(&u32::MAX) <= *gp,
-                // add.binary_search(gp).is_ok(),
-                // del.binary_search(gp).is_ok()
             )
         }) {
             let tc = &ui.style().visuals.code_bg_color;
@@ -961,7 +863,7 @@ impl<'a> FetchedViewImpl<'a> {
         additions: Option<&[u32]>,
         deletions: Option<&[u32]>,
         mut global_pos: &mut Option<u32>,
-        path: Vec<usize>,
+        path: super::Offsets,
     ) -> ControlFlow<()> {
         let rect = ui.available_rect_before_wrap();
         let focus = (self.focus.as_ref())
@@ -992,13 +894,6 @@ impl<'a> FetchedViewImpl<'a> {
             let child_size = prefill_old.children_sizes.get(i).unwrap(); // children and children_sizes should be the same sizes
             let exact_max_y = rect.min.y + *child;
             if focus.is_none() && exact_max_y < CLIP_LEN {
-                // ignore = Some(exact_max_y);
-                // FetchedViewImpl {
-                //     store: self.store,
-                //     prefill_cache: None,
-                //     min_before_count: 0,
-                //     draw_count: 0,
-                // }
                 prefill.children.push(*child);
                 prefill.children_sizes.push(*child_size);
                 if let (Some(child_size), Some(gp)) = (child_size, &mut global_pos) {
@@ -1170,11 +1065,7 @@ impl<'a> FetchedViewImpl<'a> {
                     || !self.deletions.unwrap_or_default().is_empty()
                     || !self.hightlights.is_empty())
             {
-                let mut prefill = if let Some(prefill_cache) = imp.prefill_cache.take() {
-                    prefill_cache
-                } else {
-                    PrefillCache::default()
-                };
+                let mut prefill = imp.prefill_cache.take().unwrap_or_default();
                 imp.draw_count += 1;
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_BLUE).ui(ui);
@@ -1190,11 +1081,7 @@ impl<'a> FetchedViewImpl<'a> {
                     egui::Spinner::new().ui(ui);
                     ui.label(c.to_string());
                 });
-                let mut prefill = if let Some(prefill_cache) = imp.prefill_cache.take() {
-                    prefill_cache
-                } else {
-                    PrefillCache::default()
-                };
+                let mut prefill = imp.prefill_cache.take().unwrap_or_default();
                 prefill.head = ui.available_rect_before_wrap().min.y - min.y;
                 imp.prefill_cache = Some(prefill);
                 Action::PartialFocused(ui.available_rect_before_wrap().min.y)
@@ -1257,48 +1144,48 @@ fn selection_highlight(
     rect: epaint::Rect,
     root_ui_id: egui::Id,
 ) {
-    let HightLightHandle {
-        path,
-        color,
-        id,
-        screen_pos: ret_pos,
-    } = handle;
-    if path.is_empty() {
-        let clip = ui.clip_rect();
-        let min_elem = clip.size().min_elem();
-        if clip.intersects(rect) {
-            ui.painter().debug_rect(rect, **color, "");
+    if !handle.path.is_empty() {
+        return;
+    }
+    let color = *handle.color;
+    let id = handle.id;
+    let ret_pos = &mut *handle.screen_pos;
+    let clip = ui.clip_rect();
+    let min_elem = clip.size().min_elem();
+    if clip.intersects(rect) {
+        ui.painter().debug_rect(rect, color, "");
+    }
+    let clip = if min_elem < 1.0 {
+        clip
+    } else {
+        let mut clip = clip.shrink((min_elem / 2.0).min(4.0));
+        clip.set_width((clip.width() - 14.0).max(0.0));
+        clip
+    };
+
+    if !clip.intersects(rect) {
+        return;
+    }
+    // TODO: Implement proper highlighting logic
+    // this is definitely brittle
+    if color == egui::Color32::BLUE {
+        let _id = root_ui_id.with("blue_highlight").with(id);
+        let pos = egui::pos2(min.x - 15.0, min.y - 10.0);
+        let pos = clip.clamp(pos);
+        if ui.clip_rect().contains(pos) {
+            // show_port(ui, id, pos);
+            *ret_pos = Some(rect);
         }
-        let clip = if min_elem < 1.0 {
-            clip
-        } else {
-            let mut clip = clip.shrink((min_elem / 2.0).min(4.0));
-            clip.set_width((clip.width() - 14.0).max(0.0));
-            clip
-        };
-
-        if clip.intersects(rect) {
-            if *color == &egui::Color32::BLUE {
-                let _id = root_ui_id.with("blue_highlight").with(id);
-                let pos = egui::pos2(min.x - 15.0, min.y - 10.0);
-                let pos = clip.clamp(pos);
-                if ui.clip_rect().contains(pos) {
-                    // show_port(ui, id, pos);
-                    **ret_pos = Some(rect);
-                }
-            } else if *color == &TARGET_COLOR {
-                let _id = root_ui_id.with("green_highlight").with(id);
-                let pos = egui::pos2(rect.max.x - 10.0, rect.min.y - 10.0);
-                let pos = clip.clamp(pos);
-                if ui.clip_rect().contains(pos) {
-                    // show_port(ui, id, pos);
-                    **ret_pos = Some(rect);
-                }
-            }
-
-            ui.painter().debug_rect(rect, **color, "");
+    } else if color == TARGET_COLOR {
+        let _id = root_ui_id.with("green_highlight").with(id);
+        let pos = egui::pos2(rect.max.x - 10.0, rect.min.y - 10.0);
+        let pos = clip.clamp(pos);
+        if ui.clip_rect().contains(pos) {
+            // show_port(ui, id, pos);
+            *ret_pos = Some(rect);
         }
     }
+    ui.painter().debug_rect(rect, color, "");
 }
 
 fn show_node_menu(ui: &mut egui::Ui, interact: egui::Response, kind: AnyType) -> Option<Action> {
@@ -1316,28 +1203,23 @@ fn show_node_menu(ui: &mut egui::Ui, interact: egui::Response, kind: AnyType) ->
 fn show_node_menu_aux(
     ui: &mut egui::Ui,
     interact: egui::Response,
-    f: impl Fn(&mut egui::Ui) -> Option<Action>,
+    add_content: impl Fn(&mut egui::Ui) -> Option<Action>,
 ) -> Option<Action> {
     let popup_id = interact.id.with("popup");
     if interact.secondary_clicked() || interact.double_clicked() || interact.drag_stopped() {
         ui.memory_mut(|mem| mem.open_popup(popup_id));
     }
-    egui::popup_below_widget(
-        ui,
-        popup_id,
-        &interact,
-        egui::PopupCloseBehavior::CloseOnClick,
-        |ui| {
-            ui.set_width_range(40.0..=100.0);
-            if let Some(a) = f(ui) {
-                return Some(a);
-            } else if ui.button("close menu").clicked() {
+    let add_contents = |ui: &mut egui::Ui| {
+        ui.set_width_range(40.0..=100.0);
+        add_content(ui).or_else(|| {
+            if ui.button("close menu").clicked() {
                 ui.memory_mut(|mem| mem.close_popup());
             }
             None
-        },
-    )
-    .flatten()
+        })
+    };
+    let behavior = egui::PopupCloseBehavior::CloseOnClick;
+    egui::popup_below_widget(ui, popup_id, &interact, behavior, add_contents).flatten()
 }
 
 #[allow(unused)] // TODO reenable ports after fixing the dependency (I believe it was not maintained anymore, and very convoluted structure btw)

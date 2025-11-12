@@ -2,6 +2,7 @@ use epaint::text::LayoutSection;
 
 use egui_addon::syntax_highlighting::TokenType;
 use egui_addon::syntax_highlighting::simple::CodeTheme;
+
 use hyperast::nodes::IndentedAlt;
 use hyperast::nodes::Space;
 use hyperast::types;
@@ -9,33 +10,55 @@ use hyperast::types;
 use types::{Childrn, HyperAST, HyperType, NodeId};
 
 pub struct Layouter<'a, 'b, IdN, HAST, const SPC: bool = false> {
-    stores: &'a HAST,
-    root: IdN,
-    root_indent: &'static str,
-    theme: &'b CodeTheme,
-    size: f32,
-    fg: egui::Color32,
-    bg: egui::Color32,
+    pub(super) stores: &'a HAST,
+    pub(super) root: IdN,
+    pub(super) root_indent: &'static str,
+    pub(super) theme: AdvTheme<&'b CodeTheme>,
 }
 
-impl<'store, 'b, IdN, HAST, const SPC: bool> Layouter<'store, 'b, IdN, HAST, SPC> {
-    pub fn new(
-        stores: &'store HAST,
-        root: IdN,
-        theme: &'b CodeTheme,
-        size: f32,
-        fg: egui::Color32,
-        bg: egui::Color32,
-    ) -> Self {
-        Self {
-            stores,
-            root,
-            root_indent: "\n",
+#[derive(Copy, Clone)]
+pub(crate) struct AdvTheme<Thm = CodeTheme> {
+    pub theme: Thm,
+    pub size: f32,
+    pub fg: egui::Color32,
+    pub bg: egui::Color32,
+}
+
+impl<Thm> AdvTheme<Thm> {
+    pub fn fg(mut self, fg: egui::Color32) -> Self {
+        self.fg = fg;
+        self
+    }
+    pub fn bg(mut self, bg: egui::Color32) -> Self {
+        self.bg = bg;
+        self
+    }
+    pub fn size(mut self, size: f32) -> Self {
+        self.size = size;
+        self
+    }
+}
+impl<Thm> From<Thm> for AdvTheme<Thm> {
+    fn from(theme: Thm) -> Self {
+        AdvTheme {
             theme,
-            size,
-            fg,
-            bg,
+            size: 12.0,
+            fg: egui::Color32::WHITE,
+            bg: egui::Color32::TRANSPARENT,
         }
+    }
+}
+impl From<&egui::Ui> for AdvTheme<CodeTheme> {
+    fn from(ui: &egui::Ui) -> Self {
+        let theme = egui_addon::syntax_highlighting::simple::CodeTheme::from_memory(ui.ctx());
+        Self::from(theme).fg(ui.style().visuals.text_color())
+    }
+}
+
+impl<Thm> std::ops::Deref for AdvTheme<&Thm> {
+    type Target = Thm;
+    fn deref(&self) -> &Self::Target {
+        &self.theme
     }
 }
 
@@ -47,7 +70,7 @@ struct Frmt {
 }
 
 impl Frmt {
-    fn with(self, theme: &CodeTheme) -> egui::TextFormat {
+    fn with(self, theme: impl std::ops::Deref<Target = CodeTheme>) -> egui::TextFormat {
         let mut format = theme.formats[self.format].clone();
         format.font_id = egui::FontId::monospace(self.size);
         format.background = self.bg;
@@ -81,39 +104,39 @@ where
         use types::NodeStore;
         use types::WithChildren;
         let b = self.stores.node_store().resolve(id);
-        // let kind = (self.stores.type_store(), b);
         let kind = self.stores.resolve_type(id);
         let label = b.try_get_label();
         let children = b.children();
 
+        let last_line = |s: &str| s[s.rfind('\n').unwrap_or(0)..].to_owned();
         if kind.is_spaces() {
-            let indent = if let Some(label) = label {
-                let s = self.stores.label_store().resolve(label);
-                let len = s.len();
-                let s = Space::format_indentation(s.as_bytes());
-                let b: String = s.iter().map(|x| x.to_string()).collect();
-                let end = *offset + len;
-                let format = self.frmt(TokenType::Punctuation);
-                out.push(LayoutSection {
-                    leading_space: 0.0,
-                    byte_range: *offset..end.clone(),
-                    format: format.with(self.theme),
-                });
-                *offset = end;
-                if b.contains("\n") {
-                    b
-                } else {
-                    parent_indent[parent_indent.rfind('\n').unwrap_or(0)..].to_owned()
-                }
-            } else {
-                parent_indent[parent_indent.rfind('\n').unwrap_or(0)..].to_owned()
+            let Some(label) = label else {
+                return Ok(last_line(parent_indent));
             };
-            return Ok(indent);
+            let s = self.stores.label_store().resolve(label);
+            let len = s.len();
+            let s = Space::format_indentation(s.as_bytes());
+            let b: String = s.iter().map(|x| x.to_string()).collect();
+            if !b.contains("\n") {
+                return Ok(last_line(parent_indent));
+            };
+            let end = *offset + len;
+            let format = self.frmt(TokenType::Punctuation);
+            out.push(LayoutSection {
+                leading_space: 0.0,
+                byte_range: *offset..end.clone(),
+                format: format.with(self.theme),
+            });
+            *offset = end;
+            return Ok(b);
         }
 
+        if let (Some(label), Some(children)) = (&label, &children) {
+            let s = self.stores.label_store().resolve(label);
+            wasm_rs_dbg::dbg!(s);
+        }
         match (label, children) {
             (None, None) => {
-                // out.write_str(&kind.to_string()).unwrap();
                 let len = kind.to_string().len();
                 let end = *offset + len;
                 let format = self.frmt(TokenType::Keyword);
@@ -124,28 +147,23 @@ where
                 });
                 *offset = end;
             }
-            (label, Some(children)) => {
-                if let Some(label) = label {
-                    let s = self.stores.label_store().resolve(label);
-                    dbg!(s);
-                }
-                if !children.is_empty() {
-                    let mut it = children.iter_children();
-                    let op = |alt| {
-                        if alt == IndentedAlt::NoIndent {
-                            Ok(parent_indent[parent_indent.rfind('\n').unwrap_or(0)..].to_owned())
-                        } else {
-                            Err(alt)
-                        }
-                    };
-                    let mut ind = self
-                        ._compute(&it.next().unwrap(), parent_indent, out, offset)
-                        .or_else(op)?;
-                    for id in it {
-                        ind = self._compute(&id, &ind, out, offset).or_else(op)?;
+            (label, Some(children)) if !children.is_empty() => {
+                let mut it = children.iter_children();
+                let op = |alt| {
+                    if alt == IndentedAlt::NoIndent {
+                        Ok(last_line(parent_indent))
+                    } else {
+                        Err(alt)
                     }
+                };
+                let mut ind = self
+                    ._compute(&it.next().unwrap(), parent_indent, out, offset)
+                    .or_else(op)?;
+                for id in it {
+                    ind = self._compute(&id, &ind, out, offset).or_else(op)?;
                 }
             }
+            (label, Some(children)) => {}
             (Some(label), None) => {
                 let s = self.stores.label_store().resolve(label);
                 let len = s.len();
@@ -165,9 +183,9 @@ where
     fn frmt(&self, format: TokenType) -> Frmt {
         Frmt {
             format,
-            size: self.size,
-            fg: self.fg,
-            bg: self.bg,
+            size: self.theme.size,
+            fg: self.theme.fg,
+            bg: self.theme.bg,
         }
     }
 }

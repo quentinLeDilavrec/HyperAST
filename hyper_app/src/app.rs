@@ -23,7 +23,6 @@ use code_aspects::remote_fetch_node;
 use commit::{CommitSlice, SelectedProjects, fetch_commit};
 use querying::DetailsResults;
 use single_repo::ComputeConfigSingle;
-use tree_view::make_pp_code;
 use tree_view::store::FetchedHyperAST;
 use types::{Commit, QueriedLang, Repo, SelectedConfig};
 use utils_poll::{Buffered3, MultiBuffered2};
@@ -1125,15 +1124,10 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         let theme = egui_addon::syntax_highlighting::simple::CodeTheme::from_memory(
                             ui.ctx(),
                         );
-                        let layout_job = make_pp_code(
-                            self.data.store.clone(),
-                            ui.ctx(),
-                            *nid,
-                            theme,
-                            12.0,
-                            ui.style().visuals.text_color(),
-                            egui::Color32::TRANSPARENT,
-                        );
+                        let layout_job = {
+                            let store = self.data.store.clone();
+                            tree_view::PPBuilder::new(store, *nid).compute_incr(ui)
+                        };
                         let galley = ui.fonts(|f| f.layout_job(layout_job));
                         let size = galley.size();
                         let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
@@ -1439,8 +1433,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                                 (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(
                                     |(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i),
                                 ));
-                                // curr_view.deletions =
-                                //     Some(&[100, 1000, 2000, 3000, 10000, 20000, 100000]);
 
                                 let bl = &(selected_commit.0, selected_baseline.clone());
                                 ui2.push_id((commit, bl), |ui| {
@@ -1458,13 +1450,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                                 });
                                 let left_side = false;
                                 let mut curr_view = long_tracking::ColView::default();
-                                curr_view
-                                    .matcheds
-                                    .extend(x.results.iter_mut().enumerate().map(|(i, x)| {
-                                        (if left_side { &mut x.0 } else { &mut x.1 }, i)
-                                    }));
-                                // curr_view.additions =
-                                //     Some(&[100, 1000, 2000, 3000, 10000, 20000, 100000]);
+                                (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(
+                                    |(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i),
+                                ));
                                 ui1.push_id((bl, commit), |ui| {
                                     let store = data.store.clone();
                                     show_tree_view(
@@ -1902,7 +1890,9 @@ fn show_tree_view(
             .unwrap_or(ui.max_rect().height() / 2000.0);
         let g_o: f32 = 50.0;
         wasm_rs_dbg::dbg!(o, g_o);
-        scroll.state.offset = (0.0, (o - g_o)).into();
+        if (scroll.state.offset.y - (o - g_o)).abs() < 20.0 {
+            scroll.state.offset = (0.0, (o - g_o)).into();
+        }
         scroll.state.store(ui.ctx(), scroll.id);
     }
 }

@@ -389,21 +389,10 @@ pub(super) fn show_central_panel(
         todo!();
     }
     if let Some(promise) = smells_result {
-        match show_smells_result(ui, api_addr, smells, fetched_files, promise) {
-            Some(value) => *smells_result = Some(value),
-            None => {
-                if let Some(examples) = &mut smells.diffs {
-                    let len = examples.examples.len();
-                    if len == 0 {
-                        ui.colored_label(ui.visuals().error_fg_color, "No changes found");
-                        return;
-                    }
-                    let conf = smells.commits.as_mut().unwrap();
-                    let center = ui.available_rect_before_wrap().center();
-                    show_examples(ui, api_addr, examples, fetched_files);
-                    return;
-                }
-            }
+        if let Some(value) = show_smells_result(ui, api_addr, smells, fetched_files, promise) {
+            *smells_result = Some(value)
+        } else {
+            return;
         }
     }
     if let Some(promise) = smells_diffs_result {
@@ -551,15 +540,12 @@ fn show_smells_result(
     }
 
     if (smells.bad_matches_bounds) == (0..=0) {
-        let start = (queries.bad.iter())
-            .map(|x| x.matches)
-            .min()
-            .unwrap_or_default();
-        let end = (queries.bad.iter())
-            .map(|x| x.matches)
-            .max()
-            .unwrap_or_default();
+        let matches = queries.bad.iter().map(|x| x.matches);
+        let start = matches.min().unwrap_or_default();
+        let matches = queries.bad.iter().map(|x| x.matches);
+        let end = matches.max().unwrap_or_default();
         smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
+        conf.wanted_matches = start..end; // TODO better open the side panel
     }
     if tot_len == 0 {
         let mut _smells_result = None;
@@ -578,6 +564,10 @@ fn show_smells_result(
         ui.colored_label(
             ui.visuals().error_fg_color,
             "No queries selected, change the hyperparameters",
+        );
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            "The hyperparameters can be found in the settings on the left panel",
         );
         return None;
     }
@@ -650,6 +640,7 @@ pub(crate) fn show_examples(
     let len = examples.examples.len();
     assert!(len > 0);
     egui::ScrollArea::vertical()
+        .id_salt("show_examples")
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
         .show_rows(ui, H, len, |ui, cols| {
             let (mut rect, _) = ui.allocate_exact_size(

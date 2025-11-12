@@ -597,12 +597,7 @@ impl crate::HyperApp {
                         .auto_shrink([false; 2])
                         .show(ui, |ui| {
                             egui::Frame::menu(ui.style()).show(ui, |ui| {
-                                let timed = true;
-                                if timed {
-                                    self.show_commit_graphs_timed(ui);
-                                } else {
-                                    self.print_commit_graph(ui, ctx);
-                                }
+                                self.show_commit_graphs_timed(ui);
                             });
                         });
                 }

@@ -1737,6 +1737,8 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         };
         if let Tab::MarkdownStatic(0) = space_view {
             true
+        } else if let Tab::LocalQuery(..) = space_view {
+            true
         } else {
             false
         }

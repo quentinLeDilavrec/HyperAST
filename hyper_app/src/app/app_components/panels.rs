@@ -113,10 +113,19 @@ impl crate::HyperApp {
 
         show_lang_selector(ui, qid, &mut query.lang);
 
-        let create_q =
+        let precomp_sel =
             show_precomp_selector(ui, qid, query.precomp.clone(), &mut self.data.queries);
+        let precomp_sel = precomp_sel.inner.as_ref();
 
-        if create_q.inner.map_or(false, |x| x.clicked()) {
+        if let Some(precomp) = precomp_sel.and_then(|x| x.0) {
+            let tid = self.tabs.push(crate::app::Tab::LocalQuery(precomp));
+            let child = self.tree.tiles.insert_pane(tid);
+            match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
+                Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
+                _ => todo!(),
+            };
+        }
+        if precomp_sel.map_or(false, |x| x.1.clicked()) {
             let precomp = self.data.queries.push(crate::app::QueryData {
                 name: "precomp".to_string(),
                 lang: self.data.queries[qid].lang.to_string(),
@@ -659,21 +668,23 @@ fn show_precomp_selector(
     qid: QueryId,
     precomp: Option<QueryId>,
     queries: &mut QueryDataVec,
-) -> egui::InnerResponse<Option<egui::Response>> {
+) -> egui::InnerResponse<Option<(Option<QueryId>, egui::Response)>> {
+    const NONE_LABEL: &str = "<none>";
     let sel_precomp = if let Some(id) = precomp {
         queries[id].name.to_string()
     } else {
-        "<none>".to_string()
+        NONE_LABEL.to_string()
     };
 
-    let mut create_q = egui::ComboBox::new((ui.id(), "Precomp", qid), "Precomp")
+    egui::ComboBox::new((ui.id(), "Precomp", qid), "Precomp")
         .selected_text(sel_precomp)
         .show_ui(ui, |ui| {
             let create_q = ui.button("new");
             let mut precomp = None;
             for (i, q) in queries.enumerate() {
                 let v = &q.name;
-                if ui.selectable_label(i == qid, v).clicked() {
+                let sel = precomp.map_or(false, |p| i == p);
+                if ui.selectable_label(sel, v).clicked() {
                     if i == qid {
                         precomp = Some(i);
                     }
@@ -684,14 +695,14 @@ fn show_precomp_selector(
                 query.precomp = Some(precomp);
             }
             if ui
-                .selectable_label(query.precomp.is_none(), "<none>")
+                .selectable_label(query.precomp.is_none(), NONE_LABEL)
                 .clicked()
             {
                 query.precomp = None;
             }
-            create_q
-        });
-    create_q
+
+            (precomp, create_q)
+        })
 }
 
 fn show_lang_selector(ui: &mut egui::Ui, id: impl std::hash::Hash, lang: &mut String) {

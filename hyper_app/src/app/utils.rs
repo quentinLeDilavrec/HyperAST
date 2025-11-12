@@ -237,6 +237,10 @@ macro_rules! typed_vec {
             $vis fn enumerate(&self) -> impl Iterator<Item = ($id, &$item)> {
                 self.0.iter().enumerate().map(|(i, v)| ($id(i as $ty), v))
             }
+
+            $vis fn find(&self, mut predicate: impl FnMut(&$item) -> bool) -> Option<($id, &$item)> {
+                self.0.iter().enumerate().find(|(_, v)| predicate(v)).map(|(i, v)| ($id(i as $ty), v))
+            }
         }
 
         impl std::ops::Index<$id> for $name {

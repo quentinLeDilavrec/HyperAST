@@ -1,72 +1,48 @@
-use std::ops::Mul as _;
-
-use crate::app::commit;
-
 use lazy_static::lazy_static;
+use std::ops::{ControlFlow, Mul as _};
 
-use super::{
-    CommitMdStore, ProjectId, QueryId, poll_md_with_pr2,
-    querying::{MatchingError, StreamedDataTable},
-    utils_results_batched::ComputeResultIdentified,
-};
+use super::commit;
+use super::querying::{MatchingError, StreamedComputeResults};
+use super::utils_results_batched::ComputeResultIdentified;
+use super::{CommitMdStore, ProjectId, QResId, QueryId, poll_md_with_pr2};
+
+type GuardedCache<'a, T, U> =
+    std::sync::MutexGuard<'a, super::utils_commit::BorrowFrameCache<T, U>>;
+type Cache<T, U> =
+    std::sync::Arc<std::sync::Mutex<crate::app::utils_commit::BorrowFrameCache<T, U>>>;
 
 lazy_static! {
-    static ref RES_PER_COMMIT: std::sync::Arc<
-        std::sync::Mutex<
-            crate::app::utils_commit::BorrowFrameCache<
-                super::ResultsPerCommit,
-                ComputeResPerCommit,
-            >,
-        >,
-    > = Default::default();
+    static ref RES_PER_COMMIT: Cache<super::ResultsPerCommit, ComputeResPerCommit> =
+        Default::default();
 }
 
 lazy_static! {
-    static ref LAYOUT: std::sync::Arc<
-        std::sync::Mutex<
-            crate::app::utils_commit::BorrowFrameCache<commit::CommitsLayoutTimed, ComputeLayout>,
-        >,
-    > = Default::default();
+    static ref LAYOUT: Cache<commit::CommitsLayoutTimed, ComputeLayout> = Default::default();
 }
 
 #[derive(Default)]
-pub struct ComputeResPerCommit {}
+pub struct ComputeResPerCommit;
 
 type ResHash = u64;
 
 impl
     egui::util::cache::ComputerMut<
-        (
-            (ProjectId, QueryId, ResHash),
-            // &crate::app::utils_results_batched::ComputeResults,
-            &StreamedDataTable<
-                Vec<String>,
-                std::result::Result<ComputeResultIdentified, MatchingError>,
-            >,
-        ),
+        ((ProjectId, QueryId, ResHash), &StreamedComputeResults),
         super::ResultsPerCommit,
     > for ComputeResPerCommit
 {
     fn compute(
         &mut self,
-        ((pid, qid, _), r): (
-            (ProjectId, QueryId, ResHash),
-            // &crate::app::utils_results_batched::ComputeResults,
-            &StreamedDataTable<
-                Vec<String>,
-                std::result::Result<ComputeResultIdentified, MatchingError>,
-            >,
-        ),
+        ((pid, qid, _), r): ((ProjectId, QueryId, ResHash), &StreamedComputeResults),
     ) -> super::ResultsPerCommit {
         let mut res = super::ResultsPerCommit::default();
-
         update_results_per_commit(&mut res, r);
         res
     }
 }
 
 #[derive(Default)]
-pub struct ComputeLayout {}
+pub struct ComputeLayout;
 
 impl
     egui::util::cache::ComputerMut<
@@ -86,334 +62,36 @@ impl
 }
 
 impl crate::HyperApp {
-    pub(crate) fn print_commit_graph_timed(&mut self, ui: &mut egui::Ui) {
+    pub(crate) fn show_commit_graphs_timed(&mut self, ui: &mut egui::Ui) {
         let res_per_commit = &mut RES_PER_COMMIT.lock().unwrap();
         let layout_cache = &mut LAYOUT.lock().unwrap();
         let mut caches_to_clear = vec![];
         ui.add_space(20.0);
         let ready_count = self.data.fetched_commit_metadata.len_local();
         for repo_id in self.data.selected_code_data.project_ids() {
-            let Some((r, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) else {
-                continue;
-            };
-            let Some(branch) = commit_slice
-                .iter_mut()
-                .next()
-                .map(|c| (format!("{}/{}", r.user, r.name), c.clone()))
-            else {
-                continue;
-            };
-            let id = ui.make_persistent_id("bottom_cache_layout");
-            let r = r.clone();
-
-            let results_per_commit: Option<&super::ResultsPerCommit> = {
-                if let Some(r) = (self.data.queries_results)
-                    .iter()
-                    .find(|x| x.project == repo_id)
-                {
-                    let qid = r.query;
-                    if let Some(Ok(r)) = r.content.get() {
-                        let content_hash = r.rows.lock().unwrap().0;
-                        let key = (repo_id, qid, content_hash);
-                        Some(res_per_commit.get2(key, r))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            };
-
-            let cached = {
-                if self.data.fetched_commit_metadata.is_absent(&branch.1) {
-                    let commit = r.clone().with(&branch.1);
-                    let fetching = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                    self.data
-                        .fetched_commit_metadata
-                        .insert(commit.id, fetching);
-                }
-                layout_cache.get2(
-                    (
-                        &branch.0,
-                        &branch.1,
-                        ready_count, // TODO find something more reliable
-                    ),
-                    &self.data.fetched_commit_metadata,
-                )
-            };
-
-            let mut to_fetch = vec![];
-            let mut to_poll = vec![];
-
-            if true {
-                let resp = show_commit_graph_timed_egui_plot(
-                    ui,
-                    self.data.max_fetch,
-                    &self.data.fetched_commit_metadata,
-                    results_per_commit,
-                    cached,
-                    repo_id,
-                    &mut to_fetch,
-                    &mut to_poll,
-                );
-
-                match resp.inner {
-                    GraphInteration::ClickCommit(i) => {
-                        if resp.response.secondary_clicked() && ui.input(|i| i.modifiers.command) {
-                            let mut it = commit_slice.iter_mut();
-                            *it.next().unwrap() = cached.commits[i].clone();
-                            for _ in 0..it.count() {
-                                commit_slice.pop();
-                            }
-                        } else if resp.response.clicked() {
-                            self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
-                            self.selected_baseline = None;
-                            let qres = (self.data.queries_results)
-                                .iter()
-                                .find(|x| x.project == repo_id && x.query.to_usize() == 0)
-                                .unwrap();
-                            if let super::Tab::QueryResults { id, format } =
-                                &mut self.tabs[qres.tab]
-                            {
-                                *format = crate::app::ResultFormat::Table
-                            } else {
-                                panic!()
-                            }
-                        } else if resp.response.secondary_clicked() {
-                            let commit = format!(
-                                "https://github.com/{}/{}/commit/{}",
-                                r.user, r.name, cached.commits[i]
-                            );
-                            ui.ctx().copy_text(commit.to_string());
-                            self.notifs.success(format!(
-                                "Copied address of github commit to clipboard\n{}",
-                                commit
-                            ));
-                            let id = &cached.commits[i];
-                            let repo = r.clone();
-                            let id = id.clone();
-                            let commit = crate::app::types::Commit { repo, id };
-                            let md = self.data.fetched_commit_metadata.remove(&commit.id);
-                            log::debug!("fetch_merge_pr");
-                            let waiting = commit::fetch_merge_pr(
-                                ui.ctx(),
-                                &self.data.api_addr,
-                                &commit,
-                                md.unwrap().unwrap().clone(),
-                                repo_id,
-                            );
-                            self.data.fetched_commit_metadata.insert(commit.id, waiting);
-                        }
-                    }
-                    GraphInteration::ClickErrorFetch(i) => {
-                        for i in i {
-                            let id = &cached.commits[i];
-                            let repo = r.clone();
-                            let id = id.clone();
-                            let commit = crate::app::types::Commit { repo, id };
-                            let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                            self.data.fetched_commit_metadata.insert(commit.id, v);
-                        }
-                    }
-                    GraphInteration::ClickChange(i, after) => {
-                        let commit = format!(
-                            "https://github.com/{}/{}/commit/{}",
-                            r.user, r.name, cached.commits[after]
-                        );
-                        self.notifs.add_log(re_log::LogMsg {
-                            level: log::Level::Info,
-                            target: format!("graph/commits"),
-                            msg: format!("Selected\n{} vs {}", commit, cached.commits[i]),
-                        });
-                        if resp.response.clicked() {
-                            self.selected_baseline = Some(cached.commits[i].to_string());
-                            self.selected_commit =
-                                Some((repo_id, cached.commits[after].to_string()));
-                            // assert_eq!(self.data.queries.len(), 1); // need to retieve current query if multiple
-
-                            let qres = (self.data.queries_results)
-                                .iter()
-                                .find(|x| {
-                                    x.project == repo_id
-                                        && self.data.queries[x.query].lang == "Java"
-                                })
-                                .unwrap();
-                            if let super::Tab::QueryResults { id, format } =
-                                &mut self.tabs[qres.tab]
-                            {
-                                *format = crate::app::ResultFormat::Hunks
-                            } else {
-                                panic!()
-                            }
-                        } else if resp.response.secondary_clicked() {
-                            ui.ctx().copy_text(commit.to_string());
-                            self.notifs.success(format!(
-                                "Copied address of github commit to clipboard\n{}",
-                                commit
-                            ));
-                        }
-                    }
-                    _ => (),
-                }
-            } else {
-                show_commit_graph_timed_custom(
-                    ui,
-                    self.data.offset_fetch,
-                    self.data.max_fetch,
-                    &self.data.fetched_commit_metadata,
-                    results_per_commit,
-                    cached,
-                    repo_id,
-                    &mut to_fetch,
-                    &mut to_poll,
-                    &mut self.selected_commit,
-                );
-            }
-
-            for id in to_fetch {
-                if !self.data.fetched_commit_metadata.is_absent(id) {
-                    continue;
-                }
-                let repo = r.clone();
-                let id = id.clone();
-                let commit = crate::app::types::Commit { repo, id };
-                let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                self.data.fetched_commit_metadata.insert(commit.id, v);
-            }
-            let max_time = cached.max_time;
-            for id in to_poll {
-                let was_err = self
-                    .data
-                    .fetched_commit_metadata
-                    .get(id)
-                    .map_or(false, |x| x.is_err());
-
-                if self.data.fetched_commit_metadata.try_poll_with(id, |x| {
-                    x.map(|x| poll_md_with_pr2(x, repo_id, &mut commit_slice))
-                }) {
-                    if let Some(Ok(md)) = self.data.fetched_commit_metadata.get(id) {
-                        let md = md.clone();
-                        if was_err {
-                            caches_to_clear.push(repo_id);
-                        }
-                        if md.forth_timestamp == i64::MAX {
-                            continue;
-                        }
-                        if md.ancestors.is_empty() {
-                            continue;
-                        }
-                        let id1 = md.ancestors[0].clone();
-                        let id2 = md.ancestors.get(1).cloned();
-                        let forth_timestamp = md.forth_timestamp;
-                        if max_time - forth_timestamp < self.data.max_fetch
-                            && self.data.fetched_commit_metadata.is_absent(&id1)
-                        {
-                            let id = id1;
-                            if self.data.fetched_commit_metadata.is_waiting(&id) {
-                                if self.data.fetched_commit_metadata.try_poll_with(&id, |x| {
-                                    x.map(|x| poll_md_with_pr2(x, repo_id, &mut commit_slice))
-                                }) {
-                                    let repo = r.clone();
-                                    let commit = crate::app::types::Commit {
-                                        repo,
-                                        id: id.clone(),
-                                    };
-                                    log::debug!("fetch_merge_pr");
-                                    let waiting = commit::fetch_merge_pr(
-                                        ui.ctx(),
-                                        &self.data.api_addr,
-                                        &commit,
-                                        md.clone(),
-                                        repo_id,
-                                    );
-                                    self.data
-                                        .fetched_commit_metadata
-                                        .insert(id.to_string(), waiting);
-                                }
-                            } else {
-                                let repo = r.clone();
-                                let commit = crate::app::types::Commit {
-                                    repo,
-                                    id: id.clone(),
-                                };
-                                let v =
-                                    commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                                self.data.fetched_commit_metadata.insert(id, v);
-                            }
-                        }
-                        let Some(id2) = id2 else {
-                            continue;
-                        };
-                        if max_time - forth_timestamp < self.data.max_fetch
-                            && self.data.fetched_commit_metadata.is_absent(&id2)
-                        {
-                            let id = id2;
-                            if self.data.fetched_commit_metadata.is_waiting(&id) {
-                                if self.data.fetched_commit_metadata.try_poll_with(&id, |x| {
-                                    x.map(|x| poll_md_with_pr2(x, repo_id, &mut commit_slice))
-                                }) {
-                                    let repo = r.clone();
-                                    let commit = crate::app::types::Commit {
-                                        repo,
-                                        id: id.clone(),
-                                    };
-                                    log::debug!("fetch_merge_pr");
-                                    let waiting = commit::fetch_merge_pr(
-                                        ui.ctx(),
-                                        &self.data.api_addr,
-                                        &commit,
-                                        md.clone(),
-                                        repo_id,
-                                    );
-                                    self.data
-                                        .fetched_commit_metadata
-                                        .insert(id.to_string(), waiting);
-                                }
-                            } else {
-                                let repo = r.clone();
-                                let commit = crate::app::types::Commit {
-                                    repo,
-                                    id: id.clone(),
-                                };
-                                let v =
-                                    commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                                self.data.fetched_commit_metadata.insert(id, v);
-                            }
-                        }
-                        let repo = r.clone();
-                        let commit = crate::app::types::Commit {
-                            repo,
-                            id: id.clone(),
-                        };
-                        log::debug!("fetch_merge_pr");
-                        let waiting = commit::fetch_merge_pr(
-                            ui.ctx(),
-                            &self.data.api_addr,
-                            &commit,
-                            md.clone(),
-                            repo_id,
-                        );
-                        self.data
-                            .fetched_commit_metadata
-                            .insert(id.to_string(), waiting);
-                    }
-                }
-            }
+            let qrid = (self.data.queries_results)
+                .find(|x| x.project == repo_id)
+                .map(|x| x.0);
+            self.show_commit_graph_timed(
+                ui,
+                res_per_commit,
+                layout_cache,
+                &mut caches_to_clear,
+                ready_count,
+                repo_id,
+                qrid,
+            );
         }
         for repo_id in caches_to_clear {
             let Some((r, mut c)) = self.data.selected_code_data.get_mut(repo_id) else {
                 continue;
             };
-            let commit_slice = &mut c.iter_mut();
-            let Some(branch) = commit_slice
-                .next()
-                .map(|c| (format!("{}/{}", r.user, r.name), c.clone()))
-            else {
+            let Some(branch) = c.iter_mut().next() else {
                 continue;
             };
-            if let Some(r) = self
-                .data
-                .queries_results
+            let branch = (format!("{}/{}", r.user, r.name), branch.clone());
+
+            if let Some(r) = (self.data.queries_results)
                 .iter()
                 .find(|x| x.project == repo_id)
             {
@@ -434,6 +112,276 @@ impl crate::HyperApp {
         res_per_commit.evice_cache();
         layout_cache.evice_cache();
     }
+
+    fn show_commit_graph_timed(
+        &mut self,
+        ui: &mut egui::Ui,
+        res_per_commit: &mut GuardedCache<'_, super::ResultsPerCommit, ComputeResPerCommit>,
+        layout_cache: &mut GuardedCache<'_, commit::CommitsLayoutTimed, ComputeLayout>,
+        caches_to_clear: &mut Vec<ProjectId>,
+        ready_count: usize,
+        repo_id: ProjectId,
+        qrid: Option<QResId>,
+    ) {
+        let Some((r, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) else {
+            return;
+        };
+        let Some(branch) = commit_slice.iter_mut().next() else {
+            return;
+        };
+        let branch = (format!("{}/{}", r.user, r.name), branch.clone());
+        let id = ui.make_persistent_id("bottom_cache_layout");
+        let r = r.clone();
+
+        let results_per_commit = qrid
+            .and_then(|qrid| self.data.queries_results.get(qrid))
+            .and_then(|r| {
+                let qid = r.query;
+                let r = r.content.get()?.as_ref().ok()?;
+                let content_hash = r.rows.lock().unwrap().0;
+                let key = (repo_id, qid, content_hash);
+                Some(res_per_commit.get2(key, r))
+            });
+
+        if self.data.fetched_commit_metadata.is_absent(&branch.1) {
+            let commit = r.clone().with(&branch.1);
+            let fetching = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
+            self.data
+                .fetched_commit_metadata
+                .insert(commit.id, fetching);
+        }
+        let cached = layout_cache.get2(
+            (
+                &branch.0,
+                &branch.1,
+                ready_count, // TODO find something more reliable
+            ),
+            &self.data.fetched_commit_metadata,
+        );
+
+        let mut to_fetch = vec![];
+        let mut to_poll = vec![];
+
+        let resp = show_commit_graph_timed_egui_plot(
+            ui,
+            self.data.max_fetch,
+            &self.data.fetched_commit_metadata,
+            results_per_commit,
+            cached,
+            repo_id,
+            &mut to_fetch,
+            &mut to_poll,
+        );
+
+        match resp.inner {
+            GraphInteration::ClickCommit(i)
+                if resp.response.secondary_clicked() && ui.input(|i| i.modifiers.command) =>
+            {
+                let mut it = commit_slice.iter_mut();
+                *it.next().unwrap() = cached.commits[i].clone();
+                for _ in 0..it.count() {
+                    commit_slice.pop();
+                }
+            }
+            GraphInteration::ClickCommit(i) if resp.response.clicked() => {
+                self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
+                self.selected_baseline = None;
+                let qres = (self.data.queries_results)
+                    .iter()
+                    .find(|x| x.project == repo_id && x.query.to_usize() == 0)
+                    .unwrap();
+                if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
+                    *format = crate::app::ResultFormat::Table
+                } else {
+                    panic!()
+                }
+            }
+            GraphInteration::ClickCommit(i) if resp.response.secondary_clicked() => {
+                let commit = format!(
+                    "https://github.com/{}/{}/commit/{}",
+                    r.user, r.name, cached.commits[i]
+                );
+                ui.ctx().copy_text(commit.to_string());
+                self.notifs.success(format!(
+                    "Copied address of github commit to clipboard\n{}",
+                    commit
+                ));
+                let id = &cached.commits[i];
+                let repo = r.clone();
+                let id = id.clone();
+                let commit = crate::app::types::Commit { repo, id };
+                let md = self.data.fetched_commit_metadata.remove(&commit.id);
+                log::debug!("fetch_merge_pr");
+                let waiting = commit::fetch_merge_pr(
+                    ui.ctx(),
+                    &self.data.api_addr,
+                    &commit,
+                    md.unwrap().unwrap().clone(),
+                    repo_id,
+                );
+                self.data.fetched_commit_metadata.insert(commit.id, waiting);
+            }
+            GraphInteration::ClickErrorFetch(i) => {
+                for i in i {
+                    let id = &cached.commits[i];
+                    let repo = r.clone();
+                    let id = id.clone();
+                    let commit = crate::app::types::Commit { repo, id };
+                    let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
+                    self.data.fetched_commit_metadata.insert(commit.id, v);
+                }
+            }
+            GraphInteration::ClickChange(i, after) => {
+                let commit = format!(
+                    "https://github.com/{}/{}/commit/{}",
+                    r.user, r.name, cached.commits[after]
+                );
+                self.notifs.add_log(re_log::LogMsg {
+                    level: log::Level::Info,
+                    target: format!("graph/commits"),
+                    msg: format!("Selected\n{} vs {}", commit, cached.commits[i]),
+                });
+                if resp.response.clicked() {
+                    self.selected_baseline = Some(cached.commits[i].to_string());
+                    self.selected_commit = Some((repo_id, cached.commits[after].to_string()));
+                    // assert_eq!(self.data.queries.len(), 1); // need to retieve current query if multiple
+
+                    let qres = (self.data.queries_results)
+                        .iter()
+                        .find(|x| x.project == repo_id && self.data.queries[x.query].lang == "Java")
+                        .unwrap();
+                    if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
+                        *format = crate::app::ResultFormat::Hunks
+                    } else {
+                        panic!()
+                    }
+                } else if resp.response.secondary_clicked() {
+                    ui.ctx().copy_text(commit.to_string());
+                    self.notifs.success(format!(
+                        "Copied address of github commit to clipboard\n{}",
+                        commit
+                    ));
+                }
+            }
+            _ => (),
+        }
+        for id in to_fetch {
+            if !self.data.fetched_commit_metadata.is_absent(id) {
+                continue;
+            }
+            let repo = r.clone();
+            let id = id.clone();
+            let commit = crate::app::types::Commit { repo, id };
+            let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
+            self.data.fetched_commit_metadata.insert(commit.id, v);
+        }
+        let mut helper = ToPollHelper {
+            ctx: ui.ctx(),
+            repo_id,
+            r: &r,
+            md_fetch: &mut self.data.fetched_commit_metadata,
+            commit_slice: &mut commit_slice,
+            api_addr: &self.data.api_addr,
+        };
+        let max_time = cached.max_time;
+        let max_fetch = self.data.max_fetch;
+        for id in to_poll {
+            to_poll_helper(&mut helper, id, max_time, caches_to_clear, max_fetch);
+        }
+    }
+}
+
+struct ToPollHelper<'a, 'b> {
+    ctx: &'a egui::Context,
+    repo_id: ProjectId,
+    r: &'a super::Repo,
+    api_addr: &'a str,
+    md_fetch: &'a mut CommitMdStore,
+    commit_slice: &'a mut super::CommitSlice<'b>,
+}
+
+fn to_poll_helper(
+    helper: &mut ToPollHelper<'_, '_>,
+    id: &str,
+    max_time: i64,
+    caches_to_clear: &mut Vec<ProjectId>,
+    max_fetch: i64,
+) {
+    let repo_id = helper.repo_id;
+    let was_err = helper.md_fetch.get(id).map_or(false, |x| x.is_err());
+    if !helper.md_fetch.try_poll_with(id, |x| {
+        x.map(|x| poll_md_with_pr2(x, repo_id, helper.commit_slice))
+    }) {
+        return;
+    }
+    let Some(Ok(md)) = helper.md_fetch.get(id) else {
+        return;
+    };
+    let md = md.clone();
+    if was_err {
+        caches_to_clear.push(repo_id);
+    }
+    if md.forth_timestamp == i64::MAX {
+        return;
+    }
+    if md.ancestors.is_empty() {
+        return;
+    }
+    let id1 = &md.ancestors[0];
+    let id2 = md.ancestors.get(1);
+    let forth_timestamp = md.forth_timestamp;
+    if max_time - forth_timestamp < max_fetch && helper.md_fetch.is_absent(id1) {
+        to_poll_helper_aux(helper, id1, &md);
+    }
+    let Some(id2) = id2 else {
+        return;
+    };
+    if max_time - forth_timestamp < max_fetch && helper.md_fetch.is_absent(id2) {
+        to_poll_helper_aux(helper, id2, &md);
+    }
+    let ToPollHelper { ctx, api_addr, .. } = helper;
+    let repo = helper.r.clone();
+    let commit = crate::app::types::Commit {
+        repo,
+        id: id.to_string(),
+    };
+    log::debug!("fetch_merge_pr");
+    let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
+    helper.md_fetch.insert(id.to_string(), waiting);
+}
+
+fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::CommitMetadata) {
+    let repo_id = helper.repo_id;
+    let ToPollHelper {
+        ctx,
+        commit_slice,
+        md_fetch,
+        api_addr,
+        ..
+    } = helper;
+    if !md_fetch.is_waiting(id) {
+        let repo = helper.r.clone();
+        let commit = crate::app::types::Commit {
+            repo,
+            id: id.to_string(),
+        };
+        let v = commit::fetch_commit(ctx, api_addr, &commit);
+        md_fetch.insert(id.to_string(), v);
+        return;
+    }
+    if !md_fetch.try_poll_with(id, |x| {
+        x.map(|x| poll_md_with_pr2(x, repo_id, commit_slice))
+    }) {
+        return;
+    }
+    let repo = helper.r.clone();
+    let commit = crate::app::types::Commit {
+        repo,
+        id: id.to_string(),
+    };
+    log::debug!("fetch_merge_pr");
+    let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
+    md_fetch.insert(id.to_string(), waiting);
 }
 
 enum GraphInteration {
@@ -1288,58 +1236,20 @@ impl crate::HyperApp {
 
 fn update_results_per_commit(
     results_per_commit: &mut super::ResultsPerCommit,
-    r: &StreamedDataTable<
-        Vec<std::string::String>,
-        std::result::Result<ComputeResultIdentified, MatchingError>,
-    >,
+    r: &StreamedComputeResults,
 ) {
-    let header = &r.head; //.results.iter().find(|x| x.is_ok());
-    // let Some(header) = header.as_ref() else {
-    //     panic!("issue with header");
-    // };
-    // let font_id = egui::TextStyle::Body.resolve(ui.style());
-    // let text_color = ui.style().visuals.text_color();
-    // let header = header.as_ref().unwrap();
-    // let h =
-    // header
-    //     .inner
-    //     .result
-    //     .as_array()
-    //     .unwrap()
-    //     .into_iter()
-    //     .enumerate()
-    //     .map(|(i, h)| i.to_string())
-    //     .collect();
+    let header = &r.head;
     let mut vals = vec![0; header.len()];
     results_per_commit.set_cols(header);
     for r in &r.rows.lock().unwrap().1 {
-        if let Ok(r) = r {
-            // let c: [u8;8] = r.commit.as_bytes().as_chunks::<8>().0[0];
-            // let mut c: [u8; 8] = [0; 8];
-            // c.copy_from_slice(
-            //     &r.commit.as_bytes()[..8],
-            // );
-            // panic!("{} {}",r.inner.result.is_object(),r.inner.result.is_array());
-            for (i, r) in r.inner.result.as_array().unwrap().into_iter().enumerate() {
-                if i > 2 {
-                    break;
-                }
-                vals[i] = r.as_i64().unwrap() as i32;
+        let Ok(r) = r else { continue };
+        for (i, r) in r.inner.result.as_array().unwrap().into_iter().enumerate() {
+            if i > 2 {
+                break;
             }
-
-            results_per_commit.insert(
-                &r.commit,
-                // || {
-                //     let text = crate::app::utils::join(vals.iter(), "\n").to_string();
-                //     ui.painter()
-                //         .layout_no_wrap(text, font_id.clone(), text_color)
-                //         .into()
-                // },
-                r.inner.compute_time as f32,
-                &[],
-                &vals,
-            );
+            vals[i] = r.as_i64().unwrap() as i32;
         }
+        results_per_commit.insert(&r.commit, r.inner.compute_time as f32, &[], &vals);
     }
     log::debug!("{:?}", results_per_commit);
 }

@@ -570,78 +570,10 @@ impl crate::HyperApp {
             .resizable(true)
             .frame(frame_style)
             .show_animated(ctx, self.show_bottom_panel, |ui| {
-                let view = &mut self.bottom_view;
                 ui.horizontal(|ui| {
-                    ui.strong("Bottom panel");
-                    ui.add_space(20.0);
-                    egui::ComboBox::from_label("View")
-                        .selected_text(view.as_ref())
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(view, super::BottomPanelConfig::Commits, "Commits");
-                            ui.selectable_value(
-                                view,
-                                super::BottomPanelConfig::CommitsTime,
-                                "Commits Time",
-                            );
-                            ui.add_enabled_ui(false, |ui| {
-                                ui.selectable_value(
-                                    view,
-                                    super::BottomPanelConfig::Temporal,
-                                    "Temporal",
-                                );
-                                ui.selectable_value(
-                                    view,
-                                    super::BottomPanelConfig::Temporal,
-                                    "Commit Metadata",
-                                );
-                            })
-                        });
-                    ui.add_space(20.0);
-                    const MAX: i64 = 60 * 60 * 24 * 365;
-                    const MIN: i64 = 60 * 60 * 24 * 1;
-                    let resp =
-                        &egui::widgets::Slider::new(&mut self.data.offset_fetch, 0..=MAX).ui(ui);
-                    if resp.drag_stopped() {
-                        self.save_interval = std::time::Duration::ZERO;
-                    }
-                    let resp = &egui::widgets::Slider::new(&mut self.data.max_fetch, MIN..=MAX)
-                        .clamping(egui::SliderClamping::Never)
-                        .custom_formatter(|n, _| {
-                            let n = n as i64;
-                            let days = n / (60 * 60 * 24);
-                            let hours = (n / (60 * 60)) % 24;
-                            let mins = (n / 60) % 60;
-                            let secs = n % 60;
-                            format!("{days:02}:{hours:02}:{mins:02}:{secs:02}")
-                        })
-                        .custom_parser(|s| {
-                            let parts: Vec<&str> = s.split(':').collect();
-                            if parts.len() == 4 {
-                                parts[0]
-                                    .parse::<i64>()
-                                    .and_then(|d| {
-                                        parts[1].parse::<i64>().and_then(|h| {
-                                            parts[2].parse::<i64>().and_then(|m| {
-                                                parts[3].parse::<i64>().map(|s| {
-                                                    ((d * 60 * 60 * 24)
-                                                        + (h * 60 * 60)
-                                                        + (m * 60)
-                                                        + s)
-                                                        as f64
-                                                })
-                                            })
-                                        })
-                                    })
-                                    .ok()
-                            } else {
-                                None
-                            }
-                        })
-                        .ui(ui);
-                    if resp.drag_stopped() {
-                        self.save_interval = std::time::Duration::ZERO;
-                    }
+                    self.bottom_pannel_buttons(ui);
                 });
+                let view = &mut self.bottom_view;
                 if *view == super::BottomPanelConfig::Commits {
                     egui::Frame::menu(ui.style()).show(ui, |ui| {
                         egui::ScrollArea::both().show(ui, |ui| {
@@ -652,13 +584,13 @@ impl crate::HyperApp {
                         });
                     });
                 } else if *view == super::BottomPanelConfig::CommitsTime {
-                    egui::ScrollArea::both()
+                    egui::ScrollArea::vertical()
                         .auto_shrink([false; 2])
                         .show(ui, |ui| {
                             egui::Frame::menu(ui.style()).show(ui, |ui| {
                                 let timed = true;
                                 if timed {
-                                    self.print_commit_graph_timed(ui);
+                                    self.show_commit_graphs_timed(ui);
                                 } else {
                                     self.print_commit_graph(ui, ctx);
                                 }
@@ -667,7 +599,61 @@ impl crate::HyperApp {
                 }
             });
     }
+
+    fn bottom_pannel_buttons(&mut self, ui: &mut egui::Ui) {
+        let view = &mut self.bottom_view;
+        ui.strong("Bottom panel");
+        ui.add_space(20.0);
+        egui::ComboBox::from_label("View")
+            .selected_text(view.as_ref())
+            .show_ui(ui, |ui| {
+                ui.selectable_value(view, super::BottomPanelConfig::Commits, "Commits");
+                ui.selectable_value(view, super::BottomPanelConfig::CommitsTime, "Commits Time");
+                ui.add_enabled_ui(false, |ui| {
+                    ui.selectable_value(view, super::BottomPanelConfig::Temporal, "Temporal");
+                    ui.selectable_value(
+                        view,
+                        super::BottomPanelConfig::Temporal,
+                        "Commit Metadata",
+                    );
+                })
+            });
+        ui.add_space(20.0);
+
+        const MAX: i64 = 60 * 60 * 24 * 365;
+        const MIN: i64 = 60 * 60 * 24 * 1;
+        let resp = &egui::widgets::Slider::new(&mut self.data.offset_fetch, 0..=MAX).ui(ui);
+        if resp.drag_stopped() {
+            self.save_interval = std::time::Duration::ZERO;
+        }
+        let resp = &egui::widgets::Slider::new(&mut self.data.max_fetch, MIN..=MAX)
+            .clamping(egui::SliderClamping::Never)
+            .custom_formatter(|n, _| {
+                let n = n as i64;
+                let days = n / (60 * 60 * 24);
+                let hours = (n / (60 * 60)) % 24;
+                let mins = (n / 60) % 60;
+                let secs = n % 60;
+                format!("{days:02}:{hours:02}:{mins:02}:{secs:02}")
+            })
+            .custom_parser(|s| {
+                let parts: Vec<&str> = s.split(':').collect();
+                if parts.len() != 4 {
+                    return None;
+                }
+                let d = parts[0].parse::<i64>().ok()? * 60 * 60 * 24;
+                let h = parts[1].parse::<i64>().ok()? * 60 * 60;
+                let m = parts[2].parse::<i64>().ok()? * 60;
+                let s = parts[3].parse::<i64>().ok()?;
+                Some((d + h + m + s) as f64)
+            })
+            .ui(ui);
+        if resp.drag_stopped() {
+            self.save_interval = std::time::Duration::ZERO;
+        }
+    }
 }
+
 fn show_precomp_selector(
     ui: &mut egui::Ui,
     qid: QueryId,

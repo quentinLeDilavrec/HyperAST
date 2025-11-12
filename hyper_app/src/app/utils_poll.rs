@@ -347,7 +347,11 @@ impl<K: Eq + Hash, V2: Send + 'static, V> Default for MultiBuffered2<K, V2, V> {
 }
 
 impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
-    pub fn try_poll_with(&mut self, key: &K, mut f: impl FnMut(V2) -> V) -> bool {
+    pub fn try_poll_with<Q: ?Sized>(&mut self, key: &Q, mut f: impl FnMut(V2) -> V) -> bool
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Hash + Eq,
+    {
         if let Some((key, prom)) = self.waiting.remove_entry(key) {
             match prom.try_take() {
                 Ok(content) => {
@@ -411,7 +415,11 @@ impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
 
 impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
     #[allow(unused)]
-    pub fn is_waiting(&self, k: &K) -> bool {
+    pub fn is_waiting<Q: ?Sized>(&self, k: &Q) -> bool
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: Hash + Eq,
+    {
         self.waiting.contains_key(k)
     }
 

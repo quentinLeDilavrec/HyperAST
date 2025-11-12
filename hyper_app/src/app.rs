@@ -15,6 +15,7 @@ use egui_addon::{
     syntax_highlighting,
 };
 
+use crate::command::UICommandSender;
 use crate::{
     command::{CommandReceiver, CommandSender, UICommand},
     command_palette::CommandPalette,
@@ -2562,6 +2563,17 @@ impl eframe::App for HyperApp {
                     let qid = self.data.queries.push(crate::app::QueryData {
                         ..Default::default()
                     });
+                    let tid = self.tabs.push(crate::app::Tab::LocalQuery(qid));
+                    let child = self.tree.tiles.insert_pane(tid);
+                    match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
+                        Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
+                        _ => todo!(),
+                    };
+                }
+                UICommand::OpenLastCreatedQuery => {
+                    let Some((qid, _)) = self.data.queries.enumerate().last() else {
+                        continue;
+                    };
                     let tid = self.tabs.push(crate::app::Tab::LocalQuery(qid));
                     let child = self.tree.tiles.insert_pane(tid);
                     match self.tree.tiles.get_mut(self.tree.root.unwrap()) {

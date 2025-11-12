@@ -92,8 +92,9 @@ pub enum UICommand {
     #[cfg(target_arch = "wasm32")]
     RestartWithWebGpu,
 
-    // NOTE: could take inspiration from zed on (kb) interations
+    // NOTE: could take inspiration from zed on (kb) interactions
     NewQuery,
+    OpenLastCreatedQuery,
 
     // Compute commands:
     RunQuery,
@@ -300,6 +301,10 @@ impl UICommand {
             ),
 
             UICommand::NewQuery => ("Create new query", "Create a new tree-sitter query"),
+            UICommand::OpenLastCreatedQuery => (
+                "Open last created query",
+                "Open the last created tree-sitter query",
+            ),
 
             UICommand::RunQuery => ("Run current code query", "TODO desc. RunQuery"),
             UICommand::ComputeTrackingMappingFuture => (
@@ -429,6 +434,7 @@ impl UICommand {
 
             // TODO
             UICommand::NewQuery => None,
+            UICommand::OpenLastCreatedQuery => None,
             UICommand::RunQuery => None,
             UICommand::ComputeTrackingMappingFuture => None,
             UICommand::ComputeTrackingMappingPast => None,

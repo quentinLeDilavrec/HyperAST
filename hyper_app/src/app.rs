@@ -2275,8 +2275,9 @@ const ACTIONS: &[fn(&mut AppData, &mut egui::Ui) -> egui::Response] = &[
         } else {
             "Query Repository with tree-sitter-query"
         });
-        ui.add_enabled(true, button)
+        ui.add_enabled(false, button)
     },
+    querying::ACTION,
 ];
 
 fn te<'a>(txt: &'a mut String, hint: &'static str) -> egui::TextEdit<'a> {

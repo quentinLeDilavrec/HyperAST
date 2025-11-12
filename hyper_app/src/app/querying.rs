@@ -703,3 +703,96 @@ impl ComputeError for QueryingError {
         }
     }
 }
+
+pub(crate) const ACTION: fn(&mut super::AppData, &mut egui::Ui) -> egui::Response = |data, ui| {
+    let button = egui::Button::new("Find JUnit tests in Java projects");
+    let resp = ui.add_enabled(true, button);
+    if resp.clicked() {
+        let precomp = data.queries.push(crate::app::QueryData {
+            name: "JUnit test annotation".to_string(),
+            lang: "Java".to_string(),
+            query: egui_addon::code_editor::CodeEditor::new(
+                egui_addon::code_editor::EditorInfo::default().into(),
+                r#"(marker_annotation
+    name: (_) (#EQ? "Test")
+)"#
+                .to_string(),
+            ),
+            ..Default::default()
+        });
+        log::info!("created subquery {precomp:?} to help find JUnit tests in Java projects");
+        let query = data.queries.push(crate::app::QueryData {
+            name: "JUnit Tests".to_string(),
+            lang: "Java".to_string(),
+            query: egui_addon::code_editor::CodeEditor::new(
+                egui_addon::code_editor::EditorInfo::default().into(),
+                r#"(class_declaration
+  body: (_
+    (method_declaration
+      (modifiers
+        (marker_annotation
+          name: (_) (#EQ? "Test")
+        )
+      )
+    )
+  )
+)"#
+                .to_string(),
+            ),
+            precomp: Some(precomp),
+            ..Default::default()
+        });
+        log::info!("created query {query:?} to find JUnit tests in Java projects");
+
+        use crate::command::UICommand;
+        use crate::command::UICommandSender;
+        data.command_sender.send_ui(UICommand::OpenLastCreatedQuery);
+    }
+    let button = egui::Button::new("Find Try fail catches in Java projects");
+    let resp2 = ui.add_enabled(true, button);
+    if resp2.clicked() {
+        let precomp = data.queries.push(crate::app::QueryData {
+            name: "try_stmt + JUnit fail".to_string(),
+            lang: "Java".to_string(),
+            query: egui_addon::code_editor::CodeEditor::new(
+                egui_addon::code_editor::EditorInfo::default().into(),
+                r#"(try_statement)
+
+(method_invocation
+  (identifier) (#EQ? "fail")
+)"#
+                .to_string(),
+            ),
+            ..Default::default()
+        });
+        log::info!(
+            "created query {precomp:?} to find try_statements and calls to JUnit fail in Java projects"
+        );
+        let query = data.queries.push(crate::app::QueryData {
+            name: "Try fail catches".to_string(),
+            lang: "Java".to_string(),
+            query: egui_addon::code_editor::CodeEditor::new(
+                egui_addon::code_editor::EditorInfo::default().into(),
+                r#"(try_statement
+  (block
+    (expression_statement
+      (method_invocation
+        (identifier) (#EQ? "fail")
+      )
+    )
+  )
+  (catch_clause)
+)"#
+                .to_string(),
+            ),
+            precomp: Some(precomp),
+            ..Default::default()
+        });
+        log::info!("created query {query:?} to find Try fail catches in Java projects");
+
+        use crate::command::UICommand;
+        use crate::command::UICommandSender;
+        data.command_sender.send_ui(UICommand::OpenLastCreatedQuery);
+    }
+    resp | resp2
+};

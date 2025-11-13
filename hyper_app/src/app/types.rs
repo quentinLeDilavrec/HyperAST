@@ -226,6 +226,27 @@ impl Repo {
             id: id.into(),
         }
     }
+    pub(crate) fn url(&self) -> String {
+        format!("https://github.com/{}/{}", self.user, self.name)
+    }
+}
+
+impl Commit {
+    pub(crate) fn url(&self) -> String {
+        let url = self.repo.url();
+        let id = &self.id;
+        format!("{url}/commit/{id}")
+    }
+    pub(crate) fn commit_url_to_clipboard(
+        &self,
+        ctx: &egui::Context,
+        notification_ui: &mut re_ui::notifications::NotificationUi,
+    ) {
+        let url = self.url();
+        let text = format!("Copied address of github commit to clipboard\n{url}",);
+        ctx.copy_text(url);
+        notification_ui.success(text);
+    }
 }
 
 impl Default for Commit {

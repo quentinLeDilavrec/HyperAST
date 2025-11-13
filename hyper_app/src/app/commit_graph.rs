@@ -1,70 +1,21 @@
-use lazy_static::lazy_static;
 use std::ops::{ControlFlow, Mul as _};
 
-use super::commit;
 use super::querying::{MatchingError, StreamedComputeResults};
 use super::utils_results_batched::ComputeResultIdentified;
-use super::{CommitMdStore, ProjectId, QResId, QueryId, poll_md_with_pr2};
+use super::{CommitMdStore, ProjectId, QResId, poll_md_with_pr2};
+use super::{QueryResults, commit};
 
-type GuardedCache<'a, T, U> =
-    std::sync::MutexGuard<'a, super::utils_commit::BorrowFrameCache<T, U>>;
-type Cache<T, U> =
-    std::sync::Arc<std::sync::Mutex<crate::app::utils_commit::BorrowFrameCache<T, U>>>;
+mod graph_caching;
 
-lazy_static! {
-    static ref RES_PER_COMMIT: Cache<super::ResultsPerCommit, ComputeResPerCommit> =
-        Default::default();
-}
-
-lazy_static! {
-    static ref LAYOUT: Cache<commit::CommitsLayoutTimed, ComputeLayout> = Default::default();
-}
-
-#[derive(Default)]
-pub struct ComputeResPerCommit;
-
-type ResHash = u64;
-
-impl
-    egui::util::cache::ComputerMut<
-        ((ProjectId, QueryId, ResHash), &StreamedComputeResults),
-        super::ResultsPerCommit,
-    > for ComputeResPerCommit
-{
-    fn compute(
-        &mut self,
-        ((pid, qid, _), r): ((ProjectId, QueryId, ResHash), &StreamedComputeResults),
-    ) -> super::ResultsPerCommit {
-        let mut res = super::ResultsPerCommit::default();
-        update_results_per_commit(&mut res, r);
-        res
-    }
-}
-
-#[derive(Default)]
-pub struct ComputeLayout;
-
-impl
-    egui::util::cache::ComputerMut<
-        ((&str, &str, usize), &super::CommitMdStore),
-        commit::CommitsLayoutTimed,
-    > for ComputeLayout
-{
-    fn compute(
-        &mut self,
-        ((name, target, _), fetched_commit_metadata): ((&str, &str, usize), &super::CommitMdStore),
-    ) -> commit::CommitsLayoutTimed {
-        commit::compute_commit_layout_timed(
-            |id| fetched_commit_metadata.get(id)?.as_ref().ok().cloned(),
-            Some((name.to_string(), target.to_string())).into_iter(),
-        )
-    }
-}
+type CommitComputeCache<'a> =
+    graph_caching::GuardedCache<'a, super::ResultsPerCommit, graph_caching::ComputeResPerCommit>;
+type CommitLayoutCache<'a> =
+    graph_caching::GuardedCache<'a, commit::CommitsLayoutTimed, graph_caching::ComputeLayout>;
 
 impl crate::HyperApp {
     pub(crate) fn show_commit_graphs_timed(&mut self, ui: &mut egui::Ui) {
-        let res_per_commit = &mut RES_PER_COMMIT.lock().unwrap();
-        let layout_cache = &mut LAYOUT.lock().unwrap();
+        let res_per_commit = &mut graph_caching::RES_PER_COMMIT.lock().unwrap();
+        let layout_cache = &mut graph_caching::LAYOUT.lock().unwrap();
         let mut caches_to_clear = vec![];
         ui.add_space(20.0);
         let ready_count = self.data.fetched_commit_metadata.len_local();
@@ -116,8 +67,8 @@ impl crate::HyperApp {
     fn show_commit_graph_timed(
         &mut self,
         ui: &mut egui::Ui,
-        res_per_commit: &mut GuardedCache<'_, super::ResultsPerCommit, ComputeResPerCommit>,
-        layout_cache: &mut GuardedCache<'_, commit::CommitsLayoutTimed, ComputeLayout>,
+        res_per_commit: &mut CommitComputeCache<'_>,
+        layout_cache: &mut CommitLayoutCache<'_>,
         caches_to_clear: &mut Vec<ProjectId>,
         ready_count: usize,
         repo_id: ProjectId,
@@ -162,130 +113,37 @@ impl crate::HyperApp {
         let mut to_fetch = vec![];
         let mut to_poll = vec![];
 
+        let widget = CommitGraphWidget {
+            max_fetch: self.data.max_fetch,
+            fetched_commit_metadata: &self.data.fetched_commit_metadata,
+            results_per_commit,
+            cached,
+            repo_id,
+        };
         let resp = egui::Frame::NONE
             .inner_margin(egui::vec2(50.0, 10.0))
-            .show(ui, |ui| {
-                show_commit_graph_timed_egui_plot(
-                    ui,
-                    self.data.max_fetch,
-                    &self.data.fetched_commit_metadata,
-                    results_per_commit,
-                    cached,
-                    repo_id,
-                    &mut to_fetch,
-                    &mut to_poll,
-                )
-            })
+            .show(ui, |ui| widget.show(ui, &mut to_fetch, &mut to_poll))
             .inner;
 
-        match resp.inner {
-            GraphInteraction::ClickCommit(i)
-                if resp.response.secondary_clicked() && ui.input(|i| i.modifiers.command) =>
-            {
-                let mut it = commit_slice.iter_mut();
-                *it.next().unwrap() = cached.commits[i].clone();
-                for _ in 0..it.count() {
-                    commit_slice.pop();
-                }
-            }
-            GraphInteraction::ClickCommit(i) if resp.response.clicked() => {
-                self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
-                self.selected_baseline = None;
-                let qres = (self.data.queries_results)
-                    .iter()
-                    .find(|x| x.project == repo_id && x.query.to_usize() == 0)
-                    .unwrap();
-                if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
-                    *format = crate::app::ResultFormat::Table
-                } else {
-                    panic!()
-                }
-            }
-            GraphInteraction::ClickCommit(i) if resp.response.secondary_clicked() => {
-                let commit = format!(
-                    "https://github.com/{}/{}/commit/{}",
-                    r.user, r.name, cached.commits[i]
-                );
-                ui.ctx().copy_text(commit.to_string());
-                self.notifs.success(format!(
-                    "Copied address of github commit to clipboard\n{}",
-                    commit
-                ));
-                let id = &cached.commits[i];
-                let repo = r.clone();
-                let id = id.clone();
-                let commit = crate::app::types::Commit { repo, id };
-                let md = self.data.fetched_commit_metadata.remove(&commit.id);
-                log::debug!("fetch_merge_pr");
-                let waiting = commit::fetch_merge_pr(
-                    ui.ctx(),
-                    &self.data.api_addr,
-                    &commit,
-                    md.unwrap().unwrap().clone(),
-                    repo_id,
-                );
-                self.data.fetched_commit_metadata.insert(commit.id, waiting);
-            }
-            GraphInteraction::ClickErrorFetch(i) => {
-                for i in i {
-                    let id = &cached.commits[i];
-                    let repo = r.clone();
-                    let id = id.clone();
-                    let commit = crate::app::types::Commit { repo, id };
-                    let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
-                    self.data.fetched_commit_metadata.insert(commit.id, v);
-                }
-            }
-            GraphInteraction::ClickChange(i, after) => {
-                let commit = format!(
-                    "https://github.com/{}/{}/commit/{}",
-                    r.user, r.name, cached.commits[after]
-                );
-                self.notifs.add_log(re_log::LogMsg {
-                    level: log::Level::Info,
-                    target: format!("graph/commits"),
-                    msg: format!("Selected\n{} vs {}", commit, cached.commits[i]),
-                });
-                if resp.response.clicked() {
-                    self.selected_baseline = Some(cached.commits[i].to_string());
-                    self.selected_commit = Some((repo_id, cached.commits[after].to_string()));
-                    // assert_eq!(self.data.queries.len(), 1); // need to retrieve current query if multiple
+        self.handle_graph_interactions(ui, repo_id, &r, cached, resp);
 
-                    let qres = (self.data.queries_results)
-                        .iter()
-                        .find(|x| x.project == repo_id && self.data.queries[x.query].lang == "Java")
-                        .unwrap();
-                    if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
-                        *format = crate::app::ResultFormat::Hunks
-                    } else {
-                        panic!()
-                    }
-                } else if resp.response.secondary_clicked() {
-                    ui.ctx().copy_text(commit.to_string());
-                    self.notifs.success(format!(
-                        "Copied address of github commit to clipboard\n{}",
-                        commit
-                    ));
-                }
-            }
-            _ => (),
-        }
         for id in to_fetch {
             if !self.data.fetched_commit_metadata.is_absent(id) {
                 continue;
             }
-            let repo = r.clone();
-            let id = id.clone();
-            let commit = crate::app::types::Commit { repo, id };
+            let commit = r.clone().with(id);
             let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
             self.data.fetched_commit_metadata.insert(commit.id, v);
         }
+        let Some((r, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) else {
+            return;
+        };
         let mut helper = ToPollHelper {
             ctx: ui.ctx(),
             repo_id,
             r: &r,
             md_fetch: &mut self.data.fetched_commit_metadata,
-            commit_slice: &mut commit_slice,
+            commit_slice,
             api_addr: &self.data.api_addr,
         };
         let max_time = cached.max_time;
@@ -293,6 +151,131 @@ impl crate::HyperApp {
         for id in to_poll {
             to_poll_helper(&mut helper, id, max_time, caches_to_clear, max_fetch);
         }
+    }
+
+    fn handle_graph_interactions(
+        &mut self,
+        ui: &mut egui::Ui,
+        repo_id: ProjectId,
+        r: &super::Repo,
+        cached: &commit::CommitsLayoutTimed,
+        resp: egui_plot::PlotResponse<GraphInteraction>,
+    ) {
+        let is_target_repo = |x: &QueryResults| x.project == repo_id;
+        let is_target_query = |x: &QueryResults| x.query.to_usize() == 0;
+        let is_target_lang = |x: &QueryResults| self.data.queries[x.query].lang == "Java";
+
+        let effect = to_effect(resp);
+        if let InteractionEffect::ClickCommitPlusCmdMod(i) = effect {
+            if let Some((r, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) {
+                let mut it = commit_slice.iter_mut();
+                *it.next().unwrap() = cached.commits[i].clone();
+                for _ in 0..it.count() {
+                    commit_slice.pop();
+                }
+            }
+        } else if let InteractionEffect::ClickErrorFetch(i) = effect {
+            let api_addr = &self.data.api_addr;
+            for i in i {
+                let id = &cached.commits[i];
+                let commit = r.clone().with(id);
+                let v = commit::fetch_commit(ui.ctx(), api_addr, &commit);
+                self.data.fetched_commit_metadata.insert(commit.id, v);
+            }
+        } else if let InteractionEffect::ClickCommitPrimary(i) = effect {
+            let pred = |x: &_| is_target_repo(x) && is_target_query(x);
+            if let Some((qrid, qres)) = self.data.queries_results.find(pred) {
+                self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
+                self.selected_baseline = None;
+                if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
+                    *format = crate::app::ResultFormat::Table
+                } else {
+                    panic!()
+                }
+            }
+        } else if let InteractionEffect::ClickCommitSecondary(i) = effect {
+            let md_fetch = &mut self.data.fetched_commit_metadata;
+
+            let ctx = ui.ctx();
+            let commit = r.clone().with(&cached.commits[i]);
+            commit.commit_url_to_clipboard(ctx, &mut self.notifs);
+
+            let md = md_fetch.remove(&commit.id);
+            log::debug!("fetch_merge_pr");
+            let waiting = commit::fetch_merge_pr(
+                ctx,
+                &self.data.api_addr,
+                &commit,
+                md.unwrap().unwrap().clone(),
+                repo_id,
+            );
+            md_fetch.insert(commit.id, waiting);
+        } else if let InteractionEffect::ClickChangeSecondary(i, after) = effect {
+            let url = r.clone().url();
+            self.notifs.add_log(re_log::LogMsg {
+                level: log::Level::Info,
+                target: format!("graph/commits"),
+                msg: format!(
+                    "Selected\n{url}/compare/{}..{}",
+                    &cached.commits[after], cached.commits[i]
+                ),
+            });
+            let commit = r.clone().with(&cached.commits[i]);
+            commit.commit_url_to_clipboard(ui.ctx(), &mut self.notifs);
+        } else if let InteractionEffect::ClickChangePrimary(i, after) = effect {
+            let commit = r.clone().with(&cached.commits[after]).url();
+            self.notifs.add_log(re_log::LogMsg {
+                level: log::Level::Info,
+                target: format!("graph/commits"),
+                msg: format!("Selected\n{} vs {}", commit, cached.commits[i]),
+            });
+
+            self.selected_baseline = Some(cached.commits[i].to_string());
+            self.selected_commit = Some((repo_id, cached.commits[after].to_string()));
+            // assert_eq!(self.data.queries.len(), 1); // need to retrieve current query if multiple
+
+            let pred = |x: &_| is_target_repo(x) && is_target_lang(x);
+            let Some((qrid, qres)) = self.data.queries_results.find(pred) else {
+                log::warn!("No Java query results found");
+                return;
+            };
+            if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
+                *format = crate::app::ResultFormat::Hunks
+            } else {
+                panic!()
+            }
+        }
+    }
+}
+
+/// Declares the different effects of graph interactions on the underlying app state
+enum InteractionEffect {
+    None,
+    ClickCommitPlusCmdMod(usize),
+    ClickCommitPrimary(usize),
+    ClickCommitSecondary(usize),
+    ClickErrorFetch(Vec<usize>),
+    ClickChangePrimary(usize, usize),
+    ClickChangeSecondary(usize, usize),
+}
+
+/// Helper to easily control the interactions with the graph, without thinking about how they are handled
+fn to_effect(resp: egui_plot::PlotResponse<GraphInteraction>) -> InteractionEffect {
+    let secondary = resp.response.secondary_clicked();
+    let primary = resp.response.clicked();
+    let ctx = &resp.response.ctx;
+    let cmd_mod = ctx.input(|i| i.modifiers.command);
+    use GraphInteraction::*;
+    use InteractionEffect as Effect;
+    // NOTE be cautious with order of guards
+    match resp.inner {
+        ClickCommit(i) if secondary && cmd_mod => Effect::ClickCommitPlusCmdMod(i),
+        ClickCommit(i) if primary => Effect::ClickCommitPrimary(i),
+        ClickCommit(i) if secondary => Effect::ClickCommitSecondary(i),
+        ClickErrorFetch(v) => Effect::ClickErrorFetch(v),
+        ClickChange(i, after) if primary => Effect::ClickChangePrimary(i, after),
+        ClickChange(i, after) if secondary => Effect::ClickChangeSecondary(i, after),
+        _ => Effect::None,
     }
 }
 
@@ -302,7 +285,7 @@ struct ToPollHelper<'a, 'b> {
     r: &'a super::Repo,
     api_addr: &'a str,
     md_fetch: &'a mut CommitMdStore,
-    commit_slice: &'a mut super::CommitSlice<'b>,
+    commit_slice: super::CommitSlice<'b>,
 }
 
 fn to_poll_helper(
@@ -315,7 +298,7 @@ fn to_poll_helper(
     let repo_id = helper.repo_id;
     let was_err = helper.md_fetch.get(id).map_or(false, |x| x.is_err());
     if !helper.md_fetch.try_poll_with(id, |x| {
-        x.map(|x| poll_md_with_pr2(x, repo_id, helper.commit_slice))
+        x.map(|x| poll_md_with_pr2(x, repo_id, &mut helper.commit_slice))
     }) {
         return;
     }
@@ -345,11 +328,7 @@ fn to_poll_helper(
         to_poll_helper_aux(helper, id2, &md);
     }
     let ToPollHelper { ctx, api_addr, .. } = helper;
-    let repo = helper.r.clone();
-    let commit = crate::app::types::Commit {
-        repo,
-        id: id.to_string(),
-    };
+    let commit = helper.r.clone().with(id);
     log::debug!("fetch_merge_pr");
     let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
     helper.md_fetch.insert(id.to_string(), waiting);
@@ -365,11 +344,7 @@ fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::
         ..
     } = helper;
     if !md_fetch.is_waiting(id) {
-        let repo = helper.r.clone();
-        let commit = crate::app::types::Commit {
-            repo,
-            id: id.to_string(),
-        };
+        let commit = helper.r.clone().with(id);
         let v = commit::fetch_commit(ctx, api_addr, &commit);
         md_fetch.insert(id.to_string(), v);
         return;
@@ -379,11 +354,7 @@ fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::
     }) {
         return;
     }
-    let repo = helper.r.clone();
-    let commit = crate::app::types::Commit {
-        repo,
-        id: id.to_string(),
-    };
+    let commit = helper.r.clone().with(id);
     log::debug!("fetch_merge_pr");
     let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
     md_fetch.insert(id.to_string(), waiting);
@@ -402,81 +373,81 @@ const DIFF_VALS: bool = true;
 const LEFT_VALS: bool = false;
 const RIGHT_VALS: bool = false;
 
-fn show_commit_graph_timed_egui_plot<'a>(
-    ui: &mut egui::Ui,
-    max_fetch: i64,
-    fetched_commit_metadata: &CommitMdStore,
-    results_per_commit: Option<&super::ResultsPerCommit>,
-    cached: &'a commit::CommitsLayoutTimed,
+struct CommitGraphWidget<'a, 'b> {
+    fetched_commit_metadata: &'b CommitMdStore,
+    results_per_commit: Option<&'b super::ResultsPerCommit>,
     repo_id: ProjectId,
+    max_fetch: i64,
+    cached: &'a commit::CommitsLayoutTimed,
+}
+
+impl<'a> CommitGraphWidget<'a, '_> {
+    fn show(
+        self,
+        ui: &mut egui::Ui,
+        to_fetch: &mut Vec<&'a String>,
+        to_poll: &mut Vec<&'a String>,
+    ) -> egui_plot::PlotResponse<GraphInteraction> {
+        use egui_plot::*;
+        let max_time = self.cached.max_time;
+        let plot = Plot::new(self.repo_id)
+            .view_aspect(8.0)
+            .show_axes([true, false])
+            .allow_zoom([true, false])
+            .x_axis_formatter(|m, _range| {
+                let v = m.value as i64 - max_time;
+                let step_size = m.step_size as i64;
+                time_axis_format(v, step_size)
+            })
+            .x_grid_spacer(|i| with_egui_plot::compute_multi_x_marks(i, max_time))
+            .show_y(false)
+            .y_axis_formatter(|m, _| Default::default())
+            .show_grid([true, false])
+            .set_margin_fraction(egui::vec2(0.1, 0.3))
+            .allow_scroll([true, false]);
+
+        show_commit_graph_timed_egui_plot(self, ui, to_fetch, to_poll, plot)
+    }
+}
+
+fn show_commit_graph_timed_egui_plot<'a>(
+    widget: CommitGraphWidget<'a, '_>,
+    ui: &mut egui::Ui,
     to_fetch: &mut Vec<&'a String>,
     to_poll: &mut Vec<&'a String>,
+    mut plot: egui_plot::Plot<'_>,
 ) -> egui_plot::PlotResponse<GraphInteraction> {
-    let diff_val_col = if ui.visuals().dark_mode {
+    let dark_mode = ui.visuals().dark_mode;
+    let results_per_commit = widget.results_per_commit;
+    let md_fetch = widget.fetched_commit_metadata;
+    let cached = widget.cached;
+    plot.label_formatter(|name, value| {
+        label_formatter(md_fetch, results_per_commit, cached, name, value)
+    })
+    .show(ui, |plot_ui| {
+        plot_graph_aux(widget, plot_ui, dark_mode, to_fetch, to_poll)
+    })
+}
+
+fn plot_graph_aux<'a>(
+    widget: CommitGraphWidget<'a, '_>,
+    plot_ui: &mut egui_plot::PlotUi<'_>,
+    dark_mode: bool,
+    to_fetch: &mut Vec<&'a String>,
+    to_poll: &mut Vec<&'a String>,
+) -> GraphInteraction {
+    let diff_val_col = if dark_mode {
         egui::Color32::YELLOW
     } else {
         egui::Color32::RED
     };
-    use egui_plot::*;
-    Plot::new(repo_id)
-        .view_aspect(8.0)
-        .show_axes([true, false])
-        .allow_zoom([true, false])
-        .x_axis_formatter(|m, _range| {
-            let v = m.value as i64 - cached.max_time;
-            if v == 0 {
-                format!("0")
-            } else if m.step_size as i64 > 60 * 60 * 24 * 364 {
-                format!("{:+}y", v / (60 * 60 * 24 * 364))
-            } else if m.step_size as i64 > 60 * 60 * 24 * 20 {
-                format!("{:+}M", v / (60 * 60 * 24 * 30))
-            } else if m.step_size as i64 > 60 * 60 * 24 * 6 {
-                format!("{:+}w", v / (60 * 60 * 24 * 7))
-            } else if m.step_size as i64 > 60 * 60 * 20 {
-                format!("{:+}d", v / (60 * 60 * 24))
-            } else {
-                format!("{:+}h", v / (60 * 60))
-            }
-        })
-        .x_grid_spacer(|i| with_egui_plot::compute_multi_x_marks(i, cached.max_time))
-        .show_y(false)
-        .y_axis_formatter(|m, _| Default::default())
-        .show_grid([true, false])
-        .set_margin_fraction(egui::vec2(0.1, 0.3))
-        .allow_scroll([true, false])
-        .label_formatter(|name, value| {
-            label_formatter(
-                fetched_commit_metadata,
-                results_per_commit,
-                cached,
-                name,
-                value,
-            )
-        })
-        .show(ui, |plot_ui| {
-            plot_graph_aux(
-                plot_ui,
-                max_fetch,
-                diff_val_col,
-                fetched_commit_metadata,
-                results_per_commit,
-                cached,
-                to_fetch,
-                to_poll,
-            )
-        })
-}
-
-fn plot_graph_aux<'a>(
-    plot_ui: &mut egui_plot::PlotUi<'_>,
-    max_fetch: i64,
-    diff_val_col: egui::Color32,
-    fetched_commit_metadata: &CommitMdStore,
-    results_per_commit: Option<&super::ResultsPerCommit>,
-    cached: &'a commit::CommitsLayoutTimed,
-    to_fetch: &mut Vec<&'a String>,
-    to_poll: &mut Vec<&'a String>,
-) -> GraphInteraction {
+    let CommitGraphWidget {
+        max_fetch,
+        fetched_commit_metadata,
+        results_per_commit,
+        cached,
+        repo_id,
+    } = widget;
     use egui_plot::*;
     let mut output = GraphInteraction::None;
     let mut offsets = vec![];
@@ -805,163 +776,27 @@ fn update_results_per_commit(
     log::debug!("{:?}", results_per_commit);
 }
 
-mod with_egui_plot {
-    use egui_plot::*;
-
-    pub(crate) fn transform_y(y: i64) -> i64 {
-        assert_ne!(y, i64::MIN);
-        assert_ne!(y, i64::MAX);
-        assert!(y > -1);
-        if y == 0 {
-            0
-        } else {
-            -((y as f64).sqrt() as i64) - 1
-        }
-    }
-
-    pub fn center(a: [f64; 2], b: [f64; 2]) -> PlotPoint {
-        fn apply(a: [f64; 2], b: [f64; 2], f: impl Fn(f64, f64) -> f64) -> [f64; 2] {
-            [f(a[0], b[0]), f(a[1], b[1])]
-        }
-        let position = apply(a, b, |a, b| (a + b) / 2.0).into();
-        position
-    }
-
-    /// from egui_plot
-    /// Fill in all values between [min, max] which are a multiple of `step_size`
-    fn fill_marks_between(
-        step_size: f64,
-        (min, max): (f64, f64),
-        ori: i64,
-    ) -> impl Iterator<Item = GridMark> {
-        debug_assert!(min <= max, "Bad plot bounds: min: {min}, max: {max}");
-        let (min, max) = (min - ori as f64, max - ori as f64);
-        let first = (min / step_size).ceil() as i64;
-        let last = (max / step_size).ceil() as i64;
-
-        (first..last).map(move |i| {
-            let value = (i as f64) * step_size + ori as f64;
-            GridMark { value, step_size }
-        })
-    }
-
-    pub(crate) fn compute_multi_x_marks(i: GridInput, ori: i64) -> Vec<GridMark> {
-        // TODO use proper rounded year convention
-        let year = 60 * 60 * 24 * 365 + 60 * 60 * 6;
-        let years = fill_marks_between(year as f64, i.bounds, ori);
-        let month = 60 * 60 * 24 * 30;
-        let months = fill_marks_between(month as f64, i.bounds, ori);
-        let week = 60 * 60 * 24 * 7;
-        let weeks = fill_marks_between(week as f64, i.bounds, ori);
-        let day = 60 * 60 * 24;
-        let days = fill_marks_between(day as f64, i.bounds, ori);
-        years.chain(months).chain(weeks).chain(days).collect()
-    }
-
-    pub struct CommitPoints<'a> {
-        pub offsets: Vec<u32>,
-        pub points: Points<'a>,
-        pub with_data: bool,
-    }
-
-    impl<'a> PlotItem for CommitPoints<'a> {
-        fn shapes(&self, ui: &egui::Ui, transform: &PlotTransform, shapes: &mut Vec<egui::Shape>) {
-            self.points.shapes(ui, transform, shapes)
-        }
-
-        fn initialize(&mut self, x_range: std::ops::RangeInclusive<f64>) {
-            self.points.initialize(x_range)
-        }
-
-        fn name(&self) -> &str {
-            PlotItem::name(&self.points)
-        }
-
-        fn color(&self) -> egui::Color32 {
-            PlotItem::color(&self.points)
-        }
-
-        fn highlight(&mut self) {
-            PlotItem::highlight(&mut self.points)
-        }
-
-        fn highlighted(&self) -> bool {
-            self.points.highlighted()
-        }
-
-        fn allow_hover(&self) -> bool {
-            PlotItem::allow_hover(&self.points)
-        }
-
-        fn geometry(&self) -> PlotGeometry<'_> {
-            self.points.geometry()
-        }
-
-        fn bounds(&self) -> PlotBounds {
-            self.points.bounds()
-        }
-
-        fn id(&self) -> egui::Id {
-            PlotItem::id(&self.points)
-        }
-
-        fn on_hover(
-            &self,
-            elem: ClosestElem,
-            shapes: &mut Vec<egui::Shape>,
-            cursors: &mut Vec<Cursor>,
-            plot: &PlotConfig<'_>,
-            label_formatter: &LabelFormatter<'_>,
-        ) {
-            let points = match self.geometry() {
-                PlotGeometry::Points(points) => points,
-                PlotGeometry::None => {
-                    panic!("If the PlotItem has no geometry, on_hover() must not be called")
-                }
-                PlotGeometry::Rects => {
-                    panic!("If the PlotItem is made of rects, it should implement on_hover()")
-                }
-            };
-
-            // this method is only called, if the value is in the result set of find_closest()
-            let value = points[elem.index];
-            let pointer = plot.transform.position_from_point(&value);
-
-            let offset = self.offsets[elem.index];
-
-            let font_id = egui::TextStyle::Body.resolve(plot.ui.style());
-            // WARN big hack passing an index as a f64...
-            let mark = if self.with_data {
-                super::CUSTOM_LABEL_FORMAT_MARK_WITH_DATA
-            } else {
-                super::CUSTOM_LABEL_FORMAT_MARK_NO_DATA
-            };
-            let text = label_formatter.as_ref().unwrap()(
-                mark,
-                &PlotPoint {
-                    x: f64::from_bits(offset as u64),
-                    y: 0.0,
-                },
-            );
-            plot.ui.painter().text(
-                pointer + egui::vec2(3.0, -2.0),
-                egui::Align2::LEFT_BOTTOM,
-                text,
-                font_id,
-                plot.ui.visuals().text_color(),
-            );
-            log::debug!("{}", label_formatter.is_some());
-        }
-
-        fn base(&self) -> &egui_plot::PlotItemBase {
-            self.points.base()
-        }
-
-        fn base_mut(&mut self) -> &mut egui_plot::PlotItemBase {
-            self.points.base_mut()
-        }
+fn time_axis_format(v: i64, step_size: i64) -> String {
+    if v == 0 {
+        format!("0")
+    } else if step_size > 60 * 60 * 24 * 364 {
+        format!("{:+}y", v / (60 * 60 * 24 * 364))
+    } else if step_size > 60 * 60 * 24 * 20 {
+        format!("{:+}M", v / (60 * 60 * 24 * 30))
+    } else if step_size > 60 * 60 * 24 * 6 {
+        format!("{:+}w", v / (60 * 60 * 24 * 7))
+    } else if step_size > 60 * 60 * 20 {
+        format!("{:+}d", v / (60 * 60 * 24))
+    } else {
+        format!("{:+}h", v / (60 * 60))
     }
 }
+
+mod with_egui_plot;
+
+// ###########################################################
+// #### Now some hacks to render complex labels in the plot###
+// ###########################################################
 
 const CUSTOM_LABEL_FORMAT_MARK_WITH_DATA: &str = "_d";
 const CUSTOM_LABEL_FORMAT_MARK_NO_DATA: &str = "_";
@@ -980,7 +815,6 @@ fn label_formatter(
         let i = value.x.to_bits() as usize;
         let c = &cached.commits[i];
         let s = results_per_commit.and_then(|x| x.offset(c.as_str()).map(|o| x.vals_to_string(o)));
-
         format!(
             "{}\n{}\n\n{}",
             &c[..6],
@@ -997,5 +831,29 @@ fn label_formatter(
         )
     } else {
         name.to_string()
+    }
+}
+
+impl with_egui_plot::CommitPoints<'_> {
+    fn label_formatter(
+        &self,
+        elem: egui_plot::ClosestElem,
+        label_formatter: &egui_plot::LabelFormatter<'_>,
+    ) -> String {
+        // WARN big hack passing an index as a f64...
+        let with_data = self.with_data;
+        let offset = self.offsets[elem.index];
+        let mark = if with_data {
+            CUSTOM_LABEL_FORMAT_MARK_WITH_DATA
+        } else {
+            CUSTOM_LABEL_FORMAT_MARK_NO_DATA
+        };
+        label_formatter.as_ref().unwrap()(
+            mark,
+            &egui_plot::PlotPoint {
+                x: f64::from_bits(offset as u64),
+                y: 0.0,
+            },
+        )
     }
 }

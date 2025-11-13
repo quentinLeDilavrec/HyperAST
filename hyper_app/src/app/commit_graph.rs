@@ -179,7 +179,7 @@ impl crate::HyperApp {
             .inner;
 
         match resp.inner {
-            GraphInteration::ClickCommit(i)
+            GraphInteraction::ClickCommit(i)
                 if resp.response.secondary_clicked() && ui.input(|i| i.modifiers.command) =>
             {
                 let mut it = commit_slice.iter_mut();
@@ -188,7 +188,7 @@ impl crate::HyperApp {
                     commit_slice.pop();
                 }
             }
-            GraphInteration::ClickCommit(i) if resp.response.clicked() => {
+            GraphInteraction::ClickCommit(i) if resp.response.clicked() => {
                 self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
                 self.selected_baseline = None;
                 let qres = (self.data.queries_results)
@@ -201,7 +201,7 @@ impl crate::HyperApp {
                     panic!()
                 }
             }
-            GraphInteration::ClickCommit(i) if resp.response.secondary_clicked() => {
+            GraphInteraction::ClickCommit(i) if resp.response.secondary_clicked() => {
                 let commit = format!(
                     "https://github.com/{}/{}/commit/{}",
                     r.user, r.name, cached.commits[i]
@@ -226,7 +226,7 @@ impl crate::HyperApp {
                 );
                 self.data.fetched_commit_metadata.insert(commit.id, waiting);
             }
-            GraphInteration::ClickErrorFetch(i) => {
+            GraphInteraction::ClickErrorFetch(i) => {
                 for i in i {
                     let id = &cached.commits[i];
                     let repo = r.clone();
@@ -236,7 +236,7 @@ impl crate::HyperApp {
                     self.data.fetched_commit_metadata.insert(commit.id, v);
                 }
             }
-            GraphInteration::ClickChange(i, after) => {
+            GraphInteraction::ClickChange(i, after) => {
                 let commit = format!(
                     "https://github.com/{}/{}/commit/{}",
                     r.user, r.name, cached.commits[after]
@@ -249,7 +249,7 @@ impl crate::HyperApp {
                 if resp.response.clicked() {
                     self.selected_baseline = Some(cached.commits[i].to_string());
                     self.selected_commit = Some((repo_id, cached.commits[after].to_string()));
-                    // assert_eq!(self.data.queries.len(), 1); // need to retieve current query if multiple
+                    // assert_eq!(self.data.queries.len(), 1); // need to retrieve current query if multiple
 
                     let qres = (self.data.queries_results)
                         .iter()
@@ -389,7 +389,7 @@ fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::
     md_fetch.insert(id.to_string(), waiting);
 }
 
-enum GraphInteration {
+enum GraphInteraction {
     None,
     ClickCommit(usize),
     ClickChange(usize, usize),
@@ -411,7 +411,7 @@ fn show_commit_graph_timed_egui_plot<'a>(
     repo_id: ProjectId,
     to_fetch: &mut Vec<&'a String>,
     to_poll: &mut Vec<&'a String>,
-) -> egui_plot::PlotResponse<GraphInteration> {
+) -> egui_plot::PlotResponse<GraphInteraction> {
     let diff_val_col = if ui.visuals().dark_mode {
         egui::Color32::YELLOW
     } else {
@@ -476,9 +476,9 @@ fn plot_graph_aux<'a>(
     cached: &'a commit::CommitsLayoutTimed,
     to_fetch: &mut Vec<&'a String>,
     to_poll: &mut Vec<&'a String>,
-) -> GraphInteration {
+) -> GraphInteraction {
     use egui_plot::*;
-    let mut ouput = GraphInteration::None;
+    let mut output = GraphInteraction::None;
     let mut offsets = vec![];
     let mut offsets2 = vec![];
     let mut points_with_data = vec![];
@@ -519,9 +519,10 @@ fn plot_graph_aux<'a>(
                                 let dist_sq = point.distance_sq(pos);
                                 if dist_sq < 100.0 {
                                     log::error!("should reload");
-                                    if let GraphInteration::None = ouput {
-                                        ouput = GraphInteration::ClickErrorFetch(vec![i]);
-                                    } else if let GraphInteration::ClickErrorFetch(v) = &mut ouput {
+                                    if let GraphInteraction::None = output {
+                                        output = GraphInteraction::ClickErrorFetch(vec![i]);
+                                    } else if let GraphInteraction::ClickErrorFetch(v) = &mut output
+                                    {
                                         v.push(i)
                                     }
                                 }
@@ -583,7 +584,7 @@ fn plot_graph_aux<'a>(
                         let dist_sq = point.distance_sq(pos);
                         if dist_sq < 100.0 {
                             log::error!("clicked");
-                            ouput = GraphInteration::ClickChange(i, sub.prev);
+                            output = GraphInteraction::ClickChange(i, sub.prev);
                         }
                     }
                 }
@@ -606,7 +607,7 @@ fn plot_graph_aux<'a>(
                         let dist_sq = point.distance_sq(pos);
                         if dist_sq < 100.0 {
                             log::debug!("clicked");
-                            ouput = GraphInteration::ClickChange(i, i - 1);
+                            output = GraphInteraction::ClickChange(i, i - 1);
                         }
                     }
                 }
@@ -716,7 +717,7 @@ fn plot_graph_aux<'a>(
                             sub.start,
                             sub.succ,
                         );
-                        ouput = GraphInteration::ClickChange(sub.succ, c1);
+                        output = GraphInteraction::ClickChange(sub.succ, c1);
                     }
                 }
             }
@@ -746,7 +747,7 @@ fn plot_graph_aux<'a>(
         {
             if x.dist_sq < 10.0 {
                 let i = item.offsets[x.index] as usize;
-                ouput = GraphInteration::ClickCommit(i);
+                output = GraphInteraction::ClickCommit(i);
             }
         }
     }
@@ -766,7 +767,7 @@ fn plot_graph_aux<'a>(
         {
             if x.dist_sq < 10.0 {
                 let i = item.offsets[x.index] as usize;
-                ouput = GraphInteration::ClickCommit(i);
+                output = GraphInteraction::ClickCommit(i);
             }
         }
     }
@@ -781,7 +782,7 @@ fn plot_graph_aux<'a>(
         let text = Text::new("branch name", position, text).anchor(egui::Align2::LEFT_TOP);
         plot_ui.text(text);
     }
-    ouput
+    output
 }
 
 fn update_results_per_commit(

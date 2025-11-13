@@ -597,91 +597,6 @@ impl Default for CommitsLayout {
     }
 }
 
-pub(crate) fn compute_commit_layout(
-    commits: impl Fn(&CommitId) -> Option<CommitMetadata>,
-    branches: impl Iterator<Item = (String, CommitId)>,
-) -> CommitsLayout {
-    // let commits: Vec<commits_layouting::CommitInfo> = commits.map(|x| todo!()).collect();
-    // let indices: std::collections::HashMap<commits_layouting::Oid, usize> = commits
-    //     .iter()
-    //     .enumerate()
-    //     .map(|(i, c)| (c.oid, i))
-    //     .collect();
-    // let mut branches: Vec<commits_layouting::BranchInfo> = branches.map(|x| todo!()).collect();
-    // let settings = commits_layouting::BranchSettings::new(branches.len());
-    // branches.into_iter().map(|x| 42).collect()
-    use egui::Pos2;
-    let mut r = CommitsLayout {
-        commits: vec![],
-        pos: vec![],
-        branches: vec![],
-        subs: vec![],
-        rect: egui::Rect::ZERO,
-    };
-    let mut index = HashMap::<CommitId, usize>::default();
-    let mut v = 0.0;
-    for (branch_name, target) in branches {
-        let mut h = 0.0;
-        r.commits.push(branch_name);
-        r.branches.push(r.subs.len());
-        let mut waiting: Vec<(String, usize)> = vec![(target, r.pos.len())];
-        r.pos.push(Pos2::new(h, v));
-        loop {
-            let Some((mut current, prev)) = waiting.pop() else {
-                break;
-            };
-            h = r.pos[prev].x;
-            let start = r.pos.len();
-            let mut succ = None;
-            loop {
-                if let Some(fork) = index.get(&current) {
-                    succ = Some(*fork);
-                    break;
-                }
-                index.insert(current.clone(), r.pos.len());
-                h += 10.0;
-                if let Some(commit) = commits(&current) {
-                    if let Some(p) = commit.parents.get(0) {
-                        r.commits.push(format!("{p}"));
-                        r.pos.push(Pos2::new(h, v));
-                        current = p.clone();
-                    } else {
-                        r.commits.push(format!("<end>"));
-                        r.pos.push(Pos2::new(h, v));
-                        r.rect.max.x = r.rect.max.x.max(h);
-                        break;
-                    }
-                    if let Some(p) = commit.parents.get(1..) {
-                        for p in p {
-                            waiting.push((p.to_string(), r.pos.len() - 1));
-                        }
-                    }
-                } else {
-                    r.commits.push(format!("m|{current}"));
-                    r.pos.push(Pos2::new(h, v));
-                    r.rect.max.x = r.rect.max.x.max(h);
-                    break;
-                }
-            }
-            let end = r.pos.len();
-            let succ = if let Some(succ) = succ {
-                succ
-            } else {
-                usize::MAX
-            };
-            r.subs.push(Subs {
-                prev,
-                start,
-                end,
-                succ,
-            });
-            v += 10.0;
-        }
-        v += 5.0;
-    }
-    r.rect.set_height(v);
-    r
-}
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct SubsTimed {
     // indexing in CommitsLayout.subs
@@ -697,6 +612,11 @@ pub(crate) struct SubsTimed {
     // indexing in CommitsLayout.commits
     pub(crate) succ: usize,
     pub(crate) delta_time: i64,
+}
+impl SubsTimed {
+    pub(crate) fn range(&self) -> std::ops::Range<usize> {
+        self.start..self.end
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -731,15 +651,6 @@ pub(crate) fn compute_commit_layout_timed(
     commits: impl Fn(&CommitId) -> Option<CommitMetadata>,
     branches: impl Iterator<Item = (String, CommitId)>,
 ) -> CommitsLayoutTimed {
-    // let commits: Vec<commits_layouting::CommitInfo> = commits.map(|x| todo!()).collect();
-    // let indices: std::collections::HashMap<commits_layouting::Oid, usize> = commits
-    //     .iter()
-    //     .enumerate()
-    //     .map(|(i, c)| (c.oid, i))
-    //     .collect();
-    // let mut branches: Vec<commits_layouting::BranchInfo> = branches.map(|x| todo!()).collect();
-    // let settings = commits_layouting::BranchSettings::new(branches.len());
-    // branches.into_iter().map(|x| 42).collect()
     type TId = usize;
     type SId = usize;
     let mut r = CommitsLayoutTimed::default();
@@ -751,14 +662,11 @@ pub(crate) fn compute_commit_layout_timed(
         r.branches.push(r.subs.len());
         let branch_index = r.times.len();
         let mut waiting: Vec<(String, TId, SId)> = vec![(target, branch_index, r.subs.len())];
-        // let mut prev_time = -1;
         r.times.push(-1);
         loop {
             let Some((mut current, prev, prev_sub)) = waiting.pop() else {
                 break;
             };
-            // h = r.pos[prev].x;
-            // let
             let start = r.times.len();
             let end;
             let mut succ = None;
@@ -814,10 +722,6 @@ pub(crate) fn compute_commit_layout_timed(
                 } else if let Some(t) = r.times[start..end - 1].iter().rev().find(|x| **x != -1) {
                     delta_time = (r.times[prev] - t).abs();
                     r.max_delta = r.max_delta.max(delta_time);
-                // } else if r.times[end - 2] != -1 {
-                //     delta_time = r.times[prev] - r.times[end - 2];
-                //     debug_assert!(delta_time >= 0);
-                //     r.max_delta = r.max_delta.max(delta_time);
                 } else {
                     delta_time = 100;
                 }

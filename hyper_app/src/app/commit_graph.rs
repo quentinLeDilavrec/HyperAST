@@ -396,6 +396,8 @@ enum GraphInteration {
     ClickErrorFetch(Vec<usize>),
 }
 
+const CORNER: bool = true;
+
 const DIFF_VALS: bool = true;
 const LEFT_VALS: bool = false;
 const RIGHT_VALS: bool = false;
@@ -452,323 +454,334 @@ fn show_commit_graph_timed_egui_plot<'a>(
             )
         })
         .show(ui, |plot_ui| {
-            let mut ouput = GraphInteration::None;
-            let mut offsets = vec![];
-            let mut offsets2 = vec![];
-            let mut points_with_data = vec![];
-            let mut points = vec![];
-            'subs: for sub @ commit::SubsTimed {
-                prev,
-                prev_sub,
-                start,
-                end,
-                succ,
-                succ_sub,
-                delta_time,
-            } in &cached.subs
-            {
-                const CORNER: bool = true;
-                let mut line = vec![];
-
-                let prev_p = [
-                    if cached.times[*prev] == -1 {
-                        -1
-                    } else {
-                        let t = cached.times[*prev];
-                        if cached.max_time - t > max_fetch {
-                            continue 'subs;
-                        }
-                        t
-                    },
-                    with_egui_plot::transform_y(cached.subs[*prev_sub].delta_time),
-                ];
-                line.push(prev_p.map(|x| x as f64));
-                for i in *start..*end {
-                    let t = cached.times[i];
-                    if t == -1 {
-                        if fetched_commit_metadata.is_absent(&cached.commits[i]) {
-                            to_fetch.push(&cached.commits[i]);
-                        } else if let Some(a) = fetched_commit_metadata.get(&cached.commits[i]) {
-                            match a {
-                                Err(e) => {
-                                    to_poll.push(&cached.commits[i]);
-                                    let plot_point = [
-                                        cached.times[*prev] as f64,
-                                        with_egui_plot::transform_y(*delta_time) as f64 + 30.0,
-                                    ];
-                                    if plot_ui.response().clicked() {
-                                        let point = plot_ui.response().hover_pos().unwrap();
-                                        let pos = plot_ui
-                                            .transform()
-                                            .position_from_point(&plot_point.into());
-                                        let dist_sq = point.distance_sq(pos);
-                                        if dist_sq < 100.0 {
-                                            log::error!("should reload");
-                                            if let GraphInteration::None = ouput {
-                                                ouput = GraphInteration::ClickErrorFetch(vec![i]);
-                                            } else if let GraphInteration::ClickErrorFetch(v) =
-                                                &mut ouput
-                                            {
-                                                v.push(i)
-                                            }
-                                        }
-                                    }
-                                    let series: Vec<[f64; 2]> = vec![plot_point];
-                                    let points = Points::new("error", series)
-                                        .radius(4.0)
-                                        .color(egui::Color32::RED)
-                                        .name(format!("Error getting {}:\n{e}", cached.commits[i]));
-                                    plot_ui.add(points);
-                                }
-                                _ => (),
-                            }
-                        } else {
-                            to_poll.push(&cached.commits[i]);
-                        }
-                        break;
-                    }
-                    let commit = &cached.commits[i];
-
-                    let before = if i != *start {
-                        Some(cached.commits[i - 1].as_str())
-                    } else if *prev != usize::MAX {
-                        Some(cached.commits[*prev].as_str())
-                    } else {
-                        None
-                    };
-                    let after = if i + 1 < *end {
-                        Some(cached.commits[i + 1].as_str())
-                    } else if *succ != usize::MAX {
-                        Some(cached.commits[*succ].as_str())
-                    } else {
-                        None
-                    };
-                    let diff = results_per_commit
-                        .zip(before)
-                        .and_then(|(x, c1)| x.try_diff_as_string(c1, commit));
-
-                    let y = with_egui_plot::transform_y(*delta_time);
-                    let mut p = [t, y];
-                    if *start == i {
-                        let corner = [
-                            (p[0] as f64).max(
-                                line.last().unwrap()[0]
-                                    - plot_ui.transform().dvalue_dpos()[0] * 10.0,
-                            ),
-                            p[1] as f64,
-                        ];
-                        line.push(corner);
-                        if let Some(text) = DIFF_VALS.then_some(()).and(diff) {
-                            plot_ui.text(
-                                Text::new("diff", corner.into(), text)
-                                    .anchor(egui::Align2::RIGHT_BOTTOM)
-                                    .color(diff_val_col),
-                            );
-
-                            if plot_ui.response().clicked() {
-                                let point = plot_ui.response().hover_pos().unwrap();
-                                let plot_point = PlotPoint::new(corner[0], corner[1]);
-                                let pos = plot_ui.transform().position_from_point(&plot_point);
-                                let dist_sq = point.distance_sq(pos);
-                                if dist_sq < 100.0 {
-                                    log::error!("clicked");
-                                    ouput = GraphInteration::ClickChange(i, *prev);
-                                }
-                            }
-                        }
-                    } else {
-                        if t > cached.times[i - 1] {
-                            p[1] += 100;
-                        }
-                        let a = line.last().unwrap().clone();
-                        let b = p.map(|x| x as f64);
-                        let position = with_egui_plot::center(a, b);
-                        if let Some(text) = DIFF_VALS.then_some(()).and(diff) {
-                            plot_ui.text(
-                                Text::new("diff val", position, text)
-                                    .anchor(egui::Align2::RIGHT_BOTTOM)
-                                    .color(diff_val_col),
-                            );
-                            if plot_ui.response().clicked() {
-                                let point = plot_ui.response().hover_pos().unwrap();
-                                let pos = plot_ui.transform().position_from_point(&position);
-                                let dist_sq = point.distance_sq(pos);
-                                if dist_sq < 100.0 {
-                                    log::debug!("clicked");
-                                    ouput = GraphInteration::ClickChange(i, i - 1);
-                                }
-                            }
-                        }
-                    }
-                    line.push(p.map(|x| x as f64));
-
-                    // stop rendering when reached limit
-                    if cached.max_time - t > max_fetch {
-                        let line = Line::new("last line", line).allow_hover(false);
-                        plot_ui.line(line);
-                        continue 'subs;
-                    }
-
-                    if i == 1 {
-                        let text = results_per_commit
-                            .and_then(|x| x.offset(commit).map(|offset| x.vals_to_string(offset)));
-                        if let Some(text) = text {
-                            plot_ui.text(
-                                Text::new("text last", p.map(|x| x as f64).into(), text)
-                                    .anchor(egui::Align2::RIGHT_BOTTOM)
-                                    .color(egui::Color32::GRAY),
-                            );
-                        }
-                    }
-
-                    let vals_offset = results_per_commit.and_then(|x| {
-                        x.offset_with_variation(commit.as_str(), before, Some(commit.as_str()))
-                    });
-                    if let Some(offset) = LEFT_VALS.then_some(()).and(vals_offset) {
-                        let text = results_per_commit.unwrap().vals_to_string(offset);
-                        plot_ui.text(
-                            Text::new("left vals", p.map(|x| x as f64).into(), text)
-                                .anchor(egui::Align2::RIGHT_BOTTOM)
-                                .color(egui::Color32::GRAY),
-                        );
-                    }
-
-                    if results_per_commit
-                        .and_then(|x| x._get_offset(commit))
-                        .is_some()
-                    {
-                        points_with_data.push(p.map(|x| x as f64));
-                        offsets.push(i as u32);
-                    } else {
-                        points.push(p.map(|x| x as f64));
-                        offsets2.push(i as u32);
-                    }
-                }
-
-                if *succ < usize::MAX && cached.times[*succ] != -1 {
-                    let y = cached.subs[*succ_sub].delta_time;
-                    let y = with_egui_plot::transform_y(y);
-                    let x = cached.times[*succ];
-                    let position: PlotPoint;
-                    let p = [x, y].map(|x| x as f64);
-                    if CORNER {
-                        let prev = line.last().unwrap();
-                        let x = p[0];
-                        let x = x + plot_ui.transform().dvalue_dpos()[0] * 10.0;
-                        let x = prev[0].min(x);
-                        let y = prev[1];
-                        let y = if (y - p[1]).abs() < 1.0 {
-                            y - 1000.0
-                        } else if y < p[1] {
-                            y - plot_ui.transform().dvalue_dpos()[1] * 5.0
-                        } else {
-                            y + plot_ui.transform().dvalue_dpos()[1] * 5.0
-                        };
-                        let corner = [x, y];
-                        position = corner.into();
-                        line.push(corner);
-                        line.push(p);
-                    } else {
-                        position = with_egui_plot::center(*line.last().unwrap(), p);
-                        line.push(p);
-                    }
-
-                    let c1 = if start == end { *prev } else { *end - 1 };
-                    let diff = results_per_commit.and_then(|x| {
-                        x.try_diff_as_string(&cached.commits[c1], &cached.commits[*succ])
-                    });
-                    if let Some(text) = DIFF_VALS.then_some(()).and(diff) {
-                        plot_ui.text(
-                            Text::new("diff vals", position, text)
-                                .anchor(egui::Align2::RIGHT_BOTTOM)
-                                .color(egui::Color32::RED),
-                        );
-
-                        if plot_ui.response().clicked() {
-                            let point = plot_ui.response().hover_pos().unwrap();
-                            let plot_point = position;
-                            let pos = plot_ui.transform().position_from_point(&plot_point);
-                            let dist_sq = point.distance_sq(pos);
-                            if dist_sq < 100.0 {
-                                log::error!("clicked");
-                                log::error!(
-                                    "{} {} {} {}\n{} {} {} {}",
-                                    cached.commits[*prev],
-                                    cached.commits[end - 1],
-                                    cached.commits[*start],
-                                    cached.commits[*succ],
-                                    prev,
-                                    end,
-                                    start,
-                                    succ,
-                                );
-                                ouput = GraphInteration::ClickChange(*succ, c1);
-                            }
-                        }
-                    }
-                }
-
-                let line = Line::new("line", line).allow_hover(false);
-                plot_ui.line(line);
-            }
-
-            let points = Points::new("commit", points)
-                .radius(2.0)
-                .color(egui::Color32::GREEN)
-                .name("Commit");
-
-            let item = with_egui_plot::CommitPoints {
-                offsets: offsets2,
-                points,
-                with_data: false,
-            };
-            let has_any_click = plot_ui
-                .response()
-                .flags
-                .contains(egui::response::Flags::CLICKED);
-            if has_any_click {
-                if let Some(x) =
-                    item.find_closest(plot_ui.response().hover_pos().unwrap(), plot_ui.transform())
-                {
-                    if x.dist_sq < 10.0 {
-                        let i = item.offsets[x.index] as usize;
-                        ouput = GraphInteration::ClickCommit(i);
-                    }
-                }
-            }
-            plot_ui.add(item);
-            let points = Points::new("commit with data", points_with_data)
-                .radius(2.0)
-                .color(egui::Color32::DARK_GREEN)
-                .name("Commit with data");
-            let item = with_egui_plot::CommitPoints {
-                offsets,
-                points,
-                with_data: true,
-            };
-            if has_any_click {
-                if let Some(x) =
-                    item.find_closest(plot_ui.response().hover_pos().unwrap(), plot_ui.transform())
-                {
-                    if x.dist_sq < 10.0 {
-                        let i = item.offsets[x.index] as usize;
-                        ouput = GraphInteration::ClickCommit(i);
-                    }
-                }
-            }
-            plot_ui.add(item);
-
-            for &b in &cached.branches {
-                let b = cached.subs[b].prev;
-                let y = cached.subs[b].delta_time;
-                let y = with_egui_plot::transform_y(y);
-                let position = [cached.times[b] as f64, y as f64].into();
-                let text = &cached.commits[b];
-                let text = Text::new("branch name", position, text).anchor(egui::Align2::LEFT_TOP);
-                plot_ui.text(text);
-            }
-            ouput
+            plot_graph_aux(
+                plot_ui,
+                max_fetch,
+                diff_val_col,
+                fetched_commit_metadata,
+                results_per_commit,
+                cached,
+                to_fetch,
+                to_poll,
+            )
         })
+}
+
+fn plot_graph_aux<'a>(
+    plot_ui: &mut egui_plot::PlotUi<'_>,
+    max_fetch: i64,
+    diff_val_col: egui::Color32,
+    fetched_commit_metadata: &CommitMdStore,
+    results_per_commit: Option<&super::ResultsPerCommit>,
+    cached: &'a commit::CommitsLayoutTimed,
+    to_fetch: &mut Vec<&'a String>,
+    to_poll: &mut Vec<&'a String>,
+) -> GraphInteration {
+    use egui_plot::*;
+    let mut ouput = GraphInteration::None;
+    let mut offsets = vec![];
+    let mut offsets2 = vec![];
+    let mut points_with_data = vec![];
+    let mut points = vec![];
+    'subs: for sub in &cached.subs {
+        let mut line = vec![];
+
+        let prev_p = [
+            if cached.times[sub.prev] == -1 {
+                -1
+            } else {
+                let t = cached.times[sub.prev];
+                if cached.max_time - t > max_fetch {
+                    continue 'subs;
+                }
+                t
+            },
+            with_egui_plot::transform_y(cached.subs[sub.prev_sub].delta_time),
+        ];
+        line.push(prev_p.map(|x| x as f64));
+        for i in sub.range() {
+            let t = cached.times[i];
+            if t == -1 {
+                if fetched_commit_metadata.is_absent(&cached.commits[i]) {
+                    to_fetch.push(&cached.commits[i]);
+                } else if let Some(a) = fetched_commit_metadata.get(&cached.commits[i]) {
+                    match a {
+                        Err(e) => {
+                            to_poll.push(&cached.commits[i]);
+                            let plot_point = [
+                                cached.times[sub.prev] as f64,
+                                with_egui_plot::transform_y(sub.delta_time) as f64 + 30.0,
+                            ];
+                            if plot_ui.response().clicked() {
+                                let point = plot_ui.response().hover_pos().unwrap();
+                                let pos =
+                                    plot_ui.transform().position_from_point(&plot_point.into());
+                                let dist_sq = point.distance_sq(pos);
+                                if dist_sq < 100.0 {
+                                    log::error!("should reload");
+                                    if let GraphInteration::None = ouput {
+                                        ouput = GraphInteration::ClickErrorFetch(vec![i]);
+                                    } else if let GraphInteration::ClickErrorFetch(v) = &mut ouput {
+                                        v.push(i)
+                                    }
+                                }
+                            }
+                            let series: Vec<[f64; 2]> = vec![plot_point];
+                            let points = Points::new("error", series)
+                                .radius(4.0)
+                                .color(egui::Color32::RED)
+                                .name(format!("Error getting {}:\n{e}", cached.commits[i]));
+                            plot_ui.add(points);
+                        }
+                        _ => (),
+                    }
+                } else {
+                    to_poll.push(&cached.commits[i]);
+                }
+                break;
+            }
+            let commit = &cached.commits[i];
+
+            let before = if i != sub.start {
+                Some(cached.commits[i - 1].as_str())
+            } else if sub.prev != usize::MAX {
+                Some(cached.commits[sub.prev].as_str())
+            } else {
+                None
+            };
+            let after = if i + 1 < sub.end {
+                Some(cached.commits[i + 1].as_str())
+            } else if sub.succ != usize::MAX {
+                Some(cached.commits[sub.succ].as_str())
+            } else {
+                None
+            };
+            let diff = results_per_commit
+                .zip(before)
+                .and_then(|(x, c1)| x.try_diff_as_string(c1, commit));
+
+            let y = with_egui_plot::transform_y(sub.delta_time);
+            let mut p = [t, y];
+            if sub.start == i {
+                let corner = [
+                    (p[0] as f64)
+                        .max(line.last().unwrap()[0] - plot_ui.transform().dvalue_dpos()[0] * 10.0),
+                    p[1] as f64,
+                ];
+                line.push(corner);
+                if let Some(text) = DIFF_VALS.then_some(()).and(diff) {
+                    plot_ui.text(
+                        Text::new("diff", corner.into(), text)
+                            .anchor(egui::Align2::RIGHT_BOTTOM)
+                            .color(diff_val_col),
+                    );
+
+                    if plot_ui.response().clicked() {
+                        let point = plot_ui.response().hover_pos().unwrap();
+                        let plot_point = PlotPoint::new(corner[0], corner[1]);
+                        let pos = plot_ui.transform().position_from_point(&plot_point);
+                        let dist_sq = point.distance_sq(pos);
+                        if dist_sq < 100.0 {
+                            log::error!("clicked");
+                            ouput = GraphInteration::ClickChange(i, sub.prev);
+                        }
+                    }
+                }
+            } else {
+                if t > cached.times[i - 1] {
+                    p[1] += 100;
+                }
+                let a = line.last().unwrap().clone();
+                let b = p.map(|x| x as f64);
+                let position = with_egui_plot::center(a, b);
+                if let Some(text) = DIFF_VALS.then_some(()).and(diff) {
+                    plot_ui.text(
+                        Text::new("diff val", position, text)
+                            .anchor(egui::Align2::RIGHT_BOTTOM)
+                            .color(diff_val_col),
+                    );
+                    if plot_ui.response().clicked() {
+                        let point = plot_ui.response().hover_pos().unwrap();
+                        let pos = plot_ui.transform().position_from_point(&position);
+                        let dist_sq = point.distance_sq(pos);
+                        if dist_sq < 100.0 {
+                            log::debug!("clicked");
+                            ouput = GraphInteration::ClickChange(i, i - 1);
+                        }
+                    }
+                }
+            }
+            line.push(p.map(|x| x as f64));
+
+            // stop rendering when reached limit
+            if cached.max_time - t > max_fetch {
+                let line = Line::new("last line", line).allow_hover(false);
+                plot_ui.line(line);
+                continue 'subs;
+            }
+
+            if i == 1 {
+                let text = results_per_commit
+                    .and_then(|x| x.offset(commit).map(|offset| x.vals_to_string(offset)));
+                if let Some(text) = text {
+                    plot_ui.text(
+                        Text::new("text last", p.map(|x| x as f64).into(), text)
+                            .anchor(egui::Align2::RIGHT_BOTTOM)
+                            .color(egui::Color32::GRAY),
+                    );
+                }
+            }
+
+            let vals_offset = results_per_commit.and_then(|x| {
+                x.offset_with_variation(commit.as_str(), before, Some(commit.as_str()))
+            });
+            if let Some(offset) = LEFT_VALS.then_some(()).and(vals_offset) {
+                let text = results_per_commit.unwrap().vals_to_string(offset);
+                plot_ui.text(
+                    Text::new("left vals", p.map(|x| x as f64).into(), text)
+                        .anchor(egui::Align2::RIGHT_BOTTOM)
+                        .color(egui::Color32::GRAY),
+                );
+            }
+
+            if results_per_commit
+                .and_then(|x| x._get_offset(commit))
+                .is_some()
+            {
+                points_with_data.push(p.map(|x| x as f64));
+                offsets.push(i as u32);
+            } else {
+                points.push(p.map(|x| x as f64));
+                offsets2.push(i as u32);
+            }
+        }
+
+        if sub.succ < usize::MAX && cached.times[sub.succ] != -1 {
+            let y = cached.subs[sub.succ_sub].delta_time;
+            let y = with_egui_plot::transform_y(y);
+            let x = cached.times[sub.succ];
+            let position: PlotPoint;
+            let p = [x, y].map(|x| x as f64);
+            if CORNER {
+                let prev = line.last().unwrap();
+                let x = p[0];
+                let x = x + plot_ui.transform().dvalue_dpos()[0] * 10.0;
+                let x = prev[0].min(x);
+                let y = prev[1];
+                let y = if (y - p[1]).abs() < 1.0 {
+                    y - 1000.0
+                } else if y < p[1] {
+                    y - plot_ui.transform().dvalue_dpos()[1] * 5.0
+                } else {
+                    y + plot_ui.transform().dvalue_dpos()[1] * 5.0
+                };
+                let corner = [x, y];
+                position = corner.into();
+                line.push(corner);
+                line.push(p);
+            } else {
+                position = with_egui_plot::center(*line.last().unwrap(), p);
+                line.push(p);
+            }
+
+            let c1 = if sub.start == sub.end {
+                sub.prev
+            } else {
+                sub.end - 1
+            };
+            let diff = results_per_commit
+                .and_then(|x| x.try_diff_as_string(&cached.commits[c1], &cached.commits[sub.succ]));
+            if let Some(text) = DIFF_VALS.then_some(()).and(diff) {
+                plot_ui.text(
+                    Text::new("diff vals", position, text)
+                        .anchor(egui::Align2::RIGHT_BOTTOM)
+                        .color(egui::Color32::RED),
+                );
+
+                if plot_ui.response().clicked() {
+                    let point = plot_ui.response().hover_pos().unwrap();
+                    let plot_point = position;
+                    let pos = plot_ui.transform().position_from_point(&plot_point);
+                    let dist_sq = point.distance_sq(pos);
+                    if dist_sq < 100.0 {
+                        log::error!("clicked");
+                        log::error!(
+                            "{} {} {} {}\n{} {} {} {}",
+                            cached.commits[sub.prev],
+                            cached.commits[sub.end - 1],
+                            cached.commits[sub.start],
+                            cached.commits[sub.succ],
+                            sub.prev,
+                            sub.end,
+                            sub.start,
+                            sub.succ,
+                        );
+                        ouput = GraphInteration::ClickChange(sub.succ, c1);
+                    }
+                }
+            }
+        }
+
+        let line = Line::new("line", line).allow_hover(false);
+        plot_ui.line(line);
+    }
+
+    let points = Points::new("commit", points)
+        .radius(2.0)
+        .color(egui::Color32::GREEN)
+        .name("Commit");
+
+    let item = with_egui_plot::CommitPoints {
+        offsets: offsets2,
+        points,
+        with_data: false,
+    };
+    let has_any_click = plot_ui
+        .response()
+        .flags
+        .contains(egui::response::Flags::CLICKED);
+    if has_any_click {
+        if let Some(x) =
+            item.find_closest(plot_ui.response().hover_pos().unwrap(), plot_ui.transform())
+        {
+            if x.dist_sq < 10.0 {
+                let i = item.offsets[x.index] as usize;
+                ouput = GraphInteration::ClickCommit(i);
+            }
+        }
+    }
+    plot_ui.add(item);
+    let points = Points::new("commit with data", points_with_data)
+        .radius(2.0)
+        .color(egui::Color32::DARK_GREEN)
+        .name("Commit with data");
+    let item = with_egui_plot::CommitPoints {
+        offsets,
+        points,
+        with_data: true,
+    };
+    if has_any_click {
+        if let Some(x) =
+            item.find_closest(plot_ui.response().hover_pos().unwrap(), plot_ui.transform())
+        {
+            if x.dist_sq < 10.0 {
+                let i = item.offsets[x.index] as usize;
+                ouput = GraphInteration::ClickCommit(i);
+            }
+        }
+    }
+    plot_ui.add(item);
+
+    for &b in &cached.branches {
+        let b = cached.subs[b].prev;
+        let y = cached.subs[b].delta_time;
+        let y = with_egui_plot::transform_y(y);
+        let position = [cached.times[b] as f64, y as f64].into();
+        let text = &cached.commits[b];
+        let text = Text::new("branch name", position, text).anchor(egui::Align2::LEFT_TOP);
+        plot_ui.text(text);
+    }
+    ouput
 }
 
 fn update_results_per_commit(

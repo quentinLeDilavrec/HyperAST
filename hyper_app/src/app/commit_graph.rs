@@ -457,77 +457,58 @@ fn plot_graph_aux<'a>(
     'subs: for sub in &cached.subs {
         let mut line = vec![];
 
-        let prev_p = [
-            if cached.times[sub.prev] == -1 {
-                -1
-            } else {
-                let t = cached.times[sub.prev];
-                if cached.max_time - t > max_fetch {
-                    continue 'subs;
-                }
-                t
-            },
-            with_egui_plot::transform_y(cached.subs[sub.prev_sub].delta_time),
-        ];
+        let prev_p = {
+            let t = cached.times[sub.prev];
+            if t != 1 && cached.max_time - t > max_fetch {
+                continue;
+            }
+            let delta = cached.subs[sub.prev_sub].delta_time;
+            let y = with_egui_plot::transform_y(delta);
+            [t, y]
+        };
+
         line.push(prev_p.map(|x| x as f64));
         for i in sub.range() {
-            let t = cached.times[i];
-            if t == -1 {
+            let Some(t) = cached.time(i) else {
                 if fetched_commit_metadata.is_absent(&cached.commits[i]) {
                     to_fetch.push(&cached.commits[i]);
-                } else if let Some(a) = fetched_commit_metadata.get(&cached.commits[i]) {
-                    match a {
-                        Err(e) => {
-                            to_poll.push(&cached.commits[i]);
-                            let plot_point = [
-                                cached.times[sub.prev] as f64,
-                                with_egui_plot::transform_y(sub.delta_time) as f64 + 30.0,
-                            ];
-                            if plot_ui.response().clicked() {
-                                let point = plot_ui.response().hover_pos().unwrap();
-                                let pos =
-                                    plot_ui.transform().position_from_point(&plot_point.into());
-                                let dist_sq = point.distance_sq(pos);
-                                if dist_sq < 100.0 {
-                                    log::error!("should reload");
-                                    if let GraphInteraction::None = output {
-                                        output = GraphInteraction::ClickErrorFetch(vec![i]);
-                                    } else if let GraphInteraction::ClickErrorFetch(v) = &mut output
-                                    {
-                                        v.push(i)
-                                    }
-                                }
-                            }
-                            let series: Vec<[f64; 2]> = vec![plot_point];
-                            let points = Points::new("error", series)
-                                .radius(4.0)
-                                .color(egui::Color32::RED)
-                                .name(format!("Error getting {}:\n{e}", cached.commits[i]));
-                            plot_ui.add(points);
-                        }
-                        _ => (),
-                    }
-                } else {
-                    to_poll.push(&cached.commits[i]);
+                    break;
                 }
+                let Some(a) = fetched_commit_metadata.get(&cached.commits[i]) else {
+                    to_poll.push(&cached.commits[i]);
+                    break;
+                };
+                let Err(e) = a else { break };
+
+                to_poll.push(&cached.commits[i]);
+                let plot_point = [
+                    cached.times[sub.prev] as f64,
+                    with_egui_plot::transform_y(sub.delta_time) as f64 + 30.0,
+                ];
+                if plot_ui.response().clicked() {
+                    let point = plot_ui.response().hover_pos().unwrap();
+                    let pos = plot_ui.transform().position_from_point(&plot_point.into());
+                    let dist_sq = point.distance_sq(pos);
+                    if dist_sq < 100.0 {
+                        log::error!("should reload");
+                        if let GraphInteraction::None = output {
+                            output = GraphInteraction::ClickErrorFetch(vec![i]);
+                        } else if let GraphInteraction::ClickErrorFetch(v) = &mut output {
+                            v.push(i)
+                        }
+                    }
+                }
+                let series: Vec<[f64; 2]> = vec![plot_point];
+                let points = Points::new("error", series)
+                    .radius(4.0)
+                    .color(egui::Color32::RED)
+                    .name(format!("Error getting {}:\n{e}", cached.commits[i]));
+                plot_ui.add(points);
                 break;
-            }
+            };
             let commit = &cached.commits[i];
 
-            let before = if i != sub.start {
-                Some(cached.commits[i - 1].as_str())
-            } else if sub.prev != usize::MAX {
-                Some(cached.commits[sub.prev].as_str())
-            } else {
-                None
-            };
-            let after = if i + 1 < sub.end {
-                Some(cached.commits[i + 1].as_str())
-            } else if sub.succ != usize::MAX {
-                Some(cached.commits[sub.succ].as_str())
-            } else {
-                None
-            };
+            let (before, after) = before_after(cached, sub, i);
             let diff = results_per_commit
                 .zip(before)
                 .and_then(|(x, c1)| x.try_diff_as_string(c1, commit));
@@ -713,9 +694,9 @@ fn plot_graph_aux<'a>(
         .flags
         .contains(egui::response::Flags::CLICKED);
     if has_any_click {
-        if let Some(x) =
-            item.find_closest(plot_ui.response().hover_pos().unwrap(), plot_ui.transform())
-        {
+        // can unwrap as click must be inside the area
+        let point = plot_ui.response().hover_pos().unwrap();
+        if let Some(x) = item.find_closest(point, plot_ui.transform()) {
             if x.dist_sq < 10.0 {
                 let i = item.offsets[x.index] as usize;
                 output = GraphInteraction::ClickCommit(i);
@@ -733,9 +714,9 @@ fn plot_graph_aux<'a>(
         with_data: true,
     };
     if has_any_click {
-        if let Some(x) =
-            item.find_closest(plot_ui.response().hover_pos().unwrap(), plot_ui.transform())
-        {
+        // can unwrap as click must be inside the area
+        let hovered = plot_ui.response().hover_pos().unwrap();
+        if let Some(x) = item.find_closest(hovered, plot_ui.transform()) {
             if x.dist_sq < 10.0 {
                 let i = item.offsets[x.index] as usize;
                 output = GraphInteraction::ClickCommit(i);
@@ -756,6 +737,28 @@ fn plot_graph_aux<'a>(
     output
 }
 
+fn before_after<'a>(
+    cached: &'a commit::CommitsLayoutTimed,
+    sub: &commit::SubsTimed,
+    i: usize,
+) -> (Option<&'a str>, Option<&'a str>) {
+    let before = if i != sub.start {
+        Some(cached.commits[i - 1].as_str())
+    } else if sub.prev != usize::MAX {
+        Some(cached.commits[sub.prev].as_str())
+    } else {
+        None
+    };
+    let after = if i + 1 < sub.end {
+        Some(cached.commits[i + 1].as_str())
+    } else if sub.succ != usize::MAX {
+        Some(cached.commits[sub.succ].as_str())
+    } else {
+        None
+    };
+    (before, after)
+}
+
 fn update_results_per_commit(
     results_per_commit: &mut super::ResultsPerCommit,
     r: &StreamedComputeResults,
@@ -765,13 +768,15 @@ fn update_results_per_commit(
     results_per_commit.set_cols(header);
     for r in &r.rows.lock().unwrap().1 {
         let Ok(r) = r else { continue };
-        for (i, r) in r.inner.result.as_array().unwrap().into_iter().enumerate() {
+        let values = r.inner.result.as_array().unwrap();
+        for (i, r) in values.into_iter().enumerate() {
             if i > 2 {
                 break;
             }
             vals[i] = r.as_i64().unwrap() as i32;
         }
-        results_per_commit.insert(&r.commit, r.inner.compute_time as f32, &[], &vals);
+        let comp_time = r.inner.compute_time as f32;
+        results_per_commit.insert(&r.commit, comp_time, &[], &vals);
     }
     log::debug!("{:?}", results_per_commit);
 }

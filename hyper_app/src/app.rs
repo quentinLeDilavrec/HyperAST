@@ -1191,290 +1191,272 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     });
                 Default::default()
             }
-            Tab::QueryResults { id, format } => {
-                let Some(QueryResults {
-                    project: proj_id,
-                    query,
-                    content: res,
-                    tab: _,
-                }) = self.data.queries_results.get_mut(*id)
-                else {
-                    ui.error_label(&format!("{:?} is not in the list of queries", id));
+            Tab::QueryResults {
+                id,
+                format: ResultFormat::List,
+            } => {
+                todo!()
+                // utils_results_batched::show_long_result_list(ui, res);
+            }
+            Tab::QueryResults {
+                id,
+                format: ResultFormat::Json,
+            } => todo!(),
+            Tab::QueryResults {
+                id,
+                format: ResultFormat::Table,
+            } => {
+                let qres = self.data.queries_results.get_mut(*id);
+                let Some((proj_id, query, res)) = fun_name(ui, qres) else {
+                    ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
-                let Some(res) = res.get_mut() else {
-                    if res.try_poll_with(|x| {
-                        todo!()
-                        // x.expect("TODO").content.expect("TODO").map(|x| x.into())
-                    }) {
-                        // TODO is there something to do ?
-                    } else {
-                        ui.label("oops");
-                        ui.spinner();
+                let mut selected_commit = None;
+                if let Some(selected) = &self.selected_commit {
+                    if selected.0 == *proj_id {
+                        let id = egui::Id::new(proj_id);
+                        let i = ui.data_mut(|w| {
+                            let m: &mut (Option<(ProjectId, types::CommitId)>, usize) =
+                                w.get_temp_mut_or_default(id);
+                            if m.0.as_ref() != Some(selected) {
+                                m.0 = Some(selected.clone());
+                                m.1 = (res.rows.lock().unwrap().1)
+                                    .iter()
+                                    .position(|x| {
+                                        x.as_ref().map_or(false, |r| r.commit == selected.1)
+                                    })
+                                    .unwrap_or(usize::MAX);
+                                log::debug!("{:?}", m);
+                                Some(m.1.clone())
+                            } else {
+                                None
+                            }
+                        });
+                        selected_commit = i;
                     }
+                }
+                ui.push_id("table", |ui| {
+                    utils_results_batched::show_long_result_table(
+                        ui,
+                        (&res.head, None, res.rows.lock().unwrap().1.as_slice()),
+                        &mut selected_commit,
+                        |cid| {
+                            (self.data.fetched_commit_metadata.get(cid)?.as_ref())
+                                .ok()?
+                                .message
+                                .clone()
+                        },
+                    )
+                });
+                Default::default()
+            }
+            Tab::QueryResults {
+                id,
+                format: format @ ResultFormat::Hunks,
+            } => {
+                let qres = self.data.queries_results.get_mut(*id);
+                let Some((&mut proj_id, &mut qid, res)) = fun_name(ui, qres) else {
+                    ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
+                if show_hunks_header(
+                    ui,
+                    format,
+                    &mut self.data,
+                    &mut self.selected_baseline,
+                    &mut self.selected_commit,
+                ) {
+                    return Default::default();
+                }
 
-                let res = match res {
-                    Ok(res) => res,
-                    Err(err) => {
-                        ui.error_label(&format!("error {:?}", err));
+                let data = &mut *self.data;
+
+                let Some(selected_baseline) = &self.selected_baseline else {
+                    unreachable!()
+                };
+                let Some(selected_commit) = &self.selected_commit else {
+                    unreachable!()
+                };
+                let Some(differential) = &mut data.queries_differential_results else {
+                    compute_queries_differential_results(
+                        ui,
+                        *pane,
+                        proj_id,
+                        qid,
+                        data,
+                        selected_baseline,
+                        selected_commit,
+                    );
+                    return Default::default();
+                };
+                let (absent, new) = update_queries_differential_results(
+                    ui,
+                    &data.queries,
+                    selected_baseline,
+                    qid,
+                    differential,
+                );
+                if absent {
+                    wasm_rs_dbg::dbg!(new);
+                    data.queries_differential_results = None;
+                    return Default::default();
+                }
+                let x = match differential.2.get() {
+                    Some(Ok(x)) => x,
+                    Some(Err(err)) => {
+                        ui.error_label(format!("Error on Differential: {:?}", err));
+                        if ui.button("retry").clicked() {
+                            data.queries_differential_results = None;
+                        }
+                        return Default::default();
+                    }
+                    None => {
                         return Default::default();
                     }
                 };
-                match format {
-                    ResultFormat::Table => {
-                        let mut selected_commit = None;
-                        if let Some(selected) = &self.selected_commit {
-                            if selected.0 == *proj_id {
-                                let id = egui::Id::new(proj_id);
-                                let i = ui.data_mut(|w| {
-                                    let m: &mut (Option<(ProjectId, types::CommitId)>, usize) =
-                                        w.get_temp_mut_or_default(id);
-                                    if m.0.as_ref() != Some(selected) {
-                                        m.0 = Some(selected.clone());
-                                        m.1 = res
-                                            // .results
-                                            .rows
-                                            .lock()
-                                            .unwrap()
-                                            .1
-                                            .iter()
-                                            .position(|x| {
-                                                x.as_ref().map_or(false, |r| r.commit == selected.1)
-                                            })
-                                            .unwrap_or(usize::MAX);
-                                        log::debug!("{:?}", m);
-                                        Some(m.1.clone())
-                                    } else {
-                                        None
-                                    }
-                                });
-                                selected_commit = i;
-                            }
+
+                if new {
+                    wasm_rs_dbg::dbg!(x.results.len());
+                    let store = &data.store;
+                    let mut node_store = store.node_store.read().unwrap();
+                    let mut pending = store.nodes_pending.lock().unwrap();
+                    let mut waiting = store.nodes_waiting.lock().unwrap();
+                    let waiting = waiting.get_or_insert_default();
+                    for x in x.iter_nodes_ids() {
+                        if pending.iter().any(|y| y.contains(&x)) || node_store.contains(x) {
+                            continue;
                         }
-                        ui.push_id("table", |ui| {
-                            utils_results_batched::show_long_result_table(
-                                ui,
-                                (&res.head, None, res.rows.lock().unwrap().1.as_slice()),
-                                &mut selected_commit,
-                                |cid| {
-                                    self.data
-                                        .fetched_commit_metadata
-                                        .get(cid)?
-                                        .as_ref()
-                                        .ok()?
-                                        .message
-                                        .clone()
-                                },
-                            )
-                        });
+                        wasm_rs_dbg::dbg!(x);
+                        waiting.insert(x);
                     }
-                    ResultFormat::Hunks => {
-                        let qid = *query;
-                        let proj_id = *proj_id;
-                        if show_hunks_header(
-                            ui,
-                            format,
-                            &mut self.data,
-                            &mut self.selected_baseline,
-                            &mut self.selected_commit,
-                        ) {
-                            return Default::default();
-                        }
-
-                        let data = &mut *self.data;
-
-                        let Some(selected_baseline) = &self.selected_baseline else {
-                            unreachable!()
-                        };
-                        let Some(selected_commit) = &self.selected_commit else {
-                            unreachable!()
-                        };
-                        if let Some(differential) = &mut data.queries_differential_results {
-                            let (absent, new) = update_queries_differential_results(
-                                ui,
-                                &data.queries,
-                                selected_baseline,
-                                qid,
-                                differential,
-                            );
-                            if absent {
-                                wasm_rs_dbg::dbg!(new);
-                                data.queries_differential_results = None;
-                                return Default::default();
-                            }
-                            let x = match differential.2.get() {
-                                Some(Ok(x)) => x,
-                                Some(Err(err)) => {
-                                    ui.error_label(format!("Error on Differential: {:?}", err));
-                                    if ui.button("retry").clicked() {
-                                        data.queries_differential_results = None;
-                                    }
-                                    return Default::default();
-                                }
-                                None => {
-                                    return Default::default();
-                                }
-                            };
-
-                            if new {
-                                wasm_rs_dbg::dbg!(x.results.len());
-                                let store = &data.store;
-                                let mut node_store = store.node_store.read().unwrap();
-                                let mut pending = store.nodes_pending.lock().unwrap();
-                                let mut waiting = store.nodes_waiting.lock().unwrap();
-                                let waiting = waiting.get_or_insert_default();
-                                for x in (x.results.iter())
-                                    .flat_map(|x| x.0.path_ids.iter().chain(x.1.path_ids.iter()))
-                                    .copied()
-                                {
-                                    if pending.iter().any(|y| y.contains(&x))
-                                        || node_store.contains(x)
-                                    {
-                                        continue;
-                                    }
-                                    wasm_rs_dbg::dbg!(x);
-                                    waiting.insert(x);
-                                }
-                            }
-                            let fetched_files = &mut data.fetched_files;
-                            let api_addr = &data.api_addr;
-                            show_hunks(ui, fetched_files, api_addr, x, selected_commit);
-                        } else if let Some(value) = compute_queries_differential_results(
-                            ui,
-                            pane,
-                            proj_id,
-                            qid,
-                            data,
-                            selected_baseline,
-                            selected_commit,
-                        ) {
-                            return value;
-                        }
-                    }
-                    ResultFormat::Tree => {
-                        let qid = *query;
-                        let proj_id = *proj_id;
-
-                        let data = &mut *self.data;
-
-                        let Some(selected_baseline) = &self.selected_baseline else {
-                            unreachable!()
-                        };
-                        let Some(selected_commit) = &self.selected_commit else {
-                            unreachable!()
-                        };
-
-                        if let Some(differential) = &mut data.queries_differential_results {
-                            let (absent, new) = update_queries_differential_results(
-                                ui,
-                                &data.queries,
-                                selected_baseline,
-                                qid,
-                                differential,
-                            );
-                            if absent {
-                                wasm_rs_dbg::dbg!(new);
-                                data.queries_differential_results = None;
-                                return Default::default();
-                            }
-                            let Some(Ok(x)) = differential.2.get_mut() else {
-                                return Default::default();
-                            };
-                            if new {
-                                wasm_rs_dbg::dbg!(x.results.len());
-                                let store = &data.store;
-                                let mut node_store = store.node_store.read().unwrap();
-                                let mut pending = store.nodes_pending.lock().unwrap();
-                                let mut waiting = store.nodes_waiting.lock().unwrap();
-                                let waiting = waiting.get_or_insert_default();
-                                for x in (x.results.iter())
-                                    .flat_map(|x| x.0.path_ids.iter().chain(x.1.path_ids.iter()))
-                                    .copied()
-                                {
-                                    if pending.iter().any(|y| y.contains(&x))
-                                        || node_store.contains(x)
-                                    {
-                                        continue;
-                                    }
-                                    wasm_rs_dbg::dbg!(x);
-                                    waiting.insert(x);
-                                }
-                            }
-                            let fetched_files = &mut data.fetched_files;
-                            let api_addr = &data.api_addr;
-
-                            let aspects = &mut data.aspects;
-                            let selected_projects = &mut data.selected_code_data;
-                            let long_tacking = &mut data.long_tracking;
-                            let store = data.store.clone();
-
-                            let rect = ui.clip_rect();
-                            use egui_addon::InteractiveSplitter;
-                            InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
-                                ui1.set_clip_rect(ui1.max_rect().intersect(rect));
-                                ui2.set_clip_rect(ui2.max_rect().intersect(rect));
-                                let commit = selected_commit;
-
-                                let left_side = true;
-                                let mut curr_view = long_tracking::ColView::default();
-                                (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(
-                                    |(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i),
-                                ));
-
-                                let bl = &(selected_commit.0, selected_baseline.clone());
-                                ui2.push_id((commit, bl), |ui| {
-                                    show_tree_view(
-                                        ui,
-                                        aspects,
-                                        selected_projects,
-                                        long_tacking,
-                                        store,
-                                        commit,
-                                        api_addr,
-                                        &mut curr_view,
-                                    );
-                                    ui.separator();
-                                });
-                                let left_side = false;
-                                let mut curr_view = long_tracking::ColView::default();
-                                (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(
-                                    |(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i),
-                                ));
-                                ui1.push_id((bl, commit), |ui| {
-                                    let store = data.store.clone();
-                                    show_tree_view(
-                                        ui,
-                                        aspects,
-                                        selected_projects,
-                                        long_tacking,
-                                        store,
-                                        bl,
-                                        api_addr,
-                                        &mut curr_view,
-                                    );
-                                    ui.separator();
-                                });
-                            });
-                        } else if let Some(value) = compute_queries_differential_results(
-                            ui,
-                            pane,
-                            proj_id,
-                            qid,
-                            data,
-                            selected_baseline,
-                            selected_commit,
-                        ) {
-                            return value;
-                        }
-                    }
-                    ResultFormat::List => {
-                        todo!()
-                        // utils_results_batched::show_long_result_list(ui, res);
-                    }
-                    ResultFormat::Json => todo!(),
                 }
+                let fetched_files = &mut data.fetched_files;
+                let api_addr = &data.api_addr;
+                show_hunks(ui, fetched_files, api_addr, x, selected_commit);
+                Default::default()
+            }
+            Tab::QueryResults {
+                id,
+                format: ResultFormat::Tree,
+            } => {
+                let qres = self.data.queries_results.get_mut(*id);
+                let Some((&mut proj_id, &mut qid, res)) = fun_name(ui, qres) else {
+                    ui.error_label(format!("problem with query result {id:?}"));
+                    return Default::default();
+                };
+
+                let data = &mut *self.data;
+
+                let Some(selected_baseline) = &self.selected_baseline else {
+                    unreachable!()
+                };
+                let Some(selected_commit) = &self.selected_commit else {
+                    unreachable!()
+                };
+
+                let Some(differential) = &mut data.queries_differential_results else {
+                    compute_queries_differential_results(
+                        ui,
+                        *pane,
+                        proj_id,
+                        qid,
+                        data,
+                        selected_baseline,
+                        selected_commit,
+                    );
+                    return Default::default();
+                };
+                let (absent, new) = update_queries_differential_results(
+                    ui,
+                    &data.queries,
+                    selected_baseline,
+                    qid,
+                    differential,
+                );
+                if absent {
+                    wasm_rs_dbg::dbg!(new);
+                    data.queries_differential_results = None;
+                    return Default::default();
+                }
+                let Some(Ok(x)) = differential.2.get_mut() else {
+                    return Default::default();
+                };
+                if new {
+                    wasm_rs_dbg::dbg!(x.results.len());
+                    let store = &data.store;
+                    let mut node_store = store.node_store.read().unwrap();
+                    let mut pending = store.nodes_pending.lock().unwrap();
+                    let mut waiting = store.nodes_waiting.lock().unwrap();
+                    let waiting = waiting.get_or_insert_default();
+                    for x in x.iter_nodes_ids() {
+                        if pending.iter().any(|y| y.contains(&x)) || node_store.contains(x) {
+                            continue;
+                        }
+                        wasm_rs_dbg::dbg!(x);
+                        waiting.insert(x);
+                    }
+                }
+                let fetched_files = &mut data.fetched_files;
+                let api_addr = &data.api_addr;
+
+                let aspects = &mut data.aspects;
+                let selected_projects = &mut data.selected_code_data;
+                let long_tacking = &mut data.long_tracking;
+                let store = data.store.clone();
+
+                let rect = ui.clip_rect();
+                use egui_addon::InteractiveSplitter;
+                InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
+                    ui1.set_clip_rect(ui1.max_rect().intersect(rect));
+                    ui2.set_clip_rect(ui2.max_rect().intersect(rect));
+                    let commit = selected_commit;
+
+                    let left_side = true;
+                    let mut curr_view = long_tracking::ColView::default();
+                    (curr_view.matcheds).extend(
+                        x.results
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
+                    );
+
+                    let bl = &(selected_commit.0, selected_baseline.clone());
+                    ui2.push_id((commit, bl), |ui| {
+                        show_tree_view(
+                            ui,
+                            aspects,
+                            selected_projects,
+                            long_tacking,
+                            store,
+                            commit,
+                            api_addr,
+                            &mut curr_view,
+                        );
+                        ui.separator();
+                    });
+                    let left_side = false;
+                    let mut curr_view = long_tracking::ColView::default();
+                    (curr_view.matcheds).extend(
+                        x.results
+                            .iter_mut()
+                            .enumerate()
+                            .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
+                    );
+                    ui1.push_id((bl, commit), |ui| {
+                        let store = data.store.clone();
+                        show_tree_view(
+                            ui,
+                            aspects,
+                            selected_projects,
+                            long_tacking,
+                            store,
+                            bl,
+                            api_addr,
+                            &mut curr_view,
+                        );
+                        ui.separator();
+                    });
+                });
                 Default::default()
             }
             Tab::ProjectSelection() => {
@@ -1769,6 +1751,36 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 }
 
+fn fun_name<'a>(
+    ui: &mut egui::Ui,
+    qres: Option<&'a mut QueryResults>,
+) -> Option<(
+    &'a mut ProjectId,
+    &'a mut QueryId,
+    &'a mut querying::StreamedDataTable<
+        Vec<String>,
+        Result<utils_results_batched::ComputeResultIdentified, querying::MatchingError>,
+    >,
+)> {
+    let Some(QueryResults {
+        project: pid,
+        query: qid,
+        content: res,
+        tab: _,
+    }) = qres
+    else {
+        log::error!("query result not in list");
+        return None;
+    };
+    let res = res.get_mut()?;
+    if let Err(err) = res {
+        ui.error_label(&format!("error {:?}", err));
+        return None;
+    }
+    let Ok(res) = res else { unreachable!() };
+    Some((pid, qid, res))
+}
+
 fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
     let code = &mut query.query.code;
     let language = "rs";
@@ -1986,16 +1998,16 @@ fn update_queries_differential_results(
 
 fn compute_queries_differential_results(
     ui: &mut egui::Ui,
-    pane: &mut TabId,
+    pane: TabId,
     proj_id: ProjectId,
     qid: QueryId,
     data: &mut AppData,
     selected_baseline: &String,
     selected_commit: &(ProjectId, String),
-) -> Option<egui_tiles::UiResponse> {
+) {
     let pid = selected_commit.0;
     if pid != proj_id {
-        return Some(Default::default());
+        return;
     }
     let (repo, mut c) = data.selected_code_data.get_mut(pid).unwrap();
     let language = &data.queries[qid].lang;
@@ -2043,10 +2055,9 @@ fn compute_queries_differential_results(
             timeout,
         },
     );
-    data.queries_differential_results = Some((pid, qid, Default::default(), *pane, hash));
+    data.queries_differential_results = Some((pid, qid, Default::default(), pane, hash));
     let res = data.queries_differential_results.as_mut().unwrap();
     res.2.buffer(prom);
-    None
 }
 
 impl MyTileTreeBehavior<'_> {

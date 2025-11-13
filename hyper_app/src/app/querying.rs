@@ -618,6 +618,17 @@ pub struct DetailsResults {
     pub results: Vec<(CodeRange, CodeRange)>,
 }
 
+impl DetailsResults {
+    pub(crate) fn iter_nodes_ids(
+        &self,
+    ) -> impl Iterator<Item = hyperast::store::nodes::fetched::NodeIdentifier> {
+        self.results
+            .iter()
+            .flat_map(|x| x.0.path_ids.iter().chain(x.1.path_ids.iter()))
+            .copied()
+    }
+}
+
 pub type DetailsResultsProm<Err> = Promise<Result<Resource<Result<DetailsResults, Err>>, String>>;
 
 impl std::hash::Hash for DetailsResults {

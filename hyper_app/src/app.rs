@@ -1209,31 +1209,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     }) {
                         // TODO is there something to do ?
                     } else {
+                        ui.label("oops");
                         ui.spinner();
                     }
-                    // let take = std::mem::take(res);
-                    // match take {
-                    //     LocalOrRemote::Remote(prom) => {
-                    //         match prom.try_take() {
-                    //             Ok(Ok(r)) => {
-                    //                 if let Some(r) = r.content {
-                    //                     *res = LocalOrRemote::Local(r);
-                    //                 }
-                    //             }
-                    //             Ok(Err(err)) => {
-                    //                 ui.error_label(&format!("error: {}", err));
-                    //             }
-                    //             Err(prom) => {
-                    //                 *res = LocalOrRemote::Remote(prom);
-                    //                 ui.spinner();
-                    //             }
-                    //         };
-                    //     }
-                    //     LocalOrRemote::None => {
-                    //         ui.error_label(&format!("no results for {}", id));
-                    //     }
-                    //     _ => (),
-                    // }
                     return Default::default();
                 };
 
@@ -1326,8 +1304,18 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                                 data.queries_differential_results = None;
                                 return Default::default();
                             }
-                            let Some(Ok(x)) = differential.2.get() else {
-                                return Default::default();
+                            let x = match differential.2.get() {
+                                Some(Ok(x)) => x,
+                                Some(Err(err)) => {
+                                    ui.error_label(format!("Error on Differential: {:?}", err));
+                                    if ui.button("retry").clicked() {
+                                        data.queries_differential_results = None;
+                                    }
+                                    return Default::default();
+                                }
+                                None => {
+                                    return Default::default();
+                                }
                             };
 
                             if new {
@@ -1987,7 +1975,7 @@ fn update_queries_differential_results(
     let absent = if !differential.2.is_present() && !differential.2.is_waiting() {
         true
     } else if let Some(Err(_)) = differential.2.get() {
-        true
+        false
     } else if hash((queries[qid].query.as_ref(), selected_baseline.clone())) != differential.4 {
         true
     } else {

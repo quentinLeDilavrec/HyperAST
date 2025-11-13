@@ -383,6 +383,7 @@ pub enum QueryingError {
     MissingLanguage(String),
     ParsingError(String),
     MatchingErrOnFirst(MatchingError),
+    DifferentialError(DetailsResults, DifferentialErrorFlags),
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Hash)]
@@ -410,6 +411,25 @@ impl PartialError<ComputeResultIdentified> for MatchingError {
 impl std::fmt::Display for MatchingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self) // TODO something better
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Hash)]
+pub struct DifferentialErrorFlags {
+    root_missing: bool,
+    single_pattern_details: bool,
+}
+impl DifferentialErrorFlags {
+    fn as_static_str(&self) -> &'static str {
+        if self.root_missing && self.single_pattern_details {
+            "Missing @root on the pattern of your choice and for now only show details on a single pattern"
+        } else if self.root_missing {
+            "Missing @root on the pattern of your choice"
+        } else if self.single_pattern_details {
+            "For now only show details on a single pattern"
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -689,6 +709,7 @@ impl ComputeError for QueryingError {
             QueryingError::MatchingErrOnFirst(MatchingError::MaxMatches(_)) => {
                 "Too many matches on first commit:"
             }
+            QueryingError::DifferentialError(_, err) => err.as_static_str(),
         }
     }
 
@@ -698,8 +719,9 @@ impl ComputeError for QueryingError {
             QueryingError::MissingLanguage(err) => err,
             QueryingError::ProcessingError(err) => err,
             QueryingError::ParsingError(err) => err,
-            QueryingError::MatchingErrOnFirst(MatchingError::TimeOut(res)) => "",
-            QueryingError::MatchingErrOnFirst(MatchingError::MaxMatches(res)) => "",
+            QueryingError::MatchingErrOnFirst(MatchingError::TimeOut(_)) => "",
+            QueryingError::MatchingErrOnFirst(MatchingError::MaxMatches(_)) => "",
+            QueryingError::DifferentialError(_, err) => err.as_static_str(),
         }
     }
 }

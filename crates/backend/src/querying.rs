@@ -88,13 +88,14 @@ fn default_timeout() -> u64 {
     1000
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub enum QueryingError {
     ProcessingError(String),
     MissingLanguage(String),
     ParsingError(String),
     MatchingErrOnFirst(MatchingError<ComputeResultIdentified>),
     MatchingError(MatchingError<ComputeResult>),
+    DifferentialError(ComputeResultsDifferential, DifferentialErrorFlags),
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -102,12 +103,27 @@ pub enum MatchingError<T> {
     TimeOut(T),
     MaxMatches(T),
 }
+
 impl<T> MatchingError<T> {
     fn map<U>(self, f: impl Fn(T) -> U) -> MatchingError<U> {
         match self {
             MatchingError::TimeOut(x) => MatchingError::TimeOut(f(x)),
             MatchingError::MaxMatches(x) => MatchingError::MaxMatches(f(x)),
         }
+    }
+}
+#[derive(Debug, Serialize, Clone, Default)]
+pub struct DifferentialErrorFlags {
+    /// requires a capture one the element of the pattern you consider a root
+    root_missing: bool,
+    /// for now can only provide details on a single pattern
+    single_pattern_details: bool,
+}
+
+impl std::ops::BitOrAssign for DifferentialErrorFlags {
+    fn bitor_assign(&mut self, other: Self) {
+        self.root_missing |= other.root_missing;
+        self.single_pattern_details |= other.single_pattern_details;
     }
 }
 
@@ -598,7 +614,7 @@ fn aux_default<T>(
     None
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 pub struct ComputeResultsDifferential {
     pub prepare_time: f64,
     pub results: Vec<(PieceOfCode, PieceOfCode)>,
@@ -703,6 +719,7 @@ pub fn differential(
     log::info!("done query construction");
     let prepare_time = now.elapsed().as_secs_f64();
     let current_tr;
+    let mut err_flags = DifferentialErrorFlags::default();
     let baseline_results: Vec<_> = {
         let commit_oid = &baseline;
         let mut oid = commit_oid.to_string();
@@ -714,8 +731,8 @@ pub fn differential(
         current_tr = code;
         let stores = &repositories.processor.main_stores;
 
-        let (r, names) = differential_aux(stores, code, &query, timeout, max_matches)
-            .map_err(QueryingError::MatchingError)?;
+        let (r, names, _err_flag) = differential_aux(stores, code, &query, timeout, max_matches);
+        err_flags |= _err_flag;
         for (i, names) in names.into_iter().enumerate() {
             if names.is_empty() {
                 continue;
@@ -736,8 +753,8 @@ pub fn differential(
         other_tr = code;
         let stores = &repositories.processor.main_stores;
 
-        let (r, names) = differential_aux(stores, code, &query, timeout, max_matches)
-            .map_err(QueryingError::MatchingError)?;
+        let (r, names, _err_flag) = differential_aux(stores, code, &query, timeout, max_matches);
+        err_flags |= _err_flag;
         for (i, names) in names.into_iter().enumerate() {
             if names.is_empty() {
                 continue;
@@ -1040,10 +1057,14 @@ pub fn differential(
         repo.spec
     );
 
-    Ok(ComputeResultsDifferential {
+    let result = ComputeResultsDifferential {
         prepare_time,
         results,
-    })
+    };
+    if err_flags.root_missing || err_flags.single_pattern_details {
+        return Err(QueryingError::DifferentialError(result, err_flags));
+    }
+    Ok(result)
 }
 
 fn diferential_filter(
@@ -1168,30 +1189,37 @@ fn differential_aux(
     query: &hyperast_tsquery::Query,
     _timeout: std::time::Duration,
     _max_matches: u64,
-) -> Result<(Vec<Position>, Vec<Names>), MatchingError<ComputeResult>> {
+) -> (Vec<Position>, Vec<Names>, DifferentialErrorFlags) {
     let pos = StructuralPosition::new(code);
     let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(stores, pos);
     let qcursor = query.matches(cursor);
     let now = Instant::now();
-    assert_eq!(
-        query.enabled_pattern_count(),
-        1,
-        "details on a single pattern"
-    );
     let mut results = vec![];
     let mut result_names = vec![];
-    let rrr = query
-        .capture_index_for_name("root")
-        .expect("@root at the end of query pattern");
+    let mut err_flags = DifferentialErrorFlags {
+        root_missing: false,
+        single_pattern_details: false,
+    };
+    if query.enabled_pattern_count() != 1 {
+        err_flags.single_pattern_details = true;
+    }
+    let Some(rrr) = query.capture_index_for_name("root") else {
+        err_flags.root_missing = true;
+        // no chance to return something
+        return (results, result_names, err_flags);
+    };
     let name_cid = query.capture_index_for_name("name");
+    let mut missing_root_flagged = false;
     for m in qcursor {
         let i = m.pattern_index;
         let i = query.enabled_pattern_index(i).unwrap();
-        assert_eq!(i, 0, "details on a single pattern");
-        let node = m
-            .nodes_for_capture_index(rrr)
-            .next()
-            .expect("@root at the end of query pattern");
+        if i != 0 {
+            err_flags.single_pattern_details = true;
+        }
+        let Some(node) = m.nodes_for_capture_index(rrr).next() else {
+            err_flags.root_missing = true;
+            continue;
+        };
         let pos = node.pos.clone();
         let names = name_cid
             .iter()
@@ -1205,5 +1233,5 @@ fn differential_aux(
         let compute_time = now.elapsed();
     }
     let compute_time = now.elapsed().as_secs_f64();
-    Ok((results, result_names))
+    (results, result_names, err_flags)
 }

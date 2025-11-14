@@ -317,9 +317,11 @@ pub(crate) fn show_repo_item_buttons(
 ) -> list_item::ShowCollapsingResponse<()> {
     let button_menu = |ui: &mut egui::Ui| {
         let button = egui::Button::new("commit");
-        let button = &ui.add_enabled(true, button);
+        let button = ui.add(button);
         let mut close_menu = false;
-        let popup_id = ui.make_persistent_id("add_commit");
+        if button.clicked() {
+            commits.push(Default::default());
+        }
         let popup_contents = |ui: &mut egui::Ui| {
             let text = commits.last_mut().unwrap();
             let singleline = &ui.text_edit_singleline(text);
@@ -330,21 +332,10 @@ pub(crate) fn show_repo_item_buttons(
                 if text.is_empty() {
                     commits.pop();
                 }
-                egui::Popup::close_id(ui.ctx(), popup_id);
-                close_menu = true;
+                ui.close();
             }
         };
-        egui::Popup::new(popup_id, ui.ctx().clone(), button, ui.layer_id())
-            .align(egui::RectAlign::BOTTOM_START)
-            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-            .show(popup_contents);
-        if close_menu {
-            egui::Popup::close_id(ui.ctx(), popup_id);
-        }
-        if button.clicked() {
-            commits.push(Default::default());
-            egui::Popup::open_id(ui.ctx(), popup_id);
-        }
+        egui::Popup::from_toggle_button_response(&button).show(popup_contents);
         let button = egui::Button::new("branch");
         if ui.add_enabled(false, button).clicked() {
             wasm_rs_dbg::dbg!("TODO add branch");
@@ -365,18 +356,8 @@ pub(crate) fn show_repo_item_buttons(
             ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
 
             let add_button = ui.add(add_button);
-            egui::Popup::new(
-                add_button.id.with("popup"),
-                ui.ctx().clone(),
-                &add_button,
-                ui.layer_id(),
-            )
-            .show(button_menu);
+            egui::Popup::from_toggle_button_response(&add_button).show(button_menu);
             add_button
-            // egui::containers::menu::Men::new(add_button)
-            //     .ui(ui, button_menu)
-            //     .0
-            // egui::menu::menu_custom_button(ui, add_button, button_menu).response
         })
         .always_show_buttons(true);
 
@@ -482,29 +463,16 @@ fn show_commit_list(ui: &mut egui::Ui, mut commits: CommitSlice<'_>, height: f32
             let resp = list_item::ListItem::new()
                 .with_height(height)
                 .show_flat(ui, content);
-            let mut close_menu = false;
-            let popup_id = ui.make_persistent_id(format!("change_commit {i}"));
             let popup_contents = |ui: &mut egui::Ui| {
                 let singleline = &ui.text_edit_singleline(oid);
                 if resp.clicked() {
                     singleline.request_focus()
                 }
                 if singleline.lost_focus() {
-                    egui::Popup::close_id(ui.ctx(), popup_id);
-                    close_menu = true;
+                    ui.close();
                 }
             };
-
-            egui::Popup::new(popup_id, ui.ctx().clone(), &resp, ui.layer_id())
-                .align(egui::RectAlign::BOTTOM_START)
-                .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-                .show(popup_contents);
-            if close_menu {
-                egui::Popup::close_id(ui.ctx(), popup_id);
-            }
-            if resp.clicked() {
-                egui::Popup::open_id(ui.ctx(), popup_id);
-            }
+            egui::Popup::from_toggle_button_response(&resp).show(popup_contents);
         }
         if let Some(j) = rm {
             egui::Popup::close_all(ui.ctx());

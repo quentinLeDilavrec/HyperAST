@@ -66,23 +66,23 @@ impl egui_addon::code_editor::generic_text_buffer::AsText for Quote {
 
 impl egui::TextBuffer for Quote {
     fn is_mutable(&self) -> bool {
-        todo!()
+        true
     }
 
     fn as_str(&self) -> &str {
-        todo!()
+        &self.text.as_str()
     }
 
     fn insert_text(&mut self, text: &str, char_index: usize) -> usize {
-        todo!()
+        TextBuffer::insert_text(self, text, char_index)
     }
 
     fn delete_char_range(&mut self, char_range: std::ops::Range<usize>) {
-        todo!()
+        TextBuffer::delete_char_range(self, char_range)
     }
 
     fn type_id(&self) -> std::any::TypeId {
-        todo!()
+        std::any::TypeId::of::<Self>()
     }
 }
 

@@ -9,17 +9,15 @@ use strum::IntoEnumIterator;
 
 use egui_addon::{code_editor, egui_utils::radio_collapsing};
 
-use crate::{
-    command::{CommandReceiver, CommandSender, UICommand},
-    command_palette::CommandPalette,
-};
+use crate::command::{CommandReceiver, CommandSender, UICommand};
+use crate::command_palette::CommandPalette;
+use crate::utils_poll::{Buffered3, MultiBuffered2};
 use code_aspects::remote_fetch_node;
 use commit::{CommitSlice, SelectedProjects, fetch_commit};
 use querying::DetailsResults;
 use single_repo::ComputeConfigSingle;
 use tree_view::store::FetchedHyperAST;
 use types::{Commit, Repo, SelectedConfig};
-use utils_poll::{Buffered3, MultiBuffered2};
 use utils_results_batched::ComputeResultsProm;
 
 pub use types::Languages;
@@ -44,7 +42,6 @@ mod utils;
 mod utils_commit;
 mod utils_edition;
 mod utils_egui;
-pub mod utils_poll; // TODO move to parent
 mod utils_results_batched;
 pub(crate) use app_components::show_repo_menu;
 mod commit_graph;
@@ -409,7 +406,7 @@ impl ResultsPerCommit {
 struct QueryResults {
     project: ProjectId,
     query: QueryId,
-    content: utils_poll::Buffered2<
+    content: crate::utils_poll::Buffered2<
         Result<querying::StreamedComputeResults, querying::QueryingError>,
         Result<querying::StreamedComputeResults, querying::QueryingError>,
     >,
@@ -477,7 +474,7 @@ pub(crate) struct AppData {
     // TODO just use the oid as key...
     fetched_commit_metadata: CommitMdStore,
     #[serde(skip)]
-    tracking_result: utils_poll::Buffered<code_tracking::RemoteResult>,
+    tracking_result: crate::utils_poll::Buffered<code_tracking::RemoteResult>,
     #[serde(skip)]
     aspects_result: Option<code_aspects::RemoteView>,
     #[serde(skip)]
@@ -513,7 +510,7 @@ type QueriesDifferentialResults = (
 pub(super) enum LocalOrRemote<R: std::marker::Send + 'static> {
     #[serde(skip)]
     #[expect(unused)]
-    Remote(utils_results_batched::Remote<R>),
+    Remote(crate::utils_poll::Remote<R>),
     Local(R),
     #[default]
     None,
@@ -1781,7 +1778,7 @@ fn show_tree_view(
         id: commit.1.clone(),
     };
     let tree_viewer = long_tacking.tree_viewer.entry(curr_commit.clone());
-    let tree_viewer = tree_viewer.or_insert_with(|| utils_poll::Buffered::default());
+    let tree_viewer = tree_viewer.or_default();
     tree_viewer.try_poll();
     let trigger = true;
     let Some(tree_viewer) = tree_viewer.get_mut() else {

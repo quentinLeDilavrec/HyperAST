@@ -19,11 +19,9 @@ use super::code_tracking::{
 };
 use super::commit::{CommitMetadata, fetch_commit0};
 use super::tree_view::{Action, store::FetchedHyperAST};
-use super::types::{
-    CodeRange, Commit, ComputeConfigAspectViews, FileIdentifier, Resource, SelectedConfig,
-};
+use super::types::{CodeRange, Commit, ComputeConfigAspectViews, FileIdentifier, SelectedConfig};
 use super::utils_egui::MyUiExt as _;
-use super::utils_poll::{AccumulableResult, Buffered, MultiBuffered};
+use crate::utils_poll::{AccumulableResult, Buffered, MultiBuffered, Resource};
 
 use super::detached_view::DetatchedViewOptions;
 
@@ -962,7 +960,7 @@ fn show_tree_view_of_tracking(
         &curr.file.commit
     };
     let tree_viewer = tree_viewer.entry(curr_commit.clone());
-    let tree_viewer = tree_viewer.or_insert_with(|| Buffered::default());
+    let tree_viewer = tree_viewer.or_default();
     let trigger = tree_viewer.try_poll();
     let Some(tree_viewer) = tree_viewer.get_mut() else {
         if !tree_viewer.is_waiting() {

@@ -6,8 +6,9 @@ use std::sync::Arc;
 use super::tree_view::FetchedViewImpl;
 use super::tree_view::store::FetchedHyperAST;
 use super::tree_view::{Action, LabelIdentifier, NodeIdentifier, PrefillCache, SimplePacked};
-use super::types::{Commit, ComputeConfigAspectViews, Repo, Resource, SelectedConfig};
+use super::types::{Commit, ComputeConfigAspectViews, Repo, SelectedConfig};
 use super::utils_egui::MyUiExt as _;
+use crate::utils_poll::Resource;
 
 pub(crate) const WANTED: SelectedConfig = SelectedConfig::Aspects;
 
@@ -309,7 +310,7 @@ impl FetchedView {
     }
 }
 
-pub(super) type RemoteView = Promise<ehttp::Result<Resource<FetchedView>>>;
+pub(super) type RemoteView = crate::utils_poll::Remote<FetchedView>;
 
 #[allow(unused)]
 pub(super) fn remote_fetch_tree(

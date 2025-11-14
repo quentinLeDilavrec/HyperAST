@@ -3,7 +3,7 @@ use std::{collections::HashMap, i64};
 use poll_promise::Promise;
 use serde::{Deserialize, Serialize};
 
-use crate::app::types::Resource;
+use crate::utils_poll::Resource;
 
 use super::types::{Commit, CommitId, Repo};
 

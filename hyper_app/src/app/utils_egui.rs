@@ -86,7 +86,7 @@ pub trait MyUiExt: UiExt {
         })
         .body_unindented(|ui| {
             ui.add_space(4.0);
-            let r = super::utils_poll::try_fetch_remote_file(&file_result, |file| {
+            let r = code_tracking::try_fetch_remote_file(&file_result, |file| {
                 let code: &str = &file.content;
                 let language = "java";
                 // show_code_scrolled(ui, language, wrap, code, desired_width)

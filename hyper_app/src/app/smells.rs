@@ -45,6 +45,8 @@ use super::code_tracking::FetchedFiles;
 use super::types;
 use super::types::{CodeRange, Commit, SelectedConfig};
 use super::utils_edition::MakeHighlights;
+use crate::app::code_tracking::try_fetch_remote_file;
+use crate::utils_poll::{Remote, Resource};
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(default)]
@@ -176,10 +178,8 @@ impl Default for Config {
     }
 }
 
-pub(crate) type RemoteResult =
-    super::utils_results_batched::Remote<Result<SearchResults, SmellsError>>;
-pub(crate) type RemoteResultDiffs =
-    super::utils_results_batched::Remote<Result<ExamplesValues, DiffsError>>;
+pub(crate) type RemoteResult = Remote<Result<SearchResults, SmellsError>>;
+pub(crate) type RemoteResultDiffs = Remote<Result<ExamplesValues, DiffsError>>;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct SearchResults {
@@ -838,7 +838,7 @@ fn show_either_side<MH: MakeHighlights>(
 ) {
     let file_result = fetched_files.entry(code.file.clone());
     let id_scroll = ui.id().with("off_scrolled");
-    let r = super::utils_poll::try_fetch_remote_file(&file_result, |file| {
+    let r = try_fetch_remote_file(&file_result, |file| {
         let mut content: &str = &file.content;
         let language = "java";
         use egui::text::LayoutJob;
@@ -1050,14 +1050,14 @@ pub(super) fn fetch_results(
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // will wake up UI thread
         let resource = response.and_then(|response| {
-            types::Resource::<Result<SearchResults, SmellsError>>::from_response(&ctx, response)
+            Resource::<Result<SearchResults, SmellsError>>::from_response(&ctx, response)
         });
         sender.send(resource);
     });
     promise
 }
 
-impl types::Resource<Result<SearchResults, SmellsError>> {
+impl Resource<Result<SearchResults, SmellsError>> {
     pub(super) fn from_response(
         _ctx: &egui::Context,
         response: ehttp::Response,
@@ -1137,14 +1137,14 @@ pub(super) fn fetch_examples_at_commits(
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // will wake up UI thread
         let resource = response.and_then(|response| {
-            types::Resource::<Result<ExamplesValues, DiffsError>>::from_response(&ctx, response)
+            Resource::<Result<ExamplesValues, DiffsError>>::from_response(&ctx, response)
         });
         sender.send(resource);
     });
     promise
 }
 
-impl types::Resource<Result<ExamplesValues, DiffsError>> {
+impl Resource<Result<ExamplesValues, DiffsError>> {
     pub(super) fn from_response(
         _ctx: &egui::Context,
         response: ehttp::Response,

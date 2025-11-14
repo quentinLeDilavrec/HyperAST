@@ -3,14 +3,43 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::collections::hash_map::Entry;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use super::code_tracking::FetchedFile;
-use super::code_tracking::RemoteFile;
-use super::types::FileIdentifier;
+pub(crate) type Remote<R, E = ehttp::Error> = Promise<Result<Resource<R>, E>>;
+
+// TODO move to utils_poll
+#[derive(Debug)]
+pub struct Resource<T> {
+    /// HTTP response
+    pub(crate) response: ehttp::Response,
+
+    pub(crate) content: Option<T>,
+    // /// If set, the response was an image.
+    // image: Option<RetainedImage>,
+}
+
+impl<T> Resource<T> {
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Resource<U> {
+        Resource {
+            response: self.response,
+            content: self.content.map(f),
+        }
+    }
+}
+
+impl<T: serde::de::DeserializeOwned> Resource<T> {
+    pub fn from_resp(response: ehttp::Response) -> Self {
+        let content = from_resp(&response);
+        Self { content, response }
+    }
+}
+
+fn from_resp<T: serde::de::DeserializeOwned>(response: &ehttp::Response) -> Option<T> {
+    let text = response.text()?;
+    serde_json::from_str::<T>(text).ok()
+}
 
 /// Much simpler than [`Buffered`]...
 /// would need a bench to see if [`Buffered`] should be completly removed.
@@ -23,7 +52,7 @@ pub struct Buffered2<T: Send + 'static, U = T> {
     promise: Option<Promise<T>>,
 }
 
-pub type HttpRes<T> = ehttp::Result<super::types::Resource<T>>;
+pub type HttpRes<T> = ehttp::Result<Resource<T>>;
 
 pub type Buffered3<U> = Buffered2<HttpRes<U>, U>;
 
@@ -480,23 +509,5 @@ impl<T: Default, U: Send + 'static> MultiBuffered<T, U> {
     #[allow(unused)]
     pub fn take(&mut self) -> Option<T> {
         self.content.take()
-    }
-}
-
-pub(crate) fn try_fetch_remote_file<R>(
-    file_result: &Entry<'_, FileIdentifier, RemoteFile>,
-    mut f: impl FnMut(&FetchedFile) -> R,
-) -> Option<Result<R, String>> {
-    let Entry::Occupied(promise) = file_result else {
-        return None;
-    };
-    let promise = promise.get();
-    let result = promise.ready()?;
-    match result {
-        Ok(resource) => {
-            let text = resource.content.as_ref()?;
-            Some(Ok(f(text)))
-        }
-        Err(error) => Some(Err(error.to_string())),
     }
 }

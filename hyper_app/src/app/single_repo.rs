@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 
-use super::types::{CodeEditors, Commit, Config, Resource, SelectedConfig};
+use super::types::{CodeEditors, Commit, Config, SelectedConfig};
 use super::types::{EditorHolder, WithDesc};
 use super::utils_edition::{EditStatus, EditingContext};
 use super::utils_edition::{
@@ -14,6 +14,7 @@ use super::utils_edition::{
 use super::utils_results_batched::ComputeError;
 use super::utils_results_batched::{ComputeResults, ComputeResultsProm, show_long_result};
 use super::{Sharing, code_editor_automerge, show_repo_menu};
+use crate::utils_poll::Resource;
 
 mod example_scripts;
 

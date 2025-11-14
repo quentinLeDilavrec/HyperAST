@@ -437,38 +437,6 @@ pub(crate) struct TsgEditor<T = code_editor::CodeEditor<Languages>> {
     pub(crate) query: T,
 }
 
-// TODO move to utils_poll
-#[derive(Debug)]
-pub struct Resource<T> {
-    /// HTTP response
-    pub(crate) response: ehttp::Response,
-
-    pub(crate) content: Option<T>,
-    // /// If set, the response was an image.
-    // image: Option<RetainedImage>,
-}
-
-impl<T> Resource<T> {
-    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Resource<U> {
-        Resource {
-            response: self.response,
-            content: self.content.map(f),
-        }
-    }
-}
-
-impl<T: serde::de::DeserializeOwned> Resource<T> {
-    pub fn from_resp(response: ehttp::Response) -> Self {
-        let content = from_resp(&response);
-        Self { content, response }
-    }
-}
-
-fn from_resp<T: serde::de::DeserializeOwned>(response: &ehttp::Response) -> Option<T> {
-    let text = response.text()?;
-    serde_json::from_str::<T>(text).ok()
-}
-
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Config {
     Any,

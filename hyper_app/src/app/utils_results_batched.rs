@@ -1,9 +1,9 @@
 use poll_promise::Promise;
 
 use super::types::CommitId;
-use super::types::Resource;
 use super::utils::SecFmt;
 use super::utils::file_save;
+use crate::utils_poll::Resource;
 
 pub(crate) trait ComputeError {
     fn head(&self) -> &str;
@@ -60,9 +60,6 @@ pub(crate) fn show_short_result_aux(content: &ComputeResults, ui: &mut egui::Ui)
         ));
     }
 }
-
-pub(super) type Remote<R> = Promise<ehttp::Result<Resource<R>>>;
-// pub(super) type RemoteResult<E> = Remote<Result<ComputeResults, E>>;
 
 pub(crate) fn show_long_result(
     promise: &Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,

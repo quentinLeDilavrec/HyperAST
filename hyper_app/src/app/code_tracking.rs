@@ -9,9 +9,9 @@ use egui_addon::egui_utils::highlight_byte_range;
 use super::code_editor::generic_text_buffer::byte_index_from_char_index;
 use super::show_repo_menu;
 use super::types::ComputeConfigTracking;
-use super::types::{CodeRange, Commit, FileIdentifier, Resource, SelectedConfig};
+use super::types::{CodeRange, Commit, FileIdentifier, SelectedConfig};
 use super::utils_egui::MyUiExt as _;
-use super::utils_poll::{Accumulable, Buffered};
+use crate::utils_poll::{Accumulable, Buffered, Resource};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct FetchedFile {
@@ -21,6 +21,24 @@ pub struct FetchedFile {
 
 pub(crate) type FetchedFiles =
     std::collections::HashMap<FileIdentifier, super::code_tracking::RemoteFile>;
+
+pub(crate) fn try_fetch_remote_file<R>(
+    file_result: &std::collections::hash_map::Entry<'_, FileIdentifier, RemoteFile>,
+    mut f: impl FnMut(&FetchedFile) -> R,
+) -> Option<Result<R, String>> {
+    let std::collections::hash_map::Entry::Occupied(promise) = file_result else {
+        return None;
+    };
+    let promise = promise.get();
+    let result = promise.ready()?;
+    match result {
+        Ok(resource) => {
+            let text = resource.content.as_ref()?;
+            Some(Ok(f(text)))
+        }
+        Err(error) => Some(Err(error.to_string())),
+    }
+}
 
 impl Resource<FetchedFile> {
     pub(super) fn from_response(_ctx: &egui::Context, response: ehttp::Response) -> Self {
@@ -55,7 +73,7 @@ impl Resource<FetchedFile> {
     }
 }
 
-pub(super) type RemoteFile = Promise<ehttp::Result<Resource<FetchedFile>>>;
+pub(super) type RemoteFile = crate::utils_poll::Remote<FetchedFile>;
 
 pub(super) fn remote_fetch_file(
     ctx: &egui::Context,

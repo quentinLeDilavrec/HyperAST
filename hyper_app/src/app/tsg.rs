@@ -2,9 +2,11 @@ use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 use poll_promise::Promise;
 use std::sync::{Arc, Mutex};
 
+use crate::utils_poll::Resource;
+
 use super::Sharing;
 use super::code_editor_automerge::CodeEditor;
-use super::types::{Commit, Config, Resource, SelectedConfig, TsgEditor};
+use super::types::{Commit, Config, SelectedConfig, TsgEditor};
 use super::types::{EditorHolder, WithDesc};
 use super::utils_edition::show_shared_code_edition;
 use super::utils_edition::{EditStatus, EditingContext};

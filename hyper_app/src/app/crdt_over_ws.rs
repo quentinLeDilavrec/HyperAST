@@ -64,6 +64,28 @@ impl egui_addon::code_editor::generic_text_buffer::AsText for Quote {
     }
 }
 
+impl egui::TextBuffer for Quote {
+    fn is_mutable(&self) -> bool {
+        todo!()
+    }
+
+    fn as_str(&self) -> &str {
+        todo!()
+    }
+
+    fn insert_text(&mut self, text: &str, char_index: usize) -> usize {
+        todo!()
+    }
+
+    fn delete_char_range(&mut self, char_range: std::ops::Range<usize>) {
+        todo!()
+    }
+
+    fn type_id(&self) -> std::any::TypeId {
+        todo!()
+    }
+}
+
 impl TextBuffer for Quote {
     type Ref = Quote;
 

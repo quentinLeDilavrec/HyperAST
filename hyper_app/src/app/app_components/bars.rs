@@ -1,4 +1,4 @@
-use re_ui::{ContextExt as _, DesignTokens, UiExt as _};
+use re_ui::{ContextExt as _, UiExt as _};
 
 use crate::{app::types, command::UICommand};
 
@@ -12,7 +12,7 @@ impl crate::HyperApp {
     pub(crate) fn top_bar(&mut self, egui_ctx: &egui::Context) {
         let top_bar_style = egui_ctx.top_bar_style(cfg!(not(target_arch = "wasm32")));
 
-        let mut frame_style = DesignTokens::top_panel_frame();
+        let mut frame_style = re_ui::design_tokens_of(egui::Theme::Dark).top_panel_frame();
         if !egui_ctx.style().visuals.dark_mode {
             frame_style.fill = egui::Color32::WHITE; //egui::Visuals::light().window_fill;
             frame_style.stroke = egui::Visuals::light().window_stroke;
@@ -209,7 +209,7 @@ fn top_bar_ui(app: &mut crate::HyperApp, ui: &mut egui::Ui) {
             ui.add_space(16.0);
         }
 
-        re_ui::notifications::notification_toggle_button(ui, &mut app.notifs);
+        app.notifs.notification_toggle_button(ui);
         ui.medium_icon_toggle_button(&re_ui::icons::RIGHT_PANEL_TOGGLE, &mut app.show_right_panel);
         ui.medium_icon_toggle_button(
             &re_ui::icons::BOTTOM_PANEL_TOGGLE,

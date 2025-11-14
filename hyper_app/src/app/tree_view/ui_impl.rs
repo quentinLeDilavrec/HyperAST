@@ -1207,19 +1207,22 @@ fn show_node_menu_aux(
 ) -> Option<Action> {
     let popup_id = interact.id.with("popup");
     if interact.secondary_clicked() || interact.double_clicked() || interact.drag_stopped() {
-        ui.memory_mut(|mem| mem.open_popup(popup_id));
+        egui::Popup::open_id(ui.ctx(), popup_id);
     }
     let add_contents = |ui: &mut egui::Ui| {
         ui.set_width_range(40.0..=100.0);
         add_content(ui).or_else(|| {
             if ui.button("close menu").clicked() {
-                ui.memory_mut(|mem| mem.close_popup());
+                egui::Popup::close_id(ui.ctx(), popup_id);
             }
             None
         })
     };
     let behavior = egui::PopupCloseBehavior::CloseOnClick;
-    egui::popup_below_widget(ui, popup_id, &interact, behavior, add_contents).flatten()
+    egui::Popup::new(popup_id, ui.ctx().clone(), &interact, ui.layer_id())
+        .close_behavior(behavior)
+        .show(add_contents)
+        .and_then(|x| x.inner)
 }
 
 #[allow(unused)] // TODO reenable ports after fixing the dependency (I believe it was not maintained anymore, and very convoluted structure btw)

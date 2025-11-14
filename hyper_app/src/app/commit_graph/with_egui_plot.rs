@@ -57,6 +57,7 @@ pub struct CommitPoints<'a> {
 }
 
 impl<'a> PlotItem for CommitPoints<'a> {
+    // fn shapes(&self, ui: &Ui, transform: &PlotTransform, shapes: &mut Vec<Shape>);
     fn shapes(&self, ui: &egui::Ui, transform: &PlotTransform, shapes: &mut Vec<egui::Shape>) {
         self.points.shapes(ui, transform, shapes)
     }
@@ -99,6 +100,7 @@ impl<'a> PlotItem for CommitPoints<'a> {
 
     fn on_hover(
         &self,
+        plot_area_response: &egui::Response,
         elem: ClosestElem,
         shapes: &mut Vec<egui::Shape>,
         cursors: &mut Vec<Cursor>,

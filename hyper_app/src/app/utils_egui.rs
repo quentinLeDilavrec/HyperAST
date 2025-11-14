@@ -125,7 +125,7 @@ pub trait MyUiExt: UiExt {
         use syntax_highlighting::syntax_highlighting_async as syntax_highlighter;
         let theme = syntax_highlighting::syntect::CodeTheme::from_memory(self.ui().ctx());
 
-        let mut layouter = |ui: &egui::Ui, code: &str, wrap_width: f32| {
+        let mut layouter = |ui: &egui::Ui, code: &dyn egui::TextBuffer, wrap_width: f32| {
             let mut layout_job = syntax_highlighter::highlight(ui.ctx(), &theme, code, language);
             if wrap {
                 layout_job.wrap.max_width = wrap_width;
@@ -251,12 +251,12 @@ pub trait MyUiExt: UiExt {
             self.ui().ctx(),
             self.ui().style(),
         );
-        let mut layouter = |ui: &egui::Ui, code: &str, _wrap_width: f32| {
+        let mut layouter = |ui: &egui::Ui, code: &dyn egui::TextBuffer, _wrap_width: f32| {
             let layout_job = egui_extras::syntax_highlighting::highlight(
                 ui.ctx(),
                 ui.style(),
                 &theme,
-                code,
+                code.as_str(),
                 language,
             );
             if wrap {
@@ -356,7 +356,8 @@ impl MyUiExt for egui::Ui {}
 type SkipedBytes = usize;
 
 pub fn framed_scroll_area_aux() -> (egui::Frame, egui::ScrollArea) {
-    let inner_margin = egui::Margin::same(re_ui::DesignTokens::view_padding());
+    let inner_margin =
+        egui::Margin::same(re_ui::design_tokens_of(egui::Theme::Dark).view_padding());
     let frame = egui::Frame {
         inner_margin,
         ..Default::default()

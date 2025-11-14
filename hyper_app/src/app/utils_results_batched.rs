@@ -196,17 +196,18 @@ pub(crate) fn show_long_result_list(ui: &mut egui::Ui, content: &ComputeResults)
                 let language = "json";
                 let theme =
                     egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx(), ui.style());
-                let mut layouter = |ui: &egui::Ui, string: &str, _wrap_width: f32| {
-                    let layout_job = egui_extras::syntax_highlighting::highlight(
-                        ui.ctx(),
-                        ui.style(),
-                        &theme,
-                        string,
-                        language,
-                    );
-                    // layout_job.wrap.max_width = wrap_width; // no wrapping
-                    ui.fonts(|f| f.layout_job(layout_job))
-                };
+                let mut layouter =
+                    |ui: &egui::Ui, string: &dyn egui::TextBuffer, _wrap_width: f32| {
+                        let layout_job = egui_extras::syntax_highlighting::highlight(
+                            ui.ctx(),
+                            ui.style(),
+                            &theme,
+                            string.as_str(),
+                            language,
+                        );
+                        // layout_job.wrap.max_width = wrap_width; // no wrapping
+                        ui.fonts(|f| f.layout_job(layout_job))
+                    };
                 if content.results.len() > 1 {
                     ui.label(format!(
                         "compute time: {:.3}",

@@ -787,7 +787,7 @@ impl<'a, 'b, MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
                     galley,
                     &std::ops::Range { start, end },
                 );
-                let row_range = cursor_range.map(|c| c.rcursor.row);
+                let row_range = cursor_range.map(|c| galley.layout_from_cursor(c).row);
                 if row_range[0] + 1 < row_range[1] {
                     let mut mid_rect =
                         egui_addon::egui_utils::compute2_bounding_rect_from_row_range(
@@ -797,21 +797,23 @@ impl<'a, 'b, MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
                     mid_rect.max.x += 1.0;
                     mid_rect.min.x -= 1.0;
                     let rect = &galley.rows[row_range[0]];
-                    let left = if cursor_range[0].rcursor.column == 0 {
-                        egui_addon::egui_utils::first_ws_x(rect)
-                            .unwrap_or(rect.x_offset(cursor_range[0].rcursor.column))
+                    let left = if galley.layout_from_cursor(cursor_range[0]).column == 0 {
+                        egui_addon::egui_utils::first_ws_x(rect).unwrap_or(
+                            rect.x_offset(galley.layout_from_cursor(cursor_range[0]).column),
+                        )
                     } else {
-                        rect.x_offset(cursor_range[0].rcursor.column) - 5.0
+                        rect.x_offset(galley.layout_from_cursor(cursor_range[0]).column) - 5.0
                     };
-                    let mut rect = rect.rect;
+                    let mut rect = rect.rect();
                     rect.min.x = left; //.min(mid_rect.min.x);
                     // mid_rect.min.x = left.min(mid_rect.min.x);
                     rect.max.x = rect.max.x.max(mid_rect.max.x);
                     shapes.push(rect);
                     let rect = &galley.rows[row_range[1]];
                     let left2 = egui_addon::egui_utils::first_ws_x(rect);
-                    let right = rect.x_offset(cursor_range[1].rcursor.column) + 2.0;
-                    let mut rect = rect.rect;
+                    let right =
+                        rect.x_offset(galley.layout_from_cursor(cursor_range[1]).column) + 2.0;
+                    let mut rect = rect.rect();
                     if let Some(left2) = left2 {
                         let x = left2 - 5.0;
                         if mid_rect.min.x < x {
@@ -829,11 +831,11 @@ impl<'a, 'b, MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
                 } else if row_range[0] + 1 == row_range[1] {
                     let first = &galley.rows[row_range[0]];
                     let second = &galley.rows[row_range[1]];
-                    let left = first.x_offset(cursor_range[0].rcursor.column);
-                    let right = second.x_offset(cursor_range[1].rcursor.column);
+                    let left = first.x_offset(galley.layout_from_cursor(cursor_range[0]).column);
+                    let right = second.x_offset(galley.layout_from_cursor(cursor_range[1]).column);
                     let left2 = second.glyphs.iter().find(|x| !x.chr.is_ascii_whitespace());
-                    let mut first = first.rect;
-                    let mut second = second.rect;
+                    let mut first = first.rect();
+                    let mut second = second.rect();
                     first.min.x = left;
                     second.max.x = right;
                     if let Some(left2) = left2 {
@@ -845,9 +847,9 @@ impl<'a, 'b, MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
                     shapes.push(second);
                 } else if row_range[0] == row_range[1] {
                     let rect = &galley.rows[row_range[0]];
-                    let left = rect.x_offset(cursor_range[0].rcursor.column);
-                    let right = rect.x_offset(cursor_range[1].rcursor.column);
-                    let mut rect = rect.rect;
+                    let left = rect.x_offset(galley.layout_from_cursor(cursor_range[0]).column);
+                    let right = rect.x_offset(galley.layout_from_cursor(cursor_range[1]).column);
+                    let mut rect = rect.rect();
                     rect.min.x = left - 1.0;
                     rect.max.x = right + 1.0;
                     shapes.push(rect);

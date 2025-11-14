@@ -1,7 +1,7 @@
 use std::ops::IndexMut;
 
 use egui::Widget;
-use re_ui::{DesignTokens, UiExt};
+use re_ui::UiExt;
 
 use crate::app::{
     ProjectId, QResId,
@@ -536,9 +536,12 @@ impl crate::HyperApp {
 
     fn show_left_panel_custom_contents(&mut self, ui: &mut egui::Ui) {
         egui::TopBottomPanel::top("left_panel_top_bar")
-            .min_height(3.0 * re_ui::DesignTokens::title_bar_height())
+            .min_height(3.0 * re_ui::design_tokens_of(egui::Theme::Dark).title_bar_height())
             .frame(egui::Frame {
-                inner_margin: egui::Margin::symmetric(re_ui::DesignTokens::view_padding(), 0),
+                inner_margin: egui::Margin::symmetric(
+                    re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
+                    0,
+                ),
                 ..Default::default()
             })
             .show_inside(ui, |ui| {
@@ -576,7 +579,9 @@ impl crate::HyperApp {
             .auto_shrink([false; 2])
             .show(ui, |ui| {
                 egui::Frame {
-                    inner_margin: egui::Margin::same(re_ui::DesignTokens::view_padding()),
+                    inner_margin: egui::Margin::same(
+                        re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
+                    ),
                     ..Default::default()
                 }
                 .show(ui, |ui| self.left_panel_mid_section_ui(ui));
@@ -586,7 +591,9 @@ impl crate::HyperApp {
             .auto_shrink([false; 2])
             .show(ui, |ui| {
                 egui::Frame {
-                    inner_margin: egui::Margin::same(re_ui::DesignTokens::view_padding()),
+                    inner_margin: egui::Margin::same(
+                        re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
+                    ),
                     ..Default::default()
                 }
                 .show(ui, |ui| self.left_panel_bottom_section_ui(ui));
@@ -594,7 +601,7 @@ impl crate::HyperApp {
     }
 
     pub(crate) fn bottom_panel(&mut self, ctx: &egui::Context) {
-        let mut frame_style = DesignTokens::bottom_panel_frame();
+        let mut frame_style = re_ui::design_tokens_of(egui::Theme::Dark).bottom_panel_frame();
         if !ctx.style().visuals.dark_mode {
             frame_style.fill = egui::Visuals::light().window_fill;
             frame_style.stroke = egui::Visuals::light().window_stroke;

@@ -103,7 +103,7 @@ impl<'a> SectionCollapsingHeader<'a> {
             content = content
                 .with_buttons(|ui| {
                     let button_response = button.map(|button| button.ui(ui));
-                    let help_response = help.map(|help| ui.help_hover_button().on_hover_ui(help));
+                    let help_response = help.map(|help| ui.help_button(help));
 
                     match (button_response, help_response) {
                         (Some(button_response), Some(help_response)) => {
@@ -117,7 +117,7 @@ impl<'a> SectionCollapsingHeader<'a> {
         }
 
         let force_background = if ui.visuals().dark_mode {
-            DesignTokens::load().section_collapsing_header_color()
+            re_ui::design_tokens_of(egui::Theme::Dark).section_header_color
         } else {
             ui.visuals().widgets.active.weak_bg_fill
         };
@@ -171,7 +171,7 @@ impl<'a> SectionCollapsingHeader<'a> {
             content = content
                 .with_buttons(|ui| {
                     let button_response = button.map(|button| button.ui(ui));
-                    let help_response = help.map(|help| ui.help_hover_button().on_hover_ui(help));
+                    let help_response = help.map(|help| ui.help_button(help));
 
                     match (button_response, help_response) {
                         (Some(button_response), Some(help_response)) => {
@@ -185,7 +185,7 @@ impl<'a> SectionCollapsingHeader<'a> {
         }
 
         let force_background = if ui.visuals().dark_mode {
-            DesignTokens::load().section_collapsing_header_color()
+            re_ui::design_tokens_of(egui::Theme::Dark).section_header_color
         } else {
             ui.visuals().widgets.active.bg_fill
         };

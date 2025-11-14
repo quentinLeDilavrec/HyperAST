@@ -99,6 +99,28 @@ impl AsText for EditAwareString {
     }
 }
 
+impl egui::TextBuffer for EditAwareString {
+    fn is_mutable(&self) -> bool {
+        todo!()
+    }
+
+    fn as_str(&self) -> &str {
+        todo!()
+    }
+
+    fn insert_text(&mut self, text: &str, char_index: usize) -> usize {
+        todo!()
+    }
+
+    fn delete_char_range(&mut self, char_range: Range<usize>) {
+        todo!()
+    }
+
+    fn type_id(&self) -> std::any::TypeId {
+        todo!()
+    }
+}
+
 impl TextBuffer for EditAwareString {
     type Ref = EditAwareString;
 

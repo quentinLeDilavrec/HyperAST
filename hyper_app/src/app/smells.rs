@@ -750,18 +750,17 @@ fn show_query_with_example(
 pub(crate) fn show_query(
     bad_query: &SearchResult,
     ui: &mut egui::Ui,
-) -> egui::scroll_area::ScrollAreaOutput<
-    egui_addon::code_editor::generic_text_edit::output::TextEditOutput,
-> {
+) -> egui::scroll_area::ScrollAreaOutput<egui_addon::code_editor::generic_text_edit::TextEditOutput>
+{
     let mut code: &str = &bad_query.query;
     let language = "clojure";
     // use super::syntax_highlighting::syntax_highlighting_async as syntax_highlighter;
     // let theme = super::syntax_highlighting::syntect::CodeTheme::from_memory(ui.ctx());
     let theme = egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx(), ui.style());
 
-    let mut layouter = |ui: &egui::Ui, code: &str, wrap_width: f32| {
+    let mut layouter = |ui: &egui::Ui, code: &dyn egui::TextBuffer, wrap_width: f32| {
         use egui_extras::syntax_highlighting::highlight;
-        let mut layout_job = highlight(ui.ctx(), ui.style(), &theme, code, language);
+        let mut layout_job = highlight(ui.ctx(), ui.style(), &theme, code.as_str(), language);
         // syntax_highlighter::highlight(ui.ctx(), &theme, code, language);
         if false {
             layout_job.wrap.max_width = wrap_width;
@@ -927,13 +926,13 @@ fn show_either_side<MH: MakeHighlights>(
         use egui::text::LayoutJob;
         use egui_addon::syntax_highlighting::syntect::CodeTheme;
         let theme = CodeTheme::from_memory(ui.ctx());
-        let mut layouter = |ui: &egui::Ui, content: &str, _wrap_width: f32| {
+        let mut layouter = |ui: &egui::Ui, content: &dyn egui::TextBuffer, _wrap_width: f32| {
             type HighlightCache =
                 egui::util::cache::FrameCache<LayoutJob, crate::app::utils_edition::Highlighter0>;
             let layout_job = ui.ctx().memory_mut(|mem| {
                 mem.caches.cache::<HighlightCache>().get((
                     &theme,
-                    crate::app::utils_edition::FileContainer(&code.file, content),
+                    crate::app::utils_edition::FileContainer(&code.file, content.as_str()),
                     language,
                 ))
             });
@@ -941,10 +940,19 @@ fn show_either_side<MH: MakeHighlights>(
             ui.fonts(|f| {
                 let galley = f.layout_job(layout_job);
                 let mut galley = galley.as_ref().clone();
-                galley
-                    .rows
-                    .iter_mut()
-                    .for_each(|row| row.glyphs.iter_mut().for_each(|g| g.line_height = 100.0));
+                // galley.rows.iter_mut().for_each(|row| {
+                //     *row = epaint::text::PlacedRow {
+                //         pos: row.pos,
+                //         row: std::sync::Arc::new(epaint::text::Row {
+                //             section_index_at_start: row.row.section_index_at_start,
+                //             glyphs: row.row.glyphs,
+                //             size: row.row.size,
+                //             visuals: row.row.visuals,
+                //             ends_with_newline: row.row.ends_with_newline,
+                //         }),
+                //     };
+                //     // row.row.glyphs.iter_mut().for_each(|g| g.line_height = 100.0)
+                // });
                 galley.into()
             })
         };
@@ -1022,7 +1030,7 @@ fn show_either_side<MH: MakeHighlights>(
             let shape = ui
                 .ctx()
                 .memory_mut(|mem| mem.caches.cache::<Type>().get((G(galley), highlights)));
-            let offset = aa.inner.text_draw_pos.to_vec2();
+            let offset = aa.inner.galley_pos.to_vec2();
             let clip_rect = ui.clip_rect().translate(-offset);
             let shapes = shape
                 .into_iter()
@@ -1044,7 +1052,7 @@ fn show_either_side<MH: MakeHighlights>(
             let mut rect = egui_addon::egui_utils::highlight_byte_range_aux(
                 ui,
                 &aa.inner.galley,
-                aa.inner.text_draw_pos,
+                aa.inner.galley_pos,
                 selected_node,
                 color.multiply(0.01).into(),
             );
@@ -1060,7 +1068,7 @@ fn show_either_side<MH: MakeHighlights>(
                     rect.top() - (aa.inner_rect.height() - rect.height()).abs() / 2.0;
                 aa.state.store(ui.ctx(), aa.id);
             }
-            rect = rect.translate(aa.inner.text_draw_pos.to_vec2());
+            rect = rect.translate(aa.inner.galley_pos.to_vec2());
 
             let stroke = {
                 let mut color = color;

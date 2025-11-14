@@ -10,7 +10,7 @@ pub fn code_view_ui(ui: &mut egui::Ui, mut code: &str) {
     let language = "rs";
     let theme = CodeTheme::from_memory(ui.ctx());
 
-    let mut layouter = |ui: &egui::Ui, string: &str, _wrap_width: f32| {
+    let mut layouter = |ui: &egui::Ui, string: &dyn egui::TextBuffer, _wrap_width: f32| {
         let layout_job = highlight(ui.ctx(), &theme, string, language);
         // layout_job.wrap.max_width = wrap_width; // no wrapping
         ui.fonts(|f| f.layout_job(layout_job))
@@ -44,7 +44,12 @@ pub fn highlight0(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: 
 }
 
 /// Memoized Code highlighting
-pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &str) -> LayoutJob {
+pub fn highlight(
+    ctx: &egui::Context,
+    theme: &CodeTheme,
+    code: &dyn egui::TextBuffer,
+    language: &str,
+) -> LayoutJob {
     // async fn something_async() {
     //     wasm_rs_dbg::dbg!("aaa");
     // }
@@ -204,7 +209,7 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
     let res = ctx.memory_mut(|mem| {
         mem.caches
             .cache::<HighlightCache>()
-            .get(ctx, (theme, code, language))
+            .get(ctx, (theme, code.as_str(), language))
     });
 
     // drop(aaa);

@@ -51,6 +51,10 @@ async fn main() {
             Forge::Github.repo("official-stockfish", "Stockfish"),
             RepoConfig::CppMake,
         );
+        repos.register_config(
+            Forge::Github.repo("rerun-io", "egui_tiles"),
+            RepoConfig::CppMake,
+        );
         repos.register_config(Forge::Github.repo("torvalds", "linux"), RepoConfig::CppMake);
         repos.register_config(
             Forge::Github.repo("systemd", "systemd"),

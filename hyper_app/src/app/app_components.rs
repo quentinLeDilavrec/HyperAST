@@ -1,6 +1,6 @@
 use crate::app::*;
 use commit::CommitSlice;
-use re_ui::{DesignTokens, list_item};
+use re_ui::list_item;
 use utils_egui::MyUiExt as _;
 mod bars;
 mod panels;
@@ -115,9 +115,13 @@ impl super::HyperApp {
         // ---
 
         re_ui_collapse::SectionCollapsingHeader::new("Data")
-            .button(list_item::ItemMenuButton::new(&re_ui::icons::ADD, |ui| {
-                ui.weak("empty");
-            }))
+            .button(list_item::ItemMenuButton::new(
+                &re_ui::icons::ADD,
+                "alt_text",
+                |ui| {
+                    ui.weak("empty");
+                },
+            ))
             .show(ui, |ui| {
                 ui.label("Some data here");
             });
@@ -164,7 +168,7 @@ impl super::HyperApp {
             .always_show_buttons(true);
 
         let force_background = if ui.visuals().dark_mode {
-            DesignTokens::load().section_collapsing_header_color()
+            re_ui::design_tokens_of(egui::Theme::Dark).section_header_color
         } else {
             ui.visuals().widgets.active.bg_fill
         };
@@ -315,6 +319,7 @@ pub(crate) fn show_repo_item_buttons(
         let button = egui::Button::new("commit");
         let button = &ui.add_enabled(true, button);
         let mut close_menu = false;
+        let popup_id = ui.make_persistent_id("add_commit");
         let popup_contents = |ui: &mut egui::Ui| {
             let text = commits.last_mut().unwrap();
             let singleline = &ui.text_edit_singleline(text);
@@ -325,25 +330,20 @@ pub(crate) fn show_repo_item_buttons(
                 if text.is_empty() {
                     commits.pop();
                 }
-                ui.memory_mut(|mem| mem.close_popup());
+                egui::Popup::close_id(ui.ctx(), popup_id);
                 close_menu = true;
             }
         };
-        let popup_id = ui.make_persistent_id("add_commit");
-        egui::popup::popup_above_or_below_widget(
-            ui,
-            popup_id,
-            button,
-            egui::AboveOrBelow::Below,
-            egui::popup::PopupCloseBehavior::CloseOnClickOutside,
-            popup_contents,
-        );
+        egui::Popup::new(popup_id, ui.ctx().clone(), button, ui.layer_id())
+            .align(egui::RectAlign::BOTTOM_START)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(popup_contents);
         if close_menu {
-            ui.close_menu();
+            egui::Popup::close_id(ui.ctx(), popup_id);
         }
         if button.clicked() {
             commits.push(Default::default());
-            ui.memory_mut(|mem| mem.open_popup(popup_id))
+            egui::Popup::open_id(ui.ctx(), popup_id);
         }
         let button = egui::Button::new("branch");
         if ui.add_enabled(false, button).clicked() {
@@ -390,7 +390,7 @@ pub(crate) fn _show_repo_item_header(
     height: f32,
 ) -> list_item::ShowCollapsingResponse<()> {
     let force_background = if ui.visuals().dark_mode {
-        DesignTokens::load().section_collapsing_header_color()
+        re_ui::design_tokens_of(egui::Theme::Dark).section_header_color
     } else {
         ui.visuals().widgets.active.weak_bg_fill
     }
@@ -422,8 +422,8 @@ pub(crate) fn show_commits_items(
     span.min = span.max.min(span.min + height);
     let body_response = ui.full_span_scope(span, |ui| {
         if indented {
-            ui.spacing_mut().indent =
-                DesignTokens::small_icon_size().x + DesignTokens::text_to_icon_padding();
+            ui.spacing_mut().indent = re_ui::design_tokens_of(egui::Theme::Dark).small_icon_size.x
+                + re_ui::design_tokens_of(egui::Theme::Dark).text_to_icon_padding();
             state.show_body_indented(&response.item_response, ui, |ui| {
                 show_commit_list(ui, commits, height)
             })
@@ -471,34 +471,31 @@ fn show_commit_list(ui: &mut egui::Ui, mut commits: CommitSlice<'_>, height: f32
                 .with_height(height)
                 .show_flat(ui, content);
             let mut close_menu = false;
+            let popup_id = ui.make_persistent_id(format!("change_commit {i}"));
             let popup_contents = |ui: &mut egui::Ui| {
                 let singleline = &ui.text_edit_singleline(oid);
                 if resp.clicked() {
                     singleline.request_focus()
                 }
                 if singleline.lost_focus() {
-                    ui.memory_mut(|mem| mem.close_popup());
+                    egui::Popup::close_id(ui.ctx(), popup_id);
                     close_menu = true;
                 }
             };
-            let popup_id = ui.make_persistent_id(format!("change_commit {i}"));
-            egui::popup::popup_above_or_below_widget(
-                ui,
-                popup_id,
-                &resp,
-                egui::AboveOrBelow::Below,
-                egui::popup::PopupCloseBehavior::CloseOnClickOutside,
-                popup_contents,
-            );
+
+            egui::Popup::new(popup_id, ui.ctx().clone(), &resp, ui.layer_id())
+                .align(egui::RectAlign::BOTTOM_START)
+                .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                .show(popup_contents);
             if close_menu {
-                ui.close_menu();
+                egui::Popup::close_id(ui.ctx(), popup_id);
             }
             if resp.clicked() {
-                ui.memory_mut(|mem| mem.open_popup(popup_id))
+                egui::Popup::open_id(ui.ctx(), popup_id);
             }
         }
         if let Some(j) = rm {
-            ui.memory_mut(|mem| mem.close_popup());
+            egui::Popup::close_all(ui.ctx());
             commits.remove(j);
         }
     });

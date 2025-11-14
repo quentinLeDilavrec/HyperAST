@@ -155,7 +155,7 @@ impl ProjectsOrCommitsModal {
         self.modal_commits.ui(
             ctx,
             || re_ui::modal::ModalWrapper::new("Commit Selection"),
-            |ui, _close| {
+            |ui| {
                 let Some(project_id) = self.chosen_project else {
                     return;
                 };
@@ -164,7 +164,7 @@ impl ProjectsOrCommitsModal {
                 //     data.show_commits_selection(ui, project_id)
                 // });
                 if let Some(cid) = cid {
-                    *_close = false;
+                    ui.close();
                     (self.commit_cb)(data, cid);
                 }
             },
@@ -172,7 +172,7 @@ impl ProjectsOrCommitsModal {
         self.modal_project.ui(
             ctx,
             || re_ui::modal::ModalWrapper::new("Project Selection"),
-            |ui, _close| {
+            |ui| {
                 if self.chosen_project.is_some() {
                     return;
                 }
@@ -181,7 +181,7 @@ impl ProjectsOrCommitsModal {
                     show_project_selection(ui, data, &mut pid);
                 });
                 if pid != (self.project_cb)(data, pid) {
-                    *_close = false;
+                    ui.close();
                 }
             },
         );
@@ -990,7 +990,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
                         egui::Frame {
-                            inner_margin: egui::Margin::same(re_ui::DesignTokens::view_padding()),
+                            inner_margin: egui::Margin::same(
+                                re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
+                            ),
                             ..Default::default()
                         }
                         .show(ui, |ui| self.show_commits(ui));
@@ -1639,7 +1641,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         if *self.maximized == Some(space_view_id) {
             // Show minimize-button:
             if ui
-                .small_icon_button(&re_ui::icons::MINIMIZE)
+                .small_icon_button(&re_ui::icons::MINIMIZE, "Restore - show all spaces")
                 .on_hover_text("Restore - show all spaces")
                 .clicked()
             {
@@ -1648,7 +1650,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         } else if num_space_views > 1 {
             // Show maximize-button:
             if ui
-                .small_icon_button(&re_ui::icons::MAXIMIZE)
+                .small_icon_button(&re_ui::icons::MAXIMIZE, "Maximize space view")
                 .on_hover_text("Maximize space view")
                 .clicked()
             {
@@ -1661,7 +1663,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         //     .class(self.ctx.space_view_class_registry)
         //     .help_markdown(self.ctx.egui_ctx);
         let help_markdown = "TODO Help text";
-        ui.help_hover_button().on_hover_ui(|ui| {
+        ui.help_button(|ui| {
             ui.markdown_ui(&help_markdown);
         });
 
@@ -1673,7 +1675,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             };
             if let Some(Ok(res)) = res.get() {
                 if ui
-                    .small_icon_button(&re_ui::icons::EXTERNAL_LINK)
+                    .small_icon_button(&re_ui::icons::EXTERNAL_LINK, "Export data as json")
                     .on_hover_text("Export data as json")
                     .clicked()
                 {
@@ -1723,7 +1725,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
 
     /// The height of the bar holding tab titles.
     fn tab_bar_height(&self, _style: &egui::Style) -> f32 {
-        re_ui::DesignTokens::title_bar_height()
+        re_ui::design_tokens_of(egui::Theme::Dark).title_bar_height()
     }
 
     /// What are the rules for simplifying the tree?
@@ -1813,7 +1815,7 @@ fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
                         ui.ctx(),
                         ui.style(),
                         &theme,
-                        string.as_ref(),
+                        string.as_str(),
                         language,
                     );
                     ui.fonts(|f| f.layout_job(layout_job))

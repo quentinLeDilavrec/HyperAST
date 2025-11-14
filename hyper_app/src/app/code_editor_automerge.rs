@@ -291,17 +291,18 @@ impl CodeEditor {
                             ui.style(),
                         );
 
-                        let mut layouter = |ui: &egui::Ui, string: &Quote, _wrap_width: f32| {
-                            let layout_job = egui_extras::syntax_highlighting::highlight(
-                                ui.ctx(),
-                                ui.style(),
-                                &theme,
-                                string.text.as_str(),
-                                language,
-                            );
-                            // layout_job.wrap.max_width = wrap_width; // no wrapping
-                            ui.fonts(|f| f.layout_job(layout_job))
-                        };
+                        let mut layouter =
+                            |ui: &egui::Ui, string: &dyn egui::TextBuffer, _wrap_width: f32| {
+                                let layout_job = egui_extras::syntax_highlighting::highlight(
+                                    ui.ctx(),
+                                    ui.style(),
+                                    &theme,
+                                    string.as_str(),
+                                    language,
+                                );
+                                // layout_job.wrap.max_width = wrap_width; // no wrapping
+                                ui.fonts(|f| f.layout_job(layout_job))
+                            };
                         ui.add(
                             egui_addon::code_editor::generic_text_edit::TextEdit::multiline(code)
                                 .font(egui::TextStyle::Monospace) // for cursor height

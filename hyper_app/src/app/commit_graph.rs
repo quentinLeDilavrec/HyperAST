@@ -421,12 +421,22 @@ fn show_commit_graph_timed_egui_plot<'a>(
     let results_per_commit = widget.results_per_commit;
     let md_fetch = widget.fetched_commit_metadata;
     let cached = widget.cached;
-    plot.label_formatter(|name, value| {
-        label_formatter(md_fetch, results_per_commit, cached, name, value)
-    })
-    .show(ui, |plot_ui| {
-        plot_graph_aux(widget, plot_ui, dark_mode, to_fetch, to_poll)
-    })
+    let style = ui.ctx().style();
+    ui.ctx().style_mut(|style| {
+        style.visuals.window_fill = egui::Color32::TRANSPARENT;
+        style.visuals.window_stroke = egui::Stroke::NONE;
+        style.visuals.popup_shadow = egui::Shadow::NONE;
+    });
+
+    let resp = plot
+        .label_formatter(|name, value| {
+            label_formatter(md_fetch, results_per_commit, cached, name, value)
+        })
+        .show(ui, |plot_ui| {
+            plot_graph_aux(widget, plot_ui, dark_mode, to_fetch, to_poll)
+        });
+    ui.ctx().set_style(style);
+    resp
 }
 
 fn plot_graph_aux<'a>(

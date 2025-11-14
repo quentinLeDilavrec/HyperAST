@@ -1,4 +1,4 @@
-use re_ui::{DesignTokens, UiExt as _, list_item};
+use re_ui::{UiExt as _, list_item};
 
 /// A collapsible section header, with support for optional help tooltip and button.
 ///
@@ -12,6 +12,7 @@ pub struct SectionCollapsingHeader<'a> {
     help: Option<Box<dyn FnOnce(&mut egui::Ui) + 'a>>,
 }
 
+#[allow(unused)]
 impl<'a> SectionCollapsingHeader<'a> {
     /// Create a new [`Self`].
     ///

@@ -1,22 +1,14 @@
-use eframe::App;
-use egui::Widget;
 use egui::util::hash;
 use re_ui::UiExt;
-use re_ui::list_item::list_item_scope;
-use re_ui::{UiExt as _, notifications::NotificationUi};
+use re_ui::notifications::NotificationUi;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::usize;
 use strum::IntoEnumIterator;
 
-use egui_addon::{
-    code_editor::{self, generic_text_buffer::TextBuffer},
-    egui_utils::radio_collapsing,
-    syntax_highlighting,
-};
+use egui_addon::{code_editor, egui_utils::radio_collapsing};
 
-use crate::command::UICommandSender;
 use crate::{
     command::{CommandReceiver, CommandSender, UICommand},
     command_palette::CommandPalette,
@@ -26,7 +18,7 @@ use commit::{CommitSlice, SelectedProjects, fetch_commit};
 use querying::DetailsResults;
 use single_repo::ComputeConfigSingle;
 use tree_view::store::FetchedHyperAST;
-use types::{Commit, QueriedLang, Repo, SelectedConfig};
+use types::{Commit, Repo, SelectedConfig};
 use utils_poll::{Buffered3, MultiBuffered2};
 use utils_results_batched::ComputeResultsProm;
 
@@ -36,7 +28,7 @@ mod app_components;
 mod code_aspects;
 mod code_editor_automerge;
 mod code_tracking;
-mod commit;
+pub mod commit;
 pub(crate) mod crdt_over_ws;
 mod detached_view;
 #[allow(unused)]
@@ -52,7 +44,7 @@ mod utils;
 mod utils_commit;
 mod utils_edition;
 mod utils_egui;
-mod utils_poll;
+pub mod utils_poll; // TODO move to parent
 mod utils_results_batched;
 pub(crate) use app_components::show_repo_menu;
 mod commit_graph;
@@ -243,32 +235,6 @@ struct ResultsPerCommit {
 }
 
 impl ResultsPerCommit {
-    fn text(&self, commit: &str) -> Option<&Arc<egui::Galley>> {
-        let mut c: [u8; 8] = [0; 8];
-        c.copy_from_slice(&commit.as_bytes()[..8]);
-        Some(&self.texts[self.map.get(&c)?.1 as usize])
-    }
-
-    fn text_with_variation(
-        &self,
-        commit: &str,
-        before: Option<&str>,
-        after: Option<&str>,
-    ) -> Option<&Arc<egui::Galley>> {
-        let offset = self._get_offset(commit)?;
-        match (before, after) {
-            (Some(before), Some(after)) => {
-                let before = self._get_offset(before);
-                let after = self._get_offset(after);
-                match (before, after) {
-                    (Some(before), Some(after)) if offset == after && before == offset => None,
-                    _ => Some(&self.texts[offset as usize]),
-                }
-            }
-            _ => Some(&self.texts[offset as usize]),
-        }
-    }
-
     fn offset(&self, commit: &str) -> Option<u32> {
         let mut c: [u8; 8] = [0; 8];
         c.copy_from_slice(&commit.as_bytes()[..8]);
@@ -294,26 +260,9 @@ impl ResultsPerCommit {
             _ => Some(offset),
         }
     }
-    fn diff_when_variation(&self, commit: &str, other: &str) -> Option<(u32, u32)> {
-        let offset = self._get_offset(commit)?;
-        let other = self._get_offset(commit)?;
-        if offset != other {
-            Some((offset, other))
-        } else {
-            None
-        }
-    }
 
     fn vals_to_string(&self, offset: u32) -> String {
         crate::app::utils::join(self.ints.iter().map(|v| v[offset as usize]), "\n").to_string()
-    }
-
-    fn offset_diff_to_string(&self, offset1: u32, offset2: u32) -> String {
-        let vals = self
-            .ints
-            .iter()
-            .map(|v| v[offset1 as usize] - v[offset2 as usize]);
-        crate::app::utils::join(vals, "\n").to_string()
     }
 
     fn try_diff_as_string(&self, c1: &str, c2: &str) -> Option<String> {
@@ -332,10 +281,6 @@ impl ResultsPerCommit {
         let mut c: [u8; 8] = [0; 8];
         c.copy_from_slice(&commit.as_bytes()[..8]);
         Some(self.map.get(&c)?.1)
-    }
-
-    fn get_vals<'a>(&'a self, commit: &str) -> Option<impl ToString + 'a> {
-        self.text(commit).map(|x| &x.job.text)
     }
 
     /// true if columns did not change
@@ -567,6 +512,7 @@ type QueriesDifferentialResults = (
 #[serde(untagged)]
 pub(super) enum LocalOrRemote<R: std::marker::Send + 'static> {
     #[serde(skip)]
+    #[expect(unused)]
     Remote(utils_results_batched::Remote<R>),
     Local(R),
     #[default]
@@ -1118,9 +1064,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 egui::ScrollArea::both()
                     .auto_shrink([false, false])
                     .show_viewport(ui, |ui, _viewport| {
-                        let theme = egui_addon::syntax_highlighting::simple::CodeTheme::from_memory(
-                            ui.ctx(),
-                        );
                         let layout_job = {
                             let store = self.data.store.clone();
                             tree_view::PPBuilder::new(store, *nid).compute_incr(ui)
@@ -1180,22 +1123,20 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             Some(&[100, 1000]),
                             Some(&[100, 1000]),
                         );
-                        let r = imp.show(ui, &self.data.api_addr, &root);
-                        // wasm_rs_dbg::dbg!(&imp);
+                        let _ = imp.show(ui, &self.data.api_addr, &root);
                         code_view.prefill_cache = imp.prefill_cache;
-                        r;
                     });
                 Default::default()
             }
             Tab::QueryResults {
-                id,
+                id: _,
                 format: ResultFormat::List,
             } => {
                 todo!()
                 // utils_results_batched::show_long_result_list(ui, res);
             }
             Tab::QueryResults {
-                id,
+                id: _,
                 format: ResultFormat::Json,
             } => todo!(),
             Tab::QueryResults {
@@ -1203,7 +1144,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 format: ResultFormat::Table,
             } => {
                 let qres = self.data.queries_results.get_mut(*id);
-                let Some((proj_id, query, res)) = fun_name(ui, qres) else {
+                let Some((proj_id, _qid, res)) = fun_name(ui, qres) else {
                     ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
@@ -1251,7 +1192,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 format: format @ ResultFormat::Hunks,
             } => {
                 let qres = self.data.queries_results.get_mut(*id);
-                let Some((&mut proj_id, &mut qid, res)) = fun_name(ui, qres) else {
+                let Some((&mut proj_id, &mut qid, _res)) = fun_name(ui, qres) else {
                     ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
@@ -1314,8 +1255,8 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 if new {
                     wasm_rs_dbg::dbg!(x.results.len());
                     let store = &data.store;
-                    let mut node_store = store.node_store.read().unwrap();
-                    let mut pending = store.nodes_pending.lock().unwrap();
+                    let node_store = store.node_store.read().unwrap();
+                    let pending = store.nodes_pending.lock().unwrap();
                     let mut waiting = store.nodes_waiting.lock().unwrap();
                     let waiting = waiting.get_or_insert_default();
                     for x in x.iter_nodes_ids() {
@@ -1336,7 +1277,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 format: ResultFormat::Tree,
             } => {
                 let qres = self.data.queries_results.get_mut(*id);
-                let Some((&mut proj_id, &mut qid, res)) = fun_name(ui, qres) else {
+                let Some((&mut proj_id, &mut qid, _res)) = fun_name(ui, qres) else {
                     ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
@@ -1380,8 +1321,8 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 if new {
                     wasm_rs_dbg::dbg!(x.results.len());
                     let store = &data.store;
-                    let mut node_store = store.node_store.read().unwrap();
-                    let mut pending = store.nodes_pending.lock().unwrap();
+                    let node_store = store.node_store.read().unwrap();
+                    let pending = store.nodes_pending.lock().unwrap();
                     let mut waiting = store.nodes_waiting.lock().unwrap();
                     let waiting = waiting.get_or_insert_default();
                     for x in x.iter_nodes_ids() {
@@ -1392,7 +1333,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         waiting.insert(x);
                     }
                 }
-                let fetched_files = &mut data.fetched_files;
                 let api_addr = &data.api_addr;
 
                 let aspects = &mut data.aspects;
@@ -1616,7 +1556,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         &mut self,
         tiles: &egui_tiles::Tiles<TabId>,
         ui: &mut egui::Ui,
-        tile_id: egui_tiles::TileId,
+        _tile_id: egui_tiles::TileId,
         tabs: &egui_tiles::Tabs,
         _scroll_offset: &mut f32,
     ) {
@@ -1834,9 +1774,7 @@ fn show_tree_view(
     api_addr: &String,
     curr_view: &mut long_tracking::ColView<'_>,
 ) {
-    let i = 0;
-
-    let (repo, mut c) = selected_projects.get_mut(commit.0).unwrap();
+    let (repo, _c) = selected_projects.get_mut(commit.0).unwrap();
 
     let curr_commit = Commit {
         repo: repo.clone(),
@@ -1879,14 +1817,14 @@ fn show_tree_view(
         &mut defered_focus_scroll,
     );
 
-    if let Some((o, i, mut scroll)) = defered_focus_scroll {
+    if let Some((o, _i, mut scroll)) = defered_focus_scroll {
         let o: f32 = o;
-        let g_o = attacheds
-            .get(i)
-            .and_then(|a| a.0.get(&0))
-            .and_then(|x| x.1)
-            .map(|p| p.min.y)
-            .unwrap_or(ui.max_rect().height() / 2000.0);
+        // let g_o = attacheds
+        //     .get(i)
+        //     .and_then(|a| a.0.get(&0))
+        //     .and_then(|x| x.1)
+        //     .map(|p| p.min.y)
+        //     .unwrap_or(ui.max_rect().height() / 2000.0);
         let g_o: f32 = 50.0;
         wasm_rs_dbg::dbg!(o, g_o);
         if (scroll.state.offset.y - (o - g_o)).abs() < 20.0 {
@@ -2005,7 +1943,7 @@ fn compute_queries_differential_results(
     if pid != proj_id {
         return;
     }
-    let (repo, mut c) = data.selected_code_data.get_mut(pid).unwrap();
+    let (repo, _c) = data.selected_code_data.get_mut(pid).unwrap();
     let language = &data.queries[qid].lang;
     let query = data.queries[qid].query.as_ref().to_string();
     wasm_rs_dbg::dbg!(&query);
@@ -2072,7 +2010,7 @@ impl AppData {
         ui: &mut egui::Ui,
         i: ProjectId,
     ) -> Option<types::CommitId> {
-        let (frame, area) = utils_egui::framed_scroll_area_aux();
+        let (_frame, area) = utils_egui::framed_scroll_area_aux();
         let text_style = egui::TextStyle::Body;
         let row_height = ui.text_style_height(&text_style);
         let id = egui::Id::new(("commit.sel", i));
@@ -2085,13 +2023,6 @@ impl AppData {
                 self._show_commits_selection::<true>(ui, i, range)
             })
             .inner
-    }
-    fn show_commits_selection(
-        &mut self,
-        ui: &mut egui::Ui,
-        i: ProjectId,
-    ) -> Option<types::CommitId> {
-        self._show_commits_selection::<true>(ui, i, 0..isize::MAX)
     }
 
     #[inline(always)]
@@ -2124,18 +2055,32 @@ impl AppData {
         for commit_oid in c.iter_mut().map(|x| &*x) {
             let mut to_fetch = HashSet::default();
             let commit_md = &self.fetched_commit_metadata;
+            const IT: bool = true;
+            let _total = if IT {
+                show_commits_as_tree_it::<true>(
+                    ui,
+                    commit_oid,
+                    commit_md,
+                    &mut to_fetch,
+                    0,
+                    &mut clicked,
+                    range.clone(),
+                    row_height,
+                )
+            } else {
+                show_commits_as_tree::<true>(
+                    ui,
+                    commit_oid,
+                    commit_md,
+                    &mut to_fetch,
+                    0,
+                    &mut clicked,
+                    range.clone(),
+                    row_height,
+                )
+            };
             // let _total = show_commits_as_tree::<true>(
-            let _total = show_commits_as_tree_it::<true>(
-                ui,
-                r,
-                commit_oid,
-                commit_md,
-                &mut to_fetch,
-                0,
-                &mut clicked,
-                range.clone(),
-                row_height,
-            );
+
             range.start = range.start.saturating_sub(_total as isize);
             range.end = range.end.saturating_sub(_total as isize);
             total = total.saturating_add(_total);
@@ -2161,7 +2106,6 @@ impl AppData {
 /// imperative version
 fn show_commits_as_tree_it<'a, const BUTTON: bool>(
     ui: &mut egui::Ui,
-    repo: &Repo,
     id: &'a types::CommitId,
     commit_md: &'a CommitMdStore,
     to_fetch: &mut HashSet<String>,
@@ -2248,7 +2192,6 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
 
 fn show_commits_as_tree<'a, const BUTTON: bool>(
     ui: &mut egui::Ui,
-    repo: &Repo,
     id: &types::CommitId,
     commit_md: &CommitMdStore,
     to_fetch: &mut HashSet<String>,
@@ -2304,7 +2247,6 @@ fn show_commits_as_tree<'a, const BUTTON: bool>(
         }
         let _total = show_commits_as_tree::<BUTTON>(
             ui,
-            repo,
             id,
             commit_md,
             to_fetch,
@@ -2416,21 +2358,6 @@ fn show_hunks_header(
 
 fn poll_md_with_pr(
     (mut md, head_commit): (commit::CommitMetadata, Option<(Commit, ProjectId)>),
-    selected_projects: &mut SelectedProjects,
-) -> commit::CommitMetadata {
-    if let Some((head_commit, i)) = head_commit {
-        if !md.parents.contains(&head_commit.id) {
-            if let Some((r, mut c)) = selected_projects.get_mut(i) {
-                todo!()
-            }
-            md.parents.push(head_commit.id.clone());
-        }
-    }
-    md
-}
-
-fn poll_md_with_pr2(
-    (mut md, head_commit): (commit::CommitMetadata, Option<(Commit, ProjectId)>),
     rid: ProjectId,
     c: &mut CommitSlice<'_>,
 ) -> commit::CommitMetadata {
@@ -2448,15 +2375,15 @@ fn poll_md_with_pr2(
 }
 
 const ACTIONS: &[fn(&mut AppData, &mut egui::Ui) -> egui::Response] = &[
-    |data, ui| {
+    |_data, ui| {
         let button = egui::Button::new("Update the current set of Repositories");
         ui.add_enabled(false, button)
     },
-    |data, ui| {
+    |_data, ui| {
         let button = egui::Button::new("Show Commit Graph");
         ui.add_enabled(false, button)
     },
-    |data, ui| {
+    |_data, ui| {
         let button = egui::Button::new("Find code patterns from examples");
         ui.add_enabled(false, button)
     },
@@ -2491,7 +2418,7 @@ pub(crate) fn show_project_selection(
     // *selected = ProjectId::INVALID;
     let mut rm = None;
     let project_ids = data.selected_code_data.project_ids();
-    let mut add_contents = |ui: &mut egui::Ui, i: ProjectId, r: &mut Repo| {
+    let add_contents = |ui: &mut egui::Ui, i: ProjectId, r: &mut Repo| {
         ui.label("github.com");
         ui.horizontal(|ui| {
             ui.label("/");
@@ -2505,13 +2432,13 @@ pub(crate) fn show_project_selection(
     };
     let layout = egui::Layout::right_to_left(egui::Align::Center);
     for i in project_ids {
-        let Some((r, commits)) = data.selected_code_data.get_mut(i) else {
+        let Some((r, _commits)) = data.selected_code_data.get_mut(i) else {
             continue;
         };
         let is_selected = old_selected == i;
         let ui_builder = egui::UiBuilder::new().layout(layout);
         use re_ui::list_item::ContentContext as CC;
-        let r = |ui: &mut egui::Ui, ctx: &CC<'_>| {
+        let r = |ui: &mut egui::Ui, _: &CC<'_>| {
             add_contents(ui, i, r);
             let button = ui
                 .new_child(ui_builder.max_rect(ui.max_rect()))
@@ -2590,36 +2517,17 @@ impl eframe::App for HyperApp {
             }
             self.save_interval = std::time::Duration::from_secs(20);
             return;
-            // let r: Option<HyperApp> = eframe::get_value(storage, eframe::APP_KEY);
-            // if let Some(r) = r {
-            //     if !r.persistance {
-            //         return;
-            //     }
-            // } else {
-            // }
         }
-        // #[cfg(target_arch = "wasm32")]
-        // use wasm_bindgen::prelude::*;
-        // #[cfg(target_arch = "wasm32")]
-        // #[wasm_bindgen]
-        // extern "C" {
-        //     fn prompt(text: &str, default: &str) -> String;
-        // }
-        // #[cfg(target_arch = "wasm32")]
-        // unsafe {
-        //     prompt("coucou", "cou")
-        // };
+
         match serde_json::to_string(self) {
             Ok(s) => {
                 storage.set_string(eframe::APP_KEY, s);
             }
             Err(err) => {
                 log::debug!("Failed to encode RON: {err}");
-                // storage.set_string(eframe::APP_KEY, s)
             }
         }
         self.save_interval = std::time::Duration::from_secs(5);
-        // eframe::set_value(storage, eframe::APP_KEY, self);
     }
     /// Time between automatic calls to [`Self::save`]
     fn auto_save_interval(&self) -> std::time::Duration {
@@ -2665,7 +2573,7 @@ impl eframe::App for HyperApp {
                     return;
                 }
 
-                let mut edited = false;
+                let edited = false;
 
                 let mut maximized = self.maximized;
 
@@ -2678,19 +2586,6 @@ impl eframe::App for HyperApp {
                         }
                     }
                 }
-
-                // if let Some(view_id) = focused {
-                //     let found = self.tree.make_active(|_, tile| match tile {
-                //         egui_tiles::Tile::Pane(this_view_id) => {
-                //             *this_view_id == view_id
-                //         }
-                //         egui_tiles::Tile::Container(_) => false,
-                //     });
-                //     log::trace!(
-                //         "Found tab to focus on for space view ID {view_id}: {found}"
-                //     );
-                //     edited = true;
-                // }
 
                 let mut maximized_tree;
 

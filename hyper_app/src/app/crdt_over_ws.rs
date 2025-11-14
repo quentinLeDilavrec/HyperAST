@@ -351,7 +351,11 @@ lazy_static! {
     );
 }
 
-pub(super) struct H(#[cfg(not(target_arch = "wasm32"))] JoinHandle<()>);
+pub(super) struct H(
+    #[cfg(not(target_arch = "wasm32"))]
+    #[allow(dead_code)]
+    JoinHandle<()>,
+);
 
 impl Rt {
     #[cfg(not(target_arch = "wasm32"))]

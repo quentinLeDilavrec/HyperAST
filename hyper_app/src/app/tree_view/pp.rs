@@ -137,7 +137,7 @@ impl IncrementalComputer<Spawnr, Prm<'_>, Vec<LayoutSection>> for Layouter {
             self.i = self.queued.as_ref().remaining.load(RemOrdering);
             for _ in 0..self.queued.as_ref().queue.len() {
                 let sections = self.queued.as_ref().queue.pop();
-                if let Some(mut sections) = sections {
+                if let Some(sections) = sections {
                     self.sections.extend_from_slice(&sections);
                 }
             }
@@ -202,7 +202,6 @@ impl PPBuilder<&AdvTheme<CodeTheme>, &ArcFetchedHAST, ()> {
     pub fn compute_incr(&self, ctx: &egui::Context) -> egui::text::LayoutJob {
         let key = (self.store.as_ref(), self.nid);
         let code = ctx.memory_mut(|mem| mem.caches.cache::<PPCache>().get(key));
-        let store = std::sync::Arc::clone(&self.store);
         let key = PPBuilder {
             len: code.len(),
             store: self.store,

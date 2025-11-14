@@ -14,13 +14,6 @@ use fetched::{HashedNodeRef, NodeStore};
 pub use fetched::{LabelIdentifier, NodeIdentifier};
 
 #[derive(Default)]
-pub(crate) struct TStore;
-
-impl<'a> hyperast::types::TypeStore for TStore {
-    type Ty = AnyType;
-}
-
-#[derive(Default)]
 pub struct FetchedHyperAST {
     pub(crate) label_store: RwLock<FetchedLabels>,
     pub(crate) node_store: RwLock<NodeStore>,

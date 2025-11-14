@@ -2706,6 +2706,7 @@ dependencies = [
 name = "egui_addon"
 version = "0.3.0"
 dependencies = [
+ "accesskit",
  "console_error_panic_hook",
  "crossbeam",
  "crossbeam-queue",

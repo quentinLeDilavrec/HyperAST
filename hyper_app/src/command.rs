@@ -552,7 +552,7 @@ impl UICommand {
             Default::default()
         }
     }
-
+    #[expect(unused)] //TODO use it
     pub fn tooltip_with_shortcut(self, egui_ctx: &egui::Context) -> String {
         format!(
             "{}{}",

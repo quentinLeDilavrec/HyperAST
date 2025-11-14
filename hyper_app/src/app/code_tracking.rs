@@ -1,10 +1,10 @@
 use egui::Id;
 use poll_promise::Promise;
-use std::collections::{HashMap, hash_map};
+use std::collections::hash_map;
 use std::ops::Range;
 
 use egui_addon::InteractiveSplitter;
-use egui_addon::egui_utils::{highlight_byte_range, radio_collapsing, show_wip};
+use egui_addon::egui_utils::highlight_byte_range;
 
 use super::code_editor::generic_text_buffer::byte_index_from_char_index;
 use super::show_repo_menu;

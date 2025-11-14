@@ -1,19 +1,12 @@
-use egui::TextFormat;
-use epaint::text::LayoutSection;
 use std::fmt::Debug;
 use std::num::NonZeroU32;
-use std::ops::ControlFlow;
-use std::sync::{Arc, atomic::AtomicUsize};
+use std::sync::Arc;
 use std::time::Duration;
 
 use super::code_aspects::{HightLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids};
-use super::long_tracking::TARGET_COLOR;
-use super::syntax_highlighting as syntax_highlighter;
-use super::syntax_highlighting::syntax_highlighting_async;
 
-use hyperast::nodes::IndentedAlt;
 pub use hyperast::store::nodes::fetched::SimplePacked;
-use hyperast::types::{AnyType, HyperType, Labeled, WithChildren, WithStats};
+use hyperast::types::{AnyType, Labeled, WithChildren, WithStats};
 
 mod cache;
 
@@ -23,7 +16,6 @@ pub use store::{LabelIdentifier, NodeIdentifier};
 mod hyperast_layouter;
 
 mod pp;
-pub(crate) use hyperast_layouter::AdvTheme;
 pub(crate) use pp::PPBuilder;
 
 mod ui_impl;

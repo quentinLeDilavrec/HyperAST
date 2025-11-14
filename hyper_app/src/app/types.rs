@@ -3,13 +3,13 @@ use std::{collections::HashSet, hash::Hash, ops::Range};
 
 use egui_addon::code_editor;
 
-use hyperast::{store::nodes::fetched::NodeIdentifier, types::TypeStore};
+use hyperast::store::nodes::fetched::NodeIdentifier;
 
 type Cpp = hyperast_gen_ts_cpp::types::Type;
 type Java = hyperast_gen_ts_java::types::Type;
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub(crate) struct Repo {
+pub struct Repo {
     pub(crate) user: String,
     pub(crate) name: String,
 }
@@ -211,7 +211,7 @@ impl Default for FileIdentifier {
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
-pub(crate) struct Commit {
+pub struct Commit {
     #[serde(flatten)]
     pub(crate) repo: Repo,
     #[serde(rename = "commit")]
@@ -390,6 +390,7 @@ pub enum QueriedLang {
     Java,
 }
 impl QueriedLang {
+    #[allow(unused)]
     pub fn as_str(&self) -> &str {
         match self {
             QueriedLang::Cpp => "Cpp",
@@ -436,8 +437,9 @@ pub(crate) struct TsgEditor<T = code_editor::CodeEditor<Languages>> {
     pub(crate) query: T,
 }
 
+// TODO move to utils_poll
 #[derive(Debug)]
-pub(crate) struct Resource<T> {
+pub struct Resource<T> {
     /// HTTP response
     pub(crate) response: ehttp::Response,
 
@@ -463,7 +465,6 @@ impl<T: serde::de::DeserializeOwned> Resource<T> {
 }
 
 fn from_resp<T: serde::de::DeserializeOwned>(response: &ehttp::Response) -> Option<T> {
-    let content_type = response.content_type().unwrap_or_default();
     let text = response.text()?;
     serde_json::from_str::<T>(text).ok()
 }
@@ -476,6 +477,7 @@ pub(crate) enum Config {
 }
 
 impl Config {
+    #[allow(unused)]
     pub fn language(&self) -> &'static str {
         match self {
             Config::Any => "",

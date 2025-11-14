@@ -1,12 +1,10 @@
-use std::ops::IndexMut;
-
 use egui::Widget;
 use re_ui::UiExt;
 
 use crate::app::{
-    ProjectId, QResId,
+    QResId,
     querying::{self, ComputeConfigQuery},
-    types::{self, Commit, Config, QueriedLang},
+    types::{self, Commit, Config},
 };
 
 use super::{QueryDataVec, QueryId, TabId, utils_results_batched::ComputeError};
@@ -44,7 +42,7 @@ impl crate::HyperApp {
                             span.min += 10.0;
                             ui.full_span_scope(span, |ui| self.show_repositories(ui))
                         });
-                    } else if let super::Tab::QueryResults { id, format } = &mut self.tabs[pane] {
+                    } else if let super::Tab::QueryResults { format, .. } = &mut self.tabs[pane] {
                         selection_querying_result_format(ui, format);
                     } else if let super::Tab::LocalQuery(id) = self.tabs[pane] {
                         self.show_local_query_left_panel(ui, id);
@@ -53,7 +51,6 @@ impl crate::HyperApp {
                         let (proj_resp, commit_resp, path_resp) =
                             code_aspects::show_config(ui, &mut self.data.aspects);
                         if proj_resp.clicked() {
-                            let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
                                 .open_projects(code_aspects::project_modal_handler);
                         }
@@ -78,7 +75,6 @@ impl crate::HyperApp {
                         use crate::app::tsg;
                         let (proj_resp, commit_resp) = tsg::show_config(ui, &mut self.data.tsg);
                         if proj_resp.clicked() {
-                            let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
                                 .open_projects(tsg::project_modal_handler);
                         }
@@ -94,7 +90,6 @@ impl crate::HyperApp {
                         let (proj_resp, commit_resp) =
                             smells::show_config(ui, &mut self.data.smells);
                         if proj_resp.clicked() {
-                            let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
                                 .open_projects(smells::project_modal_handler);
                         }
@@ -114,7 +109,6 @@ impl crate::HyperApp {
                         let (proj_resp, commit_resp) =
                             long_tracking::show_config(ui, &mut self.data.long_tracking);
                         if proj_resp.clicked() {
-                            let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
                                 .open_projects(long_tracking::project_modal_handler);
                         }
@@ -206,7 +200,7 @@ impl crate::HyperApp {
             loop {
                 match (l.next(), it.next()) {
                     (None, None) => break,
-                    (Some((rid, c)), None) => {
+                    (Some((rid, _c)), None) => {
                         let qrid = self.data.queries_results.push(super::QueryResults {
                             project: rid,
                             query: qid,
@@ -415,18 +409,6 @@ impl crate::HyperApp {
                                 ui.label(&query_data.lang)
                             });
                         });
-                        // egui::ComboBox::new(("Lang", q_res.query), "Lang")
-                        //     .selected_text(query_data.lang.as_str())
-                        //     .show_ui(ui, |ui| {
-                        //         lang_selection(ui, current_lang, "Cpp", &mut new_lang, q_res.query);
-                        //         lang_selection(
-                        //             ui,
-                        //             current_lang,
-                        //             "Java",
-                        //             &mut new_lang,
-                        //             q_res.query,
-                        //         );
-                        //     });
                     };
                     compute_button
                 })
@@ -482,20 +464,9 @@ impl crate::HyperApp {
     }
 
     /// returns Ok(true) if it is now local
-    fn sync_query_results(
-        q_res: &mut super::QueryResults,
-        // results_per_commit: &mut super::ResultsPerCommit,
-    ) -> Result<bool, Option<String>> {
+    fn sync_query_results(q_res: &mut super::QueryResults) -> Result<bool, Option<String>> {
         if q_res.content.is_waiting() {
-            if q_res.content.try_poll_with(|x| {
-                // x.map_err(|x| querying::QueryingError::NetworkError(x))?
-                //     .content
-                //     .ok_or(querying::QueryingError::NetworkError(
-                //         "content was not deserialized or empty".to_string(),
-                //     ))?
-                //     .map(|x| x.into())
-                x
-            }) {
+            if q_res.content.try_poll_with(|x| x) {
                 Ok(true)
             } else {
                 Err(None)
@@ -503,101 +474,6 @@ impl crate::HyperApp {
         } else {
             Ok(false)
         }
-
-        // let a = std::mem::take(&mut q_res.2);
-        // match a {
-        //     LocalOrRemote::Remote(prom) => {
-        //         match prom.try_take() {
-        //             Ok(Ok(r)) => {
-        //                 if let Some(r) = r.content {
-        //                     if let Ok(r) = &r {
-        //                         // Self::update_results_per_commit(results_per_commit, r);
-        //                     }
-        //                     q_res.2 = LocalOrRemote::Local(r);
-        //                     Ok(true)
-        //                 } else {
-        //                     Ok(false)
-        //                 }
-        //             }
-        //             Ok(Err(err)) => {
-        //                 log::error!("{}", err);
-        //                 Err(Some(format!("error: {}", err)))
-        //             }
-        //             Err(prom) => {
-        //                 q_res.2 = LocalOrRemote::Remote(prom);
-        //                 Err(None)
-        //             }
-        //         }
-        //     }
-        //     LocalOrRemote::None => Ok(false),
-        //     _ => Ok(false),
-        // }
-    }
-
-    fn show_left_panel_custom_contents(&mut self, ui: &mut egui::Ui) {
-        egui::TopBottomPanel::top("left_panel_top_bar")
-            .min_height(3.0 * re_ui::design_tokens_of(egui::Theme::Dark).title_bar_height())
-            .frame(egui::Frame {
-                inner_margin: egui::Margin::symmetric(
-                    re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
-                    0,
-                ),
-                ..Default::default()
-            })
-            .show_inside(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.strong("Actions");
-                    ui.horizontal_wrapped(|ui| {
-                        self.data.show_actions(ui);
-                    });
-                })
-            });
-
-        // list_item::list_item_scope(ui, "testing stuff", |ui| {
-        //     ui.list_item().show_hierarchical(
-        //         ui,
-        //         list_item::PropertyContent::new("Text (editable)")
-        //             .value_text_mut(&mut self.latest_cmd),
-        //     );
-        //     ui.list_item().show_hierarchical(
-        //         ui,
-        //         list_item::PropertyContent::new("Color")
-        //             .with_icon(&re_ui::icons::SPACE_VIEW_TEXT)
-        //             .action_button(&re_ui::icons::ADD, || {
-        //                 // re_log::warn!("Add button clicked");
-        //             })
-        //             .value_color_mut(&mut egui::Color32::RED.to_array()),
-        //     );
-        //     ui.list_item().show_hierarchical(
-        //         ui,
-        //         list_item::PropertyContent::new("Bool (editable)")
-        //             .value_bool_mut(&mut self.dummy_bool),
-        //     );
-        // });
-
-        egui::ScrollArea::vertical()
-            .auto_shrink([false; 2])
-            .show(ui, |ui| {
-                egui::Frame {
-                    inner_margin: egui::Margin::same(
-                        re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
-                    ),
-                    ..Default::default()
-                }
-                .show(ui, |ui| self.left_panel_mid_section_ui(ui));
-            });
-
-        egui::ScrollArea::vertical()
-            .auto_shrink([false; 2])
-            .show(ui, |ui| {
-                egui::Frame {
-                    inner_margin: egui::Margin::same(
-                        re_ui::design_tokens_of(egui::Theme::Dark).view_padding(),
-                    ),
-                    ..Default::default()
-                }
-                .show(ui, |ui| self.left_panel_bottom_section_ui(ui));
-            });
     }
 
     pub(crate) fn bottom_panel(&mut self, ctx: &egui::Context) {
@@ -767,19 +643,4 @@ fn selection_querying_result_format(ui: &mut egui::Ui, format: &mut super::Resul
                 ui.selectable_value(format, super::ResultFormat::Json, "Json");
             });
         });
-}
-
-fn lang_selection<'a, T>(
-    ui: &mut egui::Ui,
-    current_lang: &str,
-    selected_value: &'a str,
-    new_lang: &mut Option<(&'a str, T)>,
-    payload: T,
-) {
-    let same = current_lang == selected_value;
-    if ui.selectable_label(same, selected_value).clicked() {
-        if !same {
-            *new_lang = Some((selected_value, payload));
-        }
-    }
 }

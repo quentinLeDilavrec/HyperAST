@@ -323,12 +323,13 @@ pub(crate) fn validate_pasted_project_url(
     }
 }
 
+// TODO move to a dedicated crate (not egui_addon)
 /// Selection of projects.
 ///     Each project is identified by main repository.
 ///     Each project contains a selection of other repositories considered as forks,
 ///     and a set of commits (not branches)
 #[derive(Deserialize, Serialize, Debug)]
-pub(crate) struct SelectedProjects {
+pub struct SelectedProjects {
     len: usize,
     repositories: Vec<Repo>,
     offsets: Vec<u32>,
@@ -391,7 +392,7 @@ impl Default for SelectedProjects {
 /// Id of each project, ie. a repository and a selection of other repositories considered as forks
 #[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub(crate) struct ProjectId(usize);
+pub struct ProjectId(usize);
 impl ProjectId {
     pub const INVALID: Self = Self(usize::MAX);
 }
@@ -474,7 +475,7 @@ impl SelectedProjects {
         (0..self.repositories.len()).into_iter().map(ProjectId)
     }
 
-    pub(crate) fn get<'a>(&'a mut self, ProjectId(i): ProjectId) -> Option<&'a Repo> {
+    pub fn get<'a>(&'a mut self, ProjectId(i): ProjectId) -> Option<&'a Repo> {
         self.repositories.get(i)
     }
 
@@ -514,24 +515,7 @@ impl SelectedProjects {
             },
         )
     }
-
-    // pub(crate) fn get<'a>(&'a self, i: usize) -> Option<(&'a Repo, CommitSlice<'a>)> {
-    //     if i >= self.len() {
-    //         return None;
-    //     }
-    //     let end = self.c_range(i).end;
-    //     Some((
-    //         &mut self.repositories[i],
-    //         CommitSlice {
-    //             end,
-    //             commits: &mut self.commits,
-    //             offsets: &mut self.offsets,
-    //             i,
-    //         },
-    //     ))
-    // }
-
-    pub(crate) fn repositories(&mut self) -> impl Iterator<Item = &mut Repo> {
+    pub fn repositories(&mut self) -> impl Iterator<Item = &mut Repo> {
         self.repositories.iter_mut()
     }
 

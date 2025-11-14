@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 
 use super::update_results_per_commit;
-use crate::app::CommitMdStore;
 use crate::app::ProjectId;
 use crate::app::QueryId;
 use crate::app::ResultsPerCommit;
@@ -38,7 +37,7 @@ impl
 {
     fn compute(
         &mut self,
-        ((pid, qid, _), r): ((ProjectId, QueryId, ResHash), &StreamedComputeResults),
+        (_, r): ((ProjectId, QueryId, ResHash), &StreamedComputeResults),
     ) -> ResultsPerCommit {
         let mut res = ResultsPerCommit::default();
         update_results_per_commit(&mut res, r);

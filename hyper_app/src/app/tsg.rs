@@ -2,6 +2,7 @@ use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 use poll_promise::Promise;
 use std::sync::{Arc, Mutex};
 
+use super::Sharing;
 use super::code_editor_automerge::CodeEditor;
 use super::types::{Commit, Config, Resource, SelectedConfig, TsgEditor};
 use super::types::{EditorHolder, WithDesc};
@@ -11,7 +12,6 @@ use super::utils_edition::{show_available_remote_docs, show_locals_and_interact}
 use super::utils_edition::{show_interactions, update_shared_editors};
 use super::utils_results_batched::show_long_result;
 use super::utils_results_batched::{ComputeError, ComputeResults, ComputeResultsProm};
-use super::{Sharing, code_editor_automerge, show_repo_menu};
 
 mod example_queries;
 
@@ -38,7 +38,6 @@ pub(crate) fn show_config(
     ui: &mut egui::Ui,
     single: &mut Sharing<ComputeConfigQuery>,
 ) -> (egui::Response, egui::Response) {
-    use super::utils_egui::MyUiExt;
     let (resp_repo, resp_commit) = single.content.commit.show_clickable(ui);
 
     ui.add(
@@ -160,8 +159,6 @@ pub(crate) fn project_modal_handler(
 }
 
 pub(crate) fn commit_modal_handler(data: &mut super::AppData, cid: super::types::CommitId) {
-    let commit = Some(&data.tsg.content.commit);
-    use crate::app::utils_commit::project_modal_handler;
     let commit = &mut data.tsg.content.commit;
     commit.id = cid;
 }

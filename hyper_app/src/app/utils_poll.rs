@@ -34,11 +34,6 @@ pub struct PreHashed<T> {
     pub value: T,
     hash: u64,
 }
-impl<T> PreHashed<T> {
-    pub(crate) fn h(&self) -> u64 {
-        self.hash
-    }
-}
 
 impl<T> Hash for PreHashed<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {

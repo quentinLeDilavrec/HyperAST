@@ -100,10 +100,10 @@ impl<'a> PlotItem for CommitPoints<'a> {
 
     fn on_hover(
         &self,
-        plot_area_response: &egui::Response,
+        _plot_area_response: &egui::Response,
         elem: ClosestElem,
-        shapes: &mut Vec<egui::Shape>,
-        cursors: &mut Vec<Cursor>,
+        _shapes: &mut Vec<egui::Shape>,
+        _cursors: &mut Vec<Cursor>,
         plot: &PlotConfig<'_>,
         label_formatter: &LabelFormatter<'_>,
     ) {

@@ -15,6 +15,7 @@ pub(super) struct Example {
     pub(crate) path: &'static str,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub(crate) enum Forge {
     GitHub,
@@ -23,6 +24,7 @@ pub(crate) enum Forge {
 
 #[derive(Clone)]
 pub(crate) struct Repo {
+    #[allow(dead_code)]
     pub(crate) forge: Forge,
     pub(crate) user: &'static str,
     pub(crate) name: &'static str,

@@ -1,8 +1,5 @@
-use std::ops::{ControlFlow, Mul as _};
-
-use super::querying::{MatchingError, StreamedComputeResults};
-use super::utils_results_batched::ComputeResultIdentified;
-use super::{CommitMdStore, ProjectId, QResId, poll_md_with_pr2};
+use super::querying::StreamedComputeResults;
+use super::{CommitMdStore, ProjectId, QResId, poll_md_with_pr};
 use super::{QueryResults, commit};
 
 mod graph_caching;
@@ -81,7 +78,6 @@ impl crate::HyperApp {
             return;
         };
         let branch = (format!("{}/{}", r.user, r.name), branch.clone());
-        let id = ui.make_persistent_id("bottom_cache_layout");
         let r = r.clone();
 
         let results_per_commit = qrid
@@ -135,7 +131,7 @@ impl crate::HyperApp {
             let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
             self.data.fetched_commit_metadata.insert(commit.id, v);
         }
-        let Some((r, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) else {
+        let Some((r, commit_slice)) = self.data.selected_code_data.get_mut(repo_id) else {
             return;
         };
         let mut helper = ToPollHelper {
@@ -167,7 +163,7 @@ impl crate::HyperApp {
 
         let effect = to_effect(resp);
         if let InteractionEffect::ClickCommitPlusCmdMod(i) = effect {
-            if let Some((r, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) {
+            if let Some((_, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) {
                 let mut it = commit_slice.iter_mut();
                 *it.next().unwrap() = cached.commits[i].clone();
                 for _ in 0..it.count() {
@@ -184,10 +180,10 @@ impl crate::HyperApp {
             }
         } else if let InteractionEffect::ClickCommitPrimary(i) = effect {
             let pred = |x: &_| is_target_repo(x) && is_target_query(x);
-            if let Some((qrid, qres)) = self.data.queries_results.find(pred) {
+            if let Some((_qrid, qres)) = self.data.queries_results.find(pred) {
                 self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
                 self.selected_baseline = None;
-                if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
+                if let super::Tab::QueryResults { format, .. } = &mut self.tabs[qres.tab] {
                     *format = crate::app::ResultFormat::Table
                 } else {
                     panic!()
@@ -235,11 +231,11 @@ impl crate::HyperApp {
             // assert_eq!(self.data.queries.len(), 1); // need to retrieve current query if multiple
 
             let pred = |x: &_| is_target_repo(x) && is_target_lang(x);
-            let Some((qrid, qres)) = self.data.queries_results.find(pred) else {
+            let Some((_qrid, qres)) = self.data.queries_results.find(pred) else {
                 log::warn!("No Java query results found");
                 return;
             };
-            if let super::Tab::QueryResults { id, format } = &mut self.tabs[qres.tab] {
+            if let super::Tab::QueryResults { id: _, format } = &mut self.tabs[qres.tab] {
                 *format = crate::app::ResultFormat::Hunks
             } else {
                 panic!()
@@ -298,7 +294,7 @@ fn to_poll_helper(
     let repo_id = helper.repo_id;
     let was_err = helper.md_fetch.get(id).map_or(false, |x| x.is_err());
     if !helper.md_fetch.try_poll_with(id, |x| {
-        x.map(|x| poll_md_with_pr2(x, repo_id, &mut helper.commit_slice))
+        x.map(|x| poll_md_with_pr(x, repo_id, &mut helper.commit_slice))
     }) {
         return;
     }
@@ -349,9 +345,7 @@ fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::
         md_fetch.insert(id.to_string(), v);
         return;
     }
-    if !md_fetch.try_poll_with(id, |x| {
-        x.map(|x| poll_md_with_pr2(x, repo_id, commit_slice))
-    }) {
+    if !md_fetch.try_poll_with(id, |x| x.map(|x| poll_md_with_pr(x, repo_id, commit_slice))) {
         return;
     }
     let commit = helper.r.clone().with(id);
@@ -371,7 +365,6 @@ const CORNER: bool = true;
 
 const DIFF_VALS: bool = true;
 const LEFT_VALS: bool = false;
-const RIGHT_VALS: bool = false;
 
 struct CommitGraphWidget<'a, 'b> {
     fetched_commit_metadata: &'b CommitMdStore,
@@ -401,7 +394,7 @@ impl<'a> CommitGraphWidget<'a, '_> {
             })
             .x_grid_spacer(|i| with_egui_plot::compute_multi_x_marks(i, max_time))
             .show_y(false)
-            .y_axis_formatter(|m, _| Default::default())
+            .y_axis_formatter(|_, _| Default::default())
             .show_grid([true, false])
             .set_margin_fraction(egui::vec2(0.1, 0.3))
             .allow_scroll([true, false]);
@@ -415,7 +408,7 @@ fn show_commit_graph_timed_egui_plot<'a>(
     ui: &mut egui::Ui,
     to_fetch: &mut Vec<&'a String>,
     to_poll: &mut Vec<&'a String>,
-    mut plot: egui_plot::Plot<'_>,
+    plot: egui_plot::Plot<'_>,
 ) -> egui_plot::PlotResponse<GraphInteraction> {
     let dark_mode = ui.visuals().dark_mode;
     let results_per_commit = widget.results_per_commit;
@@ -456,7 +449,7 @@ fn plot_graph_aux<'a>(
         fetched_commit_metadata,
         results_per_commit,
         cached,
-        repo_id,
+        ..
     } = widget;
     use egui_plot::*;
     let mut output = GraphInteraction::None;
@@ -518,7 +511,7 @@ fn plot_graph_aux<'a>(
             };
             let commit = &cached.commits[i];
 
-            let (before, after) = before_after(cached, sub, i);
+            let (before, _after) = before_after(cached, sub, i);
             let diff = results_per_commit
                 .zip(before)
                 .and_then(|(x, c1)| x.try_diff_as_string(c1, commit));

@@ -1,5 +1,5 @@
 use super::types::Commit;
-use egui_addon::code_editor::{self, generic_text_buffer::byte_index_from_char_index};
+use egui_addon::code_editor::generic_text_buffer::byte_index_from_char_index;
 use lazy_static::lazy_static;
 use std::{ops::Range, sync::Arc};
 
@@ -159,6 +159,7 @@ pub struct CommitTextBuffer<'a, 'b, 'c> {
     pub(crate) str: &'b mut std::sync::MutexGuard<'c, BorrowFrameCache<String, ComputeCommitStr>>,
 }
 
+#[allow(unused)] // TODO use it
 impl<'a, 'b, 'c> CommitTextBuffer<'a, 'b, 'c> {
     pub(crate) fn new(
         commit: &'a mut Commit,
@@ -314,7 +315,7 @@ pub(crate) fn project_modal_handler<'a>(
         };
         return Err(projects.find(&commit.repo).unwrap_or(ProjectId::INVALID));
     }
-    let Some((repo, mut commits)) = projects.get_mut(pid) else {
+    let Some((repo, commits)) = projects.get_mut(pid) else {
         return Err(ProjectId::INVALID);
     };
     let Some(commit) = commit else {

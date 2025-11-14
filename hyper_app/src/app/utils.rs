@@ -193,6 +193,7 @@ macro_rules! typed_vec {
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         $vis struct $id($ty);
 
+        #[allow(dead_code)]
         impl $id {
             const INVALID: $id = $id(<$ty>::MAX);
             // TODO try to avoid it
@@ -205,6 +206,7 @@ macro_rules! typed_vec {
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         $vis struct $name(Vec<$item>);
 
+        #[allow(dead_code)]
         impl $name {
             $vis fn new() -> Self {
                 Self(Vec::new())

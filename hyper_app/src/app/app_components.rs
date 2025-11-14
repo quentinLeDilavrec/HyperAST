@@ -37,108 +37,6 @@ impl super::AppData {
 }
 
 impl super::HyperApp {
-    pub(crate) fn left_panel_mid_section_ui(&mut self, ui: &mut egui::Ui) {
-        re_ui_collapse::SectionCollapsingHeader::new("Config").show(ui, |ui| {
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            // ui.label("Some blueprint stuff here, that might be wide.");
-            ui.re_checkbox(&mut self.dummy_bool, "Checkbox");
-
-            // ui.collapsing_header("Collapsing header", true, |ui| {
-            //     ui.label("Some data here");
-            //     ui.re_checkbox(&mut self.dummy_bool, "Checkbox");
-            // });
-        });
-    }
-
-    pub(crate) fn left_panel_bottom_section_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("Toggle switch:");
-            ui.toggle_switch(8.0, &mut self.dummy_bool);
-        });
-        ui.label(format!("Latest command: {}", self.latest_cmd));
-
-        // ---
-
-        // if ui.button("Open modal").clicked() {
-        //     self.modal_handler.open();
-        // }
-
-        // self.modal_handler.ui(
-        //     ui.ctx(),
-        //     || re_ui::modal::Modal::new("Modal window"),
-        //     |ui, _| ui.label("This is a modal window."),
-        // );
-
-        // ---
-
-        // if ui.button("Open full span modal").clicked() {
-        //     self.full_span_modal_handler.open();
-        // }
-
-        // self.full_span_modal_handler.ui(
-        //     ui.ctx(),
-        //     || re_ui::modal::Modal::new("Modal window").full_span_content(true),
-        //     |ui, _| {
-        //         list_item::list_item_scope(ui, "modal demo", |ui| {
-        //             for idx in 0..10 {
-        //                 list_item::ListItem::new()
-        //                     .show_flat(ui, list_item::LabelContent::new(format!("Item {idx}")));
-        //             }
-        //         });
-        //     },
-        // );
-
-        ui.horizontal_wrapped(|ui| {
-            if ui.button("Log info").clicked() {
-                log::info!(
-                    "A lot of text on info level.\nA lot of text in fact. So \
-                                    much that we should ideally be auto-wrapping it at some point, much \
-                                    earlier than this."
-                );
-            }
-            if ui.button("Log warn").clicked() {
-                log::warn!(
-                    "A lot of text on warn level.\nA lot of text in fact. So \
-                                much that we should ideally be auto-wrapping it at some point, much \
-                                earlier than this."
-                );
-            }
-            if ui.button("Log error").clicked() {
-                log::error!(
-                    "A lot of text on error level.\nA lot of text in fact. \
-                                So much that we should ideally be auto-wrapping it at some point, much \
-                                earlier than this."
-                );
-            }
-        });
-
-        // ---
-
-        re_ui_collapse::SectionCollapsingHeader::new("Data")
-            .button(list_item::ItemMenuButton::new(
-                &re_ui::icons::ADD,
-                "alt_text",
-                |ui| {
-                    ui.weak("empty");
-                },
-            ))
-            .show(ui, |ui| {
-                ui.label("Some data here");
-            });
-        re_ui_collapse::SectionCollapsingHeader::new("Blueprint").show(ui, |ui| {
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-            // ui.label("Some blueprint stuff here, that might be wide.");
-            ui.re_checkbox(&mut self.dummy_bool, "Checkbox");
-
-            ui.collapsing_header("Collapsing header", true, |ui| {
-                ui.label("Some data here");
-                ui.re_checkbox(&mut self.dummy_bool, "Checkbox");
-            });
-        });
-
-        self.show_repositories(ui);
-    }
-
     fn show_repositories(&mut self, ui: &mut egui::Ui) {
         let label = "Repositories";
 
@@ -161,7 +59,7 @@ impl super::HyperApp {
                 let resp = ui.add_enabled(true, button);
                 if resp.clicked() {
                     self.modal_handler_proj_or_commits
-                        .open_projects(|data, pid| pid);
+                        .open_projects(|_, pid| pid);
                 }
                 resp
             })
@@ -318,7 +216,6 @@ pub(crate) fn show_repo_item_buttons(
     let button_menu = |ui: &mut egui::Ui| {
         let button = egui::Button::new("commit");
         let button = ui.add(button);
-        let mut close_menu = false;
         if button.clicked() {
             commits.push(Default::default());
         }
@@ -362,18 +259,8 @@ pub(crate) fn show_repo_item_buttons(
         .always_show_buttons(true);
 
     let height: f32 = 16.0;
-    let response = _show_repo_item_header(ui, content, id, 16.0);
+    let response = _show_repo_item_header(ui, content, id, height);
     show_commits_items(ui, response, commits, id, true)
-}
-
-pub(crate) fn show_repo_item_custom(
-    repo_cb: impl FnOnce(&mut egui::Ui, &list_item::ContentContext<'_>),
-    ui: &mut egui::Ui,
-    id: egui::Id,
-    height: f32,
-) -> list_item::ShowCollapsingResponse<()> {
-    let content = list_item::CustomContent::new(repo_cb);
-    _show_repo_item_header(ui, content, id, height)
 }
 
 pub(crate) fn _show_repo_item_header(
@@ -382,30 +269,18 @@ pub(crate) fn _show_repo_item_header(
     id: egui::Id,
     height: f32,
 ) -> list_item::ShowCollapsingResponse<()> {
-    let force_background = if ui.visuals().dark_mode {
-        re_ui::design_tokens_of(egui::Theme::Dark).section_header_color
-    } else {
-        ui.visuals().widgets.active.weak_bg_fill
-    }
-    .gamma_multiply(0.6);
-
-    let default_open = true;
-
     let list = list_item::ListItem::new()
         .interactive(true)
-        // .force_background(force_background)
-        // .selected(true)
         .with_height(height);
     list_item::list_item_scope(ui, id, |ui| {
-        // list.show_flat(ui, content)
-        list.show_hierarchical_with_children(ui, id, default_open, content, |_| ())
+        list.show_hierarchical_with_children(ui, id, true, content, |_| ())
     })
 }
 
 pub(crate) fn show_commits_items(
     ui: &mut egui::Ui,
     response: list_item::ShowCollapsingResponse<()>,
-    mut commits: CommitSlice<'_>,
+    commits: CommitSlice<'_>,
     id: egui::Id,
     indented: bool,
 ) -> list_item::ShowCollapsingResponse<()> {
@@ -413,7 +288,7 @@ pub(crate) fn show_commits_items(
     let mut state = egui::collapsing_header::CollapsingState::load(ui.ctx(), id).unwrap();
     let mut span = ui.full_span().shrink(height * 0.8);
     span.min = span.max.min(span.min + height);
-    let body_response = ui.full_span_scope(span, |ui| {
+    ui.full_span_scope(span, |ui| {
         if indented {
             ui.spacing_mut().indent = re_ui::design_tokens_of(egui::Theme::Dark).small_icon_size.x
                 + re_ui::design_tokens_of(egui::Theme::Dark).text_to_icon_padding();

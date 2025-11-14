@@ -131,7 +131,7 @@ where
             return Ok(b);
         }
 
-        if let (Some(label), Some(children)) = (&label, &children) {
+        if let (Some(label), Some(_)) = (&label, &children) {
             let s = self.stores.label_store().resolve(label);
             wasm_rs_dbg::dbg!(s);
         }
@@ -147,7 +147,7 @@ where
                 });
                 *offset = end;
             }
-            (label, Some(children)) if !children.is_empty() => {
+            (_, Some(children)) if !children.is_empty() => {
                 let mut it = children.iter_children();
                 let op = |alt| {
                     if alt == IndentedAlt::NoIndent {
@@ -163,7 +163,7 @@ where
                     ind = self._compute(&id, &ind, out, offset).or_else(op)?;
                 }
             }
-            (label, Some(children)) => {}
+            (_, Some(_)) => {}
             (Some(label), None) => {
                 let s = self.stores.label_store().resolve(label);
                 let len = s.len();

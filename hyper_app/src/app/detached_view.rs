@@ -1,6 +1,5 @@
 use egui::Pos2;
 use std::collections::{HashMap, VecDeque};
-use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use egui_addon::meta_edge::meta_egde;
@@ -77,13 +76,6 @@ pub(crate) fn ui_detached<'a>(
         let src_rect = *rendered.get(src).unwrap();
         let m_pos = m_rect.center();
         let src_pos = src_rect.center();
-        let x = m_pos.x - src_pos.x + 350.0;
-        let x = if x < 0.0 {
-            -(m_pos.x - src_pos.x).abs() * 100.0 / x
-        } else {
-            2.0 * x
-        };
-        let y = ((m_pos.y - src_pos.y) / 2.0).clamp(-100.0, 100.0);
         let b_d = m_rect.right() - src_rect.left();
         let mut color = egui::Color32::RED;
         let mut ctrl = (m_pos, src_pos);
@@ -383,22 +375,9 @@ fn ui_detached_node(
             }
             resp.inner.element.rect
         };
-        if options.cable {
-            let in_id = src_id.with("right");
-            // let in_plug = Plug::to(in_id).default_pos(egui::Pos2::ZERO);
-            let out_id = id.with("left");
-            // let out_plug = Plug::to(out_id).default_pos(egui::Pos2::ZERO);
-            // ui.add(Cable::new(in_id.with(out_id), in_plug, out_plug));
-        }
+        if options.cable {}
         let m_pos = m_rect.center();
         let src_pos = src_rect.center();
-        let x = m_pos.x - src_pos.x + 350.0;
-        let x = if x < 0.0 {
-            -(m_pos.x - src_pos.x).abs() * 100.0 / x
-        } else {
-            2.0 * x
-        };
-        let y = ((m_pos.y - src_pos.y) / 2.0).clamp(-100.0, 100.0);
         let b_d = m_rect.right() - src_rect.left();
         let mut color = egui::Color32::RED;
         let mut ctrl = (m_pos, src_pos);
@@ -487,7 +466,7 @@ fn show_detached_element_aux(
 fn show_element(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
-    global_opt: &DetatchedViewOptions,
+    _global_opt: &DetatchedViewOptions,
     x: &CodeRange,
     id: egui::Id,
     options: &O,
@@ -610,8 +589,8 @@ fn show_element_content(
     ui: &mut egui::Ui,
     id: &NodeIdentifier,
 ) {
+    use hyperast::types::WithChildren as _;
     use hyperast::types::{AnyType, Labeled as _, WithStats};
-    use hyperast::types::{HyperType as _, Typed as _, WithChildren as _};
     if options.id {
         ui.label(format!("{:?}", id));
     }
@@ -667,8 +646,8 @@ fn retrieve_extra(
     name: &mut Option<String>,
     r_id: NodeIdentifier,
 ) {
-    use hyperast::types::{AnyType, Labeled as _, WithStats};
-    use hyperast::types::{HyperType as _, Typed as _, WithChildren as _};
+    use hyperast::types::{AnyType, Labeled as _};
+    use hyperast::types::{HyperType as _, WithChildren as _};
     if value.is_some() && name.is_some() {
         return;
     }

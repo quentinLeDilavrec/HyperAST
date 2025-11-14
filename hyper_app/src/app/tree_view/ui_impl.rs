@@ -1,6 +1,4 @@
-use std::fmt::Debug;
 use std::ops::ControlFlow;
-use std::sync::Arc;
 
 use egui::Widget;
 use egui_addon::syntax_highlighting as syntax_highlighter;
@@ -85,7 +83,7 @@ impl<'a> FetchedViewImpl<'a> {
         ui: &mut egui::Ui,
         kind: AnyType,
         size: u32,
-        nid: NodeIdentifier,
+        _nid: NodeIdentifier,
         label: LabelIdentifier,
         cs: &[NodeIdentifier],
     ) -> Action {
@@ -153,13 +151,13 @@ impl<'a> FetchedViewImpl<'a> {
                 if !add.is_empty() {
                     let tc = &ui.style().visuals.code_bg_color;
                     let c = tc.lerp_to_gamma(CC.add, 0.5);
-                    let mut rt_adds = egui::RichText::new(format!("+{}", add.len())).color(c);
+                    let rt_adds = egui::RichText::new(format!("+{}", add.len())).color(c);
                     ui.label(rt_adds.monospace());
                 }
                 if !del.is_empty() {
                     let tc = &ui.style().visuals.code_bg_color;
                     let c = tc.lerp_to_gamma(CC.del, 0.5);
-                    let mut rt_dels = egui::RichText::new(format!("-{} ", del.len())).color(c);
+                    let rt_dels = egui::RichText::new(format!("-{} ", del.len())).color(c);
                     ui.label(rt_dels.monospace());
                 }
                 ui.label(label);
@@ -415,7 +413,7 @@ impl<'a> FetchedViewImpl<'a> {
                 };
                 let mut path = self.path.clone();
                 path.push(offset);
-                self.children_ui_aux(
+                let _ = self.children_ui_aux(
                     ui,
                     offset,
                     &child,
@@ -661,7 +659,7 @@ impl<'a> FetchedViewImpl<'a> {
         false
     }
 
-    fn show_pp(&mut self, ui: &mut egui::Ui, nid: NodeIdentifier, size: u32) -> Action {
+    fn show_pp(&mut self, ui: &mut egui::Ui, nid: NodeIdentifier, _size: u32) -> Action {
         let mut font = 12.0;
 
         let tc = ui.style().visuals.code_bg_color;
@@ -740,7 +738,6 @@ impl<'a> FetchedViewImpl<'a> {
         _size: u32,
     ) -> Action {
         if self.is_hidden(kind) {
-            let prefill = self.prefill_cache.get_or_insert_default();
             return Action::Keep;
         }
         let min = ui.available_rect_before_wrap().min;
@@ -1201,13 +1198,10 @@ fn show_node_menu(ui: &mut egui::Ui, interact: egui::Response, kind: AnyType) ->
 }
 
 fn show_node_menu_aux(
-    ui: &mut egui::Ui,
+    _ui: &mut egui::Ui,
     interact: egui::Response,
     add_content: impl Fn(&mut egui::Ui) -> Option<Action>,
 ) -> Option<Action> {
-    // if interact.secondary_clicked() || interact.double_clicked() || interact.drag_stopped() {
-    //     egui::Popup::open_id(ui.ctx(), popup_id);
-    // }
     let add_contents = |ui: &mut egui::Ui| {
         ui.set_width_range(40.0..=100.0);
         add_content(ui).or_else(|| {
@@ -1220,14 +1214,4 @@ fn show_node_menu_aux(
     egui::Popup::context_menu(&interact)
         .show(add_contents)
         .and_then(|x| x.inner)
-}
-
-#[allow(unused)] // TODO reenable ports after fixing the dependency (I believe it was not maintained anymore, and very convoluted structure btw)
-fn show_port(ui: &mut egui::Ui, id: egui::Id, pos: epaint::Pos2) {
-    let area = egui::Area::new(id)
-        .order(egui::Order::Middle)
-        .constrain(true)
-        .fixed_pos(pos)
-        .interactable(false);
-    // area.show(ui.ctx(), |ui| ui.add(Port::new(id)));
 }

@@ -3,8 +3,6 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use egui_addon::egui_utils::{radio_collapsing, show_wip};
-
 use super::tree_view::FetchedViewImpl;
 use super::tree_view::store::FetchedHyperAST;
 use super::tree_view::{Action, LabelIdentifier, NodeIdentifier, PrefillCache, SimplePacked};
@@ -219,8 +217,6 @@ pub(crate) fn project_modal_handler(
 
 impl ComputeConfigAspectViews {
     pub(crate) fn on_action(&mut self, action: Action) {
-        use hyperast_gen_ts_cpp::types::Type as Cpp;
-        use hyperast_gen_ts_java::types::Type as Java;
         match action {
             Action::SerializeKind(k) => {
                 self.ser_opt_cpp.toggle(&*k);

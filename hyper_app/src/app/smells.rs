@@ -34,7 +34,6 @@
 //! https://github.com/Marcono1234/gson/commit/3d241ca0a6435cbf1fa1cdaed2af8480b99fecde
 //! about fixing try catches in tests
 
-use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::{Range, SubAssign};
 use wasm_rs_dbg::dbg;
@@ -42,8 +41,7 @@ use wasm_rs_dbg::dbg;
 use egui_addon::InteractiveSplitter;
 use egui_addon::MultiSplitter;
 
-use super::code_tracking::{FetchedFiles, RemoteFile};
-use super::show_repo_menu;
+use super::code_tracking::FetchedFiles;
 use super::types;
 use super::types::{CodeRange, Commit, SelectedConfig};
 use super::utils_edition::MakeHighlights;
@@ -180,16 +178,8 @@ impl Default for Config {
 
 pub(crate) type RemoteResult =
     super::utils_results_batched::Remote<Result<SearchResults, SmellsError>>;
-pub(crate) type RemoteResultGenQuery =
-    super::utils_results_batched::Remote<Result<QueryGenResults, SmellsError>>;
 pub(crate) type RemoteResultDiffs =
     super::utils_results_batched::Remote<Result<ExamplesValues, DiffsError>>;
-
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct QueryGenResults {
-    pub prepare_time: f64,
-    pub results: Vec<Result<String, String>>,
-}
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct SearchResults {
@@ -225,14 +215,6 @@ pub struct SearchResult {
     pub examples: Vec<usize>,
     //stats
     pub matches: usize,
-}
-
-pub struct SearchResults2 {
-    pub prepare_time: f64,
-    pub search_time: f64,
-    pub examples: Vec<(CodeRange, CodeRange)>,
-    pub bad: Vec<SearchResult>,
-    pub good: Vec<SearchResult>,
 }
 
 // WIP
@@ -315,70 +297,6 @@ pub(crate) fn show_config(
     let text = "displays only queries in the given range";
     double_ended_slider.on_hover_text_at_pointer(text);
     (resp_repo, resp_commit)
-}
-
-pub(super) fn show_result(
-    ui: &mut egui::Ui,
-    api_addr: &str,
-    smells: &mut ComputeConfigQuery,
-    examples: &ExamplesValues,
-    promise: &mut Option<RemoteResult>,
-    _cols: std::ops::Range<usize>,
-    _id: egui::Id,
-) {
-    let Some(promise) = promise else {
-        ui.spinner();
-        ui.spinner();
-        *promise = Some(fetch_results(ui.ctx(), api_addr, smells, examples));
-        return;
-    };
-    let Some(result) = promise.ready() else {
-        ui.spinner();
-        return;
-    };
-    match result {
-        Ok(resource) => match &resource.content {
-            Some(Ok(content)) => {
-                // show_long_result_success(ui, content);
-                let len = content.bad.len();
-                if len == 0 {
-                    ui.label("no queries found");
-                    return;
-                }
-                // loop {
-                //     let i = cols.start;
-                // ui.push_id(id.with(-(i as isize + 1)), |ui| {
-                // });
-                // }
-                // MultiSplitter::with_orientation(MultiSplitterOrientation::Horizontal)
-                //     .ratios(vec![0.1 * 2.0; len - 1])
-                //     .show(ui, |uis| {
-                //         for (i, ui) in uis.iter_mut().enumerate() {
-                //             let c = &content.bad[i];
-                //             ui.label(format!(
-                //                 "query[{}] prep={:3} search={:3} matches={}",
-                //                 i, content.prepare_time, content.search_time, c.matches
-                //             ));
-                //             ui.text_edit_multiline(&mut c.query.clone());
-                //         }
-                //     });
-                todo!()
-            }
-            Some(Err(error)) => {
-                dbg!(&error);
-                ui.label("Error");
-            }
-            _ => (),
-        },
-        Err(error) => {
-            dbg!();
-            // This should only happen if the fetch API isn't available or something similar.
-            ui.colored_label(
-                ui.visuals().error_fg_color,
-                if error.is_empty() { "Error" } else { error },
-            );
-        }
-    }
 }
 
 pub(super) fn show_central_panel(
@@ -939,20 +857,6 @@ fn show_either_side<MH: MakeHighlights>(
 
             ui.fonts(|f| {
                 let galley = f.layout_job(layout_job);
-                let mut galley = galley.as_ref().clone();
-                // galley.rows.iter_mut().for_each(|row| {
-                //     *row = epaint::text::PlacedRow {
-                //         pos: row.pos,
-                //         row: std::sync::Arc::new(epaint::text::Row {
-                //             section_index_at_start: row.row.section_index_at_start,
-                //             glyphs: row.row.glyphs,
-                //             size: row.row.size,
-                //             visuals: row.row.visuals,
-                //             ends_with_newline: row.row.ends_with_newline,
-                //         }),
-                //     };
-                //     // row.row.glyphs.iter_mut().for_each(|g| g.line_height = 100.0)
-                // });
                 galley.into()
             })
         };
@@ -1109,12 +1013,6 @@ pub(super) fn fetch_results(
         &smells.commit.id,
         &smells.len,
     );
-    #[derive(serde::Serialize)]
-    struct QueryContent {
-        language: String,
-        query: String,
-        commits: usize,
-    }
 
     #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
     pub struct ExamplesValues<S, T, U> {
@@ -1229,12 +1127,6 @@ pub(super) fn fetch_examples_at_commits(
         &smells.commit.id,
         &smells.len,
     );
-    #[derive(serde::Serialize)]
-    struct QueryContent {
-        language: String,
-        query: String,
-        commits: usize,
-    }
 
     let mut request = ehttp::Request::post(&url, serde_json::to_vec(&[""]).unwrap());
     request.headers.insert(

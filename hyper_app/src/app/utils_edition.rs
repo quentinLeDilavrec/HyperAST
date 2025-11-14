@@ -615,6 +615,7 @@ impl
 /// e.g. visualizing deleted, moved and inserted ranges of code
 /// WARN apparently doesn't work well with transparency... the background rectangles are slighlty expanded for looks... so it makes ugly border looking things
 #[derive(Default)]
+#[allow(unused)] // TODO: move to egui_addon
 pub(crate) struct HiHighlighter(egui_addon::syntax_highlighting::syntect::Highlighter);
 impl<MH: MakeHighlights>
     egui::util::cache::ComputerMut<

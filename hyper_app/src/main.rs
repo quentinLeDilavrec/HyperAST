@@ -1,6 +1,5 @@
-#![warn(clippy::all, rust_2018_idioms)]
+// #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-#![allow(unused)]
 
 const ADDR: &str = "127.0.0.1:8888";
 

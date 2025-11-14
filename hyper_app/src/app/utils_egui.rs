@@ -7,6 +7,7 @@ use egui_addon::{
 use re_ui::UiExt;
 use std::collections::hash_map;
 
+#[allow(unused)] // TODO move to egui_addon
 pub trait MyUiExt: UiExt {
     fn radio_collapsing<R, S: PartialEq + Clone>(
         &mut self,

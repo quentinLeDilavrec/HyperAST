@@ -1,6 +1,5 @@
 use poll_promise::Promise;
 
-use super::ProjectId;
 use super::types::CommitId;
 use super::types::Resource;
 use super::utils::SecFmt;
@@ -141,39 +140,40 @@ fn show_long_result_compute_failure<'a>(ui: &mut egui::Ui, error: &impl ComputeE
 
 pub(crate) fn show_long_result_success(ui: &mut egui::Ui, content: &ComputeResults) {
     if content.results.len() > 5 {
-        let header = content.results.iter().find(|x| x.is_ok());
-        let Some(header) = header.as_ref() else {
-            wasm_rs_dbg::dbg!("issue with header");
-            return;
-        };
-        let header = header.as_ref().unwrap();
+        ui.label("TODO");
+        // let header = content.results.iter().find(|x| x.is_ok());
+        // let Some(header) = header.as_ref() else {
+        //     wasm_rs_dbg::dbg!("issue with header");
+        //     return;
+        // };
         // TODO
-        let header = if let Some(result) = header.inner.result.as_object() {
-            // for (name, v) in result {
-            //     f(&mut head, name, v)
-            // }
-            (todo!(), Some(todo!()))
-        } else if let Some(result) = header.inner.result.as_array() {
-            // for (i, v) in result.iter().enumerate() {
-            //     f(&mut head, &i.to_string(), v)
-            // }
-            (todo!(), None)
-        } else {
-            panic!()
-        };
-        egui::ScrollArea::horizontal()
-            .scroll_bar_visibility(
-                egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
-            )
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                show_long_result_table(
-                    ui,
-                    (header.0, header.1, &content.results[1..]),
-                    &mut None,
-                    |_| None,
-                )
-            });
+        // let header = header.as_ref().unwrap();
+        // let header = if let Some(result) = header.inner.result.as_object() {
+        //     // for (name, v) in result {
+        //     //     f(&mut head, name, v)
+        //     // }
+        //     (todo!(), Some(todo!()))
+        // } else if let Some(result) = header.inner.result.as_array() {
+        //     // for (i, v) in result.iter().enumerate() {
+        //     //     f(&mut head, &i.to_string(), v)
+        //     // }
+        //     (todo!(), None)
+        // } else {
+        //     panic!()
+        // };
+        // egui::ScrollArea::horizontal()
+        //     .scroll_bar_visibility(
+        //         egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
+        //     )
+        //     .auto_shrink([false, false])
+        //     .show(ui, |ui| {
+        //         show_long_result_table(
+        //             ui,
+        //             (header.0, header.1, &content.results[1..]),
+        //             &mut None,
+        //             |_| None,
+        //         )
+        //     });
     } else {
         egui::CollapsingHeader::new("Results (JSON)")
             .default_open(true)
@@ -291,7 +291,7 @@ pub(crate) fn show_long_result_table(
 fn show_table_header(
     mut head: egui_extras::TableRow<'_, '_>,
     header: &[String],
-    sub_header: Option<&[String]>,
+    _sub_header: Option<&[String]>,
 ) {
     let hf = |ui: &mut egui::Ui, name: &str| {
         ui.label(
@@ -369,7 +369,6 @@ fn show_table_body(
         // if let Some((_, c)) = &selected_commit {
         //     row.set_selected(c == &cont.commit);
         // }
-        let i = row.index();
         row.col(|ui| {
             // if let Some((_, c)) = &selected_commit {
             //     // if c == &cont.commit {

@@ -1205,22 +1205,19 @@ fn show_node_menu_aux(
     interact: egui::Response,
     add_content: impl Fn(&mut egui::Ui) -> Option<Action>,
 ) -> Option<Action> {
-    let popup_id = interact.id.with("popup");
-    if interact.secondary_clicked() || interact.double_clicked() || interact.drag_stopped() {
-        egui::Popup::open_id(ui.ctx(), popup_id);
-    }
+    // if interact.secondary_clicked() || interact.double_clicked() || interact.drag_stopped() {
+    //     egui::Popup::open_id(ui.ctx(), popup_id);
+    // }
     let add_contents = |ui: &mut egui::Ui| {
         ui.set_width_range(40.0..=100.0);
         add_content(ui).or_else(|| {
             if ui.button("close menu").clicked() {
-                egui::Popup::close_id(ui.ctx(), popup_id);
+                ui.close();
             }
             None
         })
     };
-    let behavior = egui::PopupCloseBehavior::CloseOnClick;
-    egui::Popup::new(popup_id, ui.ctx().clone(), &interact, ui.layer_id())
-        .close_behavior(behavior)
+    egui::Popup::context_menu(&interact)
         .show(add_contents)
         .and_then(|x| x.inner)
 }

@@ -1,3 +1,4 @@
+#[allow(unused, dead_code)] // TODO finish the implementation
 use std::{
     ops::Range,
     sync::{Arc, Mutex, RwLock},
@@ -178,6 +179,7 @@ pub fn highlight(
         }
     }
 
+    #[allow(dead_code)] // TODO finish implementation
     fn increment(
         this: Arc<IncrementalHighlightLayout2>,
         hh: &Arc<Highlighter>,
@@ -218,10 +220,7 @@ pub fn highlight(
 
 /// slight modifications to egui's Framecache
 pub mod cache {
-    use std::{
-        collections::HashMap,
-        hash::{BuildHasher, Hasher},
-    };
+    use std::{collections::HashMap, hash::BuildHasher};
 
     use egui::util::cache::CacheTrait;
 
@@ -457,6 +456,7 @@ struct IncrementalHighlightLayout2 {
 }
 
 struct IncrementalHighlightLayout2Inner {
+    #[allow(dead_code)] // TODO finish implementation
     macrotask: Option<Arc<Mutex<async_exec::TimeoutHandle>>>,
     highlight_state: syntect::highlighting::HighlightState,
     parse_state: syntect::parsing::ParseState,

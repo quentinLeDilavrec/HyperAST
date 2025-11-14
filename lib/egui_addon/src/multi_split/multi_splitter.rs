@@ -123,8 +123,6 @@ impl MultiSplitter {
                         orientation.rev().p(remaining_rect.min),
                     ))
                     .into();
-                let line_pos_2 =
-                    line_pos_1 + orientation.t((0.0, orientation.r(&remaining_rect))).into();
 
                 let mut patition_rect = {
                     let mut rect = remaining_rect;

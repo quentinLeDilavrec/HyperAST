@@ -36,7 +36,6 @@ pub fn meta_egde(
     );
     let down = link.flatten(Some(tolerance));
     let l = up.len() + down.len();
-    let color_step = 255.0 / l as f32;
     let mut out = epaint::Mesh::default();
     let mut up = up.into_iter();
     let mut down = down.into_iter();

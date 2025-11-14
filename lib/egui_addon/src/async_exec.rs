@@ -158,12 +158,9 @@ pub mod web {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
-    use std::{
-        sync::{Arc, Mutex},
-        thread::{JoinHandle, spawn},
-    };
+    use std::thread::{JoinHandle, spawn};
 
-    pub struct TimeoutHandle(JoinHandle<()>);
+    pub struct TimeoutHandle(#[allow(dead_code)] JoinHandle<()>);
     pub fn spawn_macrotask(f: Box<dyn FnMut() + 'static + Send>) -> TimeoutHandle {
         let spawn = spawn(f);
         TimeoutHandle(spawn)

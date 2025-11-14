@@ -1,4 +1,3 @@
-use egui::{NumExt, text::CCursor};
 use epaint::text::cursor::LayoutCursor;
 
 /// without visualizing newlines
@@ -37,48 +36,4 @@ pub(crate) fn paint_cursor_selection2(
         );
         painter.rect_filled(rect, 0.0, color);
     }
-}
-
-pub fn paint_cursor_end(
-    ui: &mut egui::Ui,
-    row_height: f32,
-    painter: &egui::Painter,
-    pos: egui::Pos2,
-    galley: &egui::Galley,
-    cursor: CCursor,
-) -> egui::Rect {
-    let stroke = ui.visuals().selection.stroke;
-    let mut cursor_pos = galley.pos_from_cursor(cursor).translate(pos.to_vec2());
-    cursor_pos.max.y = cursor_pos.max.y.at_least(cursor_pos.min.y + row_height); // Handle completely empty galleys
-    cursor_pos = cursor_pos.expand(1.5); // slightly above/below row
-
-    let top = cursor_pos.center_top();
-    let bottom = cursor_pos.center_bottom();
-
-    painter.line_segment(
-        [top, bottom],
-        (ui.visuals().text_cursor.stroke.width, stroke.color),
-    );
-
-    if false {
-        // Roof/floor:
-        let extrusion = 3.0;
-        let width = 1.0;
-        painter.line_segment(
-            [
-                top - egui::vec2(extrusion, 0.0),
-                top + egui::vec2(extrusion, 0.0),
-            ],
-            (width, stroke.color),
-        );
-        painter.line_segment(
-            [
-                bottom - egui::vec2(extrusion, 0.0),
-                bottom + egui::vec2(extrusion, 0.0),
-            ],
-            (width, stroke.color),
-        );
-    }
-
-    cursor_pos
 }

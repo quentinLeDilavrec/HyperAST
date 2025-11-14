@@ -183,11 +183,7 @@ impl<L: Default> CodeEditor<L> {
         self.code.as_str()
     }
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        let Self {
-            code, lang, info, ..
-        } = self;
-
-        let theme = crate::syntax_highlighting::simple::CodeTheme::from_memory(ui.ctx());
+        let Self { code, info, .. } = self;
 
         let id = ui.make_persistent_id(&info.title);
         let mut col =

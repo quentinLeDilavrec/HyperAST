@@ -857,25 +857,22 @@ impl TextEdit<'_> {
             });
         }
 
-        #[cfg(feature = "accesskit")]
-        {
-            let role = if password {
-                accesskit::Role::PasswordInput
-            } else if multiline {
-                accesskit::Role::MultilineTextInput
-            } else {
-                accesskit::Role::TextInput
-            };
+        let role = if password {
+            accesskit::Role::PasswordInput
+        } else if multiline {
+            accesskit::Role::MultilineTextInput
+        } else {
+            accesskit::Role::TextInput
+        };
 
-            crate::text_selection::accesskit_text::update_accesskit_for_text_widget(
-                ui.ctx(),
-                id,
-                cursor_range,
-                role,
-                TSTransform::from_translation(galley_pos.to_vec2()),
-                &galley,
-            );
-        }
+        egui::text_selection::accesskit_text::update_accesskit_for_text_widget(
+            ui.ctx(),
+            id,
+            cursor_range,
+            role,
+            TSTransform::from_translation(galley_pos.to_vec2()),
+            &galley,
+        );
 
         TextEditOutput {
             response,

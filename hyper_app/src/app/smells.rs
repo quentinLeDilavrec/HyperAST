@@ -155,6 +155,15 @@ pub(crate) struct Config {
     pub(crate) bad_matches_bounds: std::ops::RangeInclusive<usize>,
     pub(crate) bads: Option<Vec<usize>>,
 }
+impl Config {
+    pub(crate) fn set_commit_id(&mut self, cid: String) {
+        self.commits.as_mut().expect("query config").commit.id = cid;
+    }
+
+    pub(crate) fn repo(&self) -> Option<&super::Repo> {
+        self.commits.as_ref().map(|x| &x.commit.repo)
+    }
+}
 impl Default for Config {
     fn default() -> Self {
         let compute_config_query: ComputeConfigQuery = Default::default();

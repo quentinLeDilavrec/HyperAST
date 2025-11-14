@@ -82,6 +82,13 @@ impl crate::HyperApp {
                             self.modal_handler_proj_or_commits
                                 .open_projects(tsg::project_modal_handler);
                         }
+                        if commit_resp.clicked() {
+                            let repo = &self.data.tsg.content.commit.repo;
+                            if let Some(proj) = self.data.selected_code_data.find(repo) {
+                                self.modal_handler_proj_or_commits
+                                    .open_commits(proj, tsg::commit_modal_handler);
+                            }
+                        }
                     } else if let super::Tab::Smells = self.tabs[pane] {
                         use crate::app::smells;
                         let (proj_resp, commit_resp) =
@@ -91,6 +98,17 @@ impl crate::HyperApp {
                             self.modal_handler_proj_or_commits
                                 .open_projects(smells::project_modal_handler);
                         }
+                        if commit_resp.clicked() {
+                            let repo = self.data.smells.repo().unwrap();
+                            if let Some(proj) = self.data.selected_code_data.find(repo) {
+                                self.modal_handler_proj_or_commits.open_commits(
+                                    proj,
+                                    |data, cid| {
+                                        data.smells.set_commit_id(cid);
+                                    },
+                                );
+                            }
+                        }
                     } else if let super::Tab::LongTracking = self.tabs[pane] {
                         use crate::app::long_tracking;
                         let (proj_resp, commit_resp) =
@@ -99,6 +117,13 @@ impl crate::HyperApp {
                             let ctx = ui.ctx();
                             self.modal_handler_proj_or_commits
                                 .open_projects(long_tracking::project_modal_handler);
+                        }
+                        if commit_resp.clicked() {
+                            let repo = self.data.long_tracking.repo();
+                            if let Some(proj) = self.data.selected_code_data.find(repo) {
+                                self.modal_handler_proj_or_commits
+                                    .open_commits(proj, long_tracking::commit_modal_handler);
+                            }
                         }
                     }
                 });

@@ -51,6 +51,12 @@ pub(crate) struct LongTracking {
     #[serde(skip)]
     pub(crate) additionnal_links: Vec<[CodeRange; 2]>,
 }
+impl LongTracking {
+    pub(crate) fn repo(&self) -> &super::Repo {
+        let code = self.origins.get(0).unwrap();
+        &code.file.commit.repo
+    }
+}
 
 impl Default for LongTracking {
     fn default() -> Self {
@@ -164,6 +170,15 @@ pub(crate) fn project_modal_handler(
     commit.repo = repo.clone();
     commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
     super::ProjectId::INVALID
+}
+
+pub(crate) fn commit_modal_handler(data: &mut super::AppData, cid: super::types::CommitId) {
+    let code = data.long_tracking.origins.get_mut(0).unwrap();
+    let mut commit = code.file.commit.clone();
+    commit.id = cid;
+    data.long_tracking = Default::default();
+    let code = data.long_tracking.origins.get_mut(0).unwrap();
+    code.file.commit = commit;
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]

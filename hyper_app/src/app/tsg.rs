@@ -124,7 +124,7 @@ pub(super) type TsgContext = EditingContext<TsgEditor, TsgEditor<CodeEditor>>;
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub(super) struct ComputeConfigQuery {
-    commit: Commit,
+    pub(crate) commit: Commit,
     config: Config,
     len: usize,
     path: String,
@@ -157,6 +157,13 @@ pub(crate) fn project_modal_handler(
     commit.repo = repo.clone();
     commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
     super::ProjectId::INVALID
+}
+
+pub(crate) fn commit_modal_handler(data: &mut super::AppData, cid: super::types::CommitId) {
+    let commit = Some(&data.tsg.content.commit);
+    use crate::app::utils_commit::project_modal_handler;
+    let commit = &mut data.tsg.content.commit;
+    commit.id = cid;
 }
 
 type QueryingContext = EditingContext<TsgEditor, TsgEditor<CodeEditor>>;

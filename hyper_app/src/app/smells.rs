@@ -309,11 +309,11 @@ pub(crate) fn show_config(
         &mut conf.wanted_matches.end,
         smells.bad_matches_bounds.clone(),
     );
-    let text = "displays only queries in the given range";
-    let slider_over = double_ended_slider.on_hover_text(text);
-    if slider_over.changed() {
+    if double_ended_slider.changed() {
         smells.bads = None
     };
+    let text = "displays only queries in the given range";
+    double_ended_slider.on_hover_text_at_pointer(text);
     (resp_repo, resp_commit)
 }
 
@@ -542,8 +542,6 @@ fn show_smells_result(
     if smells.bads.is_none() {
         smells.bads = Some((0..tot_len).filter(predicate).collect())
     }
-    let bads = smells.bads.as_ref().unwrap();
-    let len = bads.len();
     if !queries.good.is_empty() {
         todo!("handle the queries matching the fixes")
     }
@@ -555,7 +553,12 @@ fn show_smells_result(
         let end = matches.max().unwrap_or_default();
         smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
         conf.wanted_matches = start..end; // TODO better open the side panel
+        smells.bads = None; // to refresh
+        return None;
     }
+
+    let bads = smells.bads.as_ref().unwrap();
+    let len = bads.len();
     if tot_len == 0 {
         let mut _smells_result = None;
         egui::Window::new("Actions")

@@ -334,7 +334,7 @@ pub trait MyUiExt: UiExt {
                     range,
                 )
                 .separation_distance(1f32);
-                let resp = egui::Widget::ui(slider, ui);
+                let resp = ui.add(slider);
                 *low = lower_value as usize;
                 *high = upper_value as usize;
                 ui.label(format!("{}..{}", low, high));

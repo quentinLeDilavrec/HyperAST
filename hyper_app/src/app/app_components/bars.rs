@@ -43,7 +43,7 @@ impl crate::HyperApp {
                     }
                 }
 
-                egui::menu::bar(ui, |ui| {
+                egui::MenuBar::new().ui(ui, |ui| {
                     // ui.set_height(top_bar_style.height);
                     ui.add_space(top_bar_style.indent);
                     let rect = ui.available_rect_before_wrap();
@@ -135,7 +135,7 @@ impl crate::HyperApp {
                         ui.add_space(50.0);
                     };
                     ui.visuals_mut().clip_rect_margin = 0.0;
-                    ui.allocate_new_ui(egui::UiBuilder::new().max_rect(max_rect), |ui| {
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(max_rect), |ui| {
                         egui::ScrollArea::horizontal()
                             // .horizontal_scroll_offset(max_rect.left() - rect.left() + 50.0)
                             .auto_shrink(false)

@@ -539,7 +539,13 @@ pub(super) fn show_locals_and_interact<T, U, L, S>(
         // res = Some(ex);
         context.current = EditStatus::Local { name, content };
     } else if button.hovered() {
-        egui::show_tooltip(ui.ctx(), ui.layer_id(), button.id.with("tooltip"), |ui| {
+        egui::Tooltip::always_open(
+            ui.ctx().clone(),
+            ui.layer_id(),
+            button.id.with("tooltip"),
+            &button,
+        )
+        .show(|ui| {
             let desc = content.desc().as_ref();
             egui_demo_lib::easy_mark::easy_mark(ui, desc);
         });
@@ -557,7 +563,7 @@ pub(super) fn show_locals_and_interact<T, U, L, S>(
                 );
             }
             if ui.button("close menu").clicked() {
-                ui.close_menu()
+                ui.close()
             }
         });
     }

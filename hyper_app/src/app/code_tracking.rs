@@ -408,7 +408,7 @@ pub(super) fn show_code_tracking_results(
                                         highlight_byte_range(ui, &aa.inner, selected_node, color);
                                     aa.inner.response.context_menu(|ui| {
                                         if ui.button("Close the menu").clicked() {
-                                            ui.close_menu();
+                                            ui.close();
                                         }
                                     });
                                     let b = ctx.memory_mut(|mem| {

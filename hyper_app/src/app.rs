@@ -2079,7 +2079,7 @@ impl AppData {
         let rows = ui.data(|d| d.get_temp(id).unwrap_or(20));
         area.id_salt(i)
             .stick_to_bottom(false)
-            .drag_to_scroll(true)
+            .scroll_source(egui::scroll_area::ScrollSource::ALL)
             .show_rows(ui, row_height, rows, |ui, range| {
                 let range = range.start as isize..range.end as isize;
                 self._show_commits_selection::<true>(ui, i, range)

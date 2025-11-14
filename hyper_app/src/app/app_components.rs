@@ -364,7 +364,19 @@ pub(crate) fn show_repo_item_buttons(
             ui.add_space(4.0);
             ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
 
-            egui::menu::menu_custom_button(ui, add_button, button_menu).response
+            let add_button = ui.add(add_button);
+            egui::Popup::new(
+                add_button.id.with("popup"),
+                ui.ctx().clone(),
+                &add_button,
+                ui.layer_id(),
+            )
+            .show(button_menu);
+            add_button
+            // egui::containers::menu::Men::new(add_button)
+            //     .ui(ui, button_menu)
+            //     .0
+            // egui::menu::menu_custom_button(ui, add_button, button_menu).response
         })
         .always_show_buttons(true);
 

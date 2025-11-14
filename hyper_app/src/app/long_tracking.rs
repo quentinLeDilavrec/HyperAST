@@ -1469,7 +1469,13 @@ fn show_commitid_info(
         } else {
             let label = ui.label(format!("commit {}", &id[..8]));
             if label.hovered() {
-                egui::show_tooltip(ui.ctx(), ui.layer_id(), label.id.with("tooltip"), |ui| {
+                egui::Tooltip::always_open(
+                    ui.ctx().clone(),
+                    ui.layer_id(),
+                    label.id.with("tooltip"),
+                    &label,
+                )
+                .show(|ui| {
                     ui.label(id);
                     ui.label("CTRL+C to copy (and send in the debug console)");
                 });

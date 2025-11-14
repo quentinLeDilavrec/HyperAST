@@ -14,10 +14,10 @@ impl crate::HyperApp {
 
         let mut frame_style = re_ui::design_tokens_of(egui::Theme::Dark).top_panel_frame();
         if !egui_ctx.style().visuals.dark_mode {
-            frame_style.fill = egui::Color32::WHITE; //egui::Visuals::light().window_fill;
+            frame_style.fill = egui::Color32::WHITE;
             frame_style.stroke = egui::Visuals::light().window_stroke;
             frame_style.stroke.color = egui::Color32::WHITE;
-            frame_style.shadow.color = egui::Color32::WHITE; //egui::Visuals::light().window_shadow.color;
+            frame_style.shadow.color = egui::Color32::WHITE;
         }
         egui::TopBottomPanel::top("top_bar")
             .frame(frame_style)
@@ -44,7 +44,6 @@ impl crate::HyperApp {
                 }
 
                 egui::MenuBar::new().ui(ui, |ui| {
-                    // ui.set_height(top_bar_style.height);
                     ui.add_space(top_bar_style.indent);
                     let rect = ui.available_rect_before_wrap();
 
@@ -100,7 +99,7 @@ impl crate::HyperApp {
                         ui.add_space(50.0);
                         ui.visuals_mut().selection.bg_fill = ui.visuals().widgets.active.bg_fill;
                         ui.visuals_mut().selection.stroke.color =
-                            ui.visuals().widgets.active.bg_fill;
+                            ui.visuals().widgets.active.fg_stroke.color;
                         ui.visuals_mut().selection.stroke.width *= 4.0;
                         for s in <types::SelectedConfig as strum::IntoEnumIterator>::iter() {
                             let text = s.title();
@@ -137,7 +136,6 @@ impl crate::HyperApp {
                     ui.visuals_mut().clip_rect_margin = 0.0;
                     ui.scope_builder(egui::UiBuilder::new().max_rect(max_rect), |ui| {
                         egui::ScrollArea::horizontal()
-                            // .horizontal_scroll_offset(max_rect.left() - rect.left() + 50.0)
                             .auto_shrink(false)
                             .hscroll(true)
                             .scroll_bar_visibility(
@@ -145,7 +143,6 @@ impl crate::HyperApp {
                             )
                             .show_viewport(ui, add_contents);
                     });
-                    // let max_rect = max_rect.expand2((5.0, 0.0).into());
                     let (rect, _) = max_rect.split_left_right_at_fraction(0.15);
                     let mut mesh = egui::Mesh::default();
                     mesh.colored_vertex(rect.left_bottom(), frame_style.fill);
@@ -170,7 +167,6 @@ impl crate::HyperApp {
 
                     ui.add_space(10.0);
                     use crate::command::UICommandSender;
-                    // #[cfg(hyperast_experimental)]
                     // if ui
                     //     .add(ui.small_icon_button_widget(&re_ui::icons::ADD))
                     //     .on_hover_text("new blank layout")
@@ -190,8 +186,6 @@ impl crate::HyperApp {
                 });
             });
     }
-
-    // #[cfg(not(target_arch = "wasm32"))]
 }
 
 fn top_bar_ui(app: &mut crate::HyperApp, ui: &mut egui::Ui) {

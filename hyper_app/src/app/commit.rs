@@ -12,7 +12,7 @@ pub struct CommitMetadata {
     /// commit message
     pub(crate) message: Option<String>,
     /// parents commits
-    /// if multiple parents, the first one should be where the merge happends
+    /// if multiple parents, the first one should be where the merge happens
     pub(crate) parents: Vec<String>,
     /// tree corresponding to version
     pub(crate) tree: Option<String>,
@@ -72,6 +72,17 @@ impl CommitMetadata {
             }
         }
     }
+
+    pub(crate) fn local_datetime(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
+        let seconds_since_epoch = self.time;
+        let tz_offset_minutes = self.timezone;
+        use chrono::prelude::*;
+        let utc_datetime = DateTime::from_timestamp(seconds_since_epoch, 0)?;
+        let offset = FixedOffset::east_opt(tz_offset_minutes * 60)?;
+        let local_datetime = utc_datetime.with_timezone(&offset);
+
+        Some(local_datetime)
+    }
 }
 
 pub(super) fn fetch_commit(
@@ -87,9 +98,6 @@ pub(super) fn fetch_commit(
     );
 
     let request = ehttp::Request::get(&url);
-    // request
-    //     .headers
-    //     .insert("Content-Type".to_string(), "text".to_string());
 
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // wake up UI thread
@@ -644,6 +652,13 @@ impl Default for CommitsLayoutTimed {
             // excluding subs with no prev AND succ
             max_delta: 0,
         }
+    }
+}
+
+impl CommitsLayoutTimed {
+    pub(crate) fn time(&self, id: usize) -> Option<i64> {
+        let r = self.times[id];
+        if r == -1 { None } else { Some(r) }
     }
 }
 

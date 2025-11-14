@@ -342,8 +342,27 @@ pub trait MyUiExt: UiExt {
             })
             .inner
     }
+
+    fn aux<R>(&mut self, txt: &str, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
+        let (frame, area) = framed_scroll_area_aux();
+        area.id_salt(txt)
+            .show(self.ui_mut(), |ui| frame.show(ui, f).inner)
+            .inner
+    }
 }
 
 impl MyUiExt for egui::Ui {}
 
 type SkipedBytes = usize;
+
+pub fn framed_scroll_area_aux() -> (egui::Frame, egui::ScrollArea) {
+    let inner_margin = egui::Margin::same(re_ui::DesignTokens::view_padding());
+    let frame = egui::Frame {
+        inner_margin,
+        ..Default::default()
+    };
+    let area = egui::ScrollArea::both()
+        .auto_shrink([false; 2])
+        .stick_to_bottom(true);
+    (frame, area)
+}

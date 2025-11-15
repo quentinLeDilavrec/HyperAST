@@ -68,10 +68,7 @@ where
     }
 }
 
-pub fn extract_file_postion_it_rec<HAST, It>(
-    stores: &HAST,
-    mut nodes: It,
-) -> Position
+pub fn extract_file_postion_it_rec<HAST, It>(stores: &HAST, mut nodes: It) -> Position
 where
     HAST: HyperAST,
     It: Iterator<Item = HAST::IdN>,
@@ -90,7 +87,7 @@ where
 pub fn extract_position_it_rec<'store, HAST, It, It2>(stores: &'store HAST, mut it: It) -> Position
 where
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = (HAST::IdN, usize)> + Into<It2>,
     It2: Iterator<Item = HAST::IdN>,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
@@ -144,7 +141,7 @@ where
 pub fn extract_position_it<'store, HAST, It, It2>(stores: &'store HAST, mut it: It) -> Position
 where
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = (HAST::IdN, HAST::Idx)> + Into<It2>,
     It2: Iterator<Item = HAST::IdN>,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,

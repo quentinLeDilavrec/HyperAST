@@ -12,7 +12,7 @@ pub fn resolve_range<'store, HAST>(
 ) -> (HAST::IdN, Vec<usize>)
 where
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST::IdN: Copy,
 {

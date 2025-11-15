@@ -1,21 +1,14 @@
-use super::{
-    Position, TreePath, WithHyperAstPositionConverter,
-    building::{self, bottom_up, top_down},
-    position_accessors, tags,
-};
+use num::{one, zero};
 use std::{fmt::Debug, path::PathBuf};
 
-use num::{one, zero};
-
-use crate::{
-    PrimInt,
-    position::building::{ReceiveRows, top_down::SetNode},
-    store::defaults::NodeIdentifier,
-    types::{
-        AnyType, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, LendT, NodeId,
-        NodeStore, Typed, TypedNodeId, WithChildren, WithSerialization, WithStats,
-    },
+use super::building;
+use super::building::{ReceiveRows, bottom_up, top_down, top_down::SetNode};
+use super::{Position, WithHyperAstPositionConverter, position_accessors, tags};
+use crate::types::{
+    AnyType, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, LendT, NodeId, NodeStore,
+    Typed, TypedNodeId, WithChildren, WithSerialization, WithStats,
 };
+use crate::{PrimInt, store::defaults::NodeIdentifier};
 
 pub use super::offsets_and_nodes::StructuralPosition;
 
@@ -194,103 +187,6 @@ impl<IdN, Idx> ExploreStructuralPositions<'_, IdN, Idx> {
         Some(SpHandle(r))
     }
 }
-
-// impl<'store, 'src, 'a, IdN: NodeId + Eq + Copy, Idx: PrimInt, HAST>
-//     WithHyperAstPositionConverter<'store, 'src, ExploreStructuralPositions<'a, IdN, Idx>, HAST>
-// {
-//     // TODO rename to compute_file_and_offset ?
-//     // pub fn make_file_and_offset(&self) -> Position
-//     // where
-//     //     'a: 'store,
-//     //     HAST: HyperAST<'store, IdN = IdN::IdN>,
-//     //     for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
-//     //     <<HAST as HyperAST<'store>>::T as types::WithChildren>::ChildIdx: Debug,
-//     //     IdN: Debug + NodeId,
-//     //     IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-//     // {
-//     //     self.src.clone().make_position(self.stores)
-//     // }
-//     // fn make_position2(&self) -> Position
-//     // where
-//     //     'a: 'store,
-//     //     HAST: HyperAST<'store, IdN = IdN::IdN>,
-//     //     for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
-//     //     <<HAST as HyperAST<'store>>::T as types::WithChildren>::ChildIdx: Debug,
-//     //     IdN: Debug + NodeId,
-//     //     IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-//     // {
-//     //     let mut from_file = false;
-//     //     let sss: ExploreStructuralPositions<'_, IdN, Idx> = self.src.clone();
-//     //     let len = if let Some(x) = sss.peek_node() {
-//     //         let b = self.stores.node_store().resolve(x.as_id());
-//     //         let t = self.stores.resolve_type(x.as_id());
-//     //         if let Some(y) = b.try_bytes_len() {
-//     //             if t.is_file() {
-//     //                 from_file = true;
-//     //             }
-//     //             y as usize
-//     //         } else {
-//     //             0
-//     //         }
-//     //     } else {
-//     //         0
-//     //     };
-//     //     let offset = 0;
-//     //     let path = vec![];
-//     //     Self::make_position2_aux(sss, self.stores, from_file, len, offset, path)
-//     // }
-
-//     // fn make_position2_aux(
-//     //     mut sss: ExploreStructuralPositions<'a, IdN, Idx>,
-//     //     stores: &'store HAST,
-//     //     from_file: bool,
-//     //     len: usize,
-//     //     mut offset: usize,
-//     //     mut path: Vec<&'store str>,
-//     // ) -> Position
-//     // where
-//     //     'a: 'store,
-//     //     HAST: HyperAST<'store, IdN = IdN::IdN>,
-//     //     for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
-//     //     IdN: Copy + Debug + NodeId,
-//     //     IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-//     // {
-//     //     if from_file {
-//     //         while let Some(p) = sss.peek_parent_node() {
-//     //             let b = stores.node_store().resolve(p.as_id());
-//     //             let t = stores.resolve_type(p.as_id());
-//     //             let o = sss.peek_offset().unwrap();
-//     //             let o: <HAST::T as WithChildren>::ChildIdx =
-//     //                 num::cast(o).expect("failed to cast, cannot put value of Idx in ChildIdx");
-//     //             let c: usize = {
-//     //                 let v: Vec<_> = b
-//     //                     .children()
-//     //                     .unwrap()
-//     //                     .before(o - one())
-//     //                     .iter_children()
-//     //                     .collect();
-//     //                 v.iter()
-//     //                     .map(|x| stores.node_store().resolve(x).try_bytes_len().unwrap())
-//     //                     .sum()
-//     //             };
-//     //             offset += c;
-//     //             if t.is_file() {
-//     //                 sss.next();
-//     //                 break;
-//     //             } else {
-//     //                 sss.next();
-//     //             }
-//     //         }
-//     //     }
-//     //     for p in sss {
-//     //         let b = stores.node_store().resolve(p.as_id());
-//     //         let l = stores.label_store().resolve(b.get_label_unchecked());
-//     //         path.push(l)
-//     //     }
-//     //     let file = PathBuf::from_iter(path.iter().rev());
-//     //     Position::new(file, offset, len)
-//     // }
-// }
 
 impl<'a, HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
 where
@@ -608,90 +504,6 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, I
         Position::new(file, offset, len)
     }
 }
-
-// impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, IdN, Idx> {
-//     fn make_position2<'store, HAST>(self, stores: &'store HAST) -> Position
-//     where
-//         'a: 'store,
-//         HAST: HyperAST<'store, IdN = IdN::IdN>,
-//         for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
-//         <<HAST as HyperAST<'store>>::T as types::WithChildren>::ChildIdx: Debug,
-//         IdN: Debug + NodeId,
-//         IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-//     {
-//         self.sps.check(stores).unwrap();
-//         let mut from_file = false;
-//         let len = if let Some(x) = self.peek_node() {
-//             let b = stores.node_store().resolve(x.as_id());
-//             let t = stores.resolve_type(x.as_id());
-//             if let Some(y) = b.try_bytes_len() {
-//                 if t.is_file() {
-//                     from_file = true;
-//                 }
-//                 y as usize
-//             } else {
-//                 0
-//             }
-//         } else {
-//             0
-//         };
-//         let offset = 0;
-//         let path = vec![];
-//         self.make_position2_aux(stores, from_file, len, offset, path)
-//     }
-
-//     fn make_position2_aux<'store: 'a, HAST>(
-//         mut self,
-//         stores: &'store HAST,
-//         from_file: bool,
-//         len: usize,
-//         mut offset: usize,
-//         mut path: Vec<&'a str>,
-//     ) -> Position
-//     where
-//         HAST: HyperAST<'store, IdN = IdN::IdN>,
-//         for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
-//         IdN: Copy + Debug + NodeId,
-//         IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-//     {
-//         if from_file {
-//             while let Some(p) = self.peek_parent_node() {
-//                 let b = stores.node_store().resolve(p.as_id());
-//                 let t = stores.resolve_type(p.as_id());
-//                 let o = self
-//                     .peek_offset()
-//                     .expect("there should be an offset if there is a parent");
-//                 let o: <HAST::T as WithChildren>::ChildIdx =
-//                     num::cast(o).expect("failed to cast, cannot put value of Idx in ChildIdx");
-//                 let c: usize = {
-//                     let v: Vec<_> = b
-//                         .children()
-//                         .unwrap()
-//                         .before(o)
-//                         .iter_children()
-//                         .collect();
-//                     v.iter()
-//                         .map(|x| stores.node_store().resolve(x).try_bytes_len().unwrap())
-//                         .sum()
-//                 };
-//                 offset += c;
-//                 if t.is_file() {
-//                     self.next();
-//                     break;
-//                 } else {
-//                     self.next();
-//                 }
-//             }
-//         }
-//         for p in self {
-//             let b = stores.node_store().resolve(p.as_id());
-//             let l = stores.label_store().resolve(b.get_label_unchecked());
-//             path.push(l)
-//         }
-//         let file = PathBuf::from_iter(path.iter().rev());
-//         Position::new(file, offset, len)
-//     }
-// }
 
 impl<TIdN: TypedNodeId, Idx> From<TypedScout<TIdN, Idx>> for Scout<TIdN::IdN, Idx> {
     fn from(value: TypedScout<TIdN, Idx>) -> Self {

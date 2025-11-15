@@ -19,7 +19,7 @@ where
     HAST: HyperAST,
     HAST::IdN: Copy,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator,
     It::Item: PrimInt,
 {
@@ -57,7 +57,7 @@ where
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization + WithChildren,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = HAST::Idx>,
 {
     let mut offset = 0;
@@ -110,7 +110,7 @@ where
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
 {
     let mut offset = 0;
     let mut x = root;

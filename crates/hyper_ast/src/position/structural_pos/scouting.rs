@@ -1,12 +1,13 @@
-use super::super::TreePathMut;
-use super::{Position, StructuralPosition, StructuralPositionStore, TreePath};
+use num::{one, traits::NumAssign, zero};
+use std::fmt::Debug;
+
+use super::{Position, StructuralPosition, StructuralPositionStore};
 use crate::PrimInt;
+use crate::position::{TreePath, TreePathMut};
 use crate::types::{
     AnyType, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, NodeId, Typed,
     WithChildren, WithSerialization,
 };
-use num::{one, traits::NumAssign, zero};
-use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
 pub struct Scout<IdN, Idx> {
@@ -109,8 +110,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
     ) -> Position
     where
         HAST: HyperAST<IdN = IdN, Idx = Idx>,
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT:
-            Typed<Type = AnyType> + WithSerialization,
+        for<'t> crate::types::LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
         HAST::Idx: Debug,
         IdN: Copy + Debug + NodeId<IdN = IdN>,
     {
@@ -201,7 +201,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
             offset += c;
             if t.is_file() {
                 from_file = false;
-            } 
+            }
         }
         sp.get(super::SpHandle(self.ancestors + 1))
             .make_position_aux(stores, from_file, len, offset, path)

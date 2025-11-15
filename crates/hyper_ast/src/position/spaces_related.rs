@@ -12,31 +12,24 @@ use crate::types::{
     WithChildren, WithSerialization,
 };
 
-pub fn path_with_spaces<'store, HAST, It: Iterator>(
+pub fn path_with_spaces<'store, HAST>(
     root: HAST::IdN,
-    no_spaces: &mut It,
+    no_spaces: &mut impl Iterator<Item = HAST::Idx>,
     stores: &'store HAST,
-) -> (Vec<It::Item>, HAST::IdN)
+) -> (Vec<HAST::Idx>, HAST::IdN)
 where
-    It::Item: Clone + PrimInt,
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT:
-        WithSerialization + WithChildren<ChildIdx = It::Item>,
+    for<'t> types::LendT<'t, HAST>: WithSerialization,
 {
     let mut x = root;
     let mut path_ids = vec![];
     let mut with_spaces = vec![];
     let mut path = vec![];
     for mut o in &mut *no_spaces {
-        // dbg!(offset);
         let b = stores.node_store().resolve(&x);
-        // dbg!(b.get_type());
-        // dbg!(o.to_usize().unwrap());
-
         let t = stores.resolve_type(&x);
-
         if t.is_directory() || t.is_file() {
             let l = stores.label_store().resolve(b.get_label_unchecked());
             path.push(l);
@@ -100,18 +93,16 @@ impl<'store, 'a, Idx: PrimInt, HAST>
         HAST,
     >
 {
-    pub fn path_with_spaces<It: Iterator>(
+    pub fn path_with_spaces<It: Iterator<Item = HAST::Idx>>(
         _root: HAST::IdN,
         _no_spaces: &mut It,
         _stores: &'store HAST,
     ) -> Filtered<Vec<It::Item>, node_filters::Full>
     where
-        It::Item: Clone + PrimInt,
         HAST::IdN: Clone,
         HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
         HAST: HyperAST,
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT:
-            WithSerialization + WithChildren<ChildIdx = It::Item>,
+        for<'t> types::LendT<'t, HAST>: WithSerialization,
     {
         todo!()
     }
@@ -164,7 +155,7 @@ where
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> types::LendT<'t, HAST>: WithSerialization,
 {
     let (pos, mut path_ids, no_spaces) =
         compute_position_and_nodes_with_no_spaces(root.clone(), offsets, stores);
@@ -180,7 +171,7 @@ where
     HAST::IdN: Clone,
     HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> types::LendT<'t, HAST>: WithSerialization,
     It: Iterator,
     It::Item: Clone + PrimInt,
 {
@@ -284,7 +275,6 @@ type FileAndOffsetFull =
     Filtered<super::file_and_offset::Position<PathBuf, usize>, node_filters::Full>;
 
 impl<'a, HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
-// WithHyperAstPositionConverter<'store, 'src, PathNoSpace<HAST::IdN, HAST::Idx>, HAST>
 where
     HAST: HyperAST,
     S: super::position_accessors::WithPreOrderOffsets<Idx = HAST::Idx>,
@@ -294,12 +284,10 @@ where
     pub fn compute_multi_position_with_no_spaces(
         &self,
     ) -> (FileAndOffsetFull, SpFull<HAST::IdN, HAST::Idx>)
-    // ) -> (Position, Vec<HAST::IdN>, Vec<HAST::Idx>)
     where
         HAST::IdN: Clone,
         HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
-        HAST: HyperAST,
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization + WithChildren,
+        for<'t> types::LendT<'t, HAST>: WithSerialization,
     {
         let stores = self.stores;
         // get root
@@ -367,13 +355,10 @@ where
     fn compute_multi_position_with_no_spaces2(
         &self,
     ) -> (FileAndOffsetFull, SpFull<HAST::IdN, HAST::Idx>)
-    // ) -> (Position, Vec<HAST::IdN>, Vec<HAST::Idx>)
     where
         HAST::IdN: Clone,
         HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
-        HAST: HyperAST,
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization + WithChildren,
-        // for<'b, 't> <<HAST as crate::types::AstLending<'t>>::RT as WithChildren>::Children: Clone,
+        for<'t> types::LendT<'t, HAST>: WithSerialization,
     {
         let stores = self.stores;
         let mut x = self.src.root();
@@ -463,13 +448,10 @@ where
     }
 
     fn compute_multi_position_with_no_spaces3<B>(&self) -> B::Prepared
-    // ) -> (Position, Vec<HAST::IdN>, Vec<HAST::Idx>)
     where
         HAST::IdN: Clone,
         HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
-        HAST: HyperAST,
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization + WithChildren,
-        // for<'t, 'b> <<HAST as crate::types::AstLending<'t>>::RT as WithChildren>::Children: Clone,
+        for<'t> types::LendT<'t, HAST>: WithSerialization,
         B: TopDownPosBuilder<HAST::IdN, HAST::Idx, usize, NoSpacePrepareParams<HAST::Idx>>
             + Default,
     {
@@ -557,12 +539,11 @@ where
     }
 
     pub fn compute_no_spaces<O, B>(&self) -> O
-    // ) -> (Position, Vec<HAST::IdN>, Vec<HAST::Idx>)
     where
         HAST::IdN: Clone,
         HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
         HAST: HyperAST,
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization + WithChildren,
+        for<'t> types::LendT<'t, HAST>: WithSerialization + WithChildren,
         // B: receivers_traits::top_down::ReceiveDir2<HAST::IdN, HAST::Idx, usize, O>
         B: building::top_down::ReceiveDir<HAST::IdN, HAST::Idx, O>
             + building::top_down::CreateBuilder,

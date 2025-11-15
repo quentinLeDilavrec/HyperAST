@@ -205,30 +205,4 @@ mod impl_receivers {
             self
         }
     }
-
-    // impl<IdN, Idx, IdO: PrimInt> top_down::ReceiveInFile<IdN, Idx, Self> for super::Position<PathBuf, T> {
-    //     type S1 = Self;
-
-    //     type S2 = Self;
-
-    //     fn finish(self) -> Self {
-    //         self
-    //     }
-    // }
-    // impl<IdN, Idx, IdO: PrimInt> top_down::ReceiveDir<IdN, Idx, Self> for super::Position<PathBuf, T> {
-    //     type SA1 = Self;
-
-    //     type SA2 = Self;
-
-    //     type SB1 = Self;
-
-    //     fn go_inside_file(mut self, file_name: &str) -> Self::SB1 {
-    //         self.file.push(file_name);
-    //         self
-    //     }
-
-    //     fn finish(self) -> Self {
-    //         self
-    //     }
-    // }
 }

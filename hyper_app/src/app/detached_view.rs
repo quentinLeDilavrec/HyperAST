@@ -2,11 +2,7 @@ use egui::Pos2;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
-use egui_addon::meta_edge::MetaEdge;
-
 use hyperast::store::nodes::fetched::NodeIdentifier;
-
-use crate::app::utils_egui::MyUiExt;
 
 use super::code_tracking::TrackingResult;
 use super::tree_view::store::FetchedHyperAST;
@@ -14,40 +10,7 @@ use super::types::CodeRange;
 
 const DEBUG: bool = false;
 
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(default)]
-pub(crate) struct DetachedViewOptions {
-    pub(crate) bezier: bool,
-    pub(crate) meta: bool,
-    pub(crate) three: bool,
-    pub(crate) cable: bool,
-}
-
-impl DetachedViewOptions {
-    #[rustfmt::skip]
-    pub(crate) fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
-        ui.checkbox(&mut self.bezier, "bezier") |
-        ui.checkbox(&mut self.meta, "meta") |
-        ui.checkbox(&mut self.three, "three") |
-        ui.add_enabled_ui(false, |ui| {
-            let r = ui.checkbox(&mut self.cable, "cable");
-            ui.wip(Some("cable is disabled"));
-            //NOTE the cable variant is not working anymore due to a lack of maintenance of a dependency
-            r
-        }).inner
-    }
-}
-
-impl Default for DetachedViewOptions {
-    fn default() -> Self {
-        Self {
-            bezier: false,
-            meta: true,
-            three: false,
-            cable: false,
-        }
-    }
-}
+pub type DetachedViewOptions = egui_addon::fancy_links::Config;
 
 pub(crate) fn ui_detached<'a>(
     ui: &mut egui::Ui,
@@ -74,55 +37,10 @@ pub(crate) fn ui_detached<'a>(
     for [m, src] in additionnal_links {
         let m_rect = *rendered.get(m).unwrap();
         let src_rect = *rendered.get(src).unwrap();
-        let m_pos = m_rect.center();
-        let src_pos = src_rect.center();
-        let b_d = m_rect.right() - src_rect.left();
-        let mut color = egui::Color32::RED;
-        let mut ctrl = (m_pos, src_pos);
-        use std::f32::consts::TAU;
-        let center_v = m_rect.center() - src_rect.center();
-        let angle = ((center_v) * epaint::vec2(0.5, 1.0)).normalized().angle() / TAU + 0.5 - 0.125;
-        if (0.03..0.25).contains(&angle) {
-        } else if (0.25..0.5).contains(&angle) {
-        } else if (0.5..0.71).contains(&angle) {
-        } else {
-            ctrl.0.x += m_rect.width() / 2.0 - b_d / 2.0 * 1.0;
-            ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
-            color = egui::Color32::BLACK;
-            if detatched_view_options.meta {
-                MetaEdge {
-                    m_pos,
-                    src_pos,
-                    m_rect,
-                    ctrl,
-                    src_rect,
-                    color,
-                }
-                .show(ui);
-            }
-            if detatched_view_options.bezier {
-                let link = epaint::CubicBezierShape::from_points_stroke(
-                    [m_pos, ctrl.0, ctrl.1, src_pos],
-                    false,
-                    egui::Color32::TRANSPARENT,
-                    (5.0, color),
-                );
-                let tolerance = (m_pos.x - src_pos.x).abs() * 0.01;
-                ui.painter().extend(
-                    link.to_path_shapes(Some(tolerance), None)
-                        .into_iter()
-                        .map(|x| epaint::Shape::Path(x)),
-                );
-            }
-            if detatched_view_options.three {
-                let points = vec![m_pos, ctrl.0, ctrl.1, src_pos];
-                let link = epaint::PathShape::line(points, (1.0, color));
-                ui.painter().add(link);
-            }
-            continue;
-        }
-        let link = epaint::PathShape::line(vec![m_pos, src_pos], (1.0, color));
-        ui.painter().add(link);
+        detatched_view_options
+            .source(src_rect)
+            .sink(m_rect)
+            .paint(ui.painter());
     }
 }
 
@@ -383,56 +301,7 @@ fn ui_detached_node(
             }
             resp.inner.element.rect
         };
-        if options.cable {}
-        let m_pos = m_rect.center();
-        let src_pos = src_rect.center();
-        let b_d = m_rect.right() - src_rect.left();
-        let mut color = egui::Color32::RED;
-        let mut ctrl = (m_pos, src_pos);
-        use std::f32::consts::TAU;
-        let center_v = m_rect.center() - src_rect.center();
-        let angle = ((center_v) * epaint::vec2(0.5, 1.0)).normalized().angle() / TAU + 0.5 - 0.125;
-        if (0.03..0.25).contains(&angle) {
-        } else if (0.25..0.5).contains(&angle) {
-        } else if (0.5..0.71).contains(&angle) {
-        } else {
-            ctrl.0.x += m_rect.width() / 2.0 - b_d / 2.0 * 1.0;
-            ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
-            color = egui::Color32::BLACK;
-            if options.meta {
-                MetaEdge {
-                    m_pos,
-                    src_pos,
-                    m_rect,
-                    ctrl,
-                    src_rect,
-                    color,
-                }
-                .show(ui);
-            }
-            if options.bezier {
-                let link = epaint::CubicBezierShape::from_points_stroke(
-                    [m_pos, ctrl.0, ctrl.1, src_pos],
-                    false,
-                    egui::Color32::TRANSPARENT,
-                    (5.0, color),
-                );
-                let tolerance = (m_pos.x - src_pos.x).abs() * 0.01;
-                ui.painter().extend(
-                    link.to_path_shapes(Some(tolerance), None)
-                        .into_iter()
-                        .map(|x| epaint::Shape::Path(x)),
-                );
-            }
-            if options.three {
-                let points = vec![m_pos, ctrl.0, ctrl.1, src_pos];
-                let link = epaint::PathShape::line(points, (1.0, color));
-                ui.painter().add(link);
-            }
-            continue;
-        }
-        let link = epaint::PathShape::line(vec![m_pos, src_pos], (1.0, color));
-        ui.painter().add(link);
+        options.source(src_rect).sink(m_rect).paint(ui.painter());
     }
 }
 

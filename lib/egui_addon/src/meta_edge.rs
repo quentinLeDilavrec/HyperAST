@@ -15,7 +15,10 @@ impl MetaEdge {
         self.paint(ui.painter());
     }
     pub fn paint(&self, painter: &egui::Painter) -> ShapeIdx {
-        painter.add(compute_mesh(self))
+        painter.add(self.shape())
+    }
+    pub(crate) fn shape(&self) -> Shape {
+        compute_mesh(self).into()
     }
 }
 

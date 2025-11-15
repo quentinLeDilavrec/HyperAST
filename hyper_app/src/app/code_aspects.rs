@@ -232,7 +232,7 @@ impl ComputeConfigAspectViews {
     }
 }
 
-pub(crate) struct HightLightHandle<'a> {
+pub(crate) struct HighLightHandle<'a> {
     pub path: &'a [usize],
     /// primary key
     pub color: &'a egui::Color32,
@@ -285,7 +285,7 @@ impl FetchedView {
         api_addr: &str,
         aspects: &ComputeConfigAspectViews,
         focus: Option<Focus<'_>>,
-        hightlights: Vec<HightLightHandle<'_>>,
+        hightlights: Vec<HighLightHandle<'_>>,
         additions: Option<&[u32]>,
         deletions: Option<&[u32]>,
         path: &str,

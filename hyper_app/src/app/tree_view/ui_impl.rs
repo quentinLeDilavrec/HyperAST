@@ -4,7 +4,7 @@ use egui::Widget;
 use egui_addon::syntax_highlighting as syntax_highlighter;
 
 use crate::app::code_aspects::Focus;
-use crate::app::code_aspects::HightLightHandle;
+use crate::app::code_aspects::HighLightHandle;
 use crate::app::long_tracking::TARGET_COLOR;
 
 use super::{Action, FetchedViewImpl, PrefillCache};
@@ -880,7 +880,7 @@ impl<'a> FetchedViewImpl<'a> {
             vec_extract_if_polyfill::MakeExtractIf::extract_if(&mut self.hightlights, |handle| {
                 !handle.path.is_empty() && handle.path[0] == i
             })
-            .map(|handle| HightLightHandle {
+            .map(|handle| HighLightHandle {
                 path: &handle.path[1..],
                 color: handle.color,
                 screen_pos: handle.screen_pos,
@@ -1136,7 +1136,7 @@ impl<'a> FetchedViewImpl<'a> {
 
 fn selection_highlight(
     ui: &mut egui::Ui,
-    handle: &mut HightLightHandle<'_>,
+    handle: &mut HighLightHandle<'_>,
     min: epaint::Pos2,
     rect: epaint::Rect,
     root_ui_id: egui::Id,

@@ -13,7 +13,7 @@ use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
 
 use crate::app::code_aspects::Focus;
 
-use super::code_aspects::{FetchedView, HightLightHandle, remote_fetch_node_old};
+use super::code_aspects::{FetchedView, HighLightHandle, remote_fetch_node_old};
 use super::code_tracking::{
     FetchedFiles, RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
 };
@@ -23,7 +23,7 @@ use super::types::{CodeRange, Commit, ComputeConfigAspectViews, FileIdentifier, 
 use super::utils_egui::MyUiExt as _;
 use crate::utils_poll::{AccumulableResult, Buffered, MultiBuffered, Resource};
 
-use super::detached_view::DetatchedViewOptions;
+use super::detached_view::DetachedViewOptions;
 
 type AccumulableTrackingResults = AccumulableResult<TrackingResultsWithChanges, Vec<String>>;
 type LongTrackingResults = VecDeque<(
@@ -39,7 +39,7 @@ pub(crate) struct LongTracking {
     pub(crate) ser_view: bool,
     pub(crate) tree_view: bool,
     pub(crate) detatched_view: bool,
-    pub(crate) detatched_view_options: DetatchedViewOptions,
+    pub(crate) detatched_view_options: DetachedViewOptions,
     pub(crate) origins: Vec<CodeRange>,
     pub(crate) origin_index: usize,
     #[serde(skip)] // TODO remove that
@@ -1307,7 +1307,7 @@ pub(crate) fn show_tree_view(
                 blue_pos.insert(*i, None);
             }
             for (i, b_p) in blue_pos.iter_mut() {
-                hightlights.push(HightLightHandle {
+                hightlights.push(HighLightHandle {
                     path: &curr_view
                         .effective_targets
                         .iter()
@@ -1325,7 +1325,7 @@ pub(crate) fn show_tree_view(
                     unreachable!()
                 };
                 green_pos.insert(*i, None);
-                hightlights.push(HightLightHandle {
+                hightlights.push(HighLightHandle {
                     path: &foc.path[..],
                     color: &TARGET_COLOR,
                     id: *i,
@@ -1396,7 +1396,7 @@ pub(crate) fn show_tree_view(
                 }
                 for (i, g_p) in green_pos.iter_mut() {
                     let matched = curr_view.matcheds.iter().find(|x| x.1 == *i).unwrap();
-                    hightlights.push(HightLightHandle {
+                    hightlights.push(HighLightHandle {
                         path: &matched.0.path[..],
                         color: &TARGET_COLOR,
                         id: *i,

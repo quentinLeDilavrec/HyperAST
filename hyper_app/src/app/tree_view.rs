@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 
-use super::code_aspects::{HightLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids};
+use super::code_aspects::{HighLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids};
 
 pub use hyperast::store::nodes::fetched::SimplePacked;
 use hyperast::types::{AnyType, Labeled, WithChildren, WithStats};
@@ -59,7 +59,7 @@ pub(crate) struct FetchedViewImpl<'a> {
     pub(super) prefill_cache: Option<PrefillCache>,
     min_before_count: usize,
     draw_count: usize,
-    hightlights: Vec<HightLightHandle<'a>>,
+    hightlights: Vec<HighLightHandle<'a>>,
     focus: Option<super::code_aspects::Focus<'a>>,
     path: Offsets,
     root_ui_id: egui::Id,
@@ -84,7 +84,7 @@ impl<'a> FetchedViewImpl<'a> {
         store: Arc<store::FetchedHyperAST>,
         aspects: &'a super::types::ComputeConfigAspectViews,
         take: Option<PrefillCache>,
-        hightlights: Vec<HightLightHandle<'a>>,
+        hightlights: Vec<HighLightHandle<'a>>,
         focus: Option<super::code_aspects::Focus<'a>>,
         path: Offsets,
         root_ui_id: egui::Id,

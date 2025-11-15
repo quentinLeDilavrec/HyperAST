@@ -16,14 +16,14 @@ const DEBUG: bool = false;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
-pub(crate) struct DetatchedViewOptions {
+pub(crate) struct DetachedViewOptions {
     pub(crate) bezier: bool,
     pub(crate) meta: bool,
     pub(crate) three: bool,
     pub(crate) cable: bool,
 }
 
-impl DetatchedViewOptions {
+impl DetachedViewOptions {
     #[rustfmt::skip]
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.checkbox(&mut self.bezier, "bezier") |
@@ -38,7 +38,7 @@ impl DetatchedViewOptions {
     }
 }
 
-impl Default for DetatchedViewOptions {
+impl Default for DetachedViewOptions {
     fn default() -> Self {
         Self {
             bezier: false,
@@ -54,7 +54,7 @@ pub(crate) fn ui_detached<'a>(
     store: Arc<FetchedHyperAST>,
     timeline_window: egui::Rect,
     total_cols: usize,
-    detatched_view_options: &DetatchedViewOptions,
+    detatched_view_options: &DetachedViewOptions,
     additionnal_links: &mut Vec<[CodeRange; 2]>,
     it: impl Iterator<Item = (usize, &'a mut [TrackingResult])>,
 ) {
@@ -121,7 +121,7 @@ pub(crate) fn ui_detached<'a>(
 fn ui_detached_nodes<'a>(
     ui: &mut egui::Ui,
     store: Arc<FetchedHyperAST>,
-    options: &DetatchedViewOptions,
+    options: &DetachedViewOptions,
     col_width: f32,
     it: impl Iterator<Item = (f32, &'a mut [TrackingResult])>,
 ) -> DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>> {
@@ -148,7 +148,7 @@ fn ui_detached_nodes<'a>(
 fn ui_detached_node(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
-    options: &DetatchedViewOptions,
+    options: &DetachedViewOptions,
     col_width: f32,
     line_id: egui::Id,
     default_x: f32,
@@ -430,7 +430,7 @@ struct DetachedElementResp<R = egui::Response, T = R> {
 fn show_detached_element_aux(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
-    global_opt: &DetatchedViewOptions,
+    global_opt: &DetachedViewOptions,
     x: &CodeRange,
     id: egui::Id,
     default_pos: (f32, f32),
@@ -466,7 +466,7 @@ fn show_detached_element_aux(
 fn show_element(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
-    _global_opt: &DetatchedViewOptions,
+    _global_opt: &DetachedViewOptions,
     x: &CodeRange,
     id: egui::Id,
     options: &O,

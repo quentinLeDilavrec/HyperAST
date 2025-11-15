@@ -61,7 +61,7 @@ impl crate::HyperApp {
                                     .open_commits(proj, |data, cid| data.aspects.commit.id = cid);
                             }
                         }
-                        if path_resp.changed() && !self.data.aspects.commit.id.is_empty() {
+                        if path_resp.changed() {
                             use crate::app::code_aspects::remote_fetch_node_old as fetch;
                             self.data.aspects_result = Some(fetch(
                                 ui.ctx(),
@@ -348,12 +348,7 @@ impl crate::HyperApp {
                                     .on_hover_text(format!("{}\n{}", err.head(), err.content()));
                             }
                         }
-                        ui.label(&format!(
-                            "{}/{}/{}",
-                            repo.user,
-                            repo.name,
-                            &c[..6.min(c.len())]
-                        ));
+                        ui.label(&format!("{}/{}/{}", repo.user, repo.name, &c.prefix(6)));
                         if q_res.content.is_waiting() {
                             ui.spinner();
                             let synced = Self::sync_query_results(q_res);
@@ -389,12 +384,7 @@ impl crate::HyperApp {
                             }
                             compute_button = ui.add(egui::Button::new("⏵"));
                         }
-                        ui.label(&format!(
-                            "{}/{}/{}",
-                            repo.user,
-                            repo.name,
-                            &c[..6.min(c.len())]
-                        ));
+                        ui.label(&format!("{}/{}/{}", repo.user, repo.name, &c.prefix(6)));
                         let query_data = &self.data.queries[q_res.query];
                         // let current_lang = &query_data.lang;
                         let w = &mut ui.style_mut().visuals.widgets;
@@ -447,7 +437,7 @@ impl crate::HyperApp {
                         timeout,
                         precomp,
                     },
-                    commit_slice.iter_mut().skip(1).map(|x| x.to_string()),
+                    commit_slice.iter_mut().skip(1).map(|x| *x),
                 );
                 q_res.content.buffer(prom);
             }

@@ -12,6 +12,7 @@ use hyperast::store::nodes::fetched::NodeIdentifier;
 use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
 
 use crate::app::code_aspects::Focus;
+use crate::app::types::CommitId;
 
 use super::code_aspects::{FetchedView, HighLightHandle, remote_fetch_node_old};
 use super::code_tracking::{
@@ -166,7 +167,7 @@ pub(crate) fn project_modal_handler(
     let code = data.long_tracking.origins.get_mut(0).unwrap();
     let commit = &mut code.file.commit;
     commit.repo = repo.clone();
-    commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    commit.id = *commits.iter_mut().next().unwrap();
     super::ProjectId::INVALID
 }
 
@@ -1461,11 +1462,11 @@ fn show_commitid_info(
     ui: &mut egui::Ui,
     code_ranges: Vec<&mut CodeRange>,
 ) {
-    let f_commit = |ui: &mut egui::Ui, id: &str| {
+    let f_commit = |ui: &mut egui::Ui, id: &CommitId| {
         if ui.available_width() > 300.0 {
             ui.label(format!("commit {}", id));
         } else {
-            let label = ui.label(format!("commit {}", &id[..8]));
+            let label = ui.label(format!("commit {}", id.prefix(8)));
             if label.hovered() {
                 egui::Tooltip::always_open(
                     ui.ctx().clone(),
@@ -1474,7 +1475,7 @@ fn show_commitid_info(
                     &label,
                 )
                 .show(|ui| {
-                    ui.label(id);
+                    ui.label(id.as_str());
                     ui.label("CTRL+C to copy (and send in the debug console)");
                 });
                 if ui.input_mut(|mem| mem.consume_shortcut(&SC_COPY)) {

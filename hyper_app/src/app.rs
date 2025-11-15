@@ -9,6 +9,7 @@ use strum::IntoEnumIterator;
 
 use egui_addon::{code_editor, egui_utils::radio_collapsing};
 
+use crate::app::types::CommitId;
 use crate::command::{CommandReceiver, CommandSender, UICommand};
 use crate::command_palette::CommandPalette;
 use crate::utils_poll::{Buffered3, MultiBuffered2};
@@ -96,15 +97,15 @@ pub struct HyperApp {
     #[serde(skip)]
     notifs: NotificationUi,
 
-    selected_commit: Option<(ProjectId, String)>,
-    selected_baseline: Option<String>,
+    selected_commit: Option<(ProjectId, CommitId)>,
+    selected_baseline: Option<CommitId>,
 }
 
 struct ProjectsOrCommitsModal {
     modal_project: re_ui::modal::ModalHandler,
     modal_commits: re_ui::modal::ModalHandler,
     chosen_project: Option<ProjectId>,
-    commit_cb: fn(&mut AppData, types::CommitId),
+    commit_cb: fn(&mut AppData, CommitId),
     project_cb: fn(&mut AppData, ProjectId) -> ProjectId,
 }
 
@@ -127,7 +128,7 @@ impl ProjectsOrCommitsModal {
         self.project_cb = cb;
     }
 
-    pub fn open_commits(&mut self, project_id: ProjectId, cb: fn(&mut AppData, types::CommitId)) {
+    pub fn open_commits(&mut self, project_id: ProjectId, cb: fn(&mut AppData, CommitId)) {
         self.chosen_project = Some(project_id);
         self.commit_cb = cb;
         self.modal_commits.open();
@@ -218,7 +219,7 @@ impl Default for QueryData {
     }
 }
 
-// TODO plit by repo and query, maybe including config variations... but not commit limit for example
+// TODO split by repo and query, maybe including config variations... but not commit limit for example
 #[derive(Default, Debug)]
 struct ResultsPerCommit {
     // prop: cols.len() == floats.len() + ints.len()
@@ -232,17 +233,17 @@ struct ResultsPerCommit {
 }
 
 impl ResultsPerCommit {
-    fn offset(&self, commit: &str) -> Option<u32> {
+    fn offset(&self, commit: &CommitId) -> Option<u32> {
         let mut c: [u8; 8] = [0; 8];
-        c.copy_from_slice(&commit.as_bytes()[..8]);
+        c.copy_from_slice(&commit.0[..8]);
         Some(self.map.get(&c)?.1)
     }
 
     fn offset_with_variation(
         &self,
-        commit: &str,
-        before: Option<&str>,
-        after: Option<&str>,
+        commit: &CommitId,
+        before: Option<&CommitId>,
+        after: Option<&CommitId>,
     ) -> Option<u32> {
         let offset = self._get_offset(commit)?;
         match (before, after) {
@@ -262,7 +263,7 @@ impl ResultsPerCommit {
         crate::app::utils::join(self.ints.iter().map(|v| v[offset as usize]), "\n").to_string()
     }
 
-    fn try_diff_as_string(&self, c1: &str, c2: &str) -> Option<String> {
+    fn try_diff_as_string(&self, c1: &CommitId, c2: &CommitId) -> Option<String> {
         let c1 = self._get_offset(c1)?;
         let c2 = self._get_offset(c2)?;
         if c1 == c2 {
@@ -274,9 +275,9 @@ impl ResultsPerCommit {
         Some(s)
     }
 
-    fn _get_offset(&self, commit: &str) -> Option<u32> {
+    fn _get_offset(&self, commit: &CommitId) -> Option<u32> {
         let mut c: [u8; 8] = [0; 8];
-        c.copy_from_slice(&commit.as_bytes()[..8]);
+        c.copy_from_slice(&commit.0[..8]);
         Some(self.map.get(&c)?.1)
     }
 
@@ -300,14 +301,14 @@ impl ResultsPerCommit {
 
     fn insert(
         &mut self,
-        commit: &str,
+        commit: &CommitId,
         // galley: impl Fn() -> Arc<egui::Galley>,
         comp_time: f32,
         floats: &[f32],
         ints: &[i32],
     ) {
         let mut c: [u8; 8] = [0; 8];
-        c.copy_from_slice(&commit.as_bytes()[..8]);
+        c.copy_from_slice(&commit.0[..8]);
         match self.map.entry(c) {
             std::collections::hash_map::Entry::Occupied(mut occ) => {
                 let (t, v) = occ.get_mut();
@@ -415,7 +416,7 @@ struct QueryResults {
 type CommitMdPayload = (commit::CommitMetadata, Option<(Commit, ProjectId)>);
 
 type CommitMdStore = MultiBuffered2<
-    types::CommitId,
+    CommitId,
     Result<CommitMdPayload, String>,
     Result<commit::CommitMetadata, String>,
 >;
@@ -913,8 +914,8 @@ struct MyTileTreeBehavior<'a> {
     tabs: &'a mut Tabs,
     maximized: &'a mut Option<TabId>,
     edited: bool,
-    selected_commit: &'a mut Option<(ProjectId, String)>,
-    selected_baseline: &'a mut Option<String>,
+    selected_commit: &'a mut Option<(ProjectId, CommitId)>,
+    selected_baseline: &'a mut Option<CommitId>,
     to_hide: Vec<egui_tiles::TileId>,
     tab_to_add: Option<TabId>,
 }
@@ -1150,7 +1151,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     if selected.0 == *proj_id {
                         let id = egui::Id::new(proj_id);
                         let i = ui.data_mut(|w| {
-                            let m: &mut (Option<(ProjectId, types::CommitId)>, usize) =
+                            let m: &mut (Option<(ProjectId, CommitId)>, usize) =
                                 w.get_temp_mut_or_default(id);
                             if m.0.as_ref() != Some(selected) {
                                 m.0 = Some(selected.clone());
@@ -1175,10 +1176,9 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         (&res.head, None, res.rows.lock().unwrap().1.as_slice()),
                         &mut selected_commit,
                         |cid| {
-                            (self.data.fetched_commit_metadata.get(cid)?.as_ref())
-                                .ok()?
-                                .message
-                                .clone()
+                            let md_fetch = &self.data.fetched_commit_metadata;
+                            let commit_metadata = md_fetch.get(&cid.parse().unwrap())?;
+                            (commit_metadata.as_ref()).ok()?.message.clone()
                         },
                     )
                 });
@@ -1767,7 +1767,7 @@ fn show_tree_view(
     selected_projects: &mut SelectedProjects,
     long_tacking: &mut long_tracking::LongTracking,
     store: Arc<FetchedHyperAST>,
-    commit: &(ProjectId, String),
+    commit: &(ProjectId, CommitId),
     api_addr: &String,
     curr_view: &mut long_tracking::ColView<'_>,
 ) {
@@ -1836,7 +1836,7 @@ fn show_hunks(
     fetched_files: &mut code_tracking::FetchedFiles,
     api_addr: &String,
     x: &DetailsResults,
-    selected_commit: &(ProjectId, String),
+    selected_commit: &(ProjectId, CommitId),
 ) {
     const B: f32 = 15.;
     const H: f32 = 800.;
@@ -1904,7 +1904,7 @@ fn show_hunks(
 fn update_queries_differential_results(
     ui: &mut egui::Ui,
     queries: impl std::ops::Index<QueryId, Output = QueryData>,
-    selected_baseline: &String,
+    selected_baseline: &CommitId,
     qid: QueryId,
     differential: &mut QueriesDifferentialResults,
 ) -> (bool, bool) {
@@ -1933,8 +1933,8 @@ fn compute_queries_differential_results(
     proj_id: ProjectId,
     qid: QueryId,
     data: &mut AppData,
-    selected_baseline: &String,
-    selected_commit: &(ProjectId, String),
+    selected_baseline: &CommitId,
+    selected_commit: &(ProjectId, CommitId),
 ) {
     let pid = selected_commit.0;
     if pid != proj_id {
@@ -2002,11 +2002,7 @@ impl AppData {
     fn show_commits(&mut self, ui: &mut egui::Ui, i: ProjectId) {
         self._show_commits_selection::<false>(ui, i, 0..isize::MAX);
     }
-    fn show_commits_selection_fast(
-        &mut self,
-        ui: &mut egui::Ui,
-        i: ProjectId,
-    ) -> Option<types::CommitId> {
+    fn show_commits_selection_fast(&mut self, ui: &mut egui::Ui, i: ProjectId) -> Option<CommitId> {
         let (_frame, area) = utils_egui::framed_scroll_area_aux();
         let text_style = egui::TextStyle::Body;
         let row_height = ui.text_style_height(&text_style);
@@ -2028,7 +2024,7 @@ impl AppData {
         ui: &mut egui::Ui,
         i: ProjectId,
         mut range: std::ops::Range<isize>,
-    ) -> Option<types::CommitId> {
+    ) -> Option<CommitId> {
         let text_style = egui::TextStyle::Body;
         let row_height = ui.text_style_height(&text_style);
         let space = ui.style().spacing.item_spacing.y;
@@ -2103,15 +2099,15 @@ impl AppData {
 /// imperative version
 fn show_commits_as_tree_it<'a, const BUTTON: bool>(
     ui: &mut egui::Ui,
-    id: &'a types::CommitId,
+    id: &'a CommitId,
     commit_md: &'a CommitMdStore,
-    to_fetch: &mut HashSet<String>,
+    to_fetch: &mut HashSet<CommitId>,
     d: usize,
-    clicked: &mut Option<types::CommitId>,
+    clicked: &mut Option<CommitId>,
     mut range: std::ops::Range<isize>,
     row_height: f32,
 ) -> usize {
-    let mut shown = HashSet::<&types::CommitId>::default();
+    let mut shown = HashSet::<&CommitId>::default();
     let mut queue = vec![(id, d)];
     let mut total = 0;
     while let Some((id, d)) = queue.pop() {
@@ -2121,7 +2117,7 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
                 ui.horizontal(|ui| {
                     ui.label("fetching");
                     ui.add_space(2.0);
-                    ui.label(id);
+                    ui.label(id.to_string());
                     ui.add_space(2.0);
                     ui.spinner();
                     ui.label(waiting.to_string());
@@ -2130,8 +2126,8 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
                 range.start -= 1;
                 range.end -= 1;
             }
-            if waiting < 30 && commit_md.is_absent(id.as_str()) {
-                to_fetch.insert(id.to_string());
+            if waiting < 30 && commit_md.is_absent(id) {
+                to_fetch.insert(*id);
             }
             continue;
         };
@@ -2139,7 +2135,7 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
             ui.horizontal(|ui| {
                 ui.error_label(err);
                 if ui.button("Retry").clicked() {
-                    to_fetch.insert(id.to_string());
+                    to_fetch.insert(*id);
                 }
             });
             total += 2;
@@ -2176,8 +2172,8 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
             if d + i * i >= 100 {
                 break;
             }
-            if waiting < 30 && commit_md.is_absent(a.as_str()) {
-                to_fetch.insert(a.to_string());
+            if waiting < 30 && commit_md.is_absent(a) {
+                to_fetch.insert(*a);
             }
         }
         if range.end < -10 {
@@ -2189,11 +2185,11 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
 
 fn show_commits_as_tree<'a, const BUTTON: bool>(
     ui: &mut egui::Ui,
-    id: &types::CommitId,
+    id: &CommitId,
     commit_md: &CommitMdStore,
-    to_fetch: &mut HashSet<String>,
+    to_fetch: &mut HashSet<CommitId>,
     d: usize,
-    clicked: &mut Option<types::CommitId>,
+    clicked: &mut Option<CommitId>,
     mut range: std::ops::Range<isize>,
     row_height: f32,
 ) -> usize {
@@ -2210,13 +2206,13 @@ fn show_commits_as_tree<'a, const BUTTON: bool>(
         ui.horizontal(|ui| {
             ui.label("fetching");
             ui.add_space(2.0);
-            ui.label(id);
+            ui.label(id.to_string());
             ui.add_space(2.0);
             ui.spinner();
             ui.label(waiting.to_string());
         });
-        if waiting < 30 && commit_md.is_absent(id.as_str()) {
-            to_fetch.insert(id.to_string());
+        if waiting < 30 && commit_md.is_absent(id) {
+            to_fetch.insert(*id);
         }
         return total;
     };
@@ -2224,7 +2220,7 @@ fn show_commits_as_tree<'a, const BUTTON: bool>(
         ui.horizontal(|ui| {
             ui.error_label(err);
             if ui.button("Retry").clicked() {
-                to_fetch.insert(id.to_string());
+                to_fetch.insert(*id);
             }
         });
 
@@ -2262,8 +2258,8 @@ fn show_commits_as_tree<'a, const BUTTON: bool>(
         if d + i * i >= limit {
             break;
         }
-        if waiting < 30 && commit_md.is_absent(a.as_str()) {
-            to_fetch.insert(a.to_string());
+        if waiting < 30 && commit_md.is_absent(a) {
+            to_fetch.insert(*a);
         }
     }
     total
@@ -2271,8 +2267,8 @@ fn show_commits_as_tree<'a, const BUTTON: bool>(
 
 fn show_commit_row<const BUTTON: bool>(
     ui: &mut egui::Ui,
-    id: &String,
-    clicked: &mut Option<String>,
+    id: &CommitId,
+    clicked: &mut Option<CommitId>,
     md: &commit::CommitMetadata,
 ) {
     let text = egui::RichText::new(format!("{}", id)).monospace();
@@ -2304,12 +2300,12 @@ fn show_commit_row<const BUTTON: bool>(
             }
             ui.label("Parents:");
             for id in &md.parents {
-                ui.monospace(id);
+                ui.monospace(id.to_string());
             }
         });
     });
     if BUTTON && button.clicked() {
-        *clicked = Some(id.to_string());
+        *clicked = Some(*id);
     }
 }
 
@@ -2317,11 +2313,11 @@ fn show_hunks_header(
     ui: &mut egui::Ui,
     format: &mut ResultFormat,
     data: &mut AppData,
-    selected_baseline: &mut Option<String>,
-    selected_commit: &mut Option<(ProjectId, String)>,
+    selected_baseline: &mut Option<CommitId>,
+    selected_commit: &mut Option<(ProjectId, CommitId)>,
 ) -> bool {
     let oid = &selected_commit.as_ref().unwrap().1;
-    ui.label(oid);
+    ui.label(oid.as_str());
     let Some(selected_baseline) = &selected_baseline else {
         *format = ResultFormat::Table;
         return true;

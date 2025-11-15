@@ -156,7 +156,7 @@ pub(crate) fn project_modal_handler(
     };
     let commit = &mut data.tsg.content.commit;
     commit.repo = repo.clone();
-    commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    commit.id = *commits.iter_mut().next().unwrap();
     super::ProjectId::INVALID
 }
 

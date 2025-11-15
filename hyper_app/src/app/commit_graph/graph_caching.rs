@@ -7,6 +7,7 @@ use crate::app::ResultsPerCommit;
 use crate::app::commit::CommitsLayoutTimed;
 use crate::app::commit::compute_commit_layout_timed;
 use crate::app::querying::StreamedComputeResults;
+use crate::app::types::CommitId;
 use crate::app::utils_commit;
 
 pub(crate) type GuardedCache<'a, T, U> =
@@ -49,16 +50,21 @@ impl
 pub struct ComputeLayout;
 
 impl
-    egui::util::cache::ComputerMut<((&str, &str, usize), &super::CommitMdStore), CommitsLayoutTimed>
-    for ComputeLayout
+    egui::util::cache::ComputerMut<
+        ((&str, &CommitId, usize), &super::CommitMdStore),
+        CommitsLayoutTimed,
+    > for ComputeLayout
 {
     fn compute(
         &mut self,
-        ((name, target, _), fetched_commit_metadata): ((&str, &str, usize), &super::CommitMdStore),
+        ((name, target, _), fetched_commit_metadata): (
+            (&str, &CommitId, usize),
+            &super::CommitMdStore,
+        ),
     ) -> CommitsLayoutTimed {
         compute_commit_layout_timed(
             |id| fetched_commit_metadata.get(id)?.as_ref().ok().cloned(),
-            Some((name.to_string(), target.to_string())).into_iter(),
+            Some((name.to_string(), *target)).into_iter(),
         )
     }
 }

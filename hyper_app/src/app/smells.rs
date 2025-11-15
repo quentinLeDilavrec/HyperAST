@@ -46,6 +46,7 @@ use super::types;
 use super::types::{CodeRange, Commit, SelectedConfig};
 use super::utils_edition::MakeHighlights;
 use crate::app::code_tracking::try_fetch_remote_file;
+use crate::app::types::CommitId;
 use crate::utils_poll::{Remote, Resource};
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -141,7 +142,7 @@ pub(crate) fn project_modal_handler(
     data.smells_diffs_result = None;
     let commit = &mut data.smells.commits.as_mut().unwrap().commit;
     commit.repo = repo.clone();
-    commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    commit.id = *commits.iter_mut().next().unwrap();
     super::ProjectId::INVALID
 }
 
@@ -156,7 +157,7 @@ pub(crate) struct Config {
     pub(crate) bads: Option<Vec<usize>>,
 }
 impl Config {
-    pub(crate) fn set_commit_id(&mut self, cid: String) {
+    pub(crate) fn set_commit_id(&mut self, cid: CommitId) {
         self.commits.as_mut().expect("query config").commit.id = cid;
     }
 
@@ -294,8 +295,8 @@ pub(crate) fn show_config(
     if double_ended_slider.changed() {
         smells.bads = None
     };
-    let text = "displays only queries in the given range";
-    double_ended_slider.on_hover_text_at_pointer(text);
+    // let text = "displays only queries in the given range";
+    // double_ended_slider.on_hover_text_at_pointer(text);
     (resp_repo, resp_commit)
 }
 
@@ -678,7 +679,7 @@ pub(crate) fn show_query(
 
     let mut layouter = |ui: &egui::Ui, code: &dyn egui::TextBuffer, wrap_width: f32| {
         use egui_extras::syntax_highlighting::highlight;
-        let mut layout_job = highlight(ui.ctx(), ui.style(), &theme, code.as_str(), language);
+        let mut layout_job = highlight(ui.ctx(), ui.style(), &theme, &code.as_str(), language);
         // syntax_highlighter::highlight(ui.ctx(), &theme, code, language);
         if false {
             layout_job.wrap.max_width = wrap_width;
@@ -1041,7 +1042,8 @@ pub(super) fn fetch_results(
         simple_matching: smells.simple_matching,
         prepro_matching: smells.prepro_matching,
     };
-    let mut request = ehttp::Request::post(&url, serde_json::to_vec(&examples).unwrap());
+    let body = serde_json::to_vec(&examples).unwrap();
+    let mut request = ehttp::Request::post(&url, body);
     request.headers.insert(
         "Content-Type".to_string(),
         "application/json; charset=utf-8".to_string(),

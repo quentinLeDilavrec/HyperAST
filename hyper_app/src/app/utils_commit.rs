@@ -197,7 +197,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
                 self.commit.repo.user = split[1].to_string();
                 self.commit.repo.name = split[2].to_string();
                 assert_eq!("commit", split[3].to_string());
-                self.commit.id = split[4].to_string();
+                self.commit.id = split[4].parse().unwrap();
             }
             self.str.get((&self.forge, &self.commit));
             return text.chars().count();
@@ -214,7 +214,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
         }
         self.commit.repo.user = split[1].to_string();
         self.commit.repo.name = split[2].to_string();
-        self.commit.id = split[3].to_string();
+        self.commit.id = split[3].parse().unwrap();
 
         self.str.get((&self.forge, &self.commit));
 
@@ -249,7 +249,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
                 self.commit.repo.user = split[1].to_string();
                 self.commit.repo.name = split[2].to_string();
                 assert_eq!("commit", split[3].to_string());
-                self.commit.id = split[4].to_string();
+                self.commit.id = split[4].parse().unwrap();
             }
             self.str.get((&self.forge, &self.commit));
             return text.chars().count();
@@ -270,7 +270,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
         }
         self.commit.repo.user = split[1].to_string();
         self.commit.repo.name = split[2].to_string();
-        self.commit.id = split[3].to_string();
+        self.commit.id = split[3].parse().unwrap();
 
         self.str.get((&self.forge, &self.commit));
 
@@ -296,7 +296,7 @@ impl Commit {
             ui.button(&self.repo.user) | ui.label("/") | ui.button(&self.repo.name) | ui.label("/")
         };
         let (resp_repo, resp_commit) = ui
-            .horizontal_wrapped(|ui| (show_repo(ui), ui.button(&self.id)))
+            .horizontal_wrapped(|ui| (show_repo(ui), ui.button(self.id.as_str())))
             .inner;
         let resp_repo = resp_repo.interact(egui::Sense::click());
         let resp_commit = resp_commit.interact(egui::Sense::click());

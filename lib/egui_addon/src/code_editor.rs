@@ -231,7 +231,7 @@ pub fn show_edit_syntect(ui: &mut egui::Ui, code: &mut EditAwareString) {
             ui.ctx(),
             ui.style(),
             &theme,
-            string.as_str(),
+            &string.as_str(),
             language,
         );
         ui.fonts(|f| f.layout_job(layout_job))

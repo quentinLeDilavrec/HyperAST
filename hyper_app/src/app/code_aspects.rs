@@ -211,7 +211,7 @@ pub(crate) fn project_modal_handler(
         Err(value) => return value,
     };
     data.aspects.commit.repo = repo.clone();
-    data.aspects.commit.id = commits.iter_mut().next().cloned().unwrap_or_default();
+    data.aspects.commit.id = commits.iter_mut().next().copied().unwrap();
     data.aspects_result = None;
     super::ProjectId::INVALID
 }

@@ -297,7 +297,7 @@ impl CodeEditor {
                                     ui.ctx(),
                                     ui.style(),
                                     &theme,
-                                    string.as_str(),
+                                    &string.as_str(),
                                     language,
                                 );
                                 // layout_job.wrap.max_width = wrap_width; // no wrapping

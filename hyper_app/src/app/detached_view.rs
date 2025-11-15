@@ -336,7 +336,7 @@ fn show_detached_element_aux(
             .fixed_pos(p)
             .anchor(egui::Align2::LEFT_BOTTOM, (0.0, 0.0))
             .show(ui.ctx(), |ui| {
-                let id = &x.file.commit.id[..x.file.commit.id.len().min(6)];
+                let id = &x.file.commit.id.prefix(6);
                 let text = if let Some(range) = &x.range {
                     format!("{}/{}:{:?}", id, x.file.file_path, range)
                 } else {
@@ -362,10 +362,7 @@ fn show_element(
     let cui = &mut prepared.content_ui;
     cui.disable();
     if options.commit {
-        cui.label(format!(
-            "{}",
-            &x.file.commit.id.chars().take(6).collect::<String>()
-        ));
+        cui.label(format!("{}", &x.file.commit.id.prefix(6)));
     }
     if options.file {
         if let Some(range) = &x.range {

@@ -691,7 +691,7 @@ pub(crate) const WANTED: SelectedConfig = SelectedConfig::Querying;
 pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigQuery>) {
     show_repo_menu(ui, &mut single.content.commit.repo);
     ui.push_id(ui.id().with("commit"), |ui| {
-        egui::TextEdit::singleline(&mut single.content.commit.id)
+        egui::TextEdit::singleline(&mut single.content.commit.id.tb())
             .clip_text(true)
             .desired_width(150.0)
             .desired_rows(1)

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, i64};
+use std::i64;
 
 use poll_promise::Promise;
 use serde::{Deserialize, Serialize};
@@ -13,16 +13,16 @@ pub struct CommitMetadata {
     pub(crate) message: Option<String>,
     /// parents commits
     /// if multiple parents, the first one should be where the merge happens
-    pub(crate) parents: Vec<String>,
+    pub(crate) parents: Vec<CommitId>,
     /// tree corresponding to version
-    pub(crate) tree: Option<String>,
+    pub(crate) tree: Option<super::types::Oid>,
     /// offset in minutes
     pub(crate) timezone: i32,
     /// seconds
     pub(crate) time: i64,
     /// (opt) ancestors in powers of 2; [2,4,8,16,32]
     /// important to avoid linear loading time
-    pub(crate) ancestors: Vec<String>,
+    pub(crate) ancestors: Vec<CommitId>,
     pub(crate) forth_timestamp: i64,
 }
 
@@ -37,14 +37,24 @@ impl CommitMetadata {
             ui.label(format!("Date:\t{:?}", date));
         } else {
         }
-        if ui.available_width() > 300.0 {
-            ui.label(format!("Parents: {}", self.parents.join(" + ")));
-        } else {
+        fn join<'a, I: Iterator>(it: I, s: I::Item) -> I::Item
+        where
+            I::Item: ToString + Clone,
+            I::Item: FromIterator<I::Item>,
+        {
             use itertools::intersperse;
-            let text = intersperse(self.parents.iter().map(|x| &x[..8]), " + ").collect::<String>();
+            intersperse(it, s).collect::<I::Item>()
+        }
+        if ui.available_width() > 300.0 {
+            ui.label(format!(
+                "Parents: {}",
+                join(self.parents.iter().map(|x| x.as_str()), " + ".to_string())
+            ));
+        } else {
+            let text = join(self.parents.iter().map(|x| x.prefix(8)), " + ".to_string());
             let label = ui.label(format!("Parents: {}", text));
             if label.hovered() {
-                let text = self.parents.join(" + ");
+                let text = join(self.parents.iter().map(|x| x.as_str()), " + ".to_string());
                 egui::Tooltip::always_open(
                     ui.ctx().clone(),
                     ui.layer_id(),
@@ -238,7 +248,7 @@ pub(super) fn fetch_commit_parents(
     api_addr: &str,
     commit: &Commit,
     depth: usize,
-) -> Promise<Result<Vec<String>, String>> {
+) -> Promise<Result<Vec<CommitId>, String>> {
     let ctx = ctx.clone();
     let (sender, promise) = Promise::new();
     let url = format!(
@@ -247,25 +257,19 @@ pub(super) fn fetch_commit_parents(
     );
 
     let request = ehttp::Request::get(&url);
-    // request
-    //     .headers
-    //     .insert("Content-Type".to_string(), "text".to_string());
-
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // wake up UI thread
         let resource = response
-            .and_then(|response| Resource::<Vec<String>>::from_response(&ctx, response))
+            .and_then(|response| Resource::<Vec<CommitId>>::from_response(&ctx, response))
             .and_then(|x| x.content.ok_or("No content".into()));
         sender.send(resource);
     });
     promise
 }
 
-impl Resource<Vec<String>> {
+impl Resource<Vec<CommitId>> {
     #[allow(unused)]
     fn from_response(ctx: &egui::Context, response: ehttp::Response) -> Result<Self, String> {
-        // let content_type = response.content_type().unwrap_or_default();
-
         let text = response.text();
         let text = text.ok_or("")?;
         let text = serde_json::from_str(text).map_err(|x| x.to_string())?;
@@ -279,7 +283,7 @@ impl Resource<Vec<String>> {
 
 pub(crate) fn validate_pasted_project_url(
     paste: &str,
-) -> Result<(super::types::Repo, Vec<String>), &'static str> {
+) -> Result<(super::types::Repo, Vec<CommitId>), &'static str> {
     use std::str::FromStr;
     match hyperast::utils::Url::from_str(paste) {
         Ok(url) if &url.domain == "github.com" && &url.protocol == "https" => {
@@ -294,7 +298,7 @@ pub(crate) fn validate_pasted_project_url(
                     if *after_repo == "commit" {
                         if let Some(after_repo) = path.get(3) {
                             if after_repo.chars().all(|x| x.is_alphanumeric()) {
-                                Ok((repo, vec![after_repo.to_string()]))
+                                Ok((repo, vec![after_repo.parse().unwrap()]))
                             } else if let Some(_) = after_repo.split_once("..") {
                                 Err("range of commits are not handled (WIP)")
                             } else {
@@ -304,7 +308,7 @@ pub(crate) fn validate_pasted_project_url(
                             Err("commit id missing")
                         }
                     } else if after_repo.chars().all(|x| x.is_alphanumeric()) {
-                        Ok((repo, vec![after_repo.to_string()]))
+                        Ok((repo, vec![after_repo.parse().unwrap()]))
                     } else if let Some(_) = after_repo.split_once("..") {
                         Err("range of commits are not handled (WIP)")
                     } else {
@@ -410,9 +414,12 @@ impl SelectedProjects {
     pub(crate) fn add_with_commit_slice(
         &mut self,
         repo: Repo,
-        commits: &[impl ToString],
+        commits: &[impl Into<CommitId> + Clone],
     ) -> ProjectId {
-        self.add(repo, commits.into_iter().map(|x| x.to_string()).collect())
+        self.add(
+            repo,
+            commits.into_iter().map(|x| x.clone().into()).collect(),
+        )
     }
 
     pub(crate) fn add(&mut self, repo: Repo, commits: Vec<CommitId>) -> ProjectId {
@@ -625,6 +632,7 @@ impl SubsTimed {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct CommitsLayoutTimed {
+    pub(crate) branch_names: Vec<String>,
     pub(crate) commits: Vec<CommitId>,
     // times and lines
     pub(crate) times: Vec<i64>,
@@ -639,6 +647,7 @@ pub(crate) struct CommitsLayoutTimed {
 impl Default for CommitsLayoutTimed {
     fn default() -> Self {
         Self {
+            branch_names: Default::default(),
             commits: Default::default(),
             times: Default::default(),
             branches: Default::default(),
@@ -662,6 +671,7 @@ pub(crate) fn compute_commit_layout_timed(
     commits: impl Fn(&CommitId) -> Option<CommitMetadata>,
     branches: impl Iterator<Item = (String, CommitId)>,
 ) -> CommitsLayoutTimed {
+    use std::collections::HashMap;
     type TId = usize;
     type SId = usize;
     let mut r = CommitsLayoutTimed::default();
@@ -669,10 +679,11 @@ pub(crate) fn compute_commit_layout_timed(
     for (branch_name, target) in branches {
         // log::debug!("{} {}", branch_name, target);
 
-        r.commits.push(branch_name);
+        r.branch_names.push(branch_name);
+        r.commits.push("branch".into());
         r.branches.push(r.subs.len());
         let branch_index = r.times.len();
-        let mut waiting: Vec<(String, TId, SId)> = vec![(target, branch_index, r.subs.len())];
+        let mut waiting: Vec<(CommitId, TId, SId)> = vec![(target, branch_index, r.subs.len())];
         r.times.push(-1);
         loop {
             let Some((mut current, prev, prev_sub)) = waiting.pop() else {
@@ -693,7 +704,7 @@ pub(crate) fn compute_commit_layout_timed(
                     let time = commit.time; // + commit.timezone as i64 * 60;
                     r.min_time = time.min(r.min_time);
                     r.max_time = time.max(r.max_time);
-                    r.commits.push(format!("{current}"));
+                    r.commits.push(current);
                     r.times.push(time);
                     if let Some(p) = commit.parents.get(0) {
                         current = p.clone();
@@ -703,11 +714,11 @@ pub(crate) fn compute_commit_layout_timed(
                     }
                     if let Some(p) = commit.parents.get(1..) {
                         for p in p {
-                            waiting.push((p.to_string(), r.times.len() - 1, r.subs.len()));
+                            waiting.push((*p, r.times.len() - 1, r.subs.len()));
                         }
                     }
                 } else {
-                    r.commits.push(format!("{current}"));
+                    r.commits.push(current);
                     r.times.push(-1);
                     end = r.times.len();
                     break;

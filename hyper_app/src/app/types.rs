@@ -1,5 +1,5 @@
 use re_ui::UiExt;
-use std::{collections::HashSet, hash::Hash, ops::Range};
+use std::{collections::HashSet, hash::Hash, ops::Range, str::FromStr, u8};
 
 use egui_addon::code_editor;
 
@@ -13,8 +13,154 @@ pub struct Repo {
     pub(crate) user: String,
     pub(crate) name: String,
 }
-// TODO uuse [u8;20]
-pub(crate) type CommitId = String;
+
+pub type CommitId = Oid;
+
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+pub struct Oid(#[doc(hidden)] pub [u8; 20]);
+
+impl Oid {
+    // take the first x char of the oid.
+    // if x > 20 just return the full oid, equivalent to as_str
+    pub fn prefix(&self, x: usize) -> String {
+        // std::str::from_utf8(&self.0[..x.min(20)]).unwrap()
+        assert!(x % 2 == 0);
+        self.0
+            .into_iter()
+            .take(x / 2)
+            .map(|x| format!("{x:02x}"))
+            .collect()
+    }
+    pub fn as_str(&self) -> String {
+        self.to_string()
+    }
+    // pub fn as_str(&self) -> &str {
+    //     std::str::from_utf8(&self.0).unwrap()
+    // }
+    pub(crate) fn tb<'a>(&'a mut self) -> OidTextBuffer<'a> {
+        OidTextBuffer(self.to_string(), self)
+    }
+}
+
+pub(crate) struct OidTextBuffer<'a>(String, &'a mut Oid);
+impl egui::TextBuffer for OidTextBuffer<'_> {
+    fn is_mutable(&self) -> bool {
+        true
+    }
+
+    fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    fn insert_text(&mut self, text: &str, char_index: usize) -> usize {
+        let r = self.0.insert_text(text, char_index);
+        *self.1 = self.0.as_str().into();
+        r
+    }
+
+    fn delete_char_range(&mut self, char_range: Range<usize>) {
+        self.0.delete_char_range(char_range);
+        *self.1 = self.0.as_str().into();
+    }
+
+    fn type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<Oid>()
+    }
+}
+
+impl std::fmt::Debug for Oid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("CommitId").field(&self.0).finish()
+    }
+}
+
+impl std::fmt::Display for Oid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:x}", self)
+    }
+}
+
+impl std::fmt::LowerHex for Oid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for x in self.0 {
+            write!(f, "{x:02x}")?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn feature() {
+    let x = "2731bbaf6b4bed23abaae8de5c1fa9f373e30e57";
+    assert_eq!(x, &Oid::from(x).to_string());
+}
+
+impl From<String> for Oid {
+    fn from(value: String) -> Self {
+        value.as_str().into()
+    }
+}
+
+impl From<&str> for Oid {
+    fn from(value: &str) -> Self {
+        match value.parse() {
+            Ok(s) => s,
+            Err((s, _)) => s,
+        }
+    }
+}
+
+impl FromStr for Oid {
+    type Err = (Self, &'static str);
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut s = s.bytes().map(|c| {
+            Some(match c as char {
+                '0'..='9' => c as u32 - '0' as u32,
+                'a'..='f' => c as u32 - 'a' as u32 + 10,
+                _ => return None,
+            } as u8)
+        });
+        let mut bytes = [0; 20];
+        for i in 0..20 {
+            let Some(c1) = s.next() else {
+                return Err((Self(bytes), "no c2"));
+            };
+            let Some(c1) = c1 else {
+                return Err((Self(bytes), "unrecognized oid char"));
+            };
+            let Some(c2) = s.next() else {
+                return Err((Self(bytes), "no c2"));
+            };
+            let Some(c2) = c2 else {
+                return Err((Self(bytes), "unrecognized oid char"));
+            };
+            bytes[i] = c1 << 4 | c2;
+        }
+        if !s.next().is_none() {
+            return Err((Self(bytes), "too many char in oid"));
+        }
+        Ok(Self(bytes))
+    }
+}
+
+impl serde::Serialize for Oid {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
+    }
+}
+impl<'de> serde::Deserialize<'de> for Oid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <&str>::deserialize(deserializer).map(From::from)
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 #[serde(default)]
@@ -22,12 +168,21 @@ pub(crate) struct ComputeConfigMulti {
     pub(crate) list: Vec<Commit>,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Default)]
-#[serde(default)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub(crate) struct ComputeConfigDiff {
     pub(crate) repo: Repo,
     pub(crate) before: CommitId,
     pub(crate) after: CommitId,
+}
+
+impl Default for ComputeConfigDiff {
+    fn default() -> Self {
+        Self {
+            repo: Default::default(),
+            before: "".into(),
+            after: "".into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -220,7 +375,7 @@ pub struct Commit {
 }
 
 impl Repo {
-    pub fn with(self, id: impl Into<String>) -> Commit {
+    pub fn with(self, id: impl Into<CommitId>) -> Commit {
         Commit {
             repo: self,
             id: id.into(),

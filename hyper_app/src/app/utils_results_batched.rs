@@ -374,22 +374,22 @@ fn show_table_body(
             // }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 if err.is_some() {
-                    ui.colored_label(egui::Color32::RED, &cont.commit[..8])
+                    ui.colored_label(egui::Color32::RED, cont.commit.prefix(8))
                 } else {
-                    ui.label(&cont.commit[..8])
+                    ui.label(cont.commit.prefix(8))
                 }
                 .on_hover_ui(|ui| {
                     if let Some(err) = err {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     } else {
-                        ui.label(&cont.commit);
+                        ui.label(cont.commit.as_str());
                     }
                 })
             });
         })
         .1
         .on_hover_ui(|ui| {
-            if let Some(text) = commit_info(&cont.commit) {
+            if let Some(text) = commit_info(&cont.commit.as_str()) {
                 ui.label("commit message:");
                 ui.label(text);
             }

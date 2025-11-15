@@ -135,7 +135,7 @@ impl super::HyperApp {
         }
         if bad == 0 {
             for s in acc.chunks(5) {
-                let f = |(r, cs): &(Repo, Vec<String>)| {
+                let f = |(r, cs): &(Repo, Vec<CommitId>)| {
                     if cs.is_empty() {
                         format!("github.com/{}/{}", r.user, r.name)
                     } else {
@@ -179,7 +179,7 @@ impl super::HyperApp {
 
     fn parse_pasted_repository(paste: String, notifs: &mut NotificationUi, data: &mut AppData) {
         let result = commit::validate_pasted_project_url(&paste);
-        let msg = |repo: &Repo, commits: &[String]| {
+        let msg = |repo: &Repo, commits: &[CommitId]| {
             let msg = format!("Successfully added github.com/{}/{}", repo.user, repo.name);
             if commits.is_empty() {
                 msg
@@ -217,18 +217,25 @@ pub(crate) fn show_repo_item_buttons(
         let button = egui::Button::new("commit");
         let button = ui.add(button);
         if button.clicked() {
-            commits.push(Default::default());
+            commits.push("".into());
         }
         let popup_contents = |ui: &mut egui::Ui| {
-            let text = commits.last_mut().unwrap();
+            let commit_id = commits.last_mut().unwrap();
+            let text = &mut commit_id.to_string();
             let singleline = &ui.text_edit_singleline(text);
             if button.clicked() {
                 singleline.request_focus()
             }
-            if singleline.lost_focus() {
+            if singleline.changed() && singleline.lost_focus() {
                 if text.is_empty() {
                     commits.pop();
+                } else {
+                    *commit_id = text.parse().unwrap();
                 }
+            } else if singleline.changed() {
+                *commit_id = text.parse().unwrap();
+            }
+            if singleline.lost_focus() {
                 ui.close();
             }
         };
@@ -339,7 +346,7 @@ fn show_commit_list(ui: &mut egui::Ui, mut commits: CommitSlice<'_>, height: f32
                 .with_height(height)
                 .show_flat(ui, content);
             let popup_contents = |ui: &mut egui::Ui| {
-                let singleline = &ui.text_edit_singleline(oid);
+                let singleline = &ui.text_edit_singleline(&mut oid.tb());
                 if resp.clicked() {
                     singleline.request_focus()
                 }

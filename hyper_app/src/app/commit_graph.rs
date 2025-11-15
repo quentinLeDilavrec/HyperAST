@@ -1,3 +1,5 @@
+use crate::app::types::CommitId;
+
 use super::querying::StreamedComputeResults;
 use super::{CommitMdStore, ProjectId, QResId, poll_md_with_pr};
 use super::{QueryResults, commit};
@@ -91,7 +93,7 @@ impl crate::HyperApp {
             });
 
         if self.data.fetched_commit_metadata.is_absent(&branch.1) {
-            let commit = r.clone().with(&branch.1);
+            let commit = r.clone().with(branch.1);
             let fetching = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
             self.data
                 .fetched_commit_metadata
@@ -127,7 +129,7 @@ impl crate::HyperApp {
             if !self.data.fetched_commit_metadata.is_absent(id) {
                 continue;
             }
-            let commit = r.clone().with(id);
+            let commit = r.clone().with(*id);
             let v = commit::fetch_commit(ui.ctx(), &self.data.api_addr, &commit);
             self.data.fetched_commit_metadata.insert(commit.id, v);
         }
@@ -145,7 +147,7 @@ impl crate::HyperApp {
         let max_time = cached.max_time;
         let max_fetch = self.data.max_fetch;
         for id in to_poll {
-            to_poll_helper(&mut helper, id, max_time, caches_to_clear, max_fetch);
+            to_poll_helper(&mut helper, *id, max_time, caches_to_clear, max_fetch);
         }
     }
 
@@ -174,14 +176,14 @@ impl crate::HyperApp {
             let api_addr = &self.data.api_addr;
             for i in i {
                 let id = &cached.commits[i];
-                let commit = r.clone().with(id);
+                let commit = r.clone().with(*id);
                 let v = commit::fetch_commit(ui.ctx(), api_addr, &commit);
                 self.data.fetched_commit_metadata.insert(commit.id, v);
             }
         } else if let InteractionEffect::ClickCommitPrimary(i) = effect {
             let pred = |x: &_| is_target_repo(x) && is_target_query(x);
             if let Some((_qrid, qres)) = self.data.queries_results.find(pred) {
-                self.selected_commit = Some((repo_id, cached.commits[i].to_string()));
+                self.selected_commit = Some((repo_id, cached.commits[i]));
                 self.selected_baseline = None;
                 if let super::Tab::QueryResults { format, .. } = &mut self.tabs[qres.tab] {
                     *format = crate::app::ResultFormat::Table
@@ -193,7 +195,7 @@ impl crate::HyperApp {
             let md_fetch = &mut self.data.fetched_commit_metadata;
 
             let ctx = ui.ctx();
-            let commit = r.clone().with(&cached.commits[i]);
+            let commit = r.clone().with(cached.commits[i]);
             commit.commit_url_to_clipboard(ctx, &mut self.notifs);
 
             let md = md_fetch.remove(&commit.id);
@@ -216,18 +218,18 @@ impl crate::HyperApp {
                     &cached.commits[after], cached.commits[i]
                 ),
             });
-            let commit = r.clone().with(&cached.commits[i]);
+            let commit = r.clone().with(cached.commits[i]);
             commit.commit_url_to_clipboard(ui.ctx(), &mut self.notifs);
         } else if let InteractionEffect::ClickChangePrimary(i, after) = effect {
-            let commit = r.clone().with(&cached.commits[after]).url();
+            let commit = r.clone().with(cached.commits[after]).url();
             self.notifs.add_log(re_log::LogMsg {
                 level: log::Level::Info,
                 target: format!("graph/commits"),
                 msg: format!("Selected\n{} vs {}", commit, cached.commits[i]),
             });
 
-            self.selected_baseline = Some(cached.commits[i].to_string());
-            self.selected_commit = Some((repo_id, cached.commits[after].to_string()));
+            self.selected_baseline = Some(cached.commits[i]);
+            self.selected_commit = Some((repo_id, cached.commits[after]));
             // assert_eq!(self.data.queries.len(), 1); // need to retrieve current query if multiple
 
             let pred = |x: &_| is_target_repo(x) && is_target_lang(x);
@@ -286,19 +288,19 @@ struct ToPollHelper<'a, 'b> {
 
 fn to_poll_helper(
     helper: &mut ToPollHelper<'_, '_>,
-    id: &str,
+    id: CommitId,
     max_time: i64,
     caches_to_clear: &mut Vec<ProjectId>,
     max_fetch: i64,
 ) {
     let repo_id = helper.repo_id;
-    let was_err = helper.md_fetch.get(id).map_or(false, |x| x.is_err());
-    if !helper.md_fetch.try_poll_with(id, |x| {
+    let was_err = helper.md_fetch.get(&id).map_or(false, |x| x.is_err());
+    if !helper.md_fetch.try_poll_with(&id, |x| {
         x.map(|x| poll_md_with_pr(x, repo_id, &mut helper.commit_slice))
     }) {
         return;
     }
-    let Some(Ok(md)) = helper.md_fetch.get(id) else {
+    let Some(Ok(md)) = helper.md_fetch.get(&id) else {
         return;
     };
     let md = md.clone();
@@ -315,22 +317,26 @@ fn to_poll_helper(
     let id2 = md.ancestors.get(1);
     let forth_timestamp = md.forth_timestamp;
     if max_time - forth_timestamp < max_fetch && helper.md_fetch.is_absent(id1) {
-        to_poll_helper_aux(helper, id1, &md);
+        to_poll_helper_aux(helper, *id1, &md);
     }
     let Some(id2) = id2 else {
         return;
     };
     if max_time - forth_timestamp < max_fetch && helper.md_fetch.is_absent(id2) {
-        to_poll_helper_aux(helper, id2, &md);
+        to_poll_helper_aux(helper, *id2, &md);
     }
     let ToPollHelper { ctx, api_addr, .. } = helper;
     let commit = helper.r.clone().with(id);
     log::debug!("fetch_merge_pr");
     let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
-    helper.md_fetch.insert(id.to_string(), waiting);
+    helper.md_fetch.insert(id, waiting);
 }
 
-fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::CommitMetadata) {
+fn to_poll_helper_aux(
+    helper: &mut ToPollHelper<'_, '_>,
+    id: CommitId,
+    md: &commit::CommitMetadata,
+) {
     let repo_id = helper.repo_id;
     let ToPollHelper {
         ctx,
@@ -339,19 +345,21 @@ fn to_poll_helper_aux(helper: &mut ToPollHelper<'_, '_>, id: &str, md: &commit::
         api_addr,
         ..
     } = helper;
-    if !md_fetch.is_waiting(id) {
+    if !md_fetch.is_waiting(&id) {
         let commit = helper.r.clone().with(id);
         let v = commit::fetch_commit(ctx, api_addr, &commit);
-        md_fetch.insert(id.to_string(), v);
+        md_fetch.insert(id, v);
         return;
     }
-    if !md_fetch.try_poll_with(id, |x| x.map(|x| poll_md_with_pr(x, repo_id, commit_slice))) {
+    if !md_fetch.try_poll_with(&id, |x| {
+        x.map(|x| poll_md_with_pr(x, repo_id, commit_slice))
+    }) {
         return;
     }
     let commit = helper.r.clone().with(id);
     log::debug!("fetch_merge_pr");
     let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
-    md_fetch.insert(id.to_string(), waiting);
+    md_fetch.insert(id, waiting);
 }
 
 enum GraphInteraction {
@@ -378,8 +386,8 @@ impl<'a> CommitGraphWidget<'a, '_> {
     fn show(
         self,
         ui: &mut egui::Ui,
-        to_fetch: &mut Vec<&'a String>,
-        to_poll: &mut Vec<&'a String>,
+        to_fetch: &mut Vec<&'a CommitId>,
+        to_poll: &mut Vec<&'a CommitId>,
     ) -> egui_plot::PlotResponse<GraphInteraction> {
         use egui_plot::*;
         let max_time = self.cached.max_time;
@@ -406,8 +414,8 @@ impl<'a> CommitGraphWidget<'a, '_> {
 fn show_commit_graph_timed_egui_plot<'a>(
     widget: CommitGraphWidget<'a, '_>,
     ui: &mut egui::Ui,
-    to_fetch: &mut Vec<&'a String>,
-    to_poll: &mut Vec<&'a String>,
+    to_fetch: &mut Vec<&'a CommitId>,
+    to_poll: &mut Vec<&'a CommitId>,
     plot: egui_plot::Plot<'_>,
 ) -> egui_plot::PlotResponse<GraphInteraction> {
     let dark_mode = ui.visuals().dark_mode;
@@ -436,8 +444,8 @@ fn plot_graph_aux<'a>(
     widget: CommitGraphWidget<'a, '_>,
     plot_ui: &mut egui_plot::PlotUi<'_>,
     dark_mode: bool,
-    to_fetch: &mut Vec<&'a String>,
-    to_poll: &mut Vec<&'a String>,
+    to_fetch: &mut Vec<&'a CommitId>,
+    to_poll: &mut Vec<&'a CommitId>,
 ) -> GraphInteraction {
     let diff_val_col = if dark_mode {
         egui::Color32::YELLOW
@@ -578,7 +586,7 @@ fn plot_graph_aux<'a>(
 
             if i == 1 {
                 let text = results_per_commit
-                    .and_then(|x| x.offset(commit).map(|offset| x.vals_to_string(offset)));
+                    .and_then(|x| x.offset(&commit).map(|offset| x.vals_to_string(offset)));
                 if let Some(text) = text {
                     plot_ui.text(
                         Text::new("text last", p.map(|x| x as f64).into(), text)
@@ -588,9 +596,8 @@ fn plot_graph_aux<'a>(
                 }
             }
 
-            let vals_offset = results_per_commit.and_then(|x| {
-                x.offset_with_variation(commit.as_str(), before, Some(commit.as_str()))
-            });
+            let vals_offset = results_per_commit
+                .and_then(|x| x.offset_with_variation(&commit, before, Some(&commit)));
             if let Some(offset) = LEFT_VALS.then_some(()).and(vals_offset) {
                 let text = results_per_commit.unwrap().vals_to_string(offset);
                 plot_ui.text(
@@ -601,7 +608,7 @@ fn plot_graph_aux<'a>(
             }
 
             if results_per_commit
-                .and_then(|x| x._get_offset(commit))
+                .and_then(|x| x._get_offset(&commit))
                 .is_some()
             {
                 points_with_data.push(p.map(|x| x as f64));
@@ -728,12 +735,12 @@ fn plot_graph_aux<'a>(
     }
     plot_ui.add(item);
 
-    for &b in &cached.branches {
+    for (&b, name) in cached.branches.iter().zip(cached.branch_names.iter()) {
         let b = cached.subs[b].prev;
         let y = cached.subs[b].delta_time;
         let y = with_egui_plot::transform_y(y);
         let position = [cached.times[b] as f64, y as f64].into();
-        let text = &cached.commits[b];
+        let text = name.to_string();
         let text = Text::new("branch name", position, text).anchor(egui::Align2::LEFT_TOP);
         plot_ui.text(text);
     }
@@ -744,18 +751,18 @@ fn before_after<'a>(
     cached: &'a commit::CommitsLayoutTimed,
     sub: &commit::SubsTimed,
     i: usize,
-) -> (Option<&'a str>, Option<&'a str>) {
+) -> (Option<&'a CommitId>, Option<&'a CommitId>) {
     let before = if i != sub.start {
-        Some(cached.commits[i - 1].as_str())
+        Some(&cached.commits[i - 1])
     } else if sub.prev != usize::MAX {
-        Some(cached.commits[sub.prev].as_str())
+        Some(&cached.commits[sub.prev])
     } else {
         None
     };
     let after = if i + 1 < sub.end {
-        Some(cached.commits[i + 1].as_str())
+        Some(&cached.commits[i + 1])
     } else if sub.succ != usize::MAX {
-        Some(cached.commits[sub.succ].as_str())
+        Some(&cached.commits[sub.succ])
     } else {
         None
     };
@@ -822,10 +829,10 @@ fn label_formatter(
     if name == CUSTOM_LABEL_FORMAT_MARK_WITH_DATA {
         let i = value.x.to_bits() as usize;
         let c = &cached.commits[i];
-        let s = results_per_commit.and_then(|x| x.offset(c.as_str()).map(|o| x.vals_to_string(o)));
+        let s = results_per_commit.and_then(|x| x.offset(c).map(|o| x.vals_to_string(o)));
         format!(
             "{}\n{}\n\n{}",
-            &c[..6],
+            &c.prefix(6),
             s.unwrap_or_default(),
             msg(fetched_commit_metadata.get(c)).unwrap_or_default()
         )
@@ -834,7 +841,7 @@ fn label_formatter(
         let c = &cached.commits[i];
         format!(
             "{}\n\n{}",
-            &c[..6],
+            &c.prefix(6),
             msg(fetched_commit_metadata.get(c)).unwrap_or_default()
         )
     } else {

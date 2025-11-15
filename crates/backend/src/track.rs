@@ -48,7 +48,7 @@ pub struct TrackingAtPathParam {
     #[serde(deserialize_with = "string_to_oid")]
     #[serde(serialize_with = "oid_to_string")]
     commit: Oid,
-    path: String,
+    path: Option<String>,
 }
 
 impl TrackingAtPathParam {
@@ -56,7 +56,8 @@ impl TrackingAtPathParam {
         hyperast_vcs_git::git::Forge::Github.repo(&self.user, &self.name)
     }
     pub fn path<T: std::str::FromStr>(&self) -> Vec<T> {
-        (self.path.split("/"))
+        (self.path.as_ref().map(|s| s.as_str()).unwrap_or_default())
+            .split("/")
             .filter_map(|x| T::from_str(x).ok())
             .collect()
     }

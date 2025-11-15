@@ -334,6 +334,10 @@ pub fn track_code_route(_st: SharedState) -> Router<SharedState> {
             get(track_code_at_path).layer(service_config.clone()),
         )
         .route(
+            "/track_at_path_with_changes/github/:user/:name/:commit/",
+            get(track_code_at_path_with_changes).layer(service_config.clone()),
+        )
+        .route(
             "/track_at_path_with_changes/github/:user/:name/:commit/*path",
             get(track_code_at_path_with_changes).layer(service_config.clone()),
         )

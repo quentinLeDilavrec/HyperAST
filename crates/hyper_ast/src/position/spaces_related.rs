@@ -167,8 +167,8 @@ where
     for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
 {
     let (pos, mut path_ids, no_spaces) =
-        compute_position_and_nodes_with_no_spaces(root, offsets, stores);
-    (pos, path_ids.pop().unwrap(), no_spaces)
+        compute_position_and_nodes_with_no_spaces(root.clone(), offsets, stores);
+    (pos, path_ids.pop().unwrap_or(root), no_spaces)
 }
 
 pub fn compute_position_and_nodes_with_no_spaces<'store, HAST, It>(

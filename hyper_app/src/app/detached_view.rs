@@ -2,7 +2,7 @@ use egui::Pos2;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
-use egui_addon::meta_edge::meta_egde;
+use egui_addon::meta_edge::MetaEdge;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
 
@@ -90,7 +90,15 @@ pub(crate) fn ui_detached<'a>(
             ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
             color = egui::Color32::BLACK;
             if detatched_view_options.meta {
-                meta_egde(m_pos, src_pos, m_rect, ctrl, src_rect, color, ui);
+                MetaEdge {
+                    m_pos,
+                    src_pos,
+                    m_rect,
+                    ctrl,
+                    src_rect,
+                    color,
+                }
+                .show(ui);
             }
             if detatched_view_options.bezier {
                 let link = epaint::CubicBezierShape::from_points_stroke(
@@ -392,7 +400,15 @@ fn ui_detached_node(
             ctrl.1.x -= src_rect.width() / 2.0 - b_d / 10.0 * 1.0;
             color = egui::Color32::BLACK;
             if options.meta {
-                meta_egde(m_pos, src_pos, m_rect, ctrl, src_rect, color, ui);
+                MetaEdge {
+                    m_pos,
+                    src_pos,
+                    m_rect,
+                    ctrl,
+                    src_rect,
+                    color,
+                }
+                .show(ui);
             }
             if options.bezier {
                 let link = epaint::CubicBezierShape::from_points_stroke(

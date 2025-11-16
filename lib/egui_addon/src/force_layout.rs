@@ -385,8 +385,6 @@ pub mod settings {
 
 const EVENTS_LIMIT: usize = 100;
 
-pub type Simple<N, E> = ForceBasedGraphExplorationApp<N, E, egui_graphs::DefaultNodeShape>;
-
 pub struct ForceBasedGraphExplorationApp<
     N: Clone = (),
     E: Clone = (),
@@ -488,7 +486,8 @@ pub fn multi_graph_pretty<
     app
 }
 
-pub use egui_graphs::Node as EGNode;
+pub type Simple<N, E> = ForceBasedGraphExplorationApp<N, E, node::NodeShapeFlex<N>>;
+pub type EGNode<N = String> = egui_graphs::Node<N, (), Directed, DefaultIx, node::NodeShapeFlex<N>>;
 pub use petgraph::stable_graph::StableGraph;
 pub struct SimpleExample(pub Graph);
 impl SimpleExample {
@@ -504,9 +503,7 @@ impl SimpleExample {
     }
 }
 
-pub fn simple_pet_graph()
--> petgraph::stable_graph::StableGraph<egui_graphs::Node<String, ()>, egui_graphs::Edge<String, ()>>
-{
+pub fn simple_pet_graph<N, E>() -> petgraph::stable_graph::StableGraph<N, E> {
     let g = StableGraph::new();
     // let mut g = StableGraph::new();
     // let n1 = simple_add_node(&mut g, "Coucou".to_string());
@@ -515,29 +512,31 @@ pub fn simple_pet_graph()
     // g.edge_weight_mut(e1).unwrap().set_id(e1);
     g
 }
-pub fn simple_add_node(
-    g: &mut petgraph::stable_graph::StableGraph<
-        egui_graphs::Node<String, ()>,
-        egui_graphs::Edge<String, ()>,
-    >,
-    label: String,
+pub type PGraph<N, E> = petgraph::Graph<N, E>;
+// pub type EGraph<N, E> = Graph<EGNode<N>, E, Directed, DefaultIx, node::NodeShapeFlex<EGNode<N>>>;
+
+pub use egui_graphs::to_graph;
+
+pub fn simple_add_node<L: std::fmt::Debug + std::fmt::Display + Clone>(
+    g: &mut petgraph::stable_graph::StableGraph<L, ()>,
+    label: L,
 ) -> NodeIndex {
-    let n1 = EGNode::new(label);
+    let n1 = label;
+    // let n1 = EGNode::new(label);
     let n1 = g.add_node(n1);
-    g.node_weight_mut(n1).unwrap().set_id(n1);
+    // g.node_weight_mut(n1).unwrap().set_id(n1);
     n1
 }
-pub fn simple_add_edge(
-    g: &mut petgraph::stable_graph::StableGraph<
-        egui_graphs::Node<String, ()>,
-        egui_graphs::Edge<String, ()>,
-    >,
+pub fn simple_add_edge<L: std::fmt::Debug + std::fmt::Display + Clone>(
+    // g: &mut petgraph::stable_graph::StableGraph<EGNode<L>, egui_graphs::Edge<L, ()>>,
+    g: &mut petgraph::stable_graph::StableGraph<L, ()>,
     n1: NodeIndex,
     n2: NodeIndex,
 ) -> petgraph::graph::EdgeIndex {
-    let e1 = egui_graphs::Edge::new(());
+    let e1 = ();
+    // let e1 = egui_graphs::Edge::new(());
     let e1 = g.add_edge(n1, n2, e1);
-    g.edge_weight_mut(e1).unwrap().set_id(e1);
+    // g.edge_weight_mut(e1).unwrap().set_id(e1);
     e1
 }
 impl<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, DefaultIx>>

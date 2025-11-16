@@ -241,9 +241,6 @@ pub enum QueryingError {
     TsgParsing(String),
 }
 
-#[cfg(feature = "force_layout")]
-pub(super) type GraphTy = egui_addon::force_layout::Simple<String, ()>;
-
 pub(super) fn show_querying(
     ui: &mut egui::Ui,
     api_addr: &str,
@@ -277,6 +274,9 @@ pub(super) fn show_querying(
             });
     }
 }
+
+#[cfg(feature = "force_layout")]
+pub(super) type GraphTy = egui_addon::force_layout::Simple<String, ()>;
 
 #[cfg(feature = "force_layout")]
 fn show_result_graph(
@@ -357,7 +357,7 @@ fn show_result_graph(
             //     "id": 2
             //   },
         }
-        let mut graph = Graph::<String, (), _, _, _, _>::new(g);
+        let mut graph = to_graph(&g.into());
         let settings_simulation = Default::default();
         let (force, sim) = force_sim(&settings_simulation, &mut graph);
         app = Some(Arc::new(Ty::new(

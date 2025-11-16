@@ -49,7 +49,6 @@ fn main() -> eframe::Result<()> {
 // when compiling to web using trunk.
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    use egui_addon::Lang;
     use wasm_bindgen::prelude::*;
     // let api_addr = None;
     let api_addr = Some(ADDR.into());
@@ -75,7 +74,7 @@ fn main() {
             .await
             .map_err(JsValue::from)
             .unwrap();
-        let mut languages: hyper_app::Languages = Default::default();
+        let languages: hyper_app::Languages = Default::default();
         let document = web_sys::window()
             .expect("No window")
             .document()

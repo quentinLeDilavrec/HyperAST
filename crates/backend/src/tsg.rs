@@ -64,11 +64,7 @@ pub fn simple(
     let language: tree_sitter::Language = hyperast_vcs_git::resolve_language(&lang_name)
         .ok_or_else(|| QueryingError::MissingLanguage(lang_name.clone()))?;
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repo = state
-        .repositories
-        .write()
-        .unwrap()
-        .get_config(repo_spec.clone());
+    let repo = (state.repositories.write().unwrap()).get_config(repo_spec.clone());
     let repo = match repo {
         Some(repo) => repo,
         None => {
@@ -99,12 +95,10 @@ pub fn simple(
 
         let mut file = tree_sitter_graph::ast::File::<M>::new(language.clone());
 
-        let precomputeds: Box<dyn hyperast_tsquery::ArrayStr> = state
-            .repositories
-            .read()
-            .unwrap()
-            .get_precomp_query(repo.config, &lang_name)
-            .map_or(Box::new([].as_slice()), |x| Box::new(x));
+        let precomputeds: Box<dyn hyperast_tsquery::ArrayStr> =
+            (state.repositories.read().unwrap())
+                .get_precomp_query(repo.config, &lang_name)
+                .map_or(Box::new([].as_slice()), |x| Box::new(x));
         let query_source = ExtQ::new(language.clone(), precomputeds, source.len());
         tree_sitter_graph::parser::Parser::<ExtQ>::with_ext(query_source, source)
             .parse_into_file(&mut file)

@@ -1,14 +1,8 @@
-use std::sync::{Arc, RwLock};
-
-#[cfg(target_arch = "wasm32")]
-use async_executors::JoinHandle;
 use autosurgeon::{Hydrate, Reconcile, reconcile};
 use egui_addon::code_editor::generic_text_buffer::TextBuffer;
 use futures_util::{Future, SinkExt, StreamExt};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::task::JoinHandle;
+use std::sync::{Arc, RwLock};
 
 #[derive(Default, Debug, Reconcile, Hydrate)]
 pub(crate) struct Quote {
@@ -342,7 +336,7 @@ impl Default for Rt {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-lazy_static! {
+lazy_static::lazy_static! {
     static ref RT: Arc<tokio::runtime::Runtime> = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -354,7 +348,7 @@ lazy_static! {
 pub(super) struct H(
     #[cfg(not(target_arch = "wasm32"))]
     #[allow(dead_code)]
-    JoinHandle<()>,
+    tokio::task::JoinHandle<()>,
 );
 
 impl Rt {

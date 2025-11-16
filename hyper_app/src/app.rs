@@ -830,7 +830,7 @@ impl HyperApp {
                 if let Some(api_addr) = api_addr {
                     r.data.api_addr = api_addr;
                 } else {
-                    r.data.api_addr = unsafe { prompt("API address", default_api_addr) };
+                    r.data.api_addr = prompt("API address", default_api_addr);
                 }
             }
         } else {
@@ -838,7 +838,7 @@ impl HyperApp {
             if let Some(api_addr) = api_addr {
                 r.data.api_addr = api_addr;
             } else {
-                r.data.api_addr = unsafe { prompt("API addresss", default_api_addr) };
+                r.data.api_addr = prompt("API addresss", default_api_addr);
             }
         }
         r.data.languages = languages;
@@ -1734,7 +1734,7 @@ fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
                         ui.ctx(),
                         ui.style(),
                         &theme,
-                        string.as_str(),
+                        string,
                         language,
                     );
                     ui.fonts(|f| f.layout_job(layout_job))

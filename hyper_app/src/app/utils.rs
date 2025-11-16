@@ -161,7 +161,7 @@ pub(crate) fn prepare_paste(
 #[cfg(target_arch = "wasm32")]
 #[allow(static_mut_refs)]
 pub(crate) fn prepare_paste(
-    ui: &mut egui::Ui,
+    _ui: &mut egui::Ui,
     trigger: bool,
     await_response: &mut bool,
 ) -> Option<String> {

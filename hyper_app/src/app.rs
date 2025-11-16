@@ -1453,6 +1453,11 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     &mut self.data.tsg_result,
                 );
                 if trigger {
+                    #[cfg(feature = "force_layout")]
+                    ui.memory_mut(|w| {
+                        w.data
+                            .remove::<Option<Arc<tsg::GraphTy>>>(egui::Id::new("force_graph"))
+                    });
                     self.data.tsg_result = Some(tsg::remote_compute_query(
                         ui.ctx(),
                         &self.data.api_addr,

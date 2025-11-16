@@ -1,17 +1,75 @@
-use std::time::Instant;
-
 use crossbeam::channel::{Receiver, Sender, unbounded};
 use drawers::ValuesSectionDebug;
 use eframe::{App, CreationContext};
 use egui::{CollapsingHeader, Context, Pos2, ScrollArea, Ui, Vec2};
+pub use egui_graphs::Graph;
 use egui_graphs::events::Event;
-use egui_graphs::{Edge, Graph, Node};
+use egui_graphs::{Edge, Node};
+
 use fdg::fruchterman_reingold::{FruchtermanReingold, FruchtermanReingoldConfiguration};
 use fdg::nalgebra::{Const, OPoint};
 use fdg::{Force, ForceGraph};
 use petgraph::Directed;
 use petgraph::stable_graph::{DefaultIx, NodeIndex};
 use petgraph::visit::IntoNodeReferences;
+
+#[cfg(target_arch = "wasm32")]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct Instant(std::time::Duration);
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct Instant(std::time::Instant);
+impl Instant {
+    fn now() -> Instant {
+        #[cfg(target_arch = "wasm32")]
+        {
+            Instant(std::time::Duration::ZERO)
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Instant(std::time::Instant::now())
+        }
+    }
+
+    fn duration_since(&self, earlier: Instant) -> std::time::Duration {
+        #[cfg(target_arch = "wasm32")]
+        {
+            // not earlier, its the trick
+            earlier.0 - self.0
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.0.duration_since(earlier.0)
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn add(&mut self, dt: f32) {
+        {
+            self.0 += std::time::Duration::from_secs_f32(dt);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = dt;
+        }
+    }
+}
+// #[cfg(target_arch = "wasm32")]
+// pub fn now() -> f64 {
+//     #[cfg(not(feature = "inaccurate"))]
+//     let now = {
+//         use wasm_bindgen_rs::JsCast;
+//         use wasm_bindgen_rs::prelude::*;
+//         js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str("performance"))
+//             .expect("failed to get performance from global object")
+//             .unchecked_into::<web_sys::Performance>()
+//             .now()
+//     };
+//     #[cfg(feature = "inaccurate")]
+//     let now = js_sys::Date::now();
+//     now
+// }
 
 pub mod drawers {
     use egui::Ui;
@@ -327,6 +385,8 @@ pub mod settings {
 
 const EVENTS_LIMIT: usize = 100;
 
+pub type Simple<N, E> = ForceBasedGraphExplorationApp<N, E, egui_graphs::DefaultNodeShape>;
+
 pub struct ForceBasedGraphExplorationApp<
     N: Clone = (),
     E: Clone = (),
@@ -405,7 +465,6 @@ pub fn multi_graph_pretty<
     N: 'a + Clone + std::fmt::Debug + std::fmt::Display,
     E: 'a + Clone,
 >(
-    _cc: &CreationContext<'_>,
     settings_graph: settings::SettingsGraph,
     settings_simulation: settings::SettingsSimulation,
     graph: Vec<Graph<N, E, Directed, DefaultIx, node::NodeShapeFlex<N>>>,
@@ -429,10 +488,62 @@ pub fn multi_graph_pretty<
     app
 }
 
+pub use egui_graphs::Node as EGNode;
+pub use petgraph::stable_graph::StableGraph;
+pub struct SimpleExample(pub Graph);
+impl SimpleExample {
+    pub fn new() -> Self {
+        let g = egui_graphs::generate_simple_digraph();
+        Self(Graph::from(&g))
+    }
+    pub fn show(&mut self, ui: &mut egui::Ui) -> egui::Response {
+        ui.add(
+            &mut egui_graphs::DefaultGraphView::new(&mut self.0)
+                .with_id(Some("default_graph".to_string())),
+        )
+    }
+}
+
+pub fn simple_pet_graph()
+-> petgraph::stable_graph::StableGraph<egui_graphs::Node<String, ()>, egui_graphs::Edge<String, ()>>
+{
+    let g = StableGraph::new();
+    // let mut g = StableGraph::new();
+    // let n1 = simple_add_node(&mut g, "Coucou".to_string());
+    // let n2 = simple_add_node(&mut g, "Bye".to_string());
+    // let e1 = g.add_edge(n1, n2, egui_graphs::Edge::new(()));
+    // g.edge_weight_mut(e1).unwrap().set_id(e1);
+    g
+}
+pub fn simple_add_node(
+    g: &mut petgraph::stable_graph::StableGraph<
+        egui_graphs::Node<String, ()>,
+        egui_graphs::Edge<String, ()>,
+    >,
+    label: String,
+) -> NodeIndex {
+    let n1 = EGNode::new(label);
+    let n1 = g.add_node(n1);
+    g.node_weight_mut(n1).unwrap().set_id(n1);
+    n1
+}
+pub fn simple_add_edge(
+    g: &mut petgraph::stable_graph::StableGraph<
+        egui_graphs::Node<String, ()>,
+        egui_graphs::Edge<String, ()>,
+    >,
+    n1: NodeIndex,
+    n2: NodeIndex,
+) -> petgraph::graph::EdgeIndex {
+    let e1 = egui_graphs::Edge::new(());
+    let e1 = g.add_edge(n1, n2, e1);
+    g.edge_weight_mut(e1).unwrap().set_id(e1);
+    e1
+}
 impl<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, DefaultIx>>
     ForceBasedGraphExplorationApp<N, E, Dn>
 {
-    fn show_graph(&mut self, ui: &mut Ui) {
+    fn _show_graph(&mut self, ui: &mut Ui) {
         let settings_interaction = &egui_graphs::SettingsInteraction::new()
             .with_node_selection_enabled(self.global.settings_interaction.node_selection_enabled)
             .with_node_selection_multi_enabled(
@@ -456,9 +567,8 @@ impl<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, DefaultIx>
         let settings_style = &egui_graphs::SettingsStyle::new()
             .with_labels_always(self.global.settings_style.labels_always);
 
-        // let mut md = egui_graphs::Metadata::load(ui);
-        // md.reset_bounds();
-
+        let mut md = egui_graphs::MetadataFrame::new(None).load(ui);
+        md.reset_bounds();
         ui.add(
             &mut egui_graphs::GraphView::<N, E, _, _, _, _, _, egui_graphs::LayoutHierarchical>::new(
                 &mut self.g,
@@ -466,8 +576,170 @@ impl<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, DefaultIx>
             .with_interactions(settings_interaction)
             .with_navigations(settings_navigation)
             .with_styles(settings_style)
-            .with_events(&self.global.event_publisher),
+            .with_event_sink(&self.global.event_publisher),
         );
+    }
+    pub fn show_graph(&mut self, ui: &mut Ui)
+    where
+        N: std::fmt::Debug,
+    {
+        self._show_graph(ui);
+
+        self.handle_events();
+        self.sync();
+        self.update_simulation();
+        // self.global.update_fps(ui.ctx());
+    }
+}
+impl<
+    N: Clone + std::fmt::Debug + std::fmt::Display,
+    E: Clone,
+    Dn: egui_graphs::DisplayNode<N, E, Directed, u32>,
+> ForceBasedGraphExplorationApp<N, E, Dn>
+{
+    pub fn show(&mut self, ctx: &Context) {
+        egui::SidePanel::right("right_panel")
+            .min_width(250.)
+            .show(ctx, |ui| {
+                if !self.others.is_empty() {
+                    ui.horizontal(|ui| {
+                        self.show_graph_selector(ui);
+
+                        ui.add_enabled(
+                            self.can_show_graph,
+                            egui::Checkbox::new(&mut self.show_graph, "graph"),
+                        );
+                        ui.checkbox(&mut self.show_pattern_list, "list");
+                    });
+
+                    ui.label(format!(
+                        "{} connex graph n:{} e:{}",
+                        self.others.len(),
+                        self.g.node_count(),
+                        self.g.edge_count()
+                    ));
+                }
+                ScrollArea::vertical().show(ui, |ui| {
+                    CollapsingHeader::new("Simulation")
+                        .default_open(true)
+                        .show(ui, |ui| self.show_section_simulation(ui));
+
+                    ui.add_space(10.);
+
+                    egui::CollapsingHeader::new("Debug")
+                        .default_open(true)
+                        .show(ui, |ui| self.show_section_debug(ui));
+
+                    ui.add_space(10.);
+
+                    CollapsingHeader::new("Widget")
+                        .default_open(true)
+                        .show(ui, |ui| self.show_section_widget(ui));
+                });
+            });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            if self.show_pattern_list {
+                if !self.can_show_graph {
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{} nodes and {} edges is too much to display",
+                            self.g.node_count(),
+                            self.g.edge_count()
+                        ))
+                        .color(ui.visuals().warn_fg_color),
+                    );
+                }
+
+                let size = if self.can_show_graph && self.show_graph {
+                    ui.available_size() * egui::vec2(1.0, 0.2)
+                } else {
+                    ui.available_size()
+                };
+                let (rect, _) = ui.allocate_exact_size(size, egui::Sense::click());
+                let ui = &mut ui.new_child(egui::UiBuilder::new().max_rect(rect));
+                let total_cols = self.g.node_count();
+                let mut rm = None;
+                let mut nodes = None;
+                crate::hscroll::hscroll_many_columns(ui, 450.0, total_cols, |ui, i| {
+                    if nodes.is_none() {
+                        nodes = Some(self.g.g().node_references().rev().skip(i));
+                    };
+                    let nodes = nodes.as_mut().unwrap();
+                    let (idx, n) = nodes.next().unwrap();
+                    let payload = n.payload();
+                    let clicked = ui
+                        .horizontal(|ui| {
+                            let clicked = ui.button("remove").clicked();
+                            let outg = self
+                                .g
+                                .edges_directed(idx, petgraph::Direction::Outgoing)
+                                .count();
+                            let inco = self
+                                .g
+                                .edges_directed(idx, petgraph::Direction::Incoming)
+                                .count();
+                            ui.label(format!("#:{payload:?} out:{outg:#} in:{inco:#}"));
+                            clicked
+                        })
+                        .inner;
+                    ui.label(format!("{:#}", payload));
+                    if clicked {
+                        rm = Some(idx)
+                    }
+                });
+                drop(nodes);
+
+                if let Some(idx) = rm {
+                    self.g.remove_node(idx);
+                    self.sim.remove_node(idx);
+                }
+            }
+            if self.can_show_graph && self.show_graph {
+                self._show_graph(ui);
+            }
+        });
+
+        self.handle_events();
+        self.sync();
+        self.update_simulation();
+        self.global.update_fps(ctx);
+    }
+
+    fn show_graph_selector(&mut self, ui: &mut Ui) {
+        let left = egui::Button::new("<");
+        let left = ui.add_enabled(self.active != 0, left).clicked();
+        ui.label(format!("{}", self.active));
+        let right = egui::Button::new(">");
+        let right = ui
+            .add_enabled(self.active != self.others.len() - 1, right)
+            .clicked();
+        if left {
+            self.others.swap(self.active, self.active - 1);
+            let new = &mut self.others[self.active];
+            self.active -= 1;
+            let Some(new) = new else { unreachable!() };
+            std::mem::swap(&mut new.0, &mut self.g);
+            std::mem::swap(&mut new.1, &mut self.sim);
+            std::mem::swap(&mut new.2, &mut self.force);
+            // self.force = init_force(&self.global.settings_simulation);
+        } else if right {
+            self.others.swap(self.active, self.active + 1);
+            let new = &mut self.others[self.active];
+            self.active += 1;
+            let Some(new) = new else { unreachable!() };
+            std::mem::swap(&mut new.0, &mut self.g);
+            std::mem::swap(&mut new.1, &mut self.sim);
+            std::mem::swap(&mut new.2, &mut self.force);
+            if self.g.node_count() < 300 {
+                self.can_show_graph = true;
+            }
+            // self.force = init_force(&self.global.settings_simulation);
+        }
+
+        if left || right {
+            egui_graphs::MetadataFrame::default().save(ui);
+        }
     }
 }
 
@@ -485,7 +757,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
         Self::new(settings_graph, settings_simulation, g, force, sim)
     }
 
-    fn new(
+    pub fn new(
         settings_graph: settings::SettingsGraph,
         settings_simulation: settings::SettingsSimulation,
         g: Graph<N, E, Directed, u32, Dn>,
@@ -496,7 +768,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
         >,
     ) -> Self {
         let (event_publisher, event_consumer) = unbounded();
-
+        let last_update_time = Instant::now();
         Self {
             g,
             sim,
@@ -524,7 +796,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
                 simulation_stopped: false,
 
                 fps: 0.,
-                last_update_time: Instant::now(),
+                last_update_time,
                 frames_last_time_span: 0,
 
                 pan: [0., 0.],
@@ -545,7 +817,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
 
     /// sync locations computed by the simulation with egui_graphs::Graph nodes.
     fn sync(&mut self) {
-        self.g.g.node_weights_mut().for_each(|node| {
+        self.g.g_mut().node_weights_mut().for_each(|node| {
             let sim_computed_point: OPoint<f32, Const<2>> =
                 self.sim.node_weight(node.id()).unwrap().1;
             node.set_location(Pos2::new(
@@ -586,7 +858,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
         });
     }
 
-    fn draw_section_simulation(&mut self, ui: &mut Ui) {
+    pub fn show_section_simulation(&mut self, ui: &mut Ui) {
         ui.horizontal_wrapped(|ui| {
             ui.style_mut().spacing.item_spacing = Vec2::new(0., 0.);
             ui.label("Force-Directed Simulation is done with ");
@@ -606,7 +878,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
         }
         if reset {
             dbg!();
-            let mut md = egui_graphs::Metadata::load(ui);
+            let mut md = egui_graphs::MetadataFrame::new(None).load(ui);
             dbg!(md.graph_bounds());
             dbg!(md.zoom);
             // md.zoom = 1.5;
@@ -618,26 +890,26 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
             }
             for n in self.g.nodes_iter() {
                 dbg!(&n.1.location());
-                md.comp_iter_bounds(n.1);
+                md.process_bounds(n.1);
             }
-            for n in self.g.g.node_weights_mut() {
+            for n in self.g.g_mut().node_weights_mut() {
                 dbg!(&n.location());
                 n.set_location(Pos2::new(1.0, 1.0));
-                md.comp_iter_bounds(n);
+                md.process_bounds(n);
             }
             dbg!(md.graph_bounds());
             md.save(ui);
             self.reset();
-            egui_graphs::GraphView::<
-                N,
-                E,
-                _,
-                _,
-                Dn,
-                egui_graphs::DefaultEdgeShape,
-                egui_graphs::LayoutStateRandom,
-                egui_graphs::LayoutRandom,
-            >::clear_cache(ui);
+            // egui_graphs::GraphView::<
+            //     N,
+            //     E,
+            //     _,
+            //     _,
+            //     Dn,
+            //     egui_graphs::DefaultEdgeShape,
+            //     egui_graphs::LayoutStateRandom,
+            //     egui_graphs::LayoutRandom,
+            // >::clear_cache(ui);
         }
 
         ui.add_space(10.);
@@ -661,7 +933,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
         ui.add_space(10.);
     }
 
-    fn draw_section_widget(&mut self, ui: &mut Ui) {
+    pub fn show_section_widget(&mut self, ui: &mut Ui) {
         self.global.settings_navigation.show(ui);
         self.global.settings_graph.show(ui);
         self.global.settings_style.show(ui);
@@ -701,7 +973,7 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
             });
     }
 
-    fn draw_section_debug(&self, ui: &mut Ui) {
+    pub fn show_section_debug(&self, ui: &mut Ui) {
         drawers::draw_section_debug(
             ui,
             ValuesSectionDebug {
@@ -718,11 +990,11 @@ impl<N: Clone + std::fmt::Debug, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Di
         self.global.settings_navigation.fit_to_screen_enabled = false;
         self.global.settings_simulation.dt = 0.001;
         self.force = init_force(&self.global.settings_simulation);
-        self.sim = fdg::init_force_graph_uniform(self.g.g.clone(), 1.0);
+        self.sim = fdg::init_force_graph_uniform(self.g.g().clone(), 1.0);
     }
 }
 
-fn force_sim<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, DefaultIx>>(
+pub fn force_sim<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, DefaultIx>>(
     settings_simulation: &settings::SettingsSimulation,
     g: &mut Graph<N, E, Directed, u32, Dn>,
 ) -> (
@@ -733,9 +1005,9 @@ fn force_sim<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, De
     >,
 ) {
     let mut force = init_force(settings_simulation);
-    let mut sim = fdg::init_force_graph_uniform(g.g.clone(), 1.0);
+    let mut sim = fdg::init_force_graph_uniform(g.g().clone(), 1.0);
     force.apply(&mut sim);
-    g.g.node_weights_mut().for_each(|node| {
+    g.g_mut().node_weights_mut().for_each(|node| {
         let point: fdg::nalgebra::OPoint<f32, fdg::nalgebra::Const<2>> =
             sim.node_weight(node.id()).unwrap().1;
         node.set_location(Pos2::new(point.coords.x, point.coords.y));
@@ -744,7 +1016,7 @@ fn force_sim<N: Clone, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Directed, De
 }
 
 impl Global {
-    fn update_fps(&mut self) {
+    fn update_fps(&mut self, _ctx: &Context) {
         self.frames_last_time_span += 1;
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_update_time);
@@ -752,6 +1024,12 @@ impl Global {
             self.last_update_time = now;
             self.fps = self.frames_last_time_span as f32 / elapsed.as_secs_f32();
             self.frames_last_time_span = 0;
+        } else {
+            _ctx.input(|mem| mem.unstable_dt);
+            #[cfg(target_arch = "wasm32")]
+            let dt = _ctx.input(|mem| mem.unstable_dt);
+            #[cfg(target_arch = "wasm32")]
+            self.last_update_time.add(dt)
         }
     }
 
@@ -780,144 +1058,7 @@ impl<
 > App for ForceBasedGraphExplorationApp<N, E, Dn>
 {
     fn update(&mut self, ctx: &Context, _: &mut eframe::Frame) {
-        egui::SidePanel::right("right_panel")
-            .min_width(250.)
-            .show(ctx, |ui| {
-                if !self.others.is_empty() {
-                    ui.horizontal(|ui| {
-                        let left = egui::Button::new("<");
-                        let left = ui.add_enabled(self.active != 0, left).clicked();
-                        ui.label(format!("{}", self.active));
-                        let right = egui::Button::new(">");
-                        let right = ui
-                            .add_enabled(self.active != self.others.len() - 1, right)
-                            .clicked();
-                        if left {
-                            self.others.swap(self.active, self.active - 1);
-                            let new = &mut self.others[self.active];
-                            self.active -= 1;
-                            let Some(new) = new else { unreachable!() };
-                            std::mem::swap(&mut new.0, &mut self.g);
-                            std::mem::swap(&mut new.1, &mut self.sim);
-                            std::mem::swap(&mut new.2, &mut self.force);
-                            // self.force = init_force(&self.global.settings_simulation);
-                        } else if right {
-                            self.others.swap(self.active, self.active + 1);
-                            let new = &mut self.others[self.active];
-                            self.active += 1;
-                            let Some(new) = new else { unreachable!() };
-                            std::mem::swap(&mut new.0, &mut self.g);
-                            std::mem::swap(&mut new.1, &mut self.sim);
-                            std::mem::swap(&mut new.2, &mut self.force);
-                            if self.g.node_count() < 300 {
-                                self.can_show_graph = true;
-                            }
-                            // self.force = init_force(&self.global.settings_simulation);
-                        }
-
-                        if left || right {
-                            egui_graphs::Metadata::default().save(ui);
-                        }
-
-                        ui.add_enabled(
-                            self.can_show_graph,
-                            egui::Checkbox::new(&mut self.show_graph, "graph"),
-                        );
-                        ui.checkbox(&mut self.show_pattern_list, "list");
-                    });
-
-                    ui.label(format!(
-                        "{} connex graph n:{} e:{}",
-                        self.others.len(),
-                        self.g.node_count(),
-                        self.g.edge_count()
-                    ));
-                }
-                ScrollArea::vertical().show(ui, |ui| {
-                    CollapsingHeader::new("Simulation")
-                        .default_open(true)
-                        .show(ui, |ui| self.draw_section_simulation(ui));
-
-                    ui.add_space(10.);
-
-                    egui::CollapsingHeader::new("Debug")
-                        .default_open(true)
-                        .show(ui, |ui| self.draw_section_debug(ui));
-
-                    ui.add_space(10.);
-
-                    CollapsingHeader::new("Widget")
-                        .default_open(true)
-                        .show(ui, |ui| self.draw_section_widget(ui));
-                });
-            });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            if self.show_pattern_list {
-                if !self.can_show_graph {
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "{} nodes and {} edges is too much to display",
-                            self.g.node_count(),
-                            self.g.edge_count()
-                        ))
-                        .color(ui.visuals().warn_fg_color),
-                    );
-                }
-
-                let size = if self.can_show_graph && self.show_graph {
-                    ui.available_size() * egui::vec2(1.0, 0.2)
-                } else {
-                    ui.available_size()
-                };
-                let (rect, _) = ui.allocate_exact_size(size, egui::Sense::click());
-                let ui = &mut ui.new_child(egui::UiBuilder::new().max_rect(rect));
-                let total_cols = self.g.node_count();
-                let mut rm = None;
-                let mut nodes = None;
-                crate::hscroll::hscroll_many_columns(ui, 450.0, total_cols, |ui, i| {
-                    if nodes.is_none() {
-                        nodes = Some(self.g.g.node_references().rev().skip(i));
-                    };
-                    let nodes = nodes.as_mut().unwrap();
-                    let (idx, n) = nodes.next().unwrap();
-                    let payload = n.payload();
-                    let clicked = ui
-                        .horizontal(|ui| {
-                            let clicked = ui.button("remove").clicked();
-                            let outg = self
-                                .g
-                                .edges_directed(idx, petgraph::Direction::Outgoing)
-                                .count();
-                            let inco = self
-                                .g
-                                .edges_directed(idx, petgraph::Direction::Incoming)
-                                .count();
-                            ui.label(format!("#:{payload:?} out:{outg:#} in:{inco:#}"));
-                            clicked
-                        })
-                        .inner;
-                    ui.label(format!("{:#}", payload));
-                    if clicked {
-                        rm = Some(idx)
-                    }
-                });
-                drop(nodes);
-
-                if let Some(idx) = rm {
-                    self.g.remove_node(idx);
-                    self.sim.remove_node(idx);
-                }
-            }
-            if self.can_show_graph && self.show_graph {
-                self.show_graph(ui);
-            }
-        });
-
-        self.handle_events();
-        self.sync();
-        self.update_simulation();
-        self.global.update_fps();
+        self.show(ctx);
     }
 }
 mod node {

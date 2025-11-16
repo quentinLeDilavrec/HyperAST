@@ -2725,7 +2725,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "log",
- "petgraph 0.7.1",
+ "petgraph 0.8.3",
  "poll-promise",
  "serde",
  "serde-wasm-bindgen",
@@ -2822,8 +2822,6 @@ dependencies = [
 [[package]]
 name = "egui_graphs"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f1a4f357adce91fb5fa51edb89d7ea81dd18a2e9a66f01ece7298b1b13eea8d"
 dependencies = [
  "crossbeam",
  "egui",
@@ -3151,11 +3149,10 @@ dependencies = [
 [[package]]
 name = "fdg"
 version = "1.0.0"
-source = "git+https://github.com/grantshandy/fdg#44f6c1bce649a67b5b19eb695b92e97a6e49cf2a"
 dependencies = [
  "nalgebra",
  "num-traits",
- "petgraph 0.7.1",
+ "petgraph 0.8.3",
  "rand 0.8.5",
  "rayon",
  "rustc-hash 1.1.0",

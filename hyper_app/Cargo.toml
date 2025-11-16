@@ -145,6 +145,8 @@ ts_highlight = [
 ]
 alt_grammar = ["hyperast_gen_ts_cpp/alt_grammar"]
 
+force_layout = ["egui_addon/force_layout"]
+
 # [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:

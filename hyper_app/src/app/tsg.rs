@@ -241,6 +241,9 @@ pub enum QueryingError {
     TsgParsing(String),
 }
 
+#[cfg(feature = "force_layout")]
+pub(super) type GraphTy = egui_addon::force_layout::Simple<String, ()>;
+
 pub(super) fn show_querying(
     ui: &mut egui::Ui,
     api_addr: &str,
@@ -268,8 +271,127 @@ pub(super) fn show_querying(
                 let ui = ui2;
                 handle_interactions(ui, query_editors, querying_result, query, trigger_compute);
                 show_long_result(&*querying_result, ui);
+
+                #[cfg(feature = "force_layout")]
+                show_result_graph(querying_result, ui);
             });
     }
+}
+
+#[cfg(feature = "force_layout")]
+fn show_result_graph(
+    querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
+    ui: &mut egui::Ui,
+) {
+    use crate::app::utils_results_batched::prep_compute_res_prom;
+    let Some(content) = prep_compute_res_prom(querying_result, ui) else {
+        return;
+    };
+    type Ty = GraphTy;
+    // type Ty = egui_addon::force_layout::SimpleExample;
+
+    let id = egui::Id::new("force_graph");
+
+    let mut app = ui.memory_mut(|w| w.data.get_temp_mut_or_default::<Option<Arc<Ty>>>(id).take());
+    if app.is_none() {
+        use egui_addon::force_layout::*;
+        let mut g = simple_pet_graph();
+        if let Some(content) = (content.as_ref().ok())
+            .and_then(|x| x.results.first())
+            .and_then(|x| x.as_ref().ok())
+        {
+            let content = &content.inner.result;
+
+            let content = content.as_array().unwrap();
+
+            let mut node_map = hyperast::compat::HashMap::new();
+            let mut e_vec = vec![];
+            for v in content {
+                let v = v.as_object().unwrap();
+                let id = v.get("id").unwrap().as_number().unwrap();
+                let n1 = simple_add_node(&mut g, id.to_string());
+                let attrs = v.get("attrs").unwrap().as_object().unwrap();
+                let edges = v.get("edges").unwrap().as_array().unwrap();
+                let id = id.as_u64().unwrap();
+                node_map.insert(id, n1);
+                for e in edges {
+                    let attrs = e.get("attrs").unwrap().as_object().unwrap();
+                    let sink = e.get("sink").unwrap().as_number().unwrap();
+                    e_vec.push((id, sink.as_u64().unwrap()));
+                }
+            }
+
+            for (source, sink) in &e_vec {
+                let n1 = *node_map.get(source).unwrap();
+                let n2 = *node_map.get(sink).unwrap();
+                simple_add_edge(&mut g, n1, n2);
+            }
+
+            // [
+            //   {
+            //     "attrs": {
+            //       "debug_tsg_location": {
+            //         "string": "line 2 column 16",
+            //         "type": "string"
+            //       },
+            //       "debug_tsg_match_node": {
+            //         "id": 3429014671,
+            //         "type": "syntaxNode"
+            //       },
+            //       "debug_tsg_variable": {
+            //         "string": "@prog.defs",
+            //         "type": "string"
+            //       }
+            //     },
+            // "edges": [
+            //   {
+            //     "attrs": {
+            //       "debug_tsg_location": {
+            //         "string": "line 4 column 5",
+            //         "type": "string"
+            //       }
+            //     },
+            //     "sink": 3
+            //   }
+            // ],
+            //     "id": 2
+            //   },
+        }
+        let mut graph = Graph::<String, (), _, _, _, _>::new(g);
+        let settings_simulation = Default::default();
+        let (force, sim) = force_sim(&settings_simulation, &mut graph);
+        app = Some(Arc::new(Ty::new(
+            Default::default(),
+            settings_simulation,
+            graph,
+            force,
+            sim,
+        )));
+    }
+    egui::CollapsingHeader::new("Results (Graph)")
+        .default_open(true)
+        .show(ui, |ui| {
+            let arc: &mut Arc<_> = app.as_mut().unwrap();
+            egui::CollapsingHeader::new("Widget")
+                .default_open(false)
+                .show(ui, |ui| {
+                    Arc::get_mut(arc).unwrap().show_section_widget(ui);
+                });
+            egui::CollapsingHeader::new("Simulation")
+                .default_open(false)
+                .show(ui, |ui| {
+                    Arc::get_mut(arc).unwrap().show_section_simulation(ui);
+                });
+
+            Arc::get_mut(arc).unwrap().show_graph(ui);
+            // Arc::get_mut(arc).unwrap().show(ui.ctx()); // need full screen
+        });
+
+    ui.memory_mut(|w| {
+        w.data
+            .get_temp_mut_or_default::<Option<Arc<Ty>>>(id)
+            .insert(app.unwrap());
+    });
 }
 
 fn handle_interactions(

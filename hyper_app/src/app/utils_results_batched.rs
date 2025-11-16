@@ -65,32 +65,37 @@ pub(crate) fn show_long_result(
     promise: &Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,
     ui: &mut egui::Ui,
 ) {
+    let Some(content) = prep_compute_res_prom(promise, ui) else {
+        return;
+    };
+    if let Err(error) = content {
+        show_long_result_compute_failure(ui, error);
+    } else if let Ok(content) = content {
+        show_long_result_success(ui, content);
+    }
+}
+
+pub fn prep_compute_res_prom<'a, 'b, T: ComputeError + Send + Sync>(
+    promise: &'a Option<ComputeResultsProm<T>>,
+    ui: &mut egui::Ui,
+) -> Option<&'a Result<ComputeResults, T>> {
     let Some(promise) = &promise else {
         ui.label("click on Compute");
-        return;
+        return None;
     };
     let Some(result) = promise.ready() else {
         ui.spinner();
-        return;
+        return None;
     };
-    match result {
-        Ok(resource) => match &resource.content {
-            Some(Ok(content)) => {
-                show_long_result_success(ui, content);
-            }
-            Some(Err(error)) => {
-                show_long_result_compute_failure(ui, error);
-            }
-            _ => (),
-        },
-        Err(error) => {
-            // This should only happen if the fetch API isn't available or something similar.
-            ui.colored_label(
-                ui.visuals().error_fg_color,
-                if error.is_empty() { "Error" } else { error },
-            );
-        }
+    if let Err(error) = result {
+        // This should only happen if the fetch API isn't available or something similar.
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            if error.is_empty() { "Error" } else { error },
+        );
+        return None;
     }
+    result.as_ref().ok().and_then(|x| x.content.as_ref())
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]

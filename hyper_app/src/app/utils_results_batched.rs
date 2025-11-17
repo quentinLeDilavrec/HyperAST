@@ -200,11 +200,12 @@ pub(crate) fn show_long_result_list(ui: &mut egui::Ui, content: &ComputeResults)
                     egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx(), ui.style());
                 let mut layouter =
                     |ui: &egui::Ui, string: &dyn egui::TextBuffer, _wrap_width: f32| {
+                        let string: &str = string.as_str();
                         let layout_job = egui_extras::syntax_highlighting::highlight(
                             ui.ctx(),
                             ui.style(),
                             &theme,
-                            string.as_str(),
+                            &string,
                             language,
                         );
                         // layout_job.wrap.max_width = wrap_width; // no wrapping

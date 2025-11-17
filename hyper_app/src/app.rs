@@ -1735,11 +1735,12 @@ fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
                 .frame(false)
                 .desired_width(f32::INFINITY)
                 .layouter(&mut |ui, string, _wrap_width| {
+                    let string: &str = string.as_str();
                     let layout_job = egui_extras::syntax_highlighting::highlight(
                         ui.ctx(),
                         ui.style(),
                         &theme,
-                        string,
+                        &string,
                         language,
                     );
                     ui.fonts(|f| f.layout_job(layout_job))
@@ -1752,12 +1753,13 @@ fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
                 .code_editor()
                 .frame(false)
                 .desired_width(f32::INFINITY)
-                .layouter(&mut |ui, string, _wrap_width| {
+                .layouter(&mut |ui, string: &_, _wrap_width| {
+                    let string: &str = string.as_str();
                     let layout_job = egui_extras::syntax_highlighting::highlight(
                         ui.ctx(),
                         ui.style(),
                         &theme,
-                        string.as_str(),
+                        &string,
                         language,
                     );
                     ui.fonts(|f| f.layout_job(layout_job))

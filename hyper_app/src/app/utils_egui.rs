@@ -253,11 +253,12 @@ pub trait MyUiExt: UiExt {
             self.ui().style(),
         );
         let mut layouter = |ui: &egui::Ui, code: &dyn egui::TextBuffer, _wrap_width: f32| {
+            let code: &str = code.as_str();
             let layout_job = egui_extras::syntax_highlighting::highlight(
                 ui.ctx(),
                 ui.style(),
                 &theme,
-                code.as_str(),
+                &code,
                 language,
             );
             if wrap {

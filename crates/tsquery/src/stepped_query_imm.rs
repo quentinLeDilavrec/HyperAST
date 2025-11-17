@@ -4,21 +4,20 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use hyperast::position::{self, TreePathMut};
+use hyperast::position;
+use hyperast::position::TreePathMut;
 use hyperast::tree_gen;
 use hyperast::tree_gen::WithLabel;
-use hyperast::types::ETypeStore;
-use hyperast::types::{self, NodeId};
+use hyperast::types;
+use hyperast::types::{ETypeStore, NodeId};
 use hyperast::types::{HyperAST, HyperASTShared, LendT};
 use hyperast::types::{Role, RoleStore};
 use hyperast::types::{WithRoles, WithSerialization, WithStats};
 
 #[cfg(feature = "tsg")]
-use tree_sitter_graph::graph;
-#[cfg(feature = "tsg")]
 use tree_sitter_graph::{
     MatchLender, MatchLending, MatchesLending, QueryWithLang,
-    graph::{NNN, NodeLender, NodeLending, NodesLending},
+    graph::{self, NNN, NodeLender, NodeLending, NodesLending},
 };
 
 use crate::{CaptureId, StatusLending, hyperast_cursor::NodeR};

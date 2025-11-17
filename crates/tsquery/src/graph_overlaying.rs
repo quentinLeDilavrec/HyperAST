@@ -1,9 +1,12 @@
-use super::stepped_query_imm;
-use hyperast::{
-    tree_gen,
-    types::{self, AstLending, ETypeStore, HyperASTShared, StoreRefAssoc},
-};
 use std::{fmt::Debug, hash::Hash};
+
+use hyperast::tree_gen;
+use hyperast::types;
+#[cfg(feature = "tsg")]
+use hyperast::types::LendT;
+use hyperast::types::{AstLending, ETypeStore, HyperASTShared, StoreRefAssoc};
+
+use super::stepped_query_imm;
 
 pub struct PreparedOverlay<Q, O> {
     pub query: Option<Q>,
@@ -12,7 +15,7 @@ pub struct PreparedOverlay<Q, O> {
 }
 
 #[cfg(feature = "tsg")]
-impl<'aaa, 'hast, 'g, HAST, Acc> tree_gen::More<HAST>
+impl<HAST, Acc> tree_gen::More<HAST>
     for PreparedOverlay<
         &crate::Query,
         &tree_sitter_graph::ast::File<
@@ -23,12 +26,10 @@ where
     HAST: StoreRefAssoc,
     HAST::IdN: Copy + Hash + Debug,
     HAST::Idx: Hash,
-    for<'t> <HAST as AstLending<'t>>::RT:
-        types::WithSerialization + types::WithStats + types::WithRoles,
-    HAST::TS: 'static
-        + Clone
-        + ETypeStore<Ty2 = Acc::Type>
-        + types::RoleStore<IdF = u16, Role = types::Role>,
+    for<'t> LendT<'t, HAST>: types::WithSerialization + types::WithStats + types::WithRoles,
+    HAST::TS: 'static + Clone,
+    HAST::TS: ETypeStore<Ty2 = Acc::Type>,
+    HAST::TS: types::RoleStore<IdF = u16, Role = types::Role>,
     Acc: tree_gen::WithRole<types::Role> + tree_gen::WithChildren<HAST::IdN> + types::Typed,
     for<'acc> &'acc Acc: tree_gen::WithLabel<L = &'acc str>,
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -52,19 +53,12 @@ where
         }
         let pos = hyperast::position::StructuralPosition::empty();
         let cursor = crate::cursor_on_unbuild::TreeCursor::new(stores, acc, label, pos);
+        use crate::cursor_on_unbuild::Node as N;
+        use hyperast::position::structural_pos::StructuralPosition as Pos;
         let mut qcursor: crate::QueryCursor<
             '_,
             _,
-            crate::cursor_on_unbuild::Node<
-                <HAST as StoreRefAssoc>::S<'_>,
-                &Acc,
-                <HAST as HyperASTShared>::Idx,
-                hyperast::position::structural_pos::StructuralPosition<
-                    <HAST as HyperASTShared>::IdN,
-                    <HAST as HyperASTShared>::Idx,
-                >,
-                &str,
-            >,
+            N<HAST::S<'_>, &Acc, HAST::Idx, Pos<HAST::IdN, HAST::Idx>, &str>,
         > = query.matches_immediate(cursor); // TODO filter on height (and visibility?)
         let mut r = Default::default();
         loop {
@@ -91,12 +85,10 @@ where
     HAST: StoreRefAssoc,
     HAST::IdN: Copy + Hash + Debug,
     HAST::Idx: Hash,
-    for<'t> <HAST as AstLending<'t>>::RT:
-        types::WithSerialization + types::WithStats + types::WithRoles,
-    HAST::TS: 'static
-        + Clone
-        + ETypeStore<Ty2 = Acc::Type>
-        + types::RoleStore<IdF = u16, Role = types::Role>,
+    for<'t> LendT<'t, HAST>: types::WithSerialization + types::WithStats + types::WithRoles,
+    HAST::TS: 'static + Clone,
+    HAST::TS: ETypeStore<Ty2 = Acc::Type>,
+    HAST::TS: types::RoleStore<IdF = u16, Role = types::Role>,
     Acc: tree_gen::WithRole<types::Role> + tree_gen::WithChildren<HAST::IdN> + types::Typed,
     for<'acc> &'acc Acc: tree_gen::WithLabel<L = &'acc str>,
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -128,15 +120,11 @@ where
     HAST: StoreRefAssoc,
     HAST::IdN: 'static + Copy + Hash + Debug,
     HAST::Idx: 'static + Hash,
-    for<'t> <HAST as AstLending<'t>>::RT:
-        types::WithSerialization + types::WithStats + types::WithRoles,
-    HAST::TS: 'static
-        + Clone
-        + ETypeStore<Ty2 = Acc::Type>
-        + types::RoleStore<IdF = u16, Role = types::Role>
-        + types::TypeStore,
-    Acc: types::Typed
-        + 'static
+    for<'t> LendT<'t, HAST>: types::WithSerialization + types::WithStats + types::WithRoles,
+    HAST::TS: 'static + Clone,
+    HAST::TS: ETypeStore<Ty2 = Acc::Type> + types::TypeStore,
+    HAST::TS: types::RoleStore<IdF = u16, Role = types::Role>,
+    Acc: 'static
         + tree_gen::WithRole<types::Role>
         + tree_gen::WithChildren<HAST::IdN>
         + types::Typed,

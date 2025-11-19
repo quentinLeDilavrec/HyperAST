@@ -64,6 +64,13 @@ impl<E: PartialEq, I: PartialEq> TR<E, I> {
             TR::SimpEQ(t) => g("SimpEQ", t),
         }
     }
+
+    pub fn as_init(&self) -> Option<&E> {
+        match self {
+            Self::Init(c) => Some(c),
+            _ => None,
+        }
+    }
 }
 
 pub struct QueryLattice<E> {

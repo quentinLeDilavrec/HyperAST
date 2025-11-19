@@ -1,15 +1,15 @@
-use std::ops::Range;
-
 use axum::Json;
 use hashbrown::HashSet;
+use serde::{Deserialize, Serialize};
+use std::ops::Range;
+use tokio::time::Instant;
+
 use hyper_diff::actions::Actions;
 use hyperast::position::TreePathMut;
 use hyperast::position::position_accessors::SolvedPosition;
 use hyperast::position::position_accessors::{RootedPosition, WithPreOrderOffsets};
 use hyperast::types::Children;
 use hyperast_gen_ts_tsquery::code2query::QueryLattice;
-use serde::{Deserialize, Serialize};
-use tokio::time::Instant;
 
 use crate::SharedState;
 use crate::utils::{LocalPieceOfCode, PieceOfCode};
@@ -219,16 +219,11 @@ pub(crate) fn smells(
         .enumerate()
         .map(|(i, v)| SearchResult {
             query: bad[i].0.clone(),
-            examples: bad[i]
-                .1
-                .iter()
+            examples: (bad[i].1.iter())
                 .filter_map(|x| query_lattice.raw_rels.get(&query_lattice.leaf(*x)))
                 .flat_map(|x| {
                     x.iter()
-                        .filter_map(|x| match x {
-                            hyperast_gen_ts_tsquery::code2query::TR::Init(c) => Some(c),
-                            _ => None,
-                        })
+                        .filter_map(|x| x.as_init())
                         .flat_map(|x| ex_map.get(x))
                 })
                 .flatten()
@@ -244,10 +239,7 @@ pub(crate) fn smells(
 
     bad.sort_by(|a, b| {
         let cmp = b.examples.len().cmp(&a.examples.len());
-        if cmp.is_eq() {
-            return b.query.len().cmp(&a.query.len());
-        }
-        cmp
+        cmp.then_with(|| b.query.len().cmp(&a.query.len()))
     });
     let search_time = now.elapsed().as_secs_f64();
     Ok(SearchResults {
@@ -280,10 +272,7 @@ pub(crate) fn smells_ex_from_diffs(
         .ok_or_else(|| "missing config for repository".to_string())?;
     let mut repository = repo_handle.fetch();
     log::warn!("done cloning {}", repository.spec);
-    let commits = state
-        .repositories
-        .write()
-        .unwrap()
+    let commits = (state.repositories.write().unwrap())
         .pre_process_with_limit(&mut repository, "", &commit, 4)
         .map_err(|e| e.to_string())?;
     let prepare_time = now.elapsed().as_secs_f64();

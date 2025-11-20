@@ -43,7 +43,7 @@ pub(crate) fn show_config(
     let (resp_repo, resp_commit) = single.content.commit.show_clickable(ui);
 
     ui.add(
-        egui::Slider::new(&mut single.content.len, 1..=200)
+        egui::Slider::new(&mut single.content.len, 1..=1)
             .text("commits")
             .clamping(egui::SliderClamping::Never)
             .integer()
@@ -53,15 +53,29 @@ pub(crate) fn show_config(
     let selected = &mut single.content.config;
     selected.show_combo_box(ui, "Repo Config");
 
-    ui.push_id(ui.id().with("path"), |ui| {
-        egui::TextEdit::singleline(&mut single.content.path)
+    ui.label("path:");
+    egui::TextEdit::singleline(&mut single.content.path)
+        .clip_text(true)
+        .id_salt("path")
+        // .desired_width(150.0)
+        .desired_rows(1)
+        .hint_text("path")
+        .interactive(true)
+        .show(ui);
+
+    ui.add_space(4.0);
+    ui.label("selected attribute:");
+    ui.add_enabled(
+        cfg!(feature = "force_layout"),
+        egui::TextEdit::singleline(&mut single.content.selected_attr)
             .clip_text(true)
+            .id_salt("selected attribute")
             // .desired_width(150.0)
             .desired_rows(1)
-            .hint_text("path")
-            .interactive(true)
-            .show(ui)
-    });
+            .hint_text("select attribute")
+            .interactive(true),
+    )
+    .on_disabled_hover_text("enable force_layout feature");
     (resp_repo, resp_commit)
 }
 
@@ -129,6 +143,7 @@ pub(super) struct ComputeConfigQuery {
     config: Config,
     len: usize,
     path: String,
+    selected_attr: String,
 }
 
 impl Default for ComputeConfigQuery {
@@ -139,6 +154,7 @@ impl Default for ComputeConfigQuery {
             // commit: "4acedc53a13a727be3640fe234f7e261d2609d58".into(),
             len: example_queries::EXAMPLES[0].commits,
             path: example_queries::EXAMPLES[0].path.to_string(),
+            selected_attr: Default::default(),
         }
     }
 }
@@ -257,10 +273,13 @@ pub(super) fn show_querying(
             show_scripts_edition(ui, api_endpoint, query_editors, query);
             handle_interactions(ui, query_editors, querying_result, query, trigger_compute);
             show_long_result(&*querying_result, ui);
+
+            let selected_attr = &query.content.selected_attr;
+            show_result_graph(querying_result, ui, selected_attr);
         });
     } else {
         InteractiveSplitter::vertical()
-            .ratio(0.7)
+            .ratio(0.5)
             .show(ui, |ui1, ui2| {
                 ui1.push_id(ui1.id().with("input"), |ui| {
                     show_scripts_edition(ui, api_endpoint, query_editors, query);
@@ -269,8 +288,8 @@ pub(super) fn show_querying(
                 handle_interactions(ui, query_editors, querying_result, query, trigger_compute);
                 show_long_result(&*querying_result, ui);
 
-                #[cfg(feature = "force_layout")]
-                show_result_graph(querying_result, ui);
+                let selected_attr = &query.content.selected_attr;
+                show_result_graph(querying_result, ui, selected_attr);
             });
     }
 }
@@ -278,17 +297,33 @@ pub(super) fn show_querying(
 #[cfg(feature = "force_layout")]
 pub(super) type GraphTy = egui_addon::force_layout::Simple<String, ()>;
 
+#[cfg(not(feature = "force_layout"))]
+fn show_result_graph(
+    querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
+    ui: &mut egui::Ui,
+    selected_attr: &str,
+) {
+    ui.add_enabled_ui(false, |ui| {
+        egui::CollapsingHeader::new("Results (Graph)")
+            .default_open(false)
+            .show(ui, |ui| {
+                // TODO add a screenshot
+            })
+    })
+    .on_disabled_hover_text("enable force_layout feature")
+}
+
 #[cfg(feature = "force_layout")]
 fn show_result_graph(
     querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
     ui: &mut egui::Ui,
+    selected_attr: &str,
 ) {
     use crate::app::utils_results_batched::prep_compute_res_prom;
     let Some(content) = prep_compute_res_prom(querying_result, ui) else {
         return;
     };
     type Ty = GraphTy;
-    // type Ty = egui_addon::force_layout::SimpleExample;
 
     let id = egui::Id::new("force_graph");
 
@@ -306,14 +341,27 @@ fn show_result_graph(
 
             let mut node_map = hyperast::compat::HashMap::new();
             let mut e_vec = vec![];
-            for v in content {
+            for v in content.iter().take(500) {
                 let v = v.as_object().unwrap();
                 let id = v.get("id").unwrap().as_number().unwrap();
-                let n1 = simple_add_node(&mut g, id.to_string());
                 let attrs = v.get("attrs").unwrap().as_object().unwrap();
-                let edges = v.get("edges").unwrap().as_array().unwrap();
+                let n1 = if let Some(attr) = attrs.get(selected_attr) {
+                    let attr = attr.as_object().unwrap();
+                    if attr.get("type").and_then(|x| x.as_str()) == Some("string") {
+                        let attr = attr.get("string").unwrap();
+                        simple_add_node(&mut g, attr.as_str().unwrap().to_string())
+                    } else {
+                        let s = attr.get("type").unwrap();
+                        let s = s.as_str().unwrap();
+                        simple_add_node(&mut g, s.to_string())
+                    }
+                } else {
+                    simple_add_node(&mut g, id.to_string())
+                };
                 let id = id.as_u64().unwrap();
                 node_map.insert(id, n1);
+
+                let edges = v.get("edges").unwrap().as_array().unwrap();
                 for e in edges {
                     let attrs = e.get("attrs").unwrap().as_object().unwrap();
                     let sink = e.get("sink").unwrap().as_number().unwrap();
@@ -322,40 +370,14 @@ fn show_result_graph(
             }
 
             for (source, sink) in &e_vec {
-                let n1 = *node_map.get(source).unwrap();
-                let n2 = *node_map.get(sink).unwrap();
-                simple_add_edge(&mut g, n1, n2);
+                let Some(n1) = node_map.get(source) else {
+                    continue;
+                };
+                let Some(n2) = node_map.get(sink) else {
+                    continue;
+                };
+                simple_add_edge(&mut g, *n1, *n2);
             }
-
-            // [
-            //   {
-            //     "attrs": {
-            //       "debug_tsg_location": {
-            //         "string": "line 2 column 16",
-            //         "type": "string"
-            //       },
-            //       "debug_tsg_match_node": {
-            //         "id": 3429014671,
-            //         "type": "syntaxNode"
-            //       },
-            //       "debug_tsg_variable": {
-            //         "string": "@prog.defs",
-            //         "type": "string"
-            //       }
-            //     },
-            // "edges": [
-            //   {
-            //     "attrs": {
-            //       "debug_tsg_location": {
-            //         "string": "line 4 column 5",
-            //         "type": "string"
-            //       }
-            //     },
-            //     "sink": 3
-            //   }
-            // ],
-            //     "id": 2
-            //   },
         }
         let mut graph = to_graph(&g.into());
         let settings_simulation = Default::default();
@@ -372,25 +394,26 @@ fn show_result_graph(
         .default_open(true)
         .show(ui, |ui| {
             let arc: &mut Arc<_> = app.as_mut().unwrap();
+            let g = Arc::get_mut(arc).unwrap();
+            {
+                let ui = &mut ui.new_child(egui::UiBuilder::new().max_rect(ui.max_rect()));
+                g.show_graph(ui);
+            }
             egui::CollapsingHeader::new("Widget")
                 .default_open(false)
                 .show(ui, |ui| {
-                    Arc::get_mut(arc).unwrap().show_section_widget(ui);
+                    g.show_section_widget(ui);
                 });
             egui::CollapsingHeader::new("Simulation")
                 .default_open(false)
                 .show(ui, |ui| {
-                    Arc::get_mut(arc).unwrap().show_section_simulation(ui);
+                    g.show_section_simulation(ui);
                 });
-
-            Arc::get_mut(arc).unwrap().show_graph(ui);
             // Arc::get_mut(arc).unwrap().show(ui.ctx()); // need full screen
         });
 
     ui.memory_mut(|w| {
-        w.data
-            .get_temp_mut_or_default::<Option<Arc<Ty>>>(id)
-            .insert(app.unwrap());
+        *w.data.get_temp_mut_or_default::<Option<Arc<Ty>>>(id) = app;
     });
 }
 

@@ -133,7 +133,7 @@ objc2-app-kit = { version = "0.2.2", features = [
 ] }
 
 [features]
-default = ["serde"]
+default = ["serde", "force_layout"]
 
 # Allow serialization using [`serde`](https://docs.rs/serde).
 serde = ["egui/serde", "dep:serde"]

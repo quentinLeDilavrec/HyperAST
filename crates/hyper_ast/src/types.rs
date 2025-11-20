@@ -529,6 +529,12 @@ pub trait WithRoles: WithChildren {
 pub trait WithPrecompQueries {
     fn wont_match_given_precomputed_queries(&self, needed: u16) -> bool;
 }
+
+//
+// TODO need a super trait with all the capabilities provided
+// NOTE  might be better to provide it in child crates which makes those capabilities available
+//
+
 pub struct ChildrenSlice<'a, T>(pub &'a [T]);
 
 impl<'a, T> From<&'a [T]> for ChildrenSlice<'a, T> {

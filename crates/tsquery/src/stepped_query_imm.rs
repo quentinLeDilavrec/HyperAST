@@ -238,12 +238,12 @@ impl<HAST, Acc> Default for MyNodeErazing<HAST, &Acc> {
     }
 }
 
-pub struct QueryMatcher<TS, Acc> {
+pub struct QueryMatcher<HAST, Acc> {
     pub query: crate::Query,
-    _phantom: std::marker::PhantomData<(TS, Acc)>,
+    _phantom: std::marker::PhantomData<(HAST, Acc)>,
 }
 
-impl<TS, Acc> QueryMatcher<TS, Acc> {
+impl<HAST, Acc> QueryMatcher<HAST, Acc> {
     fn new(
         source: &str,
         language: &tree_sitter::Language,
@@ -269,7 +269,7 @@ impl<TS, Acc> QueryMatcher<TS, Acc> {
     }
 }
 
-impl<TS, Acc> Debug for QueryMatcher<TS, Acc> {
+impl<HAST, Acc> Debug for QueryMatcher<HAST, Acc> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.query)
     }

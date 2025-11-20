@@ -514,6 +514,51 @@ pub use precompute_pattern_predicate::PreparedQuerying;
 mod graph_overlaying;
 pub use graph_overlaying::PreparedOverlay;
 
+pub trait Opaque {
+    fn type_id(&self) -> std::any::TypeId;
+}
+
+impl<G: 'static> Opaque for tree_sitter_graph::functions::Functions<G> {
+    fn type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<G>()
+    }
+}
+
+pub type ImmGraph<HAST, Acc> =
+    tree_sitter_graph::graph::Graph<crate::stepped_query_imm::Node<HAST, Acc>>;
+
+#[derive(Clone)]
+pub struct ErazedFcts {
+    erzd: std::sync::Arc<dyn Opaque + Send + Sync>,
+}
+
+impl ErazedFcts {
+    #[cfg(feature = "tsg")]
+    pub fn new<G: tree_sitter_graph::graph::WithSynNodes + 'static>(
+        functions: tree_sitter_graph::functions::Functions<G>,
+    ) -> ErazedFcts {
+        Self {
+            erzd: std::sync::Arc::new(functions),
+        }
+    }
+    pub fn downcast_fcts<G: tree_sitter_graph::graph::WithSynNodes>(
+        &self,
+    ) -> &tree_sitter_graph::functions::Functions<G> {
+        // I tried other approaches but nothing worked,
+        // we cannot afford to rebuild the set each call,
+        // it cannot be passed easily as reference due to invariance over G (the fcts modify G)
+        let functions = &*self.erzd;
+        // SAFETY: assumes provided self.functions is the right one
+        let functions: &tree_sitter_graph::functions::Functions<G> =
+            unsafe { downcast_ref_unchecked(functions) };
+        pub unsafe fn downcast_ref_unchecked<T>(s: &dyn crate::Opaque) -> &T {
+            // SAFETY: caller guarantees that T is the correct type
+            unsafe { &*(s as *const dyn crate::Opaque as *const T) }
+        }
+        functions
+    }
+}
+
 // mod staged_graph {
 //     use std::collections::VecDeque;
 //     use std::collections::HashMap;

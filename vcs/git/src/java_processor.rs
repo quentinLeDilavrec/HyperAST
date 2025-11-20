@@ -1,29 +1,28 @@
+use std::iter::Peekable;
 use std::marker::PhantomData;
+use std::path::Components;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{iter::Peekable, path::Components};
 
 use git2::{Oid, Repository};
-use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
+
+use hyperast::hashed::{IndexingHashBuilder as _, MetaDataHashsBuilder as _};
 use hyperast::store::nodes::legion::{RawHAST, subtree_builder};
 use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
 use hyperast_gen_ts_java::types::{TStore, Type};
 
+use crate::Processor;
 use crate::StackEle;
+use crate::git::BasicGitObject;
+use crate::java::JavaAcc;
+use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
-use crate::{
-    Processor,
-    git::BasicGitObject,
-    java::JavaAcc,
-    preprocessed::RepositoryProcessor,
-    processing::{CacheHolding, InFiles, ObjectName},
-};
+use crate::processing::{CacheHolding, InFiles, ObjectName};
 
 pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
-    tree.iter()
-        .rev()
+    (tree.iter().rev())
         .map(TryInto::try_into)
         .filter_map(|x| x.ok())
         .collect()
@@ -77,9 +76,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
                 if let Some(
                     // (already, skiped_ana)
                     already,
-                ) = self
-                    .prepro
-                    .processing_systems
+                ) = (self.prepro.processing_systems)
                     .mut_or_default::<JavaProcessorHolder>()
                     .with_parameters(self.handle.0) //.with_parameters(self.parameters.0)
                     .cache
@@ -415,15 +412,21 @@ pub struct JavaProc {
     pub height_counts: Vec<u32>,
     query: Option<Query>,
     #[cfg(feature = "tsg")]
-    tsg: Option<(ErazedTSG, ErazedFcts)>,
+    tsg: Option<TsgErzedSettings>,
     cache: crate::processing::caches::Java,
     commits: crate::processing::caches::OidMap<crate::Commit>,
 }
 
 #[cfg(feature = "tsg")]
-type ErazedFcts = Arc<dyn std::any::Any + Send + Sync>;
+struct TsgErzedSettings {
+    file: ErazedTSG,
+    fcts: hyperast_tsquery::ErazedFcts,
+}
+
 #[cfg(feature = "tsg")]
 type ErazedTSG = Box<dyn std::any::Any + Send + Sync>;
+
+type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, 'a, TS>, Acc>;
 
 impl crate::processing::erased::Parametrized for JavaProcessorHolder {
     type T = Parameter;
@@ -450,15 +453,13 @@ impl crate::processing::erased::Parametrized for JavaProcessorHolder {
         let tsg = if let Some(q) = &t.tsg {
             use std::ops::Deref;
             let tsg = q.deref();
-            type M<'hast, TS, Acc> = hyperast_tsquery::QueryMatcher<TS, Acc>;
-            type ExtQ<'hast, TS, Acc> =
-                hyperast_tsquery::ExtendingStringQuery<M<'hast, TS, Acc>, tree_sitter::Language>;
+            type ExtQ<'a, HAST, Acc> =
+                hyperast_tsquery::ExtendingStringQuery<M<'a, HAST, Acc>, tree_sitter::Language>;
 
             let source: &str = tsg;
             let language = hyperast_gen_ts_java::language();
 
-            let mut file =
-                tree_sitter_graph::ast::File::<M<&SimpleStores, &Acc>>::new(language.clone());
+            let mut file = tree_sitter_graph::ast::File::<M<TStore, &Acc>>::new(language.clone());
 
             let query_source = if let Some(p) = &t.query {
                 ExtQ::new(language.clone(), Box::new(p.clone()), source.len())
@@ -473,23 +474,14 @@ impl crate::processing::erased::Parametrized for JavaProcessorHolder {
 
             M::check(&mut file).unwrap();
 
-            let functions = tree_sitter_graph::functions::Functions::<
-                tree_sitter_graph::graph::Graph<
-                    hyperast_tsquery::stepped_query_imm::Node<
-                        hyperast::store::SimpleStores<
-                            TStore,
-                            &hyperast::store::nodes::legion::NodeStoreInner,
-                            &hyperast::store::labels::LabelStore,
-                        >,
-                        &Acc,
-                    >,
-                >,
-            >::essentials();
-            // TODO port those path functions to the generified variant in my fork
-            // hyperast_tsquery::add_path_functions(&mut functions);
-            let functions = functions.as_any();
+            let fcts = hyperast_tsquery::ErazedFcts::new::<
+                hyperast_tsquery::ImmGraph<RawHAST<TStore>, &Acc>,
+            >(tree_sitter_graph::functions::Functions::stdlib());
 
-            Some((file.as_any(), functions))
+            Some(TsgErzedSettings {
+                file: file.as_any(),
+                fcts,
+            })
         } else {
             None
         };
@@ -559,7 +551,7 @@ impl crate::processing::erased::CommitProc for JavaProc {
 
     fn prepare_processing<'repo>(
         &self,
-        repository: &'repo git2::Repository,
+        repository: &'repo Repository,
         commit_builder: crate::preprocessed::CommitBuilder,
         handle: crate::processing::ParametrizedCommitProcessorHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc + 'repo> {
@@ -572,7 +564,7 @@ impl crate::processing::erased::CommitProc for JavaProc {
 }
 
 struct PreparedJavaCommitProc<'repo> {
-    repository: &'repo git2::Repository,
+    repository: &'repo Repository,
     commit_builder: crate::preprocessed::CommitBuilder,
     pub(crate) handle: ParametrizedCommitProcessorHandle,
 }
@@ -785,11 +777,16 @@ impl RepositoryProcessor {
                     }
                     #[cfg(feature = "tsg")]
                     {
-                        let spec: &tree_sitter_graph::ast::File<
-                            hyperast_tsquery::QueryMatcher<_, &Acc>,
-                        > = tsg.0.downcast_ref().unwrap();
+                        //
+                        let spec: &tree_sitter_graph::ast::File<M<TStore, &Acc>> =
+                            tsg.file.downcast_ref().unwrap();
+                        // let spec: &tree_sitter_graph::ast::File<
+                        //     hyperast_tsquery::QueryMatcher<_, &Acc>,
+                        //     u32,
+                        //     tree_sitter::Language,
+                        // > = tsg.file.downcast_ref().unwrap();
                         let query = java_proc.query.as_ref().map(|x| &x.0);
-                        let functions = tsg.1.clone();
+                        let functions = tsg.fcts.clone();
                         let more = hyperast_tsquery::PreparedOverlay {
                             query,
                             overlayer: spec,

@@ -20,7 +20,7 @@ impl<HAST: HyperASTShared, P: Clone> From<Node<'_, HAST, P>> for NodeR<P> {
 
 #[repr(transparent)]
 pub struct Node<'tree, HAST: HyperASTShared, P = Pos<HAST>>(
-    crate::hyperast_cursor::Node<'tree, HAST, P>,
+    pub crate::hyperast_cursor::Node<'tree, HAST, P>,
 );
 
 impl<HAST: HyperASTShared, P: Clone> Clone for Node<'_, HAST, P> {
@@ -256,8 +256,9 @@ type Pos<HAST: HyperASTShared> = hyperast::position::StructuralPosition<
     <HAST as HyperASTShared>::IdN,
     <HAST as HyperASTShared>::Idx,
 >;
-pub struct CapturedNodesIter<'b, 'cursor, 'tree, HAST: HyperASTShared, P = Pos<HAST>> {
-    stores: &'b HAST,
+
+pub struct CapturedNodesIter<'hast, 'cursor, 'tree, HAST: HyperASTShared, P = Pos<HAST>> {
+    stores: &'hast HAST,
     index: u32,
     inner: &'cursor [crate::Capture<Node<'tree, HAST, P>>],
 }

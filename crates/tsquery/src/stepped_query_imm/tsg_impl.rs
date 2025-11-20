@@ -30,14 +30,6 @@ impl<P: Clone + Hash> graph::SimpleNode for NodeR<P> {
         self.pos.hash(&mut hasher);
         hasher.finish() as usize
     }
-
-    fn parent(&self) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        let mut r = self.clone();
-        todo!()
-    }
 }
 
 impl<'acc, HAST: HyperASTShared, Acc: 'static> graph::Erzd for MyNodeErazing<HAST, &'acc Acc>
@@ -72,7 +64,7 @@ where
     &'acc Acc: WithLabel,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type Node = Node<HAST, &'acc Acc>;
+    type SNode = Node<HAST, &'acc Acc>;
 }
 
 impl<'a, 'acc, 'hast, HAST, Acc> MatchesLending<'a> for QueryMatcher<HAST, &'acc Acc>
@@ -91,7 +83,7 @@ where
     type Matches = MyQMatches<
         'a,
         'a,
-        crate::QueryCursor<'a, <Self as NodeLending<'a>>::Node, <Self as NodeLending<'a>>::Node>,
+        crate::QueryCursor<'a, <Self as NodeLending<'a>>::SNode, <Self as NodeLending<'a>>::SNode>,
         HAST,
         &'acc Acc,
     >;
@@ -151,11 +143,11 @@ where
     fn matches<'a>(
         &self,
         cursor: &mut Self::Cursor,
-        node: &<Self as NodeLending<'a>>::Node,
+        node: &<Self as NodeLending<'a>>::SNode,
     ) -> <Self as tree_sitter_graph::MatchesLending<'a>>::Matches {
         let matchs = self
             .query
-            .matches::<_, <Self as NodeLending<'_>>::Node>(node.clone());
+            .matches::<_, <Self as NodeLending<'_>>::SNode>(node.clone());
         // let matchs = self.query.matches_immediate(node.clone());
         // TODO find a way to avoid transmuting
         let node = node.clone();
@@ -258,18 +250,6 @@ where
         let mut hasher = std::hash::DefaultHasher::new();
         self.0.pos.hash(&mut hasher);
         hasher.finish() as usize
-    }
-
-    fn parent(&self) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        let mut r = self.clone();
-        if r.0.pos.pop().is_some() {
-            Some(r)
-        } else {
-            None
-        }
     }
 }
 
@@ -382,6 +362,18 @@ where
         #[allow(unreachable_code)]
         vec![todo!()].into_iter()
     }
+
+    fn parent(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        let mut r = self.clone();
+        if r.0.pos.pop().is_some() {
+            Some(r)
+        } else {
+            None
+        }
+    }
 }
 
 impl<HAST: HyperASTShared, Acc: WithLabel> QueryWithLang for MyQMatch<'_, HAST, Acc> {
@@ -402,7 +394,7 @@ where
     &'acc Acc: WithLabel,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type Node = Node<HAST, &'acc Acc>;
+    type SNode = Node<HAST, &'acc Acc>;
 }
 
 impl<'acc, HAST: HyperAST, Acc> NodeLender for CapturedNodesIter<'_, HAST, &'acc Acc>
@@ -418,7 +410,7 @@ where
     &'acc Acc: WithLabel,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    fn next(&mut self) -> Option<<Self as NodeLending<'_>>::Node> {
+    fn next(&mut self) -> Option<<Self as NodeLending<'_>>::SNode> {
         loop {
             if self.inner.is_empty() {
                 return None;
@@ -485,7 +477,7 @@ where
     fn nodes_for_capture_indexii(
         &self,
         index: Self::I,
-    ) -> impl graph::NodeLender + graph::NodeLending<'_, Node = NNN<'_, '_, Self>> {
+    ) -> impl graph::NodeLender + graph::NodeLending<'_, SNode = NNN<'_, '_, Self>> {
         CapturedNodesIter::<HAST, &'acc Acc> {
             stores: self.stores,
             index,

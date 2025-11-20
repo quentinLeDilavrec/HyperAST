@@ -31,7 +31,7 @@ where
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type Node = Node<'a, HAST>;
+    type SNode = Node<'a, HAST>;
 }
 
 impl<'a, HAST> tree_sitter_graph::MatchesLending<'a> for QueryMatcher<HAST>
@@ -49,7 +49,7 @@ where
         'a,
         'a,
         'a,
-        crate::QueryCursor<'a, <Self as NodeLending<'a>>::Node, <Self as NodeLending<'a>>::Node>,
+        crate::QueryCursor<'a, <Self as NodeLending<'a>>::SNode, <Self as NodeLending<'a>>::SNode>,
         HAST,
     >;
 }
@@ -106,11 +106,11 @@ where
     fn matches<'a>(
         &self,
         cursor: &mut Self::Cursor,
-        node: &<Self as NodeLending<'a>>::Node,
+        node: &<Self as NodeLending<'a>>::SNode,
     ) -> <Self as tree_sitter_graph::MatchesLending<'a>>::Matches {
         let matchs = self
             .query
-            .matches::<_, <Self as NodeLending<'_>>::Node>(node.clone());
+            .matches::<_, <Self as NodeLending<'_>>::SNode>(node.clone());
         // let matchs = self.query.matches_immediate(node.clone());
         // TODO find a way to avoid transmuting
         let node = node.clone();
@@ -203,14 +203,6 @@ where
         self.0.pos.hash(&mut hasher);
         hasher.finish() as usize
     }
-
-    fn parent(&self) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        let mut r = self.clone();
-        if r.0.goto_parent() { Some(r) } else { None }
-    }
 }
 
 impl<HAST: HyperAST> tree_sitter_graph::graph::SyntaxNode for Node<'_, HAST>
@@ -295,6 +287,14 @@ where
         todo!();
         [].iter().cloned()
     }
+
+    fn parent(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        let mut r = self.clone();
+        if r.0.goto_parent() { Some(r) } else { None }
+    }
 }
 
 impl<HAST: HyperAST> QueryWithLang for MyQMatch<'_, '_, HAST> {
@@ -302,7 +302,7 @@ impl<HAST: HyperAST> QueryWithLang for MyQMatch<'_, '_, HAST> {
     type I = u32;
 }
 
-impl<'tree, HAST: HyperAST> NodeLending<'_> for CapturedNodesIter<'_, '_, 'tree, HAST>
+impl<'a, HAST: HyperAST> NodeLending<'a> for CapturedNodesIter<'_, '_, '_, HAST>
 where
     HAST::IdN: Debug + Copy,
     HAST::TS: RoleStore,
@@ -312,7 +312,7 @@ where
     HAST::Idx: Copy + Hash,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
 {
-    type Node = Node<'tree, HAST>;
+    type SNode = Node<'a, HAST>;
 }
 
 impl<HAST: HyperAST> NodeLender for CapturedNodesIter<'_, '_, '_, HAST>
@@ -325,7 +325,7 @@ where
     HAST::Idx: Copy + Hash,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
 {
-    fn next(&mut self) -> Option<<Self as NodeLending<'_>>::Node> {
+    fn next(&mut self) -> Option<<Self as NodeLending<'_>>::SNode> {
         loop {
             if self.inner.is_empty() {
                 return None;
@@ -341,7 +341,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST> NodesLending<'a> for MyQMatch<'_, '_, HAST>
+impl<'cursor, 'tree, 'a, HAST: HyperAST> NodesLending<'a> for MyQMatch<'cursor, 'tree, HAST>
 where
     HAST::IdN: Debug + Copy,
     HAST::TS: RoleStore,
@@ -379,18 +379,19 @@ where
     }
 
     fn nodes_for_capture_indexi(&self, index: Self::I) -> Option<NNN<'_, '_, Self>> {
-        CapturedNodesIter {
-            stores: self.stores,
-            index,
-            inner: self.qm.captures.captures(),
-        }
-        .next()
+        todo!()
+        // CapturedNodesIter {
+        //     stores: self.stores,
+        //     index,
+        //     inner: self.qm.captures.captures(),
+        // }
+        // .next()
     }
 
     fn nodes_for_capture_indexii(
         &self,
         index: Self::I,
-    ) -> impl NodeLender + NodeLending<'_, Node = NNN<'_, '_, Self>> {
+    ) -> impl NodeLender + NodeLending<'_, SNode = NNN<'_, '_, Self>> {
         CapturedNodesIter::<HAST> {
             stores: self.stores,
             index,
@@ -405,8 +406,12 @@ where
     fn syn_node_ref(&self, node: &NNN<'_, '_, Self>) -> tree_sitter_graph::graph::SyntaxNodeRef {
         tree_sitter_graph::graph::SyntaxNodeRef::new(node)
     }
+
     fn node(&self, s: Self::Simple) -> NNN<'_, '_, Self> {
-        todo!()
+        Node::<'_, HAST>(crate::hyperast_cursor::Node {
+            stores: self.stores,
+            pos: s.pos,
+        })
     }
 }
 

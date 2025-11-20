@@ -2,14 +2,11 @@ use crate::{CNLending, StatusLending};
 
 use super::{Cursor, Node as _, Status, Symbol, TreeCursorStep};
 use hyperast::position::TreePath;
-use hyperast::types::{
-    HyperASTShared, HyperType, LabelStore, Labeled, NodeStore, RoleStore, Tree, WithPrecompQueries,
-    WithRoles,
-};
-use hyperast::{
-    position::TreePathMut,
-    types::{HyperAST, TypeStore},
-};
+use hyperast::position::TreePathMut;
+use hyperast::types::{HyperAST, HyperASTShared, TypeStore};
+use hyperast::types::{HyperType, LabelStore, Labeled, NodeStore, RoleStore, Tree};
+use hyperast::types::{WithPrecompQueries, WithRoles};
+
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 
 pub struct Node<
@@ -24,7 +21,7 @@ pub struct Node<
     pub pos: P,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct NodeR<P> {
     /// the offset in acc
     // offset: Idx,
@@ -46,7 +43,7 @@ impl<'hast, HAST: HyperAST> Node<'hast, HAST> {
     }
 }
 
-impl<HAST: HyperAST> Clone for Node<'_, HAST> {
+impl<HAST: HyperASTShared, P: Clone> Clone for Node<'_, HAST, P> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,

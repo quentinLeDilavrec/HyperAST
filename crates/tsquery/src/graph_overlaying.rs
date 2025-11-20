@@ -6,12 +6,20 @@ use hyperast::types;
 use hyperast::types::LendT;
 use hyperast::types::{AstLending, ETypeStore, HyperASTShared, StoreRefAssoc};
 
+use hyperast::position::structural_pos::StructuralPosition as Pos;
+
 use super::stepped_query_imm;
+
+type ImmFcts<HAST, Acc> = tree_sitter_graph::functions::Functions<
+    tree_sitter_graph::graph::Graph<crate::stepped_query_imm::Node<HAST, Acc>>,
+>;
 
 pub struct PreparedOverlay<Q, O> {
     pub query: Option<Q>,
     pub overlayer: O,
-    pub functions: std::sync::Arc<dyn std::any::Any>,
+    // NOTE I tried with ImmFcts<'a, TS, Acc>
+    // and it does not help with the lifetime invariance of G in Functions
+    pub functions: crate::ErazedFcts,
 }
 
 #[cfg(feature = "tsg")]
@@ -51,10 +59,9 @@ where
         if query.enabled_pattern_count() == 0 {
             return Default::default();
         }
-        let pos = hyperast::position::StructuralPosition::empty();
+        let pos = Pos::empty();
         let cursor = crate::cursor_on_unbuild::TreeCursor::new(stores, acc, label, pos);
         use crate::cursor_on_unbuild::Node as N;
-        use hyperast::position::structural_pos::StructuralPosition as Pos;
         let mut qcursor: crate::QueryCursor<
             '_,
             _,
@@ -143,33 +150,39 @@ where
         label: Option<&str>,
     ) -> Result<usize, String> {
         // NOTE I had to do a lot of unsafe magic :/
-        // mostly exending lifetime and converting HAST to HAST2 on compatible structures
-
+        use tree_sitter_graph::functions;
         use tree_sitter_graph::graph::Graph;
         let cancellation_flag = tree_sitter_graph::NoCancellation;
         let mut globals = tree_sitter_graph::Variables::new();
-        let mut graph: Graph<
-            crate::hyperast_cursor::NodeR<
-                hyperast::position::StructuralPosition<HAST::IdN, HAST::Idx>,
-            >,
-        > = tree_sitter_graph::graph::Graph::default();
+        let mut graph = tree_sitter_graph::graph::Graph::default();
         init_globals(&mut globals, &mut graph);
 
-        // retreive the custom functions
-        // NOTE need the concrete type of the stores to instanciate
-        // WARN cast will fail if the original instance type was not identical
-        type Fcts<T> = tree_sitter_graph::functions::Functions<
-            T, // tree_sitter_graph::graph::GraphErazing<stepped_query_imm::MyNodeErazing<HAST, Acc>>,
-        >;
-        let functions: &Fcts<_> = std::ops::Deref::deref(&self.functions)
-            .downcast_ref()
-            .expect("identical instance type");
+        // retrieve the custom functions
+        // NOTE need the concrete type of the stores to instantiate
+        // // I tried other approaches but nothing worked,
+        // // we cannot afford to rebuild the set each call,
+        // // it cannot be passed easily as reference due to invariance over G (the fcts modify G)
+        // let functions = std::ops::Deref::deref(&self.functions);
+        // // SAFETY: assumes provided self.functions is the right one
+        // let functions: &ImmFcts<<HAST as StoreRefAssoc>::S<'_>, &Acc> =
+        //     unsafe { downcast_ref_unchecked(functions) };
+        // pub unsafe fn downcast_ref_unchecked<T>(s: &dyn crate::Opaque) -> &T {
+        //     // SAFETY: caller guarantees that T is the correct type
+        //     unsafe { &*(s as *const dyn crate::Opaque as *const T) }
+        // }
+
+        let functions = self
+            .functions
+            .downcast_fcts::<crate::ImmGraph<<HAST as StoreRefAssoc>::S<'_>, &Acc>>();
+
+        // // alternatively
+        // let mut functions = &tree_sitter_graph::functions::Functions::stdlib();
 
         // tree_sitter_stack_graphs::functions::add_path_functions(&mut functions);
 
         let mut config = configure(&globals, functions);
 
-        let pos = hyperast::position::StructuralPosition::empty();
+        let pos = Pos::empty();
         let tree = stepped_query_imm::Node::new(stores, acc, label, pos);
 
         // NOTE could not use the execute_lazy_into due to limitations with type checks (needed some transmutes)
@@ -182,15 +195,13 @@ where
         // ORI: let mut matches = this.query.matches(&mut cursor, tree);
         let mut matches = {
             let q: &stepped_query_imm::QueryMatcher<_, &Acc> =
-                unsafe { std::mem::transmute(self.overlayer.query.as_ref().unwrap()) };
-            // log::error!("{:?}",this.query.as_ref().unwrap().query.capture_names);
-            let node = &tree;
+                self.overlayer.query.as_ref().unwrap();
+            // SAFETY: Fine for now, I don't know hot to make it work without bypassing 80% of tsg
+            let q: &stepped_query_imm::QueryMatcher<_, &Acc> = unsafe { std::mem::transmute(q) };
             let cursor = &mut cursor;
-            // log::error!("{:?}",this.query.as_ref().unwrap().query);
-            // log::error!("{}",this.query.as_ref().unwrap().query);
             let qm = self.overlayer.query.as_ref().unwrap();
-            let matchs = qm.query.matches_immediate(node.clone());
-            let node = node.clone();
+            let matchs = qm.query.matches_immediate(tree.clone());
+            let node = tree.clone();
             stepped_query_imm::MyQMatches::<_, _, _> {
                 q,
                 cursor,
@@ -204,11 +215,19 @@ where
             // ORI: ... matches.next() ...
             let mat: stepped_query_imm::MyQMatch<_, &Acc> = {
                 let Some(mat) = matches.next() else { break };
-
+                let qm: crate::QueryMatch<
+                    stepped_query_imm::Node<
+                        <HAST as StoreRefAssoc>::S<'_>,
+                        &Acc,
+                        HAST::Idx,
+                        Pos<HAST::IdN, HAST::Idx>,
+                        &str,
+                    >,
+                > = unsafe { std::mem::transmute(mat.qm) };
                 stepped_query_imm::MyQMatch {
                     stores: tree.0.stores,
                     b: mat.b,
-                    qm: unsafe { std::mem::transmute(mat.qm) },
+                    qm,
                     i: mat.i,
                 }
             };
@@ -234,49 +253,37 @@ where
                     // NOTE could not properly get the source location, just use a zeroed location
                     // ORI: let error_context = StatementContext::new(...
                     let error_context = {
-                        let stmt: &tree_sitter_graph::ast::Statement = statement;
-                        let stanza = &stanza;
                         let source_node = &node;
                         // use crate::graph::SyntaxNode;
                         // let source_location: Location::from(source_node.start_position()), // TODO make a better location for hyperast;
                         let source_location = tree_sitter_graph::Location { row: 0, column: 0 };
-                        tree_sitter_graph::execution::error::StatementContext::raw(
-                            stmt,
+                        let kind = source_node.0.kind();
+                        use tree_sitter_graph::execution::error::StatementContext;
+                        StatementContext::raw(
+                            &statement,
                             stanza.range.start,
                             source_location,
-                            source_node.0.kind().to_string(),
+                            kind.to_string(),
                         )
                     };
-                    let mat: &QM<_, &Acc, HAST::IdN, HAST::Idx> = mat;
-                    type G<IdN, Idx> = Graph<
-                        crate::hyperast_cursor::NodeR<
-                            hyperast::position::StructuralPosition<IdN, Idx>,
-                        >,
-                    >;
-                    type P<IdN, Idx> = hyperast::position::StructuralPosition<IdN, Idx>;
-                    type QM<'c, HAST, Acc, IdN, Idx> =
-                        stepped_query_imm::MyQMatch<'c, HAST, Acc, Idx, P<IdN, Idx>>;
                     let full_match_file_capture_index = stanza.full_match_file_capture_index.into();
-                    if let Err(err) = ctx
-                        .exec::<G<HAST::IdN, HAST::Idx>, QM<HAST::S<'_>, &Acc, HAST::IdN, HAST::Idx>, _>(
-                            graph,
-                            inherited_variables,
-                            cancellation_flag,
-                            full_match_file_capture_index,
-                            shorthands,
-                            mat,
-                            config,
-                            &current_regex_captures,
-                            statement,
-                            error_context,
-                        )
-                    {
+                    if let Err(err) = ctx.exec(
+                        graph,
+                        inherited_variables,
+                        cancellation_flag,
+                        full_match_file_capture_index,
+                        shorthands,
+                        mat,
+                        config,
+                        &current_regex_captures,
+                        statement,
+                        error_context,
+                    ) {
                         log::trace!("{}", graph.pretty_print());
                         let source_path = std::path::Path::new(&"");
                         let tsg_path = std::path::Path::new(&"");
                         log::error!("{}", err.display_pretty(source_path, "", tsg_path, ""));
                     }
-                    // .with_context(|| exec.error_context.into())?
                 }
             };
         }

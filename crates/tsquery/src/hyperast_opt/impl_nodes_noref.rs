@@ -13,7 +13,7 @@ use crate::Status;
 use crate::WithField;
 use crate::{BiCow, Point, Symbol};
 
-impl<HAST: HyperAST> Clone for super::NodeRef<'_, '_, HAST> {
+impl<HAST: HyperAST + Copy> Clone for super::NodeRefNoRef<'_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
@@ -23,7 +23,7 @@ impl<HAST: HyperAST> Clone for super::NodeRef<'_, '_, HAST> {
 }
 
 #[cfg(feature = "tsg")]
-impl<HAST: HyperAST> tree_sitter_graph::graph::SimpleNode for super::NodeRef<'_, '_, HAST>
+impl<HAST: HyperAST + Copy> tree_sitter_graph::graph::SimpleNode for super::NodeRefNoRef<'_, HAST>
 where
     <HAST as HyperASTShared>::IdN: std::hash::Hash + Copy,
     <HAST as HyperASTShared>::Idx: std::hash::Hash,
@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<HAST: HyperAST> super::NodeRef<'_, '_, HAST>
+impl<HAST: HyperAST> super::NodeRefNoRef<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -46,8 +46,8 @@ where
     pub(crate) fn compute_current_role(
         mut self,
     ) -> (
-        Option<<HAST::TS as RoleStore>::Role>,
-        <HAST::TS as RoleStore>::IdF,
+        Option<<<HAST as HyperAST>::TS as RoleStore>::Role>,
+        <<HAST as HyperAST>::TS as RoleStore>::IdF,
     ) {
         let lang;
         let role = loop {
@@ -56,13 +56,13 @@ where
                 return (None, Default::default());
             };
             // dbg!(self.kind());
-            let k = kind(self.stores, &self.pos);
+            let k = kind(&self.stores, &self.pos);
             // dbg!(k);
             if k.is_supertype() {
                 // dbg!();
                 continue;
             }
-            let n = resolve(self.stores, &self.pos);
+            let n = resolve(&self.stores, &self.pos);
             if let Some(role) = n.role_at::<<HAST::TS as RoleStore>::Role>(o) {
                 lang = k.get_lang();
                 break Some(role);
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<HAST: HyperAST> Clone for super::NodeRefK<'_, '_, HAST> {
+impl<HAST: HyperAST + Copy> Clone for super::NodeRefKNoRef<'_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
@@ -91,7 +91,7 @@ impl<HAST: HyperAST> Clone for super::NodeRefK<'_, '_, HAST> {
 }
 
 #[cfg(feature = "tsg")]
-impl<HAST: HyperAST> tree_sitter_graph::graph::SimpleNode for super::NodeRefK<'_, '_, HAST>
+impl<HAST: HyperAST + Copy> tree_sitter_graph::graph::SimpleNode for super::NodeRefKNoRef<'_, HAST>
 where
     <HAST as HyperASTShared>::IdN: std::hash::Hash + Copy,
     <HAST as HyperASTShared>::Idx: std::hash::Hash,
@@ -105,7 +105,7 @@ where
     }
 }
 
-impl<HAST: HyperAST> super::NodeRefK<'_, '_, HAST>
+impl<HAST: HyperAST> super::NodeRefKNoRef<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -115,8 +115,8 @@ where
     fn compute_current_role(
         mut self,
     ) -> (
-        Option<<HAST::TS as RoleStore>::Role>,
-        <HAST::TS as RoleStore>::IdF,
+        Option<<<HAST as HyperAST>::TS as RoleStore>::Role>,
+        <<HAST as HyperAST>::TS as RoleStore>::IdF,
     ) {
         let lang;
         let role = loop {
@@ -124,14 +124,11 @@ where
             if !self.pos.up() {
                 return (None, Default::default());
             };
-            // dbg!(self.kind());
-            let k = kind(self.stores, &self.pos);
-            // dbg!(k);
+            let k = kind(&self.stores, &self.pos);
             if k.is_supertype() {
-                // dbg!();
                 continue;
             }
-            let n = resolve(self.stores, &self.pos);
+            let n = resolve(&self.stores, &self.pos);
             if let Some(role) = n.role_at::<<HAST::TS as RoleStore>::Role>(o) {
                 lang = k.get_lang();
                 break Some(role);
@@ -149,11 +146,11 @@ where
     }
 }
 
-impl<'hast, HAST: HyperAST> crate::TextLending<'_> for super::NodeRefK<'_, 'hast, HAST> {
-    type TP = &'hast <HAST as HyperAST>::LS;
+impl<HAST: HyperAST> crate::TextLending<'_> for super::NodeRefKNoRef<'_, HAST> {
+    type TP = ();
 }
 
-impl<HAST: HyperAST> PartialEq for super::NodeRefK<'_, '_, HAST>
+impl<HAST: HyperAST> PartialEq for super::NodeRefKNoRef<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -165,7 +162,7 @@ where
     }
 }
 
-impl<HAST: HyperAST> crate::Node for super::NodeRefK<'_, '_, HAST>
+impl<HAST: HyperAST + Copy> crate::Node for super::NodeRefKNoRef<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -207,17 +204,17 @@ where
         if self.kind.is_supertype() {
             loop {
                 use crate::TreeCursorStep;
-                match super::cursor_utils2::goto_first_child_internal(self.stores, &mut pos) {
+                match super::cursor_utils2::goto_first_child_internal(&self.stores, &mut pos) {
                     TreeCursorStep::None => panic!(),
                     TreeCursorStep::Hidden => (),
                     TreeCursorStep::Visible => break,
                 }
-                if !kind(self.stores, &pos).is_supertype() {
+                if !kind(&self.stores, &pos).is_supertype() {
                     break;
                 }
             }
         }
-        super::cursor_utils2::child_by_role(self.stores, &mut pos, role).is_some()
+        super::cursor_utils2::child_by_role(&self.stores, &mut pos, role).is_some()
     }
 
     fn equal(&self, other: &Self, _text_provider: <Self as crate::TextLending<'_>>::TP) -> bool {
@@ -232,15 +229,15 @@ where
         &'s self,
         _text_provider: <Self as crate::TextLending<'l>>::TP,
     ) -> crate::BiCow<'s, 'l, str> {
-        text(self.stores, &self.pos)
+        text(&self.stores, &self.pos)
     }
 }
 
-impl<'hast, HAST: HyperAST> crate::TextLending<'_> for super::Node<'hast, HAST> {
-    type TP = &'hast <HAST as HyperAST>::LS;
+impl<HAST: HyperAST, P> crate::TextLending<'_> for super::NodeNoRef<HAST, P> {
+    type TP = ();
 }
 
-impl<HAST: HyperAST> PartialEq for super::Node<'_, HAST>
+impl<HAST: HyperAST, P: Clone + PartialEq> PartialEq for super::NodeNoRef<HAST, P>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -253,7 +250,7 @@ where
     }
 }
 
-impl<HAST: HyperAST> Clone for super::Node<'_, HAST> {
+impl<HAST: HyperAST + Copy, P: Clone> Clone for super::NodeNoRef<HAST, P> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,
@@ -262,16 +259,21 @@ impl<HAST: HyperAST> Clone for super::Node<'_, HAST> {
     }
 }
 
-impl<HAST: HyperAST> crate::Node for super::Node<'_, HAST>
+impl<HAST: HyperAST + Copy> crate::Node for super::NodeNoRef<HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    // P: CursorHead<HAST::IdN, HAST::Idx>,
+    // P: PartialEq,
+    // P: structural_pos::Ext,
+    // for<'t> P::E<'t>:
+    //     Clone + CursorHeadMove<HAST::IdN, HAST::Idx> + CursorHead<HAST::IdN, HAST::Idx>,
 {
     fn symbol(&self) -> Symbol {
-        super::cursor_utils::symbol(self.stores, &self.pos)
+        super::cursor_utils::symbol(&self.stores, &self.pos)
     }
 
     fn is_named(&self) -> bool {
@@ -290,7 +292,7 @@ where
     type IdF = <HAST::TS as RoleStore>::IdF;
 
     fn has_child_with_field_id(&self, field_id: Self::IdF) -> bool {
-        has_child_with_field_id(self.stores, self.pos.ext(), field_id)
+        has_child_with_field_id(&self.stores, self.pos.ext(), field_id)
     }
 
     fn equal(&self, other: &Self, _text_provider: <Self as crate::TextLending<'_>>::TP) -> bool {
@@ -310,15 +312,15 @@ where
         &'s self,
         text_provider: <Self as crate::TextLending<'l>>::TP,
     ) -> crate::BiCow<'s, 'l, str> {
-        text(self.stores, &self.pos)
+        text(&self.stores, &self.pos)
     }
 }
 
-impl<'hast, HAST: HyperAST> crate::TextLending<'_> for super::NodeRef<'_, 'hast, HAST> {
-    type TP = &'hast <HAST as HyperAST>::LS;
+impl<HAST: HyperAST> crate::TextLending<'_> for super::NodeRefNoRef<'_, HAST> {
+    type TP = ();
 }
 
-impl<HAST: HyperAST> PartialEq for super::NodeRef<'_, '_, HAST>
+impl<HAST: HyperAST> PartialEq for super::NodeRefNoRef<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -330,7 +332,7 @@ where
     }
 }
 
-impl<HAST: HyperAST> crate::Node for super::NodeRef<'_, '_, HAST>
+impl<HAST: HyperAST + Copy> crate::Node for super::NodeRefNoRef<'_, HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
@@ -338,15 +340,15 @@ where
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
 {
     fn symbol(&self) -> Symbol {
-        super::cursor_utils::symbol(self.stores, &self.pos)
+        super::cursor_utils::symbol(&self.stores, &self.pos)
     }
 
     fn is_named(&self) -> bool {
-        kind(self.stores, &self.pos).is_named()
+        kind(&self.stores, &self.pos).is_named()
     }
 
     fn str_symbol(&self) -> &str {
-        kind(self.stores, &self.pos).as_static_str()
+        kind(&self.stores, &self.pos).as_static_str()
     }
 
     fn start_point(&self) -> tree_sitter::Point {
@@ -357,7 +359,7 @@ where
     type IdF = <HAST::TS as RoleStore>::IdF;
 
     fn has_child_with_field_id(&self, field_id: Self::IdF) -> bool {
-        has_child_with_field_id(self.stores, self.pos.ext(), field_id)
+        has_child_with_field_id(&self.stores, self.pos.ext(), field_id)
     }
 
     fn equal(&self, other: &Self, _text_provider: <Self as crate::TextLending<'_>>::TP) -> bool {
@@ -372,15 +374,15 @@ where
         &'s self,
         _text_provider: <Self as crate::TextLending<'l>>::TP,
     ) -> crate::BiCow<'s, 'l, str> {
-        text(self.stores, &self.pos)
+        text(&self.stores, &self.pos)
     }
 }
 
-impl<HAST: HyperAST> super::Node<'_, HAST>
+impl<HAST: HyperAST> super::NodeNoRef<HAST>
 where
     HAST::IdN: std::fmt::Debug + Copy,
 {
     fn kind(&self) -> <HAST::TS as TypeStore>::Ty {
-        kind(self.stores, &self.pos)
+        kind(&self.stores, &self.pos)
     }
 }

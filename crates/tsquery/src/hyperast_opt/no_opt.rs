@@ -1,3 +1,4 @@
+use crate::hyperast_opt::NodeNoRef;
 use crate::{CNLending, StatusLending};
 use crate::{Cursor, Node as _, Status, Symbol, TreeCursorStep};
 
@@ -9,16 +10,15 @@ use hyperast::types::{WithPrecompQueries, WithRoles};
 
 use super::CursorStatus;
 
+#[allow(type_alias_bounds)]
+pub type Pos<HAST: HyperASTShared> = hyperast::position::StructuralPosition<
+    <HAST as HyperASTShared>::IdN,
+    <HAST as HyperASTShared>::Idx,
+>;
+
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 
-pub struct Node<
-    'hast,
-    HAST: HyperASTShared,
-    P = hyperast::position::StructuralPosition<
-        <HAST as HyperASTShared>::IdN,
-        <HAST as HyperASTShared>::Idx,
-    >,
-> {
+pub struct Node<'hast, HAST: HyperASTShared, P = Pos<HAST>> {
     pub stores: &'hast HAST,
     pub pos: P,
 }
@@ -36,16 +36,13 @@ impl<HAST: HyperAST> PartialEq for Node<'_, HAST> {
     }
 }
 
-impl<'hast, HAST: HyperAST> Node<'hast, HAST> {
-    pub fn new(
-        stores: &'hast HAST,
-        pos: hyperast::position::StructuralPosition<HAST::IdN, HAST::Idx>,
-    ) -> Self {
+impl<'hast, HAST: HyperASTShared> Node<'hast, HAST> {
+    pub fn new(stores: &'hast HAST, pos: Pos<HAST>) -> Self {
         Self { stores, pos }
     }
 }
 
-impl<HAST: HyperAST> Clone for Node<'_, HAST> {
+impl<HAST: HyperASTShared> Clone for Node<'_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,

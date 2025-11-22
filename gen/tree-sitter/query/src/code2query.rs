@@ -1,9 +1,11 @@
 #![allow(unused)]
 use crate::auto::tsq_ser_meta::Converter;
 use crate::auto::tsq_transform;
+use crate::search::try_ts_query;
 use hyperast::position;
 use hyperast::position::offsets_and_nodes::SolvedStructuralPosition;
 use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
+use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{
     self, Children, HashKind, HyperAST, RoleStore, TypeStore, TypedNodeId, WithHashs,
@@ -20,7 +22,7 @@ use std::ops::{Deref, DerefMut};
 // use crate::legion as qgen; // includes indentation, such as spaces and new lines
 use crate::no_fmt_legion as qgen; // ignores spaces, new lines,...
 
-type QStore = hyperast::store::SimpleStores<crate::types::TStore>;
+type QStore = SimpleStores<crate::types::TStore>;
 
 type IdN = NodeIdentifier;
 type Idx = u16;
@@ -107,12 +109,9 @@ impl<TR> DerefMut for DedupRawEntry<TR> {
 
 pub trait Ded {
     fn queries(&self) -> Vec<IdNQ>;
-    fn sorted_queries<TS: TypeStore>(
-        &self,
-        stores: &hyperast::store::SimpleStores<TS>,
-    ) -> Vec<IdNQ> {
+    fn sorted_queries<TS: TypeStore>(&self, stores: &SimpleStores<TS>) -> Vec<IdNQ> {
         let mut v = self.queries();
-        v.sort_by_cached_key(|x| WithHashs::hash(&stores.resolve(x), &HashKind::label()));
+        v.sort_by_cached_key(|x| query_hash(&stores, x));
         v.dedup();
         v
     }
@@ -127,7 +126,7 @@ type IdNQ = IdN;
 
 impl QueryLattice<IdN> {
     pub fn with_examples<TS, TIdN>(
-        stores: &hyperast::store::SimpleStores<TS>,
+        stores: &SimpleStores<TS>,
         from: impl Iterator<Item = IdN>,
         meta_gen: &hyperast_tsquery::Query,
         meta_simp: &hyperast_tsquery::Query,
@@ -156,13 +155,13 @@ impl QueryLattice<IdN> {
                 .fold(DedupRawEntry::<TR<IdN>>::default(), |mut acc, x| {
                     let (from, (query, label_h)) = x;
                     let v = acc.raw_entry_mut().from_hash(label_h as u64, |x| true);
+                    use hashbrown::hash_map::RawEntryMut::*;
                     let v = match v {
-                        hashbrown::hash_map::RawEntryMut::Occupied(occ) => occ.into_key_value().1,
-                        hashbrown::hash_map::RawEntryMut::Vacant(vacant) => {
+                        Occupied(occ) => occ.into_key_value().1,
+                        Vacant(vacant) => {
                             vacant
                                 .insert_with_hasher(label_h as u64, query, vec![], |query| {
-                                    WithHashs::hash(&stores.resolve(query), &HashKind::label())
-                                        as u64
+                                    query_hash(&stores, query)
                                 })
                                 .1
                         }
@@ -260,7 +259,7 @@ impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
     }
 
     pub fn builder<'q, TS, TIdN, T>(
-        stores: &hyperast::store::SimpleStores<TS>,
+        stores: &SimpleStores<TS>,
         from: impl Iterator<Item = Init>,
         meta_gen: &'q hyperast_tsquery::Query,
         meta_simp: &'q hyperast_tsquery::Query,
@@ -305,7 +304,7 @@ impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
     /// thus we can use a kind of vec of maps and parallelize inserts in the maps.
     #[cfg(feature = "synth_par")]
     pub fn with_examples_by_size<TS, TIdN>(
-        stores: &hyperast::store::SimpleStores<TS>,
+        stores: &SimpleStores<TS>,
         from: impl Iterator<Item = Init>,
         meta_gen: &hyperast_tsquery::Query,
         meta_simp: &hyperast_tsquery::Query,
@@ -333,7 +332,7 @@ impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
     /// then merges requiring additional subtrees are merged sequentially.
     #[cfg(feature = "synth_par")]
     pub fn with_examples_by_size_try<TS, TIdN>(
-        stores: &hyperast::store::SimpleStores<TS>,
+        stores: &SimpleStores<TS>,
         from: impl Iterator<Item = Init>,
         meta_gen: &hyperast_tsquery::Query,
         meta_simp: &hyperast_tsquery::Query,
@@ -396,8 +395,7 @@ impl<TR> DerefMut for DedupBySize2<TR> {
 }
 impl<TR> Ded for DedupBySize2<TR> {
     fn queries(&self) -> Vec<IdNQ> {
-        self.0
-            .iter()
+        (self.0.iter())
             // .flat_map(|x| x.values().flat_map(|v| v.iter().map(|x| x)))
             .flat_map(|x| x.keys().copied())
             .collect()
@@ -408,7 +406,9 @@ impl<TR> Ded for DedupBySize2<TR> {
 pub fn group_by_size<Init: Clone + SolvedPosition<IdN> + Eq + Sync + Send>(
     from: Vec<(Init, (IdNQ, (u32, u32)))>,
 ) -> DedupBySize2<TR<Init>> {
-    use rayon::iter::{IntoParallelIterator, ParallelIterator};
+    use rayon::iter::IntoParallelIterator as _;
+    use rayon::iter::ParallelIterator;
+
     DedupBySize2(
         from.into_iter()
             // grouping on size of queries (i.e. number of nodes)
@@ -462,12 +462,16 @@ impl<'q, E, D> Builder<'q, E, D> {
             meta_simp: self.meta_simp,
         };
         b.lattice.leaf_queries = b.dedup.queries();
-        b.lattice.leaf_queries.sort_by_cached_key(|x| {
-            WithHashs::hash(&b.lattice.query_store.resolve(x), &HashKind::label())
-        });
+        b.lattice
+            .leaf_queries
+            .sort_by_cached_key(|x| query_hash(&b.lattice.query_store, x));
         b.lattice.leaf_queries.dedup();
         b
     }
+}
+
+fn query_hash<TS: TypeStore>(query_store: &SimpleStores<TS>, x: &IdN) -> u64 {
+    WithHashs::hash(&query_store.resolve(x), &HashKind::label()) as u64
 }
 
 impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
@@ -475,23 +479,12 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
-        let mut active: Vec<IdNQ> = dedup
-            .keys()
-            .copied()
+        let mut active: Vec<IdNQ> = (dedup.keys().copied())
             .filter(|x| {
-                simp_search_need(
-                    &s.query_store,
-                    dedup
-                        .raw_entry()
-                        .from_hash(
-                            WithHashs::hash(&s.query_store.resolve(x), &HashKind::label()) as u64,
-                            |y| true,
-                        )
-                        .unwrap()
-                        .1[0]
-                        .0,
-                    meta_simp,
-                )
+                let entry = dedup
+                    .raw_entry()
+                    .from_hash(query_hash(&s.query_store, x), |y| true);
+                simp_search_need(&s.query_store, entry.unwrap().1[0].0, meta_simp)
             })
             .collect();
 
@@ -500,10 +493,10 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
             let rms = std::mem::take(&mut active)
                 .into_iter()
                 .flat_map(|x| {
-                    let Some((_, x)) = dedup.raw_entry().from_hash(
-                        WithHashs::hash(&s.query_store.resolve(&x), &HashKind::label()) as u64,
-                        |x| true,
-                    ) else {
+                    let Some((_, x)) = dedup
+                        .raw_entry()
+                        .from_hash(query_hash(&s.query_store, &x), |x| true)
+                    else {
                         return vec![];
                     };
                     let query = x[0].0;
@@ -515,14 +508,14 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
             dbg!(rms.len());
             for (label_h, x) in rms {
                 let v = dedup.raw_entry_mut().from_hash(label_h as u64, |x| true);
+                use hashbrown::hash_map::RawEntryMut::*;
                 let v = match v {
-                    hashbrown::hash_map::RawEntryMut::Occupied(occ) => occ.into_key_value().1,
-                    hashbrown::hash_map::RawEntryMut::Vacant(vacant) => {
+                    Occupied(occ) => occ.into_key_value().1,
+                    Vacant(vacant) => {
                         active.push(x.0);
                         vacant
                             .insert_with_hasher(label_h as u64, x.0, vec![], |query| {
-                                WithHashs::hash(&s.query_store.resolve(query), &HashKind::label())
-                                    as u64
+                                query_hash(&s.query_store, query)
                             })
                             .1
                     }
@@ -541,21 +534,22 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
             .values()
             .filter_map(|x| {
                 let query = x[0].0;
-                let (new_q, label_h) = simp_imm_eq(&mut s.query_store, query, meta_simp)?;
+                let new_q = simp_imm_eq(&mut s.query_store, query, meta_simp)?;
+                let label_h = s.query_store.resolve(&new_q).hash(&HashKind::label());
                 Some((label_h, (new_q, TR::RMs(query))))
             })
             .collect::<Vec<_>>();
 
         for (label_h, x) in simp_eq {
             let v = dedup.0.raw_entry_mut().from_hash(label_h as u64, |x| true);
+            use hashbrown::hash_map::RawEntryMut::*;
             let v = match v {
-                hashbrown::hash_map::RawEntryMut::Occupied(occ) => occ.into_key_value().1,
-                hashbrown::hash_map::RawEntryMut::Vacant(vacant) => {
+                Occupied(occ) => occ.into_key_value().1,
+                Vacant(vacant) => {
                     active.push(x.0);
                     vacant
                         .insert_with_hasher(label_h as u64, x.0, vec![], |query| {
-                            WithHashs::hash(&s.query_store.resolve(query), &HashKind::label())
-                                as u64
+                            query_hash(&s.query_store, query)
                         })
                         .1
                 }
@@ -607,19 +601,16 @@ where
         let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
         let rms = std::mem::take(active).into_iter();
-        let rms = rms
-            .flat_map(|x| {
-                let Some(y) = dedup.0[active_size].get(&x) else {
-                    return vec![];
-                };
-                let query = x;
-                // let query = y[0].0;
-                simp_rms(&mut s.query_store, query, meta_simp)
-                    .map(|(new_q, label_h)| (label_h, (new_q, TR::RMs(query))))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        rms
+        rms.flat_map(|x| {
+            let Some(y) = dedup.0[active_size].get(&x) else {
+                return vec![];
+            };
+            let query = x;
+            simp_rms(&mut s.query_store, query, meta_simp)
+                .map(|(new_q, label_h)| (label_h, (new_q, TR::RMs(query))))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
     }
 
     pub fn dedup_removes_par(
@@ -630,10 +621,11 @@ where
     ) where
         Init: Eq,
     {
-        use rayon::iter::{
-            IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator,
-            ParallelIterator,
-        };
+        use rayon::iter::IndexedParallelIterator as _;
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::IntoParallelRefMutIterator as _;
+        use rayon::iter::ParallelIterator;
+
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let fold = ParallelIterator::fold(
@@ -645,7 +637,7 @@ where
                 acc
             },
         );
-        let aaa: BTreeMap<usize, Vec<(LabelH, (IdN, TR<Init>))>> = ParallelIterator::reduce(
+        let aaa = ParallelIterator::reduce(
             fold,
             BTreeMap::<usize, Vec<(LabelH, (IdN, TR<Init>))>>::default,
             |mut acc, b| {
@@ -695,22 +687,23 @@ where
     where
         Init: Eq,
     {
-        use rayon::iter::{
-            IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator,
-            ParallelIterator,
-        };
+        use rayon::iter::IndexedParallelIterator as _;
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::IntoParallelRefMutIterator as _;
+        use rayon::iter::ParallelIterator;
+
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let fold = ParallelIterator::fold(
             uniques.into_par_iter(),
-            BTreeMap::default,
-            |mut acc: BTreeMap<usize, Vec<_>>, (label_h, x): (u32, (IdNQ, TR<Init>))| {
+            BTreeMap::<usize, Vec<_>>::default,
+            |mut acc, (label_h, x): (u32, (IdNQ, TR<Init>))| {
                 let size = s.query_store.resolve(&x.0).size();
                 acc.entry(size).or_default().push((label_h, x));
                 acc
             },
         );
-        let aaa: BTreeMap<usize, Vec<(LabelH, (IdNQ, TR<Init>))>> = ParallelIterator::reduce(
+        let aaa = ParallelIterator::reduce(
             fold,
             BTreeMap::<usize, Vec<(LabelH, (IdNQ, TR<Init>))>>::default,
             |mut acc, b| {
@@ -760,10 +753,11 @@ where
     where
         Init: Eq,
     {
-        use rayon::iter::{
-            IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator,
-            ParallelIterator,
-        };
+        use rayon::iter::IndexedParallelIterator as _;
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::IntoParallelRefMutIterator as _;
+        use rayon::iter::ParallelIterator;
+
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let fold = ParallelIterator::fold(
@@ -775,7 +769,7 @@ where
                 acc
             },
         );
-        let aaa: BTreeMap<usize, Vec<(LabelH, (IdNQ, TR<Init>))>> = ParallelIterator::reduce(
+        let aaa = ParallelIterator::reduce(
             fold,
             BTreeMap::<usize, Vec<(LabelH, (IdNQ, TR<Init>))>>::default,
             |mut acc, b| {
@@ -861,12 +855,10 @@ where
         active_size: usize,
         active: &mut Vec<IdNQ>,
     ) -> Vec<(u32, (IdNQ, TR<Init>))> {
-        use rayon::iter::{
-            IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator,
-            ParallelIterator,
-        };
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::ParallelIterator;
+
         let s = &mut self.lattice;
-        let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
         let rms = std::mem::take(active).into_par_iter();
         let rms = ParallelIterator::flat_map(rms, |x| {
@@ -910,12 +902,10 @@ where
         active: &mut Vec<IdNQ>,
         cid: hyperast_tsquery::CaptureId,
     ) -> Vec<(u32, (IdNQ, TR<Init>))> {
-        use rayon::iter::{
-            IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator,
-            ParallelIterator,
-        };
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::ParallelIterator;
+
         let s = &mut self.lattice;
-        let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
         let rms = std::mem::take(active).into_par_iter();
         let rms = ParallelIterator::filter_map(rms, |x| {
@@ -967,10 +957,9 @@ where
         active_size: usize,
         active: &mut Vec<IdNQ>,
     ) -> (Vec<(u32, (IdNQ, TR<Init>))>, Vec<IdNQ>) {
-        use rayon::iter::{
-            IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator,
-            ParallelIterator,
-        };
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::ParallelIterator;
+
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
@@ -1105,12 +1094,12 @@ impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
         let simp_eq = act
             .flat_map(|x| {
                 let query = x;
-                let Some((new_q, label_h)) = simp_imm_eq(&mut s.query_store, query, meta_simp)
-                else {
+                let Some(new_q) = simp_imm_eq(&mut s.query_store, query, meta_simp) else {
                     already.push(query);
                     return vec![];
                 };
                 assert_ne!(new_q, query);
+                let label_h = s.query_store.resolve(&new_q).hash(&HashKind::label());
                 vec![(label_h, (new_q, TR::<Init>::SimpEQ(query)))]
             })
             .collect::<Vec<_>>();
@@ -1180,9 +1169,7 @@ impl<Init> Builder<'_, Init, DedupRawEntry<TR<Init>>> {
                     (self.lattice.raw_rels.get(&x).unwrap().iter())
                         .position(|x| matches!(x, TR::Init(_)))
                 );
-                self.lattice
-                    .leaf_queries
-                    .iter()
+                (self.lattice.leaf_queries.iter())
                     .position(|y| x == *y)
                     .unwrap() as u32
             })
@@ -1209,7 +1196,8 @@ impl<Init, D> Builder<'_, Init, D> {
                     }
                     TR::RMs(v) | TR::Uniqs(v) | TR::SimpEQ(v) if !already.contains(v) => {
                         already.insert(*v);
-                        extract(map, *v, map.get(v).unwrap().iter(), already, r, leafs)
+                        let downs = map.get(v).unwrap().iter();
+                        extract(map, *v, downs, already, r, leafs)
                     }
                     _ => (),
                 }
@@ -1229,9 +1217,7 @@ impl<Init, D> Builder<'_, Init, D> {
         let r = r
             .into_iter()
             .map(|x| {
-                self.lattice
-                    .leaf_queries
-                    .iter()
+                (self.lattice.leaf_queries.iter())
                     .position(|y| x == *y)
                     .unwrap() as u32
             })
@@ -1241,21 +1227,17 @@ impl<Init, D> Builder<'_, Init, D> {
 }
 
 fn cmp_lat_entry<TS: TypeStore + RoleStore, T: PartialOrd>(
-    stores: &hyperast::store::SimpleStores<TS>,
+    stores: &SimpleStores<TS>,
 ) -> impl Fn(&(IdN, T), &(IdN, T)) -> Ordering {
     |a, b| {
         let tr = a.1.partial_cmp(&b.1);
         if tr != Some(Ordering::Equal) {
             return tr.unwrap();
         }
-        let a_l = stores
-            .node_store()
-            .resolve(a.0)
+        let a_l = (stores.node_store().resolve(a.0))
             .try_bytes_len()
             .unwrap_or_default();
-        let b_l = stores
-            .node_store()
-            .resolve(b.0)
+        let b_l = (stores.node_store().resolve(b.0))
             .try_bytes_len()
             .unwrap_or_default();
 
@@ -1319,7 +1301,7 @@ impl<E> Default for QueryLattice<E> {
 fn generate_query<TS: TypeStore + RoleStore, TIdN: TypedNodeId<IdN = NodeIdentifier>>(
     query_store: &mut QStore,
     // stores: &JStore,
-    stores: &hyperast::store::SimpleStores<TS>,
+    stores: &SimpleStores<TS>,
     from: NodeIdentifier,
 ) -> NodeIdentifier
 where
@@ -1328,7 +1310,6 @@ where
     TS::IdF: From<u16> + Into<u16>,
 {
     struct Conv<Ty>(PhantomData<Ty>);
-
     impl<Ty> Default for Conv<Ty> {
         fn default() -> Self {
             Self(Default::default())
@@ -1336,75 +1317,52 @@ where
     }
     impl<Ty: for<'t> From<&'t str>> Converter for Conv<Ty> {
         type Ty = Ty;
-
         fn conv(s: &str) -> Option<Self::Ty> {
             Some(Ty::from(s))
         }
     }
-    let _query = crate::auto::tsq_ser_meta::TreeToQuery::<_, TIdN, Conv<TIdN::Ty>>::with_pred(
-        stores,
-        from,
-        "(identifier) (type_identifier)",
-    );
+    use crate::auto::tsq_ser_meta::TreeToQuery;
+    let _query: TreeToQuery<_, TIdN, Conv<TIdN::Ty>> =
+        TreeToQuery::with_pred(stores, from, "(identifier) (type_identifier)");
     let _query = _query.to_string();
     let (mut query_store, query) = crate::search::ts_query(_query.as_bytes());
     const M0: &str = r#"(predicate (identifier) @op (#eq? @op "eq") (parameters (capture (identifier) @id ) (string) @label ))"#;
     println!();
     println!("\nThe meta query:\n{}", M0);
+
     let (query_store1, query1) = crate::search::ts_query(M0.as_bytes());
-    let path = hyperast::position::structural_pos::StructuralPosition::new(query);
+    use hyperast::position::structural_pos::StructuralPosition as Pos;
+    let path = Pos::new(query);
     let prepared_matcher =
         crate::search::PreparedMatcher::<crate::types::Type>::new(&query_store1, query1);
-    let mut per_label = std::collections::HashMap::<
-        String,
-        Vec<(
-            String,
-            hyperast::position::structural_pos::StructuralPosition<NodeIdentifier, u16>,
-        )>,
-    >::default();
+
+    let mut per_label = std::collections::HashMap::<String, Vec<(String, Pos<_, _>)>>::default();
+
     for e in crate::iter::IterAll::new(&query_store, path, query) {
-        if let Some(capts) = prepared_matcher
-            .is_matching_and_capture::<_, crate::types::TIdN<NodeIdentifier>>(
-                &query_store,
-                e.node(),
-            )
-        {
-            dbg!(&capts);
-            let l_l = prepared_matcher
-                .captures
-                .iter()
-                .position(|x| &x.name == "label")
-                .unwrap() as u32;
-            let l_i = prepared_matcher
-                .captures
-                .iter()
-                .position(|x| &x.name == "id")
-                .unwrap() as u32;
-            let k = capts
-                .by_capture_id(l_l)
-                .unwrap()
-                .clone()
-                .try_label(&query_store)
-                .unwrap();
-            let v = capts
-                .by_capture_id(l_i)
-                .unwrap()
-                .clone()
-                .try_label(&query_store)
-                .unwrap();
-            let p = e;
-            per_label
-                .entry(k.to_string())
-                .or_insert(vec![])
-                .push((v.to_string(), p));
-        }
+        let capts = prepared_matcher
+            .is_matching_and_capture::<_, crate::types::TIdN<_>>(&query_store, e.node());
+        let Some(capts) = capts else { continue };
+        dbg!(&capts);
+        let l_l = (prepared_matcher.captures.iter())
+            .position(|x| &x.name == "label")
+            .unwrap();
+        let l_i = (prepared_matcher.captures.iter())
+            .position(|x| &x.name == "id")
+            .unwrap();
+        let k = capts.by_capture_id(l_l as u32).unwrap().clone();
+        let k = k.try_label(&query_store).unwrap();
+        let v = capts.by_capture_id(l_i as u32).unwrap().clone();
+        let v = v.try_label(&query_store).unwrap();
+        per_label
+            .entry(k.to_string())
+            .or_insert(vec![])
+            .push((v.to_string(), e));
     }
     dbg!(&per_label);
     let query_bis = tsq_transform::regen_query(
         &mut query_store,
         query,
-        per_label
-            .values()
+        (per_label.values())
             .filter(|l| l.len() == 2)
             .flatten()
             .map(|x| tsq_transform::Action::Delete {
@@ -1419,27 +1377,26 @@ where
     query
 }
 
+// TODO remove LabelH, no_fmt_gen already guaranties identity by ignoring leaves holding formatting information
 type LabelH = u32;
 
 fn simp_imm_eq(
-    query_store: &mut hyperast::store::SimpleStores<crate::types::TStore>,
-    query: NodeIdentifier,
+    query_store: &mut QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
-) -> Option<(NodeIdentifier, LabelH)> {
+) -> Option<IdNQ> {
     // merge immediate predicates with identical labels
     let mut per_label = simp_search_imm_preds(query_store, query, meta_simp);
     let query = replace_preds_with_caps(query_store, query, per_label.values_mut().collect())?;
     let preds = format!("(_) {}", PerLabel(per_label));
     let mut md_cache = Default::default();
-    let mut query_tree_gen = qgen::TsQueryTreeGen::new(query_store, &mut md_cache);
-    let tree = match qgen::tree_sitter_parse(preds.as_bytes()) {
-        Ok(t) => t,
-        Err(t) => {
-            eprintln!("{}", t.root_node().to_sexp());
-            t
-        }
-    };
-    let preds = query_tree_gen.generate_file(b"", preds.as_bytes(), tree.walk());
+    let preds = try_ts_query(query_store, &mut md_cache, preds.as_bytes(), |n, t| {
+        log::warn!(
+            "Error parsing predicates for simp_imm_eq: {}",
+            t.root_node().to_sexp()
+        );
+        Some(n)
+    })?;
     let preds = preds.local.compressed_node;
     use hyperast::types::WithChildren;
     eprintln!(
@@ -1455,26 +1412,23 @@ fn simp_imm_eq(
     let preds = Children::<Idx, _>::after(&(preds).children().unwrap(), 1);
     new_q.extend(preds);
 
+    use hyperast::types::LabelStore as _;
+    let mty_l = query_store.label_store.get_or_insert("");
     let mut query_tree_gen = qgen::TsQueryTreeGen::new(query_store, &mut md_cache);
-    let new_q = query_tree_gen.build_then_insert(query, crate::types::Type::Program, None, new_q);
+    use crate::types::Type::Program;
+    let new_q = query_tree_gen.build_then_insert(query, Program, Some(mty_l), new_q);
 
-    // dbg!();
     // eprintln!(
     //     "{}",
     //     hyperast::nodes::SyntaxSerializer::new(query_store, new_q)
     // );
 
-    let query = new_q;
-
-    // let query = format!("{} {}", query, PerLabel(per_label));
-    // println!("\nThe generified query:\n{}", query);
-    // crate::search::ts_query2_with_label_hash(query_store, query.as_bytes())
-    Some((query, query_store.resolve(&query).hash(&HashKind::label())))
+    Some(new_q)
 }
 
 /// remove a matched thing from query
 fn simp_rms<'a>(
-    query_store: &'a mut hyperast::store::SimpleStores<crate::types::TStore>,
+    query_store: &'a mut QStore,
     query: NodeIdentifier,
     meta_simp: &'a hyperast_tsquery::Query,
 ) -> impl Iterator<Item = (NodeIdentifier, LabelH)> + 'a {
@@ -1496,7 +1450,7 @@ fn simp_rms<'a>(
 
 /// remove all matched thing from query
 fn simp_rmalls<'a>(
-    query_store: &'a mut hyperast::store::SimpleStores<crate::types::TStore>,
+    query_store: &'a mut QStore,
     query: NodeIdentifier,
     meta_simp: &'a hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
@@ -1515,11 +1469,15 @@ fn simp_rmalls<'a>(
     vec![(query, query_store.resolve(&query).hash(&HashKind::label()))].into_iter()
 }
 
+type SimpRmsRemoves = (IdNQ, LabelH);
+type SimpRmsRemains = (IdNQ, PendingRmPath);
+type PendingRmPath = Vec<u16>;
+
 fn try_simp_rms<'a>(
-    query_store: &'a hyperast::store::SimpleStores<crate::types::TStore>,
-    query: NodeIdentifier,
+    query_store: &'a QStore,
+    query: IdNQ,
     meta_simp: &'a hyperast_tsquery::Query,
-) -> impl Iterator<Item = Result<(NodeIdentifier, LabelH), (NodeIdentifier, Vec<u16>)>> + 'a {
+) -> impl Iterator<Item = Result<SimpRmsRemoves, SimpRmsRemains>> + 'a {
     let rms = if let Some(cid) = meta_simp.capture_index_for_name("rm") {
         find_matches(query_store, query, meta_simp, cid)
     } else {
@@ -1540,11 +1498,11 @@ fn try_simp_rms<'a>(
 }
 
 fn try_simp_rmalls<'a>(
-    query_store: &'a hyperast::store::SimpleStores<crate::types::TStore>,
-    query: NodeIdentifier,
+    query_store: &'a QStore,
+    query: IdNQ,
     meta_simp: &'a hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
-) -> Option<Result<(NodeIdentifier, LabelH), (NodeIdentifier, NodeIdentifier, Vec<Vec<u16>>)>> {
+) -> Option<Result<SimpRmsRemoves, (IdNQ, IdNQ, Vec<PendingRmPath>)>> {
     let mut rms = find_matches(query_store, query, meta_simp, cid);
     for rm in &mut rms {
         rm.pop();
@@ -1573,10 +1531,10 @@ fn try_simp_rmalls<'a>(
 }
 
 fn simp_uniq<'a>(
-    query_store: &'a mut hyperast::store::SimpleStores<crate::types::TStore>,
-    query: NodeIdentifier,
+    query_store: &'a mut QStore,
+    query: IdNQ,
     meta_simp: &'a hyperast_tsquery::Query,
-) -> impl Iterator<Item = (NodeIdentifier, LabelH)> + 'a {
+) -> impl Iterator<Item = SimpRmsRemoves> + 'a {
     let m = if let Some(cid) = meta_simp.capture_index_for_name("uniq") {
         find_matches(query_store, query, meta_simp, cid)
     } else {
@@ -1603,13 +1561,13 @@ fn simp_uniq<'a>(
 }
 
 enum ResSimpUniq {
-    Deduplicated(NodeIdentifier, LabelH), // Some Ok
-    NeedMut(NodeIdentifier, NodeIdentifier, Vec<Vec<u16>>), // Some Err
-    AlreadyUniq(NodeIdentifier),          // None
+    Deduplicated(IdNQ, LabelH),              // Some Ok
+    NeedMut(IdNQ, IdNQ, Vec<PendingRmPath>), // Some Err
+    AlreadyUniq(IdNQ),                       // None
 }
 
 fn try_simp_uniq<'a>(
-    query_store: &'a hyperast::store::SimpleStores<crate::types::TStore>,
+    query_store: &'a QStore,
     query: IdNQ,
     meta_simp: &'a hyperast_tsquery::Query,
 ) -> impl Iterator<
@@ -1661,7 +1619,7 @@ fn generate_query_aux<
 >(
     query_store: &mut QStore,
     md_cache: &mut qgen::MDCache,
-    stores: &hyperast::store::SimpleStores<TS>,
+    stores: &SimpleStores<TS>,
     from: Init,
     meta_gen: &hyperast_tsquery::Query,
     f: &impl Fn(qgen::FNode) -> T,
@@ -1673,23 +1631,16 @@ where
     use crate::auto::tsq_ser_meta2::TreeToQuery;
     let query = TreeToQuery::<_, TIdN>::new(stores, from.node(), meta_gen.clone());
     let query = format!("{} @_root", query);
-    let text = query.as_bytes();
-    let mut query_tree_gen = qgen::TsQueryTreeGen::new(query_store, md_cache);
-    let tree = match crate::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => {
-            log::warn!("Error parsing query: {}", t.root_node().to_sexp());
-            return None;
-        }
-    };
-    let full_node = query_tree_gen.generate_file(b"", text, tree.walk());
-    let r = (full_node.local.compressed_node, f(full_node));
-    Some(r)
+    try_ts_query(query_store, md_cache, query.as_bytes(), |n, t| {
+        log::warn!("Error parsing query: {}", t.root_node().to_sexp());
+        None
+    })
+    .map(|full_node| (full_node.local.compressed_node, f(full_node)))
 }
 
 fn simp_search_atleast(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> bool {
     let Some(cid) = meta_simp.capture_index_for_name("atleast") else {
@@ -1710,8 +1661,8 @@ fn simp_search_atleast(
 }
 
 fn simp_search_need(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> bool {
     let Some(cid) = meta_simp.capture_index_for_name("need") else {
@@ -1734,11 +1685,7 @@ fn simp_search_need(
     }
 }
 
-pub fn pred_uniq(
-    query_store: &Store,
-    query: NodeIdentifier,
-    meta_simp: &hyperast_tsquery::Query,
-) -> bool {
+pub fn pred_uniq(query_store: &QStore, query: IdNQ, meta_simp: &hyperast_tsquery::Query) -> bool {
     let cid = meta_simp.capture_index_for_name("uniq");
     let Some(cid) = cid else {
         return true;
@@ -1762,8 +1709,8 @@ pub fn pred_uniq(
 }
 
 fn simp_search_need2(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> bool {
     let need = meta_simp.capture_index_for_name("need");
@@ -1837,8 +1784,8 @@ fn simp_search_need2(
 }
 
 fn simp_search_rm(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> Vec<P> {
     let Some(cid) = meta_simp.capture_index_for_name("rm") else {
@@ -1848,8 +1795,8 @@ fn simp_search_rm(
 }
 
 fn simp_search_uniq(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> Vec<P> {
     let Some(cid) = meta_simp.capture_index_for_name("uniq") else {
@@ -1859,8 +1806,8 @@ fn simp_search_uniq(
 }
 
 pub fn find_matches(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
 ) -> Vec<P> {
@@ -1869,11 +1816,11 @@ pub fn find_matches(
 }
 
 pub fn find_matches_aux(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
-) -> position::structural_pos::CursorWithPersistenceOrderedSet<NodeIdentifier> {
+) -> position::structural_pos::CursorWithPersistenceOrderedSet<IdNQ> {
     // let mut result = vec![];
     let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let mut set = pos.build_empty_set();
@@ -1892,11 +1839,7 @@ pub fn find_matches_aux(
     set
 }
 
-fn apply_rms_aux(
-    query_store: &mut Store,
-    query: NodeIdentifier,
-    path: &Vec<u16>,
-) -> Option<NodeIdentifier> {
+fn apply_rms_aux(query_store: &mut QStore, query: IdNQ, path: &PendingRmPath) -> Option<IdNQ> {
     let mut path = path.clone();
     path.pop();
     path.reverse();
@@ -1906,11 +1849,7 @@ fn apply_rms_aux(
     tsq_transform::regen_query(query_store, query, actions)
 }
 
-fn try_apply_rms_aux(
-    query_store: &Store,
-    query: NodeIdentifier,
-    path: &Vec<u16>,
-) -> Option<NodeIdentifier> {
+fn try_apply_rms_aux(query_store: &QStore, query: IdNQ, path: &PendingRmPath) -> Option<IdNQ> {
     let mut path = path.clone();
     path.pop();
     path.reverse();
@@ -1920,11 +1859,7 @@ fn try_apply_rms_aux(
     tsq_transform::try_regen_query(query_store, query, actions)
 }
 
-fn apply_rms_aux2(
-    query_store: &mut Store,
-    query: NodeIdentifier,
-    path: &Vec<u16>,
-) -> Option<NodeIdentifier> {
+fn apply_rms_aux2(query_store: &mut QStore, query: IdNQ, path: &PendingRmPath) -> Option<IdNQ> {
     let mut path = path.clone();
     let action = tsq_transform::Action::Delete { path };
     let actions = vec![action];
@@ -1932,11 +1867,7 @@ fn apply_rms_aux2(
     tsq_transform::regen_query(query_store, query, actions)
 }
 
-fn try_apply_rms_aux2(
-    query_store: &Store,
-    query: NodeIdentifier,
-    path: &Vec<u16>,
-) -> Option<NodeIdentifier> {
+fn try_apply_rms_aux2(query_store: &QStore, query: IdNQ, path: &PendingRmPath) -> Option<IdNQ> {
     let mut path = path.clone();
     let action = tsq_transform::Action::Delete { path };
     let actions = vec![action];
@@ -1945,10 +1876,10 @@ fn try_apply_rms_aux2(
 }
 
 pub fn replace_preds_with_caps(
-    query_store: &mut Store,
-    query: NodeIdentifier,
-    per_label_values: Vec<&mut Vec<(String, Vec<u16>)>>,
-) -> Option<NodeIdentifier> {
+    query_store: &mut QStore,
+    query: IdNQ,
+    per_label_values: Vec<&mut Vec<(String, PendingRmPath)>>,
+) -> Option<IdNQ> {
     let mut count = 0;
     let mut values: Vec<_> = per_label_values;
     values.sort_by_key(|x| x.iter().map(|x| &x.1).max().unwrap_or(&vec![]).clone());
@@ -2000,15 +1931,20 @@ pub fn replace_preds_with_caps(
     tsq_transform::regen_query(query_store, query, actions)
 }
 
-type Store = hyperast::store::SimpleStores<crate::types::TStore>;
-
-pub fn make_cap(query_store: &mut Store, name: &str) -> NodeIdentifier {
+// can be cached for a given query_store, but such caching is better done by caller.
+// note most importantly it would not require to hold the store mutably
+pub fn make_cap(query_store: &mut QStore, name: &str) -> IdNQ {
     let q = format!("_ @{}", name);
-    let q = crate::search::ts_query2(query_store, q.as_bytes());
+    let mut md_cache = Default::default();
+    let q = try_ts_query(query_store, &mut md_cache, q.as_bytes(), |n, t| Some(n))
+        .unwrap_or_else(|| unreachable!("some is returned on_err"))
+        .local
+        .compressed_node;
     use hyperast::types::WithChildren;
     let q = query_store.node_store.resolve(q).child(&0).unwrap();
     let q = query_store.node_store.resolve(q).child(&1).unwrap(); // NOTE: no spaces now
     // let q = query_store.node_store.resolve(q).child(&2).unwrap();
+    // TODO add debug assertion
     q
 }
 
@@ -2017,8 +1953,8 @@ type Lab = String;
 type Cap = String;
 
 fn simp_search_imm_preds(
-    query_store: &Store,
-    query: NodeIdentifier,
+    query_store: &QStore,
+    query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> std::collections::HashMap<Lab, Vec<(Cap, P)>> {
     let mut per_label = std::collections::HashMap::default();

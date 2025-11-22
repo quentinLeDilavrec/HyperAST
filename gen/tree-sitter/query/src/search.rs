@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tree_sitter::CaptureQuantifier as Quant;
 
 use crate::auto::tsq_ser_meta::Conv;
-use crate::no_fmt_legion::TsQueryTreeGen;
+use crate::no_fmt_legion::{MD, TsQueryTreeGen};
 use crate::types::TStore;
 
 use hyperast::store::SimpleStores;
@@ -294,55 +294,57 @@ pub fn ts_query_store() -> SimpleStores<crate::types::TStore> {
     SimpleStores::default()
 }
 
-pub fn ts_query(text: &[u8]) -> (SimpleStores<crate::types::TStore>, legion::Entity) {
+pub fn ts_query(text: &[u8]) -> (SimpleStores<crate::types::TStore>, NodeIdentifier) {
     let mut stores = ts_query_store();
     let query = ts_query2(&mut stores, text);
     (stores, query)
 }
 
-pub fn ts_query2(stores: &mut SimpleStores<TStore>, text: &[u8]) -> legion::Entity {
-    let mut md_cache = Default::default();
-    let mut query_tree_gen = TsQueryTreeGen {
-        line_break: "\n".as_bytes().to_vec(),
-        stores,
-        md_cache: &mut md_cache,
-    };
+type QueryFullNode =
+    hyperast::full::FullNode<hyperast::tree_gen::BasicGlobalData, crate::no_fmt_legion::Local>;
 
-    let tree = match crate::legion::tree_sitter_parse(text) {
-        Ok(t) => t,
+/// Generate query using no fmt tree gen, i.e without space characters
+///
+/// there is a little overhead for the error case, if we do not use it,
+/// but considering the debugging and printing use cases it is worth the cost.
+/// NOTE having an unfaillible generator would be good there to be more resilient
+pub fn try_ts_query(
+    stores: &mut SimpleStores<TStore>,
+    md_cache: &mut HashMap<NodeIdentifier, MD>,
+    text: &[u8],
+    on_err: impl Fn(QueryFullNode, &tree_sitter::Tree) -> Option<QueryFullNode>,
+) -> Option<QueryFullNode> {
+    let mut query_tree_gen = TsQueryTreeGen::new(stores, md_cache);
+    let mut f = |t: &tree_sitter::Tree| query_tree_gen.generate_file(b"", text, t.walk());
+    match crate::legion::tree_sitter_parse(text) {
+        Ok(t) => Some(f(&t)),
         Err(t) => {
-            eprintln!("{}", t.root_node().to_sexp());
-            t
+            let n = f(&t);
+            on_err(n, &t)
         }
-    };
-    let full_node = query_tree_gen.generate_file(b"", text, tree.walk());
+    }
+}
 
-    full_node.local.compressed_node
+pub fn ts_query2(stores: &mut SimpleStores<TStore>, text: &[u8]) -> NodeIdentifier {
+    let mut md_cache = Default::default();
+    try_ts_query(stores, &mut md_cache, text, |n, t| {
+        eprintln!("{}", t.root_node().to_sexp());
+        Some(n)
+    })
+    .unwrap_or_else(|| unreachable!("some is returned on errors, in on_err"))
+    .local
+    .compressed_node
 }
 
 pub fn ts_query2_with_label_hash(
     stores: &mut SimpleStores<TStore>,
     text: &[u8],
-) -> Option<(legion::Entity, u32)> {
+) -> Option<(NodeIdentifier, u32)> {
     let mut md_cache = Default::default();
-    let mut query_tree_gen = TsQueryTreeGen::new(stores, &mut md_cache);
-
-    let tree = match crate::legion::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => {
-            dbg!(t.root_node().to_sexp());
-            return None;
-        }
-    };
-    // dbg!(tree.root_node().to_sexp());
-    let full_node = query_tree_gen.generate_file(b"", text, tree.walk());
-    // eprintln!(
-    //     "{}",
-    //     hyperast::nodes::SyntaxSerializer::new(stores, full_node.local.compressed_node)
-    // );
-    let r = (
-        full_node.local.compressed_node,
-        full_node.local.metrics.hashs.label,
-    );
-    Some(r)
+    try_ts_query(stores, &mut md_cache, text, |n, t| {
+        eprintln!("{}", t.root_node().to_sexp());
+        Some(n)
+    })
+    .map(|f| f.local)
+    .map(|l| (l.compressed_node, l.metrics.hashs.label))
 }

@@ -9,11 +9,12 @@ use petgraph::visit::{EdgeRef, IntoNodeReferences};
 
 type IdN = hyperast::store::defaults::NodeIdentifier;
 type Idx = u16;
-type Lattice<'a> = &'a QueryLattice<&'a StructuralPosition<IdN, Idx>>;
+type Latt<'a, P> = &'a QueryLattice<&'a P>;
+type Lattice<'a> = Latt<'a, StructuralPosition<IdN, Idx>>;
 // use crate::utils::Q;
 
-pub fn make_lattice_graph<N, E: 'static>(
-    lattice: Lattice,
+pub fn make_lattice_graph<N, E: 'static, P: PartialEq>(
+    lattice: Latt<P>,
     f: impl Fn(IdN) -> N,
     g: impl Fn(petgraph::graph::NodeIndex, petgraph::graph::NodeIndex, &'static str) -> E,
 ) -> petgraph::acyclic::Acyclic<petgraph::Graph<N, E>> {

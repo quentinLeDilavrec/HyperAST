@@ -10,6 +10,7 @@ use hyperast::position::structural_pos::StructuralPosition as Pos;
 
 use super::stepped_query_imm;
 
+#[cfg(feature = "tsg")]
 type ImmFcts<HAST, Acc> = tree_sitter_graph::functions::Functions<
     tree_sitter_graph::graph::Graph<crate::stepped_query_imm::Node<HAST, Acc>>,
 >;

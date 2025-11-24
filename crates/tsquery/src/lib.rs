@@ -518,12 +518,14 @@ pub trait Opaque {
     fn type_id(&self) -> std::any::TypeId;
 }
 
+#[cfg(feature = "tsg")]
 impl<G: 'static> Opaque for tree_sitter_graph::functions::Functions<G> {
     fn type_id(&self) -> std::any::TypeId {
         std::any::TypeId::of::<G>()
     }
 }
 
+#[cfg(feature = "tsg")]
 pub type ImmGraph<HAST, Acc> =
     tree_sitter_graph::graph::Graph<crate::stepped_query_imm::Node<HAST, Acc>>;
 
@@ -541,6 +543,7 @@ impl ErazedFcts {
             erzd: std::sync::Arc::new(functions),
         }
     }
+    #[cfg(feature = "tsg")]
     pub fn downcast_fcts<G: tree_sitter_graph::graph::WithSynNodes>(
         &self,
     ) -> &tree_sitter_graph::functions::Functions<G> {

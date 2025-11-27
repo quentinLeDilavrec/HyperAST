@@ -29,6 +29,7 @@ pub(crate) struct Repo {
     pub(crate) user: &'static str,
     pub(crate) name: &'static str,
 }
+
 #[derive(Clone)]
 pub(crate) struct Commit {
     pub(crate) repo: Repo,
@@ -43,6 +44,7 @@ impl From<&Repo> for super::super::types::Repo {
         }
     }
 }
+
 impl From<&Commit> for super::super::types::Commit {
     fn from(value: &Commit) -> Self {
         Self {

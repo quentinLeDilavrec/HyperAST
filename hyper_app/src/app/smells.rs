@@ -34,6 +34,7 @@
 //! https://github.com/Marcono1234/gson/commit/3d241ca0a6435cbf1fa1cdaed2af8480b99fecde
 //! about fixing try catches in tests
 
+use itertools::Itertools;
 use std::hash::Hash;
 use std::ops::{Range, SubAssign};
 use wasm_rs_dbg::dbg;
@@ -49,6 +50,7 @@ use crate::app::code_tracking::try_fetch_remote_file;
 use crate::app::types::CommitId;
 use crate::utils_poll::{Remote, Resource};
 
+mod config_examples;
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(default)]
 pub(super) struct ComputeConfigQuery {
@@ -68,59 +70,24 @@ pub(super) struct ComputeConfigQuery {
     // filterings
     wanted_matches: std::ops::Range<usize>,
 
+    #[serde(skip)]
+    // examples
+    examples: Vec<config_examples::Example>,
+
     // just ui stuff, might do better
     advanced_open: bool,
 }
 
 impl Default for ComputeConfigQuery {
     fn default() -> Self {
-        use super::types::*;
         Self {
-            //google/gson/commit/99cc4cb11f73a6d672aa6381013d651b7921e00f
-            //Marcono1234/gson/commit/3d241ca0a6435cbf1fa1cdaed2af8480b99fecde
-            commit: Commit {
-                repo: Repo {
-                    user: "Marcono1234".into(),
-                    name: "gson".into(),
-                },
-                id: "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde".into(),
-            },
-            meta_gen: r#"(identifier) @label
-["{" ";" "." "try" "(" ")" "}" "catch" "import"] @skip"#
-                .into(),
-            meta_simp: r#"(predicate
-    (identifier) (#EQ? "EQ")
-    (parameters
-        (string) @label
-    )
-) @pred
-(_
-    (named_node
-        (identifier) (#EQ "expression_statement")
-    ) @rm
-    .
-)
-(_
-    (named_node
-        (identifier) (#EQ "expression_statement")
-    ) @rm
-    .
-    (named_node)
-)
-(_
-    (named_node
-        (identifier) (#EQ "expression_statement")
-    ) @rm
-    .
-    (anonymous_node)
-)"#
-            .into(),
-            config: Config::MavenJava,
-            len: 1,
-            simple_matching: true,
-            prepro_matching: true,
             wanted_matches: usize::MAX..usize::MAX,
             advanced_open: false,
+            examples: vec![
+                config_examples::BASE_TRY_FAIL_CATCH_EX.clone(),
+                config_examples::MORE_TRY_FAIL_CATCH_EX.clone(),
+            ],
+            ..Into::into(&config_examples::MORE_TRY_FAIL_CATCH_EX)
         }
     }
 }
@@ -192,6 +159,20 @@ pub struct SearchResults {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default = "Default::default")]
     pub good: Vec<SearchResult>,
+
+    pub graphs: Vec<G>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub struct G {
+    /// hold the query ids
+    queries: Vec<u32>,
+    /// successors (ie. to more general patterns in our case)
+    /// multiple opti based on topo sorted lattice:
+    /// * sub lists are separated by zero
+    /// * each succ is encoded as the difference with prev succ
+    ///   * when first the index of the node is the one subtracted from succ
+    succ: Vec<u32>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -242,16 +223,15 @@ pub(crate) fn show_config(
     let Some(conf) = &mut smells.commits else {
         return (ui.label(""), ui.label(""));
     };
-    ui.label("Source of inital Examples:");
+    ui.label("Source of initial Examples:");
     let (resp_repo, resp_commit) = conf.commit.show_clickable(ui);
 
-    ui.add(
-        egui::Slider::new(&mut conf.len, 1..=200)
-            .text("commits")
-            .clamping(egui::SliderClamping::Always)
-            .integer()
-            .logarithmic(true),
-    );
+    let slider = egui::Slider::new(&mut conf.len, 1..=200)
+        .clamping(egui::SliderClamping::Always)
+        .integer()
+        .logarithmic(true);
+    ui.responsive_width_slider(slider, "commits");
+
     let selected = &mut conf.config;
     selected.show_combo_box(ui, "Repo Config");
 
@@ -279,24 +259,54 @@ pub(crate) fn show_config(
     ui.checkbox(&mut conf.simple_matching, "Simple Matching");
     ui.checkbox(&mut conf.prepro_matching, "Incr. Matching");
 
-    if (smells.bad_matches_bounds) == (0..=0) {
-        return (resp_repo, resp_commit);
-    }
-    ui.label("#matches on entire commit:");
-    if (conf.wanted_matches) == (usize::MAX..usize::MAX) {
-        smells.bads = None;
-        conf.wanted_matches = *smells.bad_matches_bounds.start()..*smells.bad_matches_bounds.end();
-    }
-    let double_ended_slider = ui.double_ended_slider(
-        &mut conf.wanted_matches.start,
-        &mut conf.wanted_matches.end,
-        smells.bad_matches_bounds.clone(),
-    );
-    if double_ended_slider.changed() {
-        smells.bads = None
-    };
+    let bounds_initialized = smells.bad_matches_bounds != (0..=0);
+    ui.add_enabled_ui(bounds_initialized, |ui| {
+        ui.label("#matches on entire commit:");
+        if bounds_initialized && (conf.wanted_matches) == (usize::MAX..usize::MAX) {
+            smells.bads = None;
+            conf.wanted_matches =
+                *smells.bad_matches_bounds.start()..*smells.bad_matches_bounds.end();
+        }
+        let double_ended_slider = ui.double_ended_slider(
+            &mut conf.wanted_matches.start,
+            &mut conf.wanted_matches.end,
+            smells.bad_matches_bounds.clone(),
+        );
+        if double_ended_slider.changed() {
+            smells.bads = None
+        };
+    })
+    .response
+    .on_disabled_hover_text("no patterns to filter");
+
     // let text = "displays only queries in the given range";
     // double_ended_slider.on_hover_text_at_pointer(text);
+
+    ui.add_space(10.0);
+    let mut sel_ex = None;
+    ui.label("examples:");
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            let mut rest = false;
+            for (i, e) in conf.examples.iter().enumerate() {
+                if rest {
+                    ui.separator();
+                }
+                rest = true;
+                if e.show(ui).clicked() {
+                    sel_ex = Some(i);
+                }
+            }
+        })
+    });
+    if let Some(sel_ex) = sel_ex {
+        *conf = ComputeConfigQuery {
+            wanted_matches: usize::MAX..usize::MAX,
+            advanced_open: conf.advanced_open,
+            examples: conf.examples.clone(),
+            ..Into::into(&conf.examples[sel_ex])
+        };
+    }
     (resp_repo, resp_commit)
 }
 
@@ -316,11 +326,13 @@ pub(super) fn show_central_panel(
     if let Some(_examples) = &mut smells.queries {
         todo!();
     }
+    let mut show_action_menu = true;
     if let Some(promise) = smells_result {
         if let Some(value) = show_smells_result(ui, api_addr, smells, fetched_files, promise) {
             *smells_result = Some(value)
         } else {
-            return;
+            show_action_menu = false;
+            // return;
         }
     }
     if let Some(promise) = smells_diffs_result {
@@ -342,14 +354,18 @@ pub(super) fn show_central_panel(
                 _ => (),
             },
             Err(error) => {
+                let mut retry = false;
                 // This should only happen if the fetch API isn't available or something similar.
                 egui::Window::new("Diff Error").show(ui.ctx(), |ui| {
                     ui.colored_label(
                         ui.visuals().error_fg_color,
                         if error.is_empty() { "Error" } else { error },
                     );
+                    if ui.button("retry").clicked() {
+                        retry = true;
+                    }
                 });
-                if ui.button("retry").clicked() {
+                if ui.button("retry").clicked() || retry {
                     *smells_diffs_result = None;
                 }
             }
@@ -364,14 +380,16 @@ pub(super) fn show_central_panel(
         let conf = smells.commits.as_mut().unwrap();
         let center = ui.available_rect_before_wrap().center();
         show_examples(ui, api_addr, examples, fetched_files);
-        egui::Window::new("Actions")
-            .default_pos(center)
-            .pivot(egui::Align2::CENTER_CENTER)
-            .show(ui.ctx(), |ui| {
-                if ui.button("Compute Queries").clicked() {
-                    *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                }
-            });
+        if show_action_menu {
+            egui::Window::new("Actions")
+                .default_pos(center)
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ui.ctx(), |ui| {
+                    if ui.button("Compute Queries").clicked() {
+                        *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+                    }
+                });
+        }
         return;
     }
     if let Some(conf) = &mut smells.commits {
@@ -470,10 +488,12 @@ fn show_smells_result(
         let start = matches.min().unwrap_or_default();
         let matches = queries.bad.iter().map(|x| x.matches);
         let end = matches.max().unwrap_or_default();
-        smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
-        conf.wanted_matches = start..end; // TODO better open the side panel
-        smells.bads = None; // to refresh
-        return None;
+        if start < end {
+            smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
+            conf.wanted_matches = start..end; // TODO better open the side panel
+            smells.bads = None; // to refresh
+            return None;
+        }
     }
 
     let bads = smells.bads.as_ref().unwrap();
@@ -485,6 +505,15 @@ fn show_smells_result(
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ui.ctx(), |ui| {
                 ui.colored_label(ui.visuals().error_fg_color, "No queries found");
+                ui.label(format!("{}", queries.graphs.len()));
+                ui.label(format!(
+                    "{:?}",
+                    queries
+                        .graphs
+                        .iter()
+                        .map(|x| x.queries.len())
+                        .collect::<Vec<_>>()
+                ));
                 if ui.button("Retry Compute Queries").clicked() {
                     _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
                 }

@@ -1,4 +1,5 @@
 use crate::app::types::Config;
+use crate::app::utils::{Commit, Forge, Repo};
 
 #[derive(Clone)]
 pub(super) struct Scripts {
@@ -14,44 +15,6 @@ pub(super) struct Example {
     pub(crate) config: Config,
     pub(crate) commits: usize,
     pub(crate) scripts: Scripts,
-}
-
-#[allow(dead_code)]
-#[derive(Clone)]
-pub enum Forge {
-    GitHub,
-    GitLab,
-}
-
-#[derive(Clone)]
-pub struct Repo {
-    #[allow(dead_code)]
-    pub forge: Forge,
-    pub user: &'static str,
-    pub name: &'static str,
-}
-
-#[derive(Clone)]
-pub(crate) struct Commit {
-    pub(crate) repo: Repo,
-    pub(crate) id: &'static str,
-}
-
-impl From<&Repo> for super::super::types::Repo {
-    fn from(value: &Repo) -> Self {
-        Self {
-            user: value.user.into(),
-            name: value.name.into(),
-        }
-    }
-}
-impl From<&Commit> for super::super::types::Commit {
-    fn from(value: &Commit) -> Self {
-        Self {
-            repo: (&value.repo).into(),
-            id: value.id.into(),
-        }
-    }
 }
 
 pub(super) const EXAMPLES: &[Example] = &[

@@ -186,6 +186,44 @@ pub(crate) fn prepare_paste(
     None
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub(crate) enum Forge {
+    GitHub,
+    GitLab,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Repo {
+    #[allow(dead_code)]
+    pub forge: Forge,
+    pub user: &'static str,
+    pub name: &'static str,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Commit {
+    pub(crate) repo: Repo,
+    pub(crate) id: &'static str,
+}
+
+impl From<&Repo> for super::types::Repo {
+    fn from(value: &Repo) -> Self {
+        Self {
+            user: value.user.into(),
+            name: value.name.into(),
+        }
+    }
+}
+impl From<&Commit> for super::types::Commit {
+    fn from(value: &Commit) -> Self {
+        Self {
+            repo: (&value.repo).into(),
+            id: value.id.into(),
+        }
+    }
+}
+
 macro_rules! typed_vec {
     ($vis:vis $name:ident, $item:ty, $id:ident($ty:ty)) => {
         #[repr(transparent)]

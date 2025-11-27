@@ -351,6 +351,17 @@ pub trait MyUiExt: UiExt {
             .show(self.ui_mut(), |ui| frame.show(ui, f).inner)
             .inner
     }
+
+    fn responsive_width_slider(&mut self, mut slider: egui::Slider, text: &str) -> egui::Response {
+        let ui = self.ui_mut();
+        if ui.spacing().slider_width + 100. < ui.available_width() {
+            slider = slider.text(text);
+        } else {
+            slider = slider.text(egui::WidgetText::default());
+            ui.label(format!("{}:", text));
+        }
+        ui.add(slider)
+    }
 }
 
 impl MyUiExt for egui::Ui {}

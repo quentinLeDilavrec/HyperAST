@@ -255,11 +255,11 @@ async fn smells(
 }
 
 async fn smells_ex_from_diffs(
-    axum::extract::Path(path): axum::extract::Path<smells::Diffs>,
+    axum::extract::Path(path): axum::extract::Path<smells::Param>,
     axum::extract::State(state): axum::extract::State<SharedState>,
 ) -> axum::response::Result<Json<smells::ExamplesResults>> {
     let r = smells::smells_ex_from_diffs(state, path)?;
-    Ok(r)
+    Ok(r.into())
 }
 
 pub fn smells_app(_st: SharedState) -> Router<SharedState> {

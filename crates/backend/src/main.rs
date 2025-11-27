@@ -6,13 +6,11 @@ use std::{net::SocketAddr, sync::Arc};
 use backend::*;
 
 use axum::Router;
-use backend::{
-    app::{
-        commit_metadata_route, fetch_code_route, fetch_git_file, querying_app, scripting_app,
-        smells_app, track_code_route, tsg_app, view_code_route,
-    },
-    examples::{example_app, kv_store_app},
+use backend::app::{
+    commit_metadata_route, fetch_code_route, fetch_git_file, querying_app, scripting_app,
+    smells_app, track_code_route, tsg_app, view_code_route,
 };
+use backend::examples::{example_app, kv_store_app};
 use hyper_diff::matchers::mapping_store::VecStore;
 use hyperast_vcs_git::git::Forge;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};

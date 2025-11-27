@@ -120,6 +120,11 @@ lock_api = "0.4.1"
 # regex = "1.10.5"
 # glob = "0.3.2"
 
+petgraph = { version = "0.7.1", optional = true }
+webgraph = { version = "0.4.0", optional = true }
+lender = { version = "0.4.1", optional = true }
+sux = { version = "0.10.0", optional = true  }
+
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 jemallocator = { package = "tikv-jemallocator", version = "0.5.0" }
 
@@ -138,6 +143,14 @@ tsg = [
     # "dep:tree-sitter-stack-graphs",
     "hyperast_tsquery/tsg",
     "hyperast_vcs_git/tsg",
+    "lattice"
+]
+lattice=[
+    "hyperast_gen_ts_tsquery/lattice",
+    "dep:petgraph", "petgraph?/serde-1",
+    "dep:webgraph", "webgraph?/serde",
+    "dep:sux", "sux?/serde",
+    "dep:lender",
 ]
 rerun = ["dep:rerun", "dep:polyglote"]
 subtree-stats = ["hyperast_gen_ts_java/subtree-stats"]

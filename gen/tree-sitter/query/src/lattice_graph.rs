@@ -143,14 +143,11 @@ pub fn group_lattices<N: Clone, E: Clone + 'static>(
                 }
             });
             let g = graph;
-            // let graph = graph.into();
-            // let g = egui_graphs::to_graph(&graph);
             Some(g)
         })
         .collect();
 
     graphs.push(singles);
-    // graphs.push(egui_graphs::to_graph(&singles.into()));
     graphs
 }
 

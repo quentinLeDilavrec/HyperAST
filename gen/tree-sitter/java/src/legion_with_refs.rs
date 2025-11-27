@@ -380,6 +380,8 @@ where
                 // if stack.parent().unwrap().simple.children.len() < 256 {
                 return PreResult::Ignore;
                 // }
+            } else if kind == Type::_Literal {
+                // return PreResult::Ignore;
             } else if !kind.is_supertype() && kind.is_hidden() {
                 return PreResult::Ignore;
             }

@@ -232,10 +232,12 @@ pub struct NodeRefKNoRef<'a, HAST: HyperAST> {
     pub pos: structural_pos::RefNode<'a, HAST::IdN, HAST::Idx>,
     pub kind: <HAST::TS as TypeStore>::Ty,
 }
-pub struct NodeNoRef<
-    HAST: HyperASTShared,
-    P = PersistedNode<<HAST as HyperASTShared>::IdN, <HAST as HyperASTShared>::Idx>,
-> {
+
+#[allow(type_alias_bounds)]
+type Pos<HAST: HyperASTShared> =
+    PersistedNode<<HAST as HyperASTShared>::IdN, <HAST as HyperASTShared>::Idx>;
+
+pub struct NodeNoRef<HAST: HyperASTShared, P = Pos<HAST>> {
     pub stores: HAST,
     pub pos: P,
 }
@@ -389,10 +391,7 @@ pub mod tsg_impl {
         }
     }
 
-    pub struct QueryMatcher<
-        HAST,
-        P = PersistedNode<<HAST as HyperASTShared>::IdN, <HAST as HyperASTShared>::Idx>,
-    > {
+    pub struct QueryMatcher<HAST, P = Pos<HAST>> {
         pub query: crate::Query,
         pub _phantom: std::marker::PhantomData<(HAST, P)>,
     }
@@ -496,12 +495,7 @@ pub mod tsg_impl {
         }
     }
 
-    pub struct MyQMatches<
-        'query,
-        It,
-        HAST: HyperASTShared,
-        P = PersistedNode<<HAST as HyperASTShared>::IdN, <HAST as HyperASTShared>::Idx>,
-    > {
+    pub struct MyQMatches<'query, It, HAST: HyperASTShared, P = Pos<HAST>> {
         pub q: &'query QueryMatcher<HAST, P>,
         pub matchs: It,
         // pub node: Node<HAST, Pos<HAST>>,
@@ -534,10 +528,7 @@ pub mod tsg_impl {
         }
     }
 
-    pub struct MyQMatch<
-        HAST: HyperAST,
-        P = PersistedNode<<HAST as HyperASTShared>::IdN, <HAST as HyperASTShared>::Idx>,
-    > {
+    pub struct MyQMatch<HAST: HyperAST, P = Pos<HAST>> {
         pub stores: HAST,
         pub qm: crate::QueryMatch<Node<HAST, P>>,
         pub i: CaptureId,

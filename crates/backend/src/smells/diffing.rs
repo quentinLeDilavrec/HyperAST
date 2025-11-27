@@ -112,12 +112,12 @@ pub(crate) fn diff(
     let with_spaces_stores = &repositories.processor.main_stores;
     let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);
 
-    let actions = hyper_diff::algorithms::gumtree_stable_hybrid_lazy::diff(
+    let diff = hyper_diff::algorithms::gumtree_stable_hybrid_lazy::diff(
         // hyper_diff::algorithms::gumtree_stable_lazy::diff(
         stores, &src_tr, &dst_tr,
-    )
-    .actions
-    .unwrap();
+    );
+    let mapper = diff.mapper;
+    let actions = diff.actions.unwrap();
     // let actions = _diff(&state, src_tr, dst_tr, with_spaces_stores, stores)?
     //     .actions
     //     .unwrap();
@@ -613,15 +613,15 @@ pub(crate) fn extract_deletes<'a>(
     let mut a_tree = ActionsTree::new();
     for a in actions.0.iter().rev() {
         if let Act::Delete { .. } = &a.action {
-            let (to_path, x) = hyperast::position::path_with_spaces(
-                src_tr,
-                &mut a.path.ori.iter(),
-                with_spaces_stores,
-            );
-            let t = with_spaces_stores.resolve_type(&x);
-            dbg!(t);
-            let del = hyperast::nodes::TextSerializer::new(with_spaces_stores, x).to_string();
-            println!("ddel: {}", del);
+            // let (to_path, x) = hyperast::position::path_with_spaces(
+            //     src_tr,
+            //     &mut a.path.ori.iter(),
+            //     with_spaces_stores,
+            // );
+            // let t = with_spaces_stores.resolve_type(&x);
+            // dbg!(t);
+            // let del = hyperast::nodes::TextSerializer::new(with_spaces_stores, x).to_string();
+            // println!("ddel: {}", del);
             a_tree.merge_ori(a);
         }
     }
@@ -632,10 +632,10 @@ pub(crate) fn extract_deletes<'a>(
         &a_tree.atomics, // , &mapping
         hyperast::position::StructuralPosition::new(src_tr),
         &mut |p, nn, n, id| {
-            let t = stores.resolve_type(&id);
-            dbg!(t);
-            let del = hyperast::nodes::TextSerializer::new(with_spaces_stores, id);
-            println!("del : {}", del);
+            // let t = stores.resolve_type(&id);
+            // dbg!(t);
+            // let del = hyperast::nodes::TextSerializer::new(with_spaces_stores, id);
+            // println!("del : {}", del);
             result.push(p.clone());
             false
         },
@@ -667,40 +667,75 @@ pub(crate) fn extract_focuses<'a>(
     with_spaces_stores: &'a hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
     stores: &'a Stores,
     src_tr: NodeIdentifier,
-    _dst_tr: NodeIdentifier,
+    dst_tr: NodeIdentifier,
     actions: &'a ActionsVec<A>,
 ) -> impl Iterator<Item = (Pos, Pos)> + 'a {
-    let mut result = vec![];
     let mut a_tree = ActionsTree::new();
     for a in actions.0.iter().rev() {
-        if let Act::Delete { .. } = &a.action {
-            a_tree.merge_ori(a);
-        }
+        let from = match &a.action {
+            Act::Delete { .. } => a_tree.merge_ori(a),
+            Act::Move { .. } => a_tree.merge_ori(a),
+            // Act::Move { from } | Act::MovUpd { from, .. } => a_tree.merge_ori(&SimpleAction {
+            //     path: a.path.clone(),
+            //     action: Act::Delete {},
+            // }),
+            _ => (),
+        };
     }
     // eprintln!("{:?}", a_tree.inspect());
     use hyperast::types::HyperType;
-    go_to_files(
-        stores,
-        &a_tree.atomics, // , &mapping
-        hyperast::position::StructuralPosition::new(src_tr),
-        &mut |p, nn, n, id| {
-            if let Act::Delete { .. } = n.action.action {
-                if with_spaces_stores.resolve_type(&id).is_syntax() {
-                    return false;
-                };
-                result.push(p.clone());
-                true
-            } else {
-                false
+    let composed = a_tree.composed;
+    a_tree.atomics.into_iter().filter_map(move |atomic| {
+        let mut already = None;
+        let mut moves = vec![];
+        go_to_files_aux(
+            stores,
+            &atomic,
+            &hyperast::position::StructuralPosition::new(src_tr),
+            &mut |p, nn, n, id| {
+                if let Act::Delete { .. } = n.action.action {
+                    if with_spaces_stores.resolve_type(&id).is_syntax() {
+                        return false;
+                    };
+                    if already.is_none() {
+                        already = Some(p.clone());
+                    }
+                    if already.is_some() && n.composed_offset != u32::MAX {
+                        moves.push(n.composed_offset);
+                    }
+                    false
+                } else {
+                    false
+                }
+            },
+        );
+        let Some(already) = already else {
+            return None;
+        };
+        let mut agg_pos = None;
+        let mut first_path = None;
+        for m in moves {
+            let a = &composed[m as usize];
+            let (to_path, x) = hyperast::position::path_with_spaces(
+                dst_tr,
+                &mut a.path.ori.iter(),
+                with_spaces_stores,
+            );
+
+            let (to, _to) = hyperast::position::compute_position(
+                dst_tr,
+                &mut to_path.iter().copied(),
+                with_spaces_stores,
+            );
+            if first_path.is_none() {
+                first_path = Some(to_path);
+                agg_pos = Some(to);
+            } else if let Some(agg_pos) = &mut agg_pos {
+                agg_pos.try_merge(to)
             }
-        },
-    );
-
-    dbg!(&result.len());
-
-    result
-        .into_iter()
-        .map(move |path| {
+        }
+        let already = {
+            let path = already;
             let tr = path.root();
             let path = hyperast::position::path_with_spaces(
                 tr,
@@ -714,8 +749,34 @@ pub(crate) fn extract_focuses<'a>(
                 with_spaces_stores,
             );
             (pos, path)
-        })
-        .map(|x| (x.clone(), x))
+        };
+        if let Some((first_path, agg_pos)) = first_path.zip(agg_pos) {
+            Some(((agg_pos, first_path), already))
+        } else {
+            Some((already.clone(), already))
+        }
+    })
+
+    // dbg!(&result.len());
+
+    // result
+    //     .into_iter()
+    //     .map(move |path| {
+    //         let tr = path.root();
+    //         let path = hyperast::position::path_with_spaces(
+    //             tr,
+    //             &mut path.iter_offsets(),
+    //             with_spaces_stores,
+    //         )
+    //         .0;
+    //         let (pos, _) = hyperast::position::compute_position(
+    //             tr,
+    //             &mut path.iter().copied(),
+    //             with_spaces_stores,
+    //         );
+    //         (pos, path)
+    //     })
+    //     .map(|x| (x.clone(), x))
 }
 
 pub(crate) type _R = hyperast::position::structural_pos::StructuralPosition<NodeIdentifier, u16>;
@@ -736,32 +797,39 @@ pub(crate) fn go_to_files<F>(stores: &Stores, cs: &[N], path: P, result: &mut F)
 where
     F: FnMut(&P, &NoSpaceWrapper<NodeIdentifier>, &N, NodeIdentifier) -> bool,
 {
-    't: for n in cs {
-        let mut path = path.clone();
-        let mut p_it = n.action.path.ori.iter();
-        loop {
-            let Some(p) = p_it.next() else {
-                break;
-            };
-            let id = path.node();
-            let nn = stores.node_store.resolve(id);
-            use hyperast::types::TypeStore;
-            let t = stores.resolve_type(&id);
-            use hyperast::types::HyperType;
-            // dbg!(t.as_static_str());
-            if t.is_file() {
-                got_through(stores, n, path.clone(), p, p_it, 0, result);
-                // got_through_file(stores, n, path.clone(), p, p_it, 0, result);
-                continue 't;
-            }
-            use hyperast::types::WithChildren;
-            let cs = nn.children().unwrap();
-            let node = cs.get(p).unwrap();
-            path.goto(*node, p);
-        }
-
-        go_to_files(stores, &n.children, path, result);
+    for n in cs {
+        go_to_files_aux(stores, n, &path, result);
     }
+}
+
+pub(crate) fn go_to_files_aux<F>(stores: &Stores, n: &N, path: &P, result: &mut F)
+where
+    F: FnMut(&P, &NoSpaceWrapper<NodeIdentifier>, &N, NodeIdentifier) -> bool,
+{
+    let mut path = path.clone();
+    let mut p_it = n.action.path.ori.iter();
+    loop {
+        let Some(p) = p_it.next() else {
+            break;
+        };
+        let id = path.node();
+        let nn = stores.node_store.resolve(id);
+        use hyperast::types::TypeStore;
+        let t = stores.resolve_type(&id);
+        use hyperast::types::HyperType;
+        // dbg!(t.as_static_str());
+        if t.is_file() {
+            got_through(stores, n, path.clone(), p, p_it, 0, result);
+            // got_through_file(stores, n, path.clone(), p, p_it, 0, result);
+            return;
+        }
+        use hyperast::types::WithChildren;
+        let cs = nn.children().unwrap();
+        let node = cs.get(p).unwrap();
+        path.goto(*node, p);
+    }
+
+    go_to_files(stores, &n.children, path, result);
 }
 
 pub(crate) fn got_through<F>(

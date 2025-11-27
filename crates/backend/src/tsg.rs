@@ -1,15 +1,18 @@
-use crate::SharedState;
 use axum::Json;
+use serde::{Deserialize, Serialize};
+use std::{fmt::Debug, hash::Hash, ops::Deref, time::Instant};
+
 use hyperast::position::structural_pos::PersistedNode;
 use hyperast::store::nodes::legion::NodeStoreInner;
 use hyperast::types::{HyperAST, HyperASTShared, LendT, NodeId, RoleStore};
 use hyperast::types::{WithPrecompQueries, WithRoles, WithSerialization, WithStats};
 use hyperast_vcs_git::{SimpleStores, preprocessed::child_at_path};
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, hash::Hash, ops::Deref, time::Instant};
+
 use tree_sitter_graph::execution::lazy::execute_stmt_lazy;
 use tree_sitter_graph::graph::{NodeLending, NodesLending, QMatch, SyntaxNode, WithSynNodes};
 use tree_sitter_graph::{GenQuery, MatchLending, MatchesLending, MyQueryMatch};
+
+use crate::SharedState;
 
 #[derive(Deserialize, Clone)]
 pub struct Param {
@@ -18,12 +21,25 @@ pub struct Param {
     commit: String,
 }
 
+impl Param {
+    pub fn repo(&self) -> hyperast_vcs_git::git::Repo {
+        hyperast_vcs_git::git::Forge::Github.repo(&self.user, &self.name)
+    }
+}
+
 #[derive(Deserialize, Clone)]
 pub struct Content {
     pub language: String,
     pub query: String,
     pub commits: usize,
     pub path: Option<String>,
+}
+
+impl Content {
+    fn language(&self) -> Result<tree_sitter::Language, QueryingError> {
+        hyperast_vcs_git::resolve_language(&self.language)
+            .ok_or_else(|| QueryingError::MissingLanguage(self.language.clone()))
+    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -57,22 +73,16 @@ pub fn simple(
     path: Param,
 ) -> Result<Json<ComputeResults>, QueryingError> {
     let now = Instant::now();
-    let Param { user, name, commit } = path.clone();
+    let repo_spec = path.repo();
+    let Param { commit, .. } = path;
+    let language = query.language()?;
     let Content {
-        language: lang_name,
         query,
         commits,
         path,
+        ..
     } = query;
-    let language: tree_sitter::Language = hyperast_vcs_git::resolve_language(&lang_name)
-        .ok_or_else(|| QueryingError::MissingLanguage(lang_name.clone()))?;
-    let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
     let repo = (state.repositories.read().unwrap()).get_config(repo_spec.clone());
-    // let repo = (state.repositories.write().unwrap()).register_config_with_tsg(
-    //     repo_spec.clone(),
-    //     (),
-    //     Arc::new(""),
-    // );
     let repo = match repo {
         Some(repo) => repo,
         None => {
@@ -81,17 +91,14 @@ pub fn simple(
                 repo_spec.clone(),
                 hyperast_vcs_git::processing::RepoConfig::JavaMaven,
             );
+            // let repo = (state.repositories.write().unwrap()).register_config_with_tsg();
             log::error!("missing config for {}", repo_spec);
             configs.get_config(repo_spec.clone()).unwrap()
         }
     };
-    // .ok_or_else(|| ScriptingError::Other("missing config for repository".to_string()))?;
     let mut repo = repo.fetch();
     log::warn!("done cloning {}", &repo.spec);
-    let commits = state
-        .repositories
-        .write()
-        .unwrap()
+    let commits = (state.repositories.write().unwrap())
         .pre_process_with_limit(&mut repo, "", &commit, commits)
         .unwrap();
     let path = &path.unwrap_or_default();

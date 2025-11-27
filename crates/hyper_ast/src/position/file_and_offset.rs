@@ -27,6 +27,18 @@ impl<F, T: PrimInt> Position<F, T> {
         self.offset..(self.offset + self.len)
     }
 }
+impl<F: Eq, T: PrimInt> Position<F, T> {
+    pub fn try_merge(&mut self, other: Position<F, T>) {
+        if self.file != other.file {
+            log::warn!("trying to merge positions from different files");
+            return;
+        }
+        self.offset = self.offset.min(other.offset);
+        let end = self.offset + self.len;
+        let end = end.max(other.offset + other.len);
+        self.len = end - self.offset;
+    }
+}
 
 impl<F: std::ops::Deref, T: PrimInt> Position<F, T> {
     pub fn file(&self) -> &F::Target {

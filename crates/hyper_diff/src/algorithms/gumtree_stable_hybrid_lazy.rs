@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use super::CDS;
 use super::DiffRes;
-use crate::actions::script_generator2::ScriptGenerator;
+use crate::actions::script_generator3::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::{DefaultMultiMappingStore, MappingStore, VecStore};

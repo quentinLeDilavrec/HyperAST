@@ -1,27 +1,26 @@
 #![allow(unused)] // WIP
-/// inspired by the implementation in gumtree
-/// WIP
-use std::{
-    collections::HashSet,
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+//! inspired by the implementation in gumtree
+//! WIP
+
+use std::collections::HashSet;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
 
 use hyperast::PrimInt;
 use num_traits::{ToPrimitive, cast};
 
-use super::action_vec::ActionsVec;
-use crate::{
-    actions::Actions,
-    decompressed_tree_store::{
-        BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-        PostOrderIterable,
-    },
-    matchers::{Mapping, mapping_store::MonoMappingStore},
-    tree::tree_path::TreePath,
-    utils::sequence_algorithms::longest_common_subsequence,
-};
 use hyperast::types::{HyperAST, Labeled};
+
+use super::Actions;
+use super::action_vec::ActionsVec;
+
+use crate::decompressed_tree_store::{
+    BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
+    PostOrderIterable,
+};
+use crate::matchers::{Mapping, mapping_store::MonoMappingStore};
+use crate::tree::tree_path::TreePath;
+use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 #[derive(Clone)]
 pub struct ApplicablePath<P> {
@@ -254,12 +253,10 @@ where
         hast: HAST,
         mapping: &'a Mapping<SS, SD, M>,
     ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
-        Ok(
-            ScriptGenerator::new(hast, &mapping.src_arena, &mapping.dst_arena)
-                .init_cpy(&mapping.mappings)
-                .generate()?
-                .actions,
-        )
+        ScriptGenerator::new(hast, &mapping.src_arena, &mapping.dst_arena)
+            .init_cpy(&mapping.mappings)
+            .generate()
+            .map(|x| x.actions)
     }
 }
 // TODO split IdD in 2 to help typecheck ids
@@ -390,14 +387,10 @@ where
         dst_arena: &'a2 SD,
         ms: &'m M,
     ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
-        Ok(
-            ScriptGenerator::<'a1, 'a2, 'm, IdD, SS, SD, HAST, M, P>::new(
-                store, src_arena, dst_arena,
-            )
+        Self::new(store, src_arena, dst_arena)
             .init_cpy(ms)
-            .generate()?
-            .actions,
-        )
+            .generate()
+            .map(|x| x.actions)
     }
 
     pub fn precompute_actions(
@@ -655,7 +648,7 @@ where
                 } else {
                     // not changed
                     // and no changes to parents
-                    // postentially try to share/map parent in super ast
+                    // potentially try to share/map parent in super ast
                     if COMPRESSION {
                         todo!()
                     }

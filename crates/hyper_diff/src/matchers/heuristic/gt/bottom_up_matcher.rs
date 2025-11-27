@@ -167,11 +167,10 @@ where
             .filter(|x| !self.mappings.is_dst(x))
             .collect::<Vec<_>>();
 
-        let lcs = longest_common_subsequence::<_, _, usize, _>(
-            &src_children,
-            &dst_children,
-            |src, dst| cmp(self, src, dst),
-        );
+        let lcs: Vec<(usize, usize)> =
+            longest_common_subsequence(&src_children, &dst_children, |src, dst| {
+                cmp(self, src, dst)
+            });
         for x in lcs {
             let t1 = src_children.get(x.0).unwrap();
             let t2 = dst_children.get(x.1).unwrap();

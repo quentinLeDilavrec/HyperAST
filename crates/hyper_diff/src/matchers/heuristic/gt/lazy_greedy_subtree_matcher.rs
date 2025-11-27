@@ -234,7 +234,7 @@ where
     fn coef_parent(mapper: &Mapper<HAST, Dsrc, Ddst, M>, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
         let s1: Vec<_> = Dsrc::parents(&mapper.src_arena, l.0).collect();
         let s2: Vec<_> = Ddst::parents(&mapper.dst_arena, l.1).collect();
-        let common = longest_common_subsequence::<_, _, usize, _>(&s1, &s2, |a, b| {
+        let common: Vec<(usize, usize)> = longest_common_subsequence(&s1, &s2, |a, b| {
             // TODO directly do the kind+label comparison in hyperast to avoid some conversions
             let (t, l) = {
                 let o = mapper.src_arena.original(a);

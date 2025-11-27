@@ -197,7 +197,7 @@ where
     fn coef_parent(&self, l: &(M::Src, M::Dst)) -> f64 {
         let s1: Vec<_> = Dsrc::parents(&self.src_arena, l.0).collect();
         let s2: Vec<_> = Ddst::parents(&self.dst_arena, l.1).collect();
-        let common = longest_common_subsequence::<_, _, usize, _>(&s1, &s2, |a, b| {
+        let common: Vec<(usize, usize)> = longest_common_subsequence(&s1, &s2, |a, b| {
             let (t, l) = {
                 let o = self.src_arena.original(a);
                 let n = self.hyperast.node_store().resolve(&o);

@@ -94,11 +94,10 @@ where
             .collect::<Vec<_>>();
 
         use crate::utils::sequence_algorithms::longest_common_subsequence;
-        let lcs = longest_common_subsequence::<_, _, usize, _>(
-            &src_children,
-            &dst_children,
-            |src, dst| cmp(self, *src, *dst),
-        );
+        let lcs: Vec<(usize, usize)> =
+            longest_common_subsequence(&src_children, &dst_children, |src, dst| {
+                cmp(self, *src, *dst)
+            });
 
         for x in lcs {
             let t1 = src_children.get(x.0).unwrap();

@@ -103,11 +103,11 @@ pub fn longest_common_sequence<'a>(s1: &'a str, s2: &str) -> &'a str {
 //     longest_common_subsequence(s0,s1,ITree::isIsoStructuralTo)
 // }
 
-pub fn longest_common_subsequence<T1, T2, U: PrimInt, F: Fn(&T1, &T2) -> bool>(
+pub fn longest_common_subsequence<T1, T2, U1: PrimInt, U2: PrimInt, F: Fn(&T1, &T2) -> bool>(
     s0: &[T1],
     s1: &[T2],
     cmp: F,
-) -> Vec<(U, U)> {
+) -> Vec<(U1, U2)> {
     let mut lens: Vec<Vec<u32>> = vec![vec![0u32; s1.len() + 1]; s0.len() + 1]; // u32[s0.len() + 1][s1.len() + 1];
     for i in 0..s0.len() {
         //(s0.len()-1).min(0) {
@@ -123,11 +123,11 @@ pub fn longest_common_subsequence<T1, T2, U: PrimInt, F: Fn(&T1, &T2) -> bool>(
     extract_indexes(lens, s0.len(), s1.len())
 }
 
-pub fn extract_indexes<T: Eq, U: PrimInt>(
+pub fn extract_indexes<T: Eq, U1: PrimInt, U2: PrimInt>(
     lens: Vec<Vec<T>>,
     len1: usize,
     len2: usize,
-) -> Vec<(U, U)> {
+) -> Vec<(U1, U2)> {
     let mut indexes = vec![]; //new ArrayList<>();
     let mut x = len1;
     let mut y = len2;

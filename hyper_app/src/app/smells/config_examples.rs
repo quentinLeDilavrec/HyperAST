@@ -119,6 +119,9 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX: Example = Example {
     (identifier) (#EQ? "cast_expression")
     .
 ) @rm.all.full
+(predicate
+    (identifier) (#EQ? "eq")
+) @rm
 (named_node
     (identifier) (#EQ? "unary_expression")
     (named_node
@@ -264,10 +267,33 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX: Example = Example {
 )
 (named_node
     (identifier) (#EQ? "catch_clause")
+    (named_node
+        (identifier) (#EQ? "catch_formal_parameter")
+        (named_node
+            (identifier) (#EQ? "identifier")
+        )
+    ) @rm
+    (named_node
+        (identifier) (#EQ? "block")
+        .
+    )
+)
+(named_node
+    (identifier) (#EQ? "catch_clause")
+    (named_node
+        (identifier) (#EQ? "block")
+        (named_node
+            (identifier) (#EQ? "expression_statement") .
+        ) @rm
+    )
+)
+(named_node
+    (identifier) (#EQ? "catch_clause")
     .
     (named_node
         (identifier) (#EQ? "block")
-    ) @rm.all.full
+        .
+    ) @rm
 )
 (named_node
     (identifier) (#EQ? "argument_list")

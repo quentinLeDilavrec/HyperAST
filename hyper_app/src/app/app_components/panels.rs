@@ -96,14 +96,18 @@ impl crate::HyperApp {
                         if commit_resp.clicked() {
                             let repo = self.data.smells.repo().unwrap();
                             if let Some(proj) = self.data.selected_code_data.find(repo) {
-                                self.modal_handler_proj_or_commits.open_commits(
-                                    proj,
-                                    |data, cid| {
-                                        data.smells.set_commit_id(cid);
-                                    },
-                                );
+                                self.modal_handler_proj_or_commits
+                                    .open_commits(proj, smells::commit_modal_handler);
                             }
                         }
+                    } else if let super::Tab::SmellsPatternGraph(gid) = self.tabs[pane] {
+                        use crate::app::smells;
+                        smells::show_smells_graph_config(
+                            ui,
+                            &mut self.data.smells,
+                            self.data.smells_result.as_mut(),
+                            gid,
+                        );
                     } else if let super::Tab::LongTracking = self.tabs[pane] {
                         use crate::app::long_tracking;
                         let (proj_resp, commit_resp) =

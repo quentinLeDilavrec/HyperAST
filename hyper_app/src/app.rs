@@ -633,7 +633,9 @@ enum Tab {
     ProjectSelection(),
     LongTracking,
     Smells,
+    SmellsPatternGraph(u16),
     TSG,
+    TsgResultGraph,
     TreeAspect,
     CodeAspect,
     Empty,
@@ -672,8 +674,10 @@ impl Tab {
             Tab::MarkdownStatic(_) => "Markdown View".into(),
             Tab::MarkdownEdit(_) => "Markdown Edit".into(),
             Tab::Smells => "Smells".into(),
+            Tab::SmellsPatternGraph(id) => format!("Smells Graph {id}").into(),
             Tab::LongTracking => "Tracking".into(),
             Tab::TSG => "TSG".into(),
+            Tab::TsgResultGraph => "TSG Result Graph".into(),
             Tab::Querying => "Querying".into(),
             Tab::TreeAspect => "Tree Aspect".into(),
             Tab::CodeAspect => "Code Aspect".into(),
@@ -716,7 +720,12 @@ impl SelectedConfig {
                 // },
             ],
             SelectedConfig::Tsg => vec![Tab::TSG],
-            SelectedConfig::Smells => vec![Tab::Smells],
+            SelectedConfig::Smells => vec![
+                Tab::Smells,
+                Tab::SmellsPatternGraph(0),
+                Tab::SmellsPatternGraph(1),
+                Tab::SmellsPatternGraph(2),
+            ],
             SelectedConfig::Multi => vec![Tab::Commits],
             SelectedConfig::Diff => vec![Tab::Diff(0)],
             SelectedConfig::Tracking => vec![Tab::CodeTree(0)],
@@ -1142,7 +1151,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 format: ResultFormat::Table,
             } => {
                 let qres = self.data.queries_results.get_mut(*id);
-                let Some((proj_id, _qid, res)) = fun_name(ui, qres) else {
+                let Some((proj_id, _qid, res)) = extract_qres(ui, qres) else {
                     ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
@@ -1189,7 +1198,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 format: format @ ResultFormat::Hunks,
             } => {
                 let qres = self.data.queries_results.get_mut(*id);
-                let Some((&mut proj_id, &mut qid, _res)) = fun_name(ui, qres) else {
+                let Some((&mut proj_id, &mut qid, _res)) = extract_qres(ui, qres) else {
                     ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
@@ -1274,7 +1283,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 format: ResultFormat::Tree,
             } => {
                 let qres = self.data.queries_results.get_mut(*id);
-                let Some((&mut proj_id, &mut qid, _res)) = fun_name(ui, qres) else {
+                let Some((&mut proj_id, &mut qid, _res)) = extract_qres(ui, qres) else {
                     ui.error_label(format!("problem with query result {id:?}"));
                     return Default::default();
                 };
@@ -1433,14 +1442,42 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     ui,
                     &mut self.data.api_addr,
                     &mut self.data.smells,
-                    &mut (),
-                    &mut false,
                     &mut self.data.smells_result,
                     &mut self.data.smells_diffs_result,
                     &mut self.data.fetched_files,
                 );
                 Default::default()
             }
+            Tab::SmellsPatternGraph(gid) => {
+                ui.set_clip_rect(ui.available_rect_before_wrap());
+                match (self.data.smells_result.as_mut())
+                    .map(|prom| smells::prep_smells_results(ui, &mut self.data.smells, prom))
+                {
+                    Some(Ok(result)) => {
+                        if let Some(queries) = smells::access_smells_results(ui, result) {
+                            smells::show_smells_graph(
+                                ui,
+                                &self.data.api_addr,
+                                &mut self.data.smells,
+                                queries,
+                                *gid,
+                            );
+                        }
+                    }
+                    Some(Err(_resp)) => {
+                        // let conf = smells.commits.as_mut().unwrap();
+                        // let examples = smells.diffs.as_mut().unwrap();
+                        // show_examples(ui, api_addr, examples, fetched_files);
+                        // if resp.map_or(false, |r| r.clicked()) {
+                        //     *smells_result =
+                        //         Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+                        // }
+                    }
+                    _ => (),
+                }
+                Default::default()
+            }
+
             Tab::TSG => {
                 ui.set_clip_rect(ui.available_rect_before_wrap());
                 let mut trigger = false;
@@ -1453,11 +1490,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     &mut self.data.tsg_result,
                 );
                 if trigger {
-                    #[cfg(feature = "force_layout")]
-                    ui.memory_mut(|w| {
-                        w.data
-                            .remove::<Option<Arc<tsg::GraphTy>>>(egui::Id::new("force_graph"))
-                    });
                     self.data.tsg_result = Some(tsg::remote_compute_query(
                         ui.ctx(),
                         &self.data.api_addr,
@@ -1465,6 +1497,11 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         &mut self.data.tsg_context,
                     ));
                 }
+                Default::default()
+            }
+            Tab::TsgResultGraph => {
+                let selected_attr = &self.data.tsg.content.selected_attr;
+                tsg::show_result_graph(&mut self.data.tsg_result, ui, selected_attr);
                 Default::default()
             }
             Tab::LongTracking => {
@@ -1689,7 +1726,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 }
 
-fn fun_name<'a>(
+fn extract_qres<'a>(
     ui: &mut egui::Ui,
     qres: Option<&'a mut QueryResults>,
 ) -> Option<(
@@ -2598,6 +2635,8 @@ impl eframe::App for HyperApp {
                     &mut self.tree
                 };
 
+                // TODO tree.ui() uses a &mut dyn Behavior<Pane>,
+                // so we could has well split it for each config
                 let mut tile_tree = MyTileTreeBehavior {
                     data: &mut self.data,
                     tabs: &mut self.tabs,

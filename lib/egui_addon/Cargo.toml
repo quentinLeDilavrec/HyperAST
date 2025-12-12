@@ -13,11 +13,11 @@ egui_demo_lib = { version = "0.32.0", default-features = false, features = [
 ] }
 egui_extras = { version = "0.32.0", default-features = false }
 # egui_graphs = { version = "0.28.0", features = ["events"], optional = true }
-egui_graphs = { path = "../../../egui_graphs/crates/egui_graphs", features = ["events"], optional = true }
+egui_graphs = { git = "https://github.com/quentinLeDilavrec/egui_graphs", rev="9e83f82cb63f0733029de8c89950af27c8bac04f", features = ["events"], optional = true }
+# egui_graphs = { path = "../../../egui_graphs/crates/egui_graphs", features = ["events"], optional = true }
 
 accesskit = "0.19.0"
 
-# You only need serde if you want app persistence:
 serde = { version = "1", optional = true, features = ["derive"] }
 
 enum-map = { version = "2", features = ["serde"] }
@@ -37,10 +37,7 @@ syntect = { version = "5", features = [
 
 petgraph = { version = "0.8.3", optional = true }
 crossbeam = { version = "0.8", optional = true }
-# fdg = { git = "https://github.com/quentinLeDilavrec/fdg", rev = "", optional = true }
-# fdg = { version = "1.0.0", optional = true }
-fdg = { path = "../../../fdg", optional = true }
-
+# fjadra = { version = "0.2.1", optional = true }
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 poll-promise = { version = "0.3", default-features = false }
@@ -85,4 +82,4 @@ ts_highlight = [
     # "dep:tree-sitter",
     # "dep:web-tree-sitter-sg"
 ]
-force_layout = ["dep:egui_graphs", "dep:petgraph", "dep:crossbeam", "dep:fdg"]
+force_layout = ["dep:egui_graphs", "dep:petgraph", "dep:crossbeam"]

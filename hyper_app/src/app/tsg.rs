@@ -76,6 +76,18 @@ pub(crate) fn show_config(
             .interactive(true),
     )
     .on_disabled_hover_text("enable force_layout feature");
+
+    #[cfg(feature = "force_layout")]
+    {
+        let _id = "TSG force_graph";
+        let mut s = egui_addon::force_layout::get_anime_state(ui, Some(_id.to_string()));
+
+        egui_addon::force_layout::show_center_gravity_params(ui, &mut s.extras.0.params);
+        egui_addon::force_layout::show_fruchterman_reingold_params(ui, &mut s.base);
+
+        egui_addon::force_layout::set_layout_state(ui, s, Some(_id.to_string()));
+    }
+
     (resp_repo, resp_commit)
 }
 
@@ -143,7 +155,7 @@ pub(super) struct ComputeConfigQuery {
     config: Config,
     len: usize,
     path: String,
-    selected_attr: String,
+    pub selected_attr: String,
 }
 
 impl Default for ComputeConfigQuery {
@@ -294,11 +306,8 @@ pub(super) fn show_querying(
     }
 }
 
-#[cfg(feature = "force_layout")]
-pub(super) type GraphTy = egui_addon::force_layout::Simple<String, ()>;
-
 #[cfg(not(feature = "force_layout"))]
-fn show_result_graph(
+pub(crate) fn show_result_graph(
     querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
     ui: &mut egui::Ui,
     selected_attr: &str,
@@ -314,27 +323,34 @@ fn show_result_graph(
 }
 
 #[cfg(feature = "force_layout")]
-fn show_result_graph(
+pub(crate) fn show_result_graph(
     querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
     ui: &mut egui::Ui,
     selected_attr: &str,
 ) {
-    use crate::app::utils_results_batched::prep_compute_res_prom;
-    let Some(content) = prep_compute_res_prom(querying_result, ui) else {
+    pub(super) type GraphTy = egui_addon::force_layout::PrettyGraph<String, ()>;
+
+    use crate::app::utils_results_batched::prep_compute_res_prom_mut;
+    let Some(content) = prep_compute_res_prom_mut(querying_result, ui) else {
         return;
     };
     type Ty = GraphTy;
 
-    let id = egui::Id::new("force_graph");
+    let _id = "TSG force_graph";
+    let id = egui::Id::new(_id);
 
-    let mut app = ui.memory_mut(|w| w.data.get_temp_mut_or_default::<Option<Arc<Ty>>>(id).take());
-    if app.is_none() {
+    let Some(content) = content.as_mut().ok() else {
+        ui.label("no data to show yet");
+        ui.label("42");
+        return;
+    };
+
+    let g: &mut Ty = if let Some(g) = content.graph.as_mut() {
+        g.downcast_mut::<Ty>().unwrap()
+    } else {
         use egui_addon::force_layout::*;
         let mut g = simple_pet_graph();
-        if let Some(content) = (content.as_ref().ok())
-            .and_then(|x| x.results.first())
-            .and_then(|x| x.as_ref().ok())
-        {
+        if let Some(content) = content.results.first().and_then(|x| x.as_ref().ok()) {
             let content = &content.inner.result;
 
             let content = content.as_array().unwrap();
@@ -379,42 +395,26 @@ fn show_result_graph(
                 simple_add_edge(&mut g, *n1, *n2);
             }
         }
-        let mut graph = to_graph(&g.into());
-        let settings_simulation = Default::default();
-        let (force, sim) = force_sim(&settings_simulation, &mut graph);
-        app = Some(Arc::new(Ty::new(
-            Default::default(),
-            settings_simulation,
-            graph,
-            force,
-            sim,
-        )));
-    }
+        let graph: Ty = to_graph(&g.into());
+        content.graph = Some(Box::new(graph));
+        (content.graph.as_mut().unwrap())
+            .downcast_mut::<Ty>()
+            .unwrap()
+    };
     egui::CollapsingHeader::new("Results (Graph)")
         .default_open(true)
         .show(ui, |ui| {
-            let arc: &mut Arc<_> = app.as_mut().unwrap();
-            let g = Arc::get_mut(arc).unwrap();
-            {
-                let ui = &mut ui.new_child(egui::UiBuilder::new().max_rect(ui.max_rect()));
-                g.show_graph(ui);
-            }
-            egui::CollapsingHeader::new("Widget")
-                .default_open(false)
-                .show(ui, |ui| {
-                    g.show_section_widget(ui);
-                });
-            egui::CollapsingHeader::new("Simulation")
-                .default_open(false)
-                .show(ui, |ui| {
-                    g.show_section_simulation(ui);
-                });
-            // Arc::get_mut(arc).unwrap().show(ui.ctx()); // need full screen
+            let mut view = egui_addon::force_layout::AnimatedGraphView::<String, _, _, _>::new(g)
+                .with_id(Some(_id.to_string()))
+                // .with_interactions(settings_interaction)
+                // .with_navigations(settings_navigation)
+                // .with_styles(settings_style)
+            ;
+
+            ui.add(&mut view);
         });
 
-    ui.memory_mut(|w| {
-        *w.data.get_temp_mut_or_default::<Option<Arc<Ty>>>(id) = app;
-    });
+
 }
 
 fn handle_interactions(

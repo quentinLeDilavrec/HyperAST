@@ -541,8 +541,6 @@ impl super::HyperApp {
                         ui,
                         api_addr,
                         smells,
-                        smells_context,
-                        &mut trigger_compute,
                         smells_result,
                         smells_diffs_result,
                         fetched_files,

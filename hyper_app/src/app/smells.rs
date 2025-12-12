@@ -34,7 +34,6 @@
 //! https://github.com/Marcono1234/gson/commit/3d241ca0a6435cbf1fa1cdaed2af8480b99fecde
 //! about fixing try catches in tests
 
-use itertools::Itertools;
 use std::hash::Hash;
 use std::ops::{Range, SubAssign};
 use wasm_rs_dbg::dbg;
@@ -113,6 +112,14 @@ pub(crate) fn project_modal_handler(
     super::ProjectId::INVALID
 }
 
+pub(crate) fn commit_modal_handler(data: &mut super::AppData, cid: super::types::CommitId) {
+    data.smells.set_commit_id(cid);
+    data.smells.diffs = None;
+    data.smells.bads = None;
+    data.smells_result = None;
+    data.smells_diffs_result = None;
+}
+
 // pub(crate) type Config = Sharing<ComputeConfigQuery>;
 #[derive(serde::Deserialize, serde::Serialize)]
 pub(crate) struct Config {
@@ -122,7 +129,173 @@ pub(crate) struct Config {
     pub(crate) stats: Option<Vec<(types::CodeRange, types::CodeRange)>>,
     pub(crate) bad_matches_bounds: std::ops::RangeInclusive<usize>,
     pub(crate) bads: Option<Vec<usize>>,
+    #[cfg(feature = "force_layout")]
+    #[serde(skip)]
+    graph_view_settings: Vec<GVSetting>,
+    #[cfg(feature = "force_layout")]
+    #[serde(skip)]
+    prepared_graphs: Vec<Option<Box<dyn std::any::Any + Send + Sync>>>,
 }
+#[cfg(feature = "force_layout")]
+struct GVSetting {
+    fit_to_screen_enabled: bool,
+    view_mode: ViewMode,
+    limit: usize,
+    pretty_nodes: usize,
+    selected_nodes: Vec<u32>,
+    pretty_queued: Vec<u32>,
+    too_general: Vec<u32>,
+}
+
+#[cfg(feature = "force_layout")]
+#[derive(PartialEq)]
+enum ViewMode {
+    /// only show the statistics of the lattice
+    StatisticsOnly,
+    /// examples as documents and tops as attributes
+    ExampleTopsBiGraph,
+    /// most expensive to render, can be impractical with many nodes (> 1000s)
+    FullGraph,
+}
+
+#[cfg(feature = "force_layout")]
+impl Default for GVSetting {
+    fn default() -> Self {
+        Self {
+            fit_to_screen_enabled: true,
+            view_mode: ViewMode::ExampleTopsBiGraph,
+            limit: 3000,
+            pretty_nodes: 20,
+            selected_nodes: vec![],
+            pretty_queued: vec![],
+            too_general: vec![],
+        }
+    }
+}
+
+#[cfg(feature = "force_layout")]
+struct ExIt<'g> {
+    content: &'g G,
+    ex_curr: u32,
+    ex_offset: usize,
+    it: std::ops::Range<usize>,
+    i: Option<usize>,
+}
+#[derive(Clone, Copy)]
+struct ExSet(u64);
+impl ExSet {
+    fn len(&self) -> u32 {
+        self.0.count_ones()
+    }
+    fn iter(&self) -> impl Iterator<Item = u32> {
+        (0..64).filter(|&i| self.0 & (1 << i) != 0)
+    }
+}
+impl std::fmt::Display for ExSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0 == 0 {
+            Ok(())
+        } else {
+            write!(f, "{}", self.len())
+        }
+    }
+}
+impl std::ops::BitOrAssign for ExSet {
+    fn bitor_assign(&mut self, other: Self) {
+        self.0 |= other.0;
+    }
+}
+impl<'a> ExIt<'a> {
+    fn new(content: &'a G) -> Self {
+        Self {
+            ex_curr: 0,
+            ex_offset: 0,
+            it: (0..content.queries.len()).into_iter(),
+            content,
+            i: None,
+        }
+    }
+    fn next_exset(&mut self) -> Option<ExSet> {
+        self.next_agg(|inits, i| inits | (1 << i)).map(ExSet)
+    }
+    fn next_agg<R: Default>(&mut self, f: impl Fn(R, usize) -> R) -> Option<R> {
+        let mut inits = R::default();
+        while let Some(ex_offset) = self.next()? {
+            // wasm_rs_dbg::dbg!(ex_offset);
+            inits = f(inits, ex_offset);
+        }
+        Some(inits)
+
+        // let i = self.it.next()?;
+        // loop {
+        //     if self.ex_curr as usize == i {
+        //         inits = f(inits, self.ex_offset);
+        //         self.ex_offset += 1;
+        //         if self.ex_offset >= self.content.ex_query.len() {
+        //             break;
+        //         }
+        //         self.ex_curr += self.content.ex_query[self.ex_offset];
+        //     } else if (self.ex_curr as usize) < i {
+        //         if self.ex_offset >= self.content.ex_query.len() {
+        //             break;
+        //         }
+        //         self.ex_curr += self.content.ex_query[self.ex_offset];
+        //     } else {
+        //         break;
+        //     }
+        // }
+        // Some(inits)
+    }
+}
+
+#[cfg(feature = "force_layout")]
+impl Iterator for ExIt<'_> {
+    type Item = Option<usize>;
+    fn next(&mut self) -> Option<Option<usize>> {
+        let i = if let Some(i) = self.i {
+            i
+        } else {
+            self.i = self.it.next();
+            self.i?
+        };
+        if self.ex_curr as usize == i {
+            let ex_offset = Some(self.ex_offset);
+            self.ex_offset += 1;
+            if self.ex_offset >= self.content.ex_query.len() {
+                self.i = None;
+                return Some(ex_offset);
+            }
+            self.ex_curr += self.content.ex_query[self.ex_offset];
+            Some(ex_offset)
+        } else if (self.ex_curr as usize) < i {
+            if self.ex_offset >= self.content.ex_query.len() {
+                return Some(None);
+            }
+            self.ex_curr += self.content.ex_query[self.ex_offset];
+            self.next()
+        } else {
+            self.i = None;
+            Some(None)
+        }
+    }
+}
+
+#[derive(Clone)]
+struct Payload {
+    pretty: String,
+    inits: ExSet,
+}
+
+#[cfg(feature = "force_layout")]
+impl egui_addon::force_layout::FlexPayload for Payload {
+    fn primary(&self) -> impl std::fmt::Display + '_ {
+        &self.pretty
+    }
+    fn secondary(&self) -> impl std::fmt::Display + '_ {
+        self.inits
+    }
+}
+
 impl Config {
     pub(crate) fn set_commit_id(&mut self, cid: CommitId) {
         self.commits.as_mut().expect("query config").commit.id = cid;
@@ -142,6 +315,10 @@ impl Default for Config {
             stats: None,
             bad_matches_bounds: std::ops::RangeInclusive::new(0, 0),
             bads: Default::default(),
+            #[cfg(feature = "force_layout")]
+            graph_view_settings: Default::default(),
+            #[cfg(feature = "force_layout")]
+            prepared_graphs: Default::default(),
         }
     }
 }
@@ -173,6 +350,25 @@ pub struct G {
     /// * each succ is encoded as the difference with prev succ
     ///   * when first the index of the node is the one subtracted from succ
     succ: Vec<u32>,
+    /// not necessarily there
+    queries_pretty: Vec<String>,
+    /// pretty printed examples
+    pub ex_pretty: Vec<String>,
+    /// query associated to pretty printed examples
+    ///
+    /// same size as ex_pretty, sorted, and delta encoded similarly to succ,
+    /// but here an example has exactly one associated query
+    pub ex_query: Vec<u32>,
+}
+impl G {
+    fn pretty_or_id(&self, id: usize) -> String {
+        let pretty_payload = self.queries_pretty.get(id);
+        pretty_payload.map_or_else(|| self.queries[id].to_string(), |x| x.to_string())
+    }
+
+    fn iter_successors<'a>(&'a self) -> impl Iterator<Item = &'a [u32]> {
+        self.succ.split(|x| *x == 0)
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -314,8 +510,6 @@ pub(super) fn show_central_panel(
     ui: &mut egui::Ui,
     api_addr: &str,
     smells: &mut Config,
-    _smells_editors: &mut Context,
-    _trigger_compute: &mut bool,
     smells_result: &mut Option<RemoteResult>,
     smells_diffs_result: &mut Option<RemoteResultDiffs>,
     fetched_files: &mut FetchedFiles,
@@ -327,13 +521,34 @@ pub(super) fn show_central_panel(
         todo!();
     }
     let mut show_action_menu = true;
-    if let Some(promise) = smells_result {
-        if let Some(value) = show_smells_result(ui, api_addr, smells, fetched_files, promise) {
-            *smells_result = Some(value)
-        } else {
-            show_action_menu = false;
-            // return;
+    match (smells_result.as_mut()).map(|prom| prep_smells_results(ui, smells, prom)) {
+        Some(Ok(result)) => {
+            if let Some(queries) = access_smells_results(ui, result) {
+                if let Err(value) = show_smells_result(ui, api_addr, smells, fetched_files, queries)
+                {
+                    #[cfg(feature = "force_layout")]
+                    for gid in 0..queries.graphs.len() {
+                        let id = format!("force_graph_patterns{}", gid);
+                        egui_addon::force_layout::reset(ui, Some(id))
+                    }
+                    smells.prepared_graphs.clear();
+                    *smells_result = Some(value)
+                } else {
+                    show_action_menu = false;
+                }
+            } else {
+                show_action_menu = false;
+            }
         }
+        Some(Err(resp)) => {
+            let conf = smells.commits.as_mut().unwrap();
+            let examples = smells.diffs.as_mut().unwrap();
+            show_examples(ui, api_addr, examples, fetched_files);
+            if resp.map_or(false, |r| r.clicked()) {
+                *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+            }
+        }
+        _ => (),
     }
     if let Some(promise) = smells_diffs_result {
         let Some(result) = promise.ready() else {
@@ -375,6 +590,16 @@ pub(super) fn show_central_panel(
         let len = examples.examples.len();
         if len == 0 {
             ui.colored_label(ui.visuals().error_fg_color, "No changes found");
+            if show_action_menu {
+                egui::Window::new("Diff Error").show(ui.ctx(), |ui| {
+                    if ui.button("retry").clicked() {
+                        *smells_diffs_result = None;
+                    }
+                });
+                if ui.button("retry").clicked() {
+                    *smells_diffs_result = None;
+                }
+            }
             return;
         }
         let conf = smells.commits.as_mut().unwrap();
@@ -408,52 +633,1002 @@ pub(super) fn show_central_panel(
     }
 }
 
-fn show_smells_result(
+#[cfg(not(feature = "force_layout"))]
+pub(crate) fn show_smells_graph_config(
+    ui: &mut egui::Ui,
+    smells: &mut Config,
+    result: &Result<Resource<Result<SearchResults, SmellsError>>, String>,
+    gid: u16,
+) {
+    ui.label("enable force_layout feature")
+}
+
+#[cfg(feature = "force_layout")]
+type GraphTy = egui_addon::force_layout::PrettyGraph<Payload, ()>;
+
+#[cfg(feature = "force_layout")]
+pub(crate) fn show_smells_graph_config(
+    ui: &mut egui::Ui,
+    smells: &mut Config,
+    smells_result: Option<&mut RemoteResult>,
+    // result: &Result<Resource<Result<SearchResults, SmellsError>>, String>,
+    // queries: &SearchResults,
+    gid: u16,
+) {
+    use re_ui::UiExt;
+
+    let gid = gid as usize;
+    if smells.graph_view_settings.len() <= gid {
+        smells
+            .graph_view_settings
+            .resize_with(gid + 1, || Default::default());
+    }
+    let graph_view_settings = &mut smells.graph_view_settings[gid];
+
+    let selected = &mut graph_view_settings.fit_to_screen_enabled;
+    ui.toggle_value(selected, "fit to screen");
+    let view_mode = &mut graph_view_settings.view_mode;
+    ui.selectable_toggle(|ui| {
+        ui.selectable_value(view_mode, ViewMode::StatisticsOnly, "Stats");
+        ui.selectable_value(view_mode, ViewMode::ExampleTopsBiGraph, "Ex-Tops");
+        ui.selectable_value(view_mode, ViewMode::FullGraph, "Full");
+    });
+    ui.label("node limit:");
+    ui.add(
+        egui::Slider::new(&mut graph_view_settings.limit, 0..=4000)
+            .integer()
+            .clamping(egui::SliderClamping::Never),
+    );
+    ui.label("pretty nodes:");
+    ui.add(
+        egui::Slider::new(&mut graph_view_settings.pretty_nodes, 0..=1000)
+            .integer()
+            .clamping(egui::SliderClamping::Never),
+    );
+
+    let _id = format!("force_graph_patterns{}", gid);
+
+    let mut s = egui_addon::force_layout::get_anime_state(ui, Some(_id.to_string()));
+
+    egui_addon::force_layout::show_center_gravity_params(ui, &mut s.extras.0.params);
+    egui_addon::force_layout::show_fruchterman_reingold_params(ui, &mut s.base);
+    egui_addon::force_layout::show_pinning_params(ui, &mut s.extras.1.0.params);
+    // egui_addon::force_layout::pin_node(&mut s.extras.1.0.params, 0);
+
+    egui_addon::force_layout::set_layout_state(ui, s, Some(_id.to_string()));
+
+    let g = smells_result
+        .and_then(|x| x.ready())
+        .and_then(|x| x.as_ref().ok())
+        .and_then(|x| x.content.as_ref())
+        .and_then(|x| x.as_ref().ok());
+
+    ui.label("too general:");
+    ui.group(|ui| {
+        let g = g.and_then(|g| g.graphs.get(gid));
+        for (i, id) in graph_view_settings.too_general.iter().enumerate() {
+            if ui
+                .button(format!("{}", id))
+                .on_hover_ui(|ui| {
+                    if let Some(g) = g {
+                        let pretty = &g.queries_pretty[*id as usize];
+                        ui.label(pretty);
+                    }
+                })
+                .clicked()
+            {}
+            ui.separator();
+        }
+    });
+    ui.label("queued prettifications:");
+    ui.horizontal_wrapped(|ui| {
+        let g = g.and_then(|g| g.graphs.get(gid));
+        let mut to_add = vec![];
+        for (i, id) in graph_view_settings.pretty_queued.iter().enumerate() {
+            if ui
+                .button(format!("{}", id))
+                .on_hover_ui(|ui| {
+                    if let Some(g) = g {
+                        let pretty = &g.queries_pretty[*id as usize];
+                        ui.label(pretty);
+                    }
+                })
+                .clicked()
+            {
+                to_add.push(i);
+            }
+            ui.separator();
+        }
+        if let Some(i) = to_add.pop() {
+            let x = graph_view_settings.pretty_queued.remove(i);
+            let content = g.unwrap();
+            if let Some(_pg) = &mut smells.prepared_graphs[gid] {
+                let pg = _pg.downcast_mut::<GraphTy>().unwrap();
+                handle_new_tops(content, pg, vec![x.into()], 4);
+            }
+        }
+    });
+    ui.label("selected nodes:");
+    ui.group(|ui| {
+        // TODO could move expensive computations to selection detection
+        let mut to_deselect = vec![];
+        let mut s = egui_addon::force_layout::get_anime_state(ui, Some(_id.to_string()));
+        let mut node_pinning = &mut s.extras.1.0.params;
+        // let mut node_pinning_iter = s.extras.1.0.params.iter_pinning();
+        let mut has_toggled_pin = false;
+        // egui_addon::force_layout::pin_node(node_pinning, 0);
+        for (i, &n) in graph_view_settings.selected_nodes.iter().enumerate() {
+            // let _pinned = node_pinning_iter.is_pinned();
+            let _pinned = node_pinning.is_pinned(n);
+            let pinned = &mut _pinned.clone();
+            show_pattern_details(
+                smells.prepared_graphs.get_mut(gid).and_then(|x| x.as_mut()),
+                g.and_then(|g| g.graphs.get(gid)),
+                ui,
+                &mut to_deselect,
+                &mut graph_view_settings.pretty_queued,
+                &mut graph_view_settings.too_general,
+                i,
+                n,
+                pinned,
+            );
+            ui.separator();
+            if _pinned != *pinned {
+                has_toggled_pin = true;
+                node_pinning.pin_node(n);
+                // node_pinning_iter.toggle_node();
+            }
+            // node_pinning_iter.next_node();
+        }
+        if has_toggled_pin {
+            egui_addon::force_layout::set_layout_state(ui, s, Some(_id.to_string()));
+        }
+        if to_deselect.len() > 0 {
+            if to_deselect.len() > 1 {
+                to_deselect.sort();
+                to_deselect.reverse(); // avoids shifting this way
+            }
+            for i in to_deselect {
+                graph_view_settings.selected_nodes.remove(i);
+            }
+        }
+    });
+}
+
+#[cfg(feature = "force_layout")]
+fn show_pattern_details(
+    prepared_graph: Option<&mut Box<dyn std::any::Any + Send + Sync>>,
+    raw_graph: Option<&G>,
+    ui: &mut egui::Ui,
+    to_deselect: &mut Vec<usize>,
+    pretty_queued: &mut Vec<u32>,
+    too_general: &mut Vec<u32>,
+    i: usize,
+    n: u32,
+    pinned: &mut bool,
+) {
+    if let Some(_pg) = prepared_graph {
+        let pg = _pg.downcast_ref::<GraphTy>().unwrap();
+        let Some(nn) = pg.node(n.into()).map(|x| x.id()) else {
+            return;
+        };
+        ui.label(format!("pattern {n} {}", nn.index()));
+
+        use egui_addon::force_layout::petgraph;
+        ui.horizontal_wrapped(|ui| {
+            let Some(w) = pg.g().node_weight(n.into()) else {
+                return;
+            };
+            let payload = w.payload();
+            ui.label("matches: 42").on_hover_text(
+                "number of matches found for this pattern when searching given commit",
+            );
+            ui.label(format!("inits: {}", payload.inits))
+                .on_hover_text("number of initial generated patterns leading to this one");
+            ui.label("tops: 42")
+                .on_hover_text("number of top generalized patterns reachable from this one");
+        });
+        let neib_count = |dir| pg.g().neighbors_directed(n.into(), dir).count();
+        let specialized = neib_count(petgraph::Outgoing);
+        let generalized = neib_count(petgraph::Incoming);
+        ui.label(format!("{generalized}-->|pattern {n}|-->{specialized}",))
+            .on_hover_text("<number of generalized patterns>-->selected pattern--><number of specialized pattern>");
+        // let pinned = pg.node(n.into()).map_or(false, |x| x.display().pinned());
+        let pin_label = if *pinned { "unpin" } else { "pin" };
+        let [general, ignore, pin] = ui
+            .horizontal_wrapped(|ui| ["too general", "ignore", pin_label].map(|txt| ui.button(txt)))
+            .inner;
+        if general.clicked() {
+            let pg = _pg.downcast_mut::<GraphTy>().unwrap();
+            log::info!("pattern {n} deemed too general");
+            if let Some(rg) = raw_graph {
+                to_deselect.push(i);
+                too_general.push(i as u32);
+                let content = rg;
+                handle_top_too_general(pg, n as usize, |g, ids| {
+                    let remaining = handle_new_tops(content, g, ids, 8);
+                    pretty_queued.extend(remaining);
+                });
+            }
+        }
+        if ignore.clicked() {
+            log::info!("ignore pattern {n} and descendants only having it as top");
+        }
+        if pin.clicked() {
+            *pinned = !*pinned;
+            // let pg = _pg.downcast_mut::<GraphTy>().unwrap();
+            // if let Some(n) = pg.node_mut(n.into()) {
+            // if pinned {
+            //     n.display_mut().unpin();
+            // } else {
+            //     n.display_mut().pin();
+            // }
+            // }
+            log::info!("pin/unpin pattern {n}");
+        }
+    } else {
+        ui.label(format!("pattern {n}"));
+    }
+    if let Some(rg) = raw_graph {
+        if let Some(pretty) = &rg.queries_pretty.get(n as usize) {
+            ui.label(*pretty);
+        }
+    }
+}
+
+fn handle_new_tops(
+    content: &G,
+    g: &mut egui_addon::force_layout::PrettyGraph<Payload>,
+    mut ids: Vec<egui_addon::force_layout::petgraph::prelude::NodeIndex>,
+    max: usize,
+) -> Vec<u32> {
+    ids.sort_by_key(|id| g.node_mut(*id).unwrap().payload_mut().inits.len());
+    let mut _new_tops = ids.into_iter().rev();
+    let new_tops: Vec<_> = ((0..max).filter_map(|_| _new_tops.next()))
+        .map(|id| {
+            let payload = g.node_mut(id).unwrap().payload_mut();
+            let pretty = content.pretty_or_id(id.index());
+            payload.pretty = pretty;
+            id
+        })
+        .collect();
+    use egui_addon::force_layout::petgraph;
+    for x in new_tops {
+        // now update the display to reflect new payload
+        use egui_addon::force_layout::DisplayNode;
+        let props = g.node_mut(x).unwrap().props().clone();
+        DisplayNode::<_, (), petgraph::Directed, u32>::update(
+            g.node_mut(x).unwrap().display_mut(),
+            &props,
+        );
+    }
+    _new_tops.map(|x| x.index() as u32).collect()
+}
+
+#[cfg(not(feature = "force_layout"))]
+pub(crate) fn show_smells_graph(
+    ui: &mut egui::Ui,
+    api_addr: &str,
+    smells: &mut Config,
+    queries: &SearchResults,
+    gid: u16,
+) {
+    ui.label("enable force_layout feature")
+}
+
+#[cfg(feature = "force_layout")]
+pub(crate) fn show_smells_graph(
+    ui: &mut egui::Ui,
+    _api_addr: &str,
+    smells: &mut Config,
+    queries: &SearchResults,
+    gid: u16,
+) {
+    let gid = gid as usize;
+
+    if smells.prepared_graphs.len() <= gid {
+        smells.prepared_graphs.resize_with(gid + 1, || None);
+    }
+    if smells.graph_view_settings.len() <= gid {
+        smells
+            .graph_view_settings
+            .resize_with(gid + 1, || Default::default());
+    }
+    let graph_view_setting = &mut smells.graph_view_settings[gid];
+    match graph_view_setting.view_mode {
+        ViewMode::StatisticsOnly => {
+            let content = &queries.graphs[gid];
+            ui.label(format!("Number of patterns: {}", content.queries.len()));
+            ui.label(format!("Number of examples: {}", content.ex_pretty.len()));
+        }
+        ViewMode::ExampleTopsBiGraph => {
+            // let _id = format!("force_bigraph_ex_tops{}", gid);
+            let _id = format!("force_graph_patterns{}", gid);
+            let prepared_graph = &mut smells.prepared_graphs[gid];
+            let content = &queries.graphs[gid];
+            show_bigraph(ui, _id, prepared_graph, content, graph_view_setting);
+        }
+        ViewMode::FullGraph => {
+            let _id = format!("force_graph_patterns{}", gid);
+            let prepared_graph = &mut smells.prepared_graphs[gid];
+            let content = &queries.graphs[gid];
+            show_full_graph(ui, _id, prepared_graph, content, graph_view_setting);
+        }
+    }
+}
+#[cfg(feature = "force_layout")]
+fn show_bigraph(
+    ui: &mut egui::Ui,
+    id: String,
+    prepared_graph: &mut Option<Box<dyn std::any::Any + Send + Sync>>,
+    content: &G,
+    graph_view_setting: &mut GVSetting,
+) {
+    let g: &mut GraphTy = if let Some(g) = prepared_graph.as_mut() {
+        g.downcast_mut::<GraphTy>().unwrap()
+    } else {
+        let _g = build_bigraph(
+            content,
+            graph_view_setting,
+            &[],
+            &mut egui_addon::force_layout::simple_pet_graph(),
+        );
+        // use egui_addon::force_layout::*;
+        // let g: GraphTy = to_graph(&_g.into());
+        let mut g: GraphTy = GraphTy::new(Default::default());
+        *g.g_mut() = _g;
+        *prepared_graph = Some(Box::new(g));
+        (prepared_graph.as_mut().unwrap())
+            .downcast_mut::<GraphTy>()
+            .unwrap()
+    };
+
+    let mut _s = egui_addon::force_layout::GVSettings::default();
+    _s.1 = _s.1.with_zoom_and_pan_enabled(true);
+    _s.1 =
+        _s.1.with_fit_to_screen_enabled(graph_view_setting.fit_to_screen_enabled);
+    _s.0 = _s.0.with_node_selection_enabled(true);
+
+    let settings_interaction = &_s.0;
+    let settings_navigation = &_s.1;
+    let settings_style = &_s.2;
+
+    let events = std::rc::Rc::<std::cell::RefCell<Vec<Event>>>::default();
+    use egui_addon::force_layout::Event;
+    let mut view = egui_addon::force_layout::AnimatedGraphView::<Payload, _, _, _>::new(g)
+        .with_id(Some(id.clone()))
+        .with_interactions(settings_interaction)
+        .with_navigations(settings_navigation)
+        .with_styles(settings_style)
+        .with_event_sink(&events);
+    ui.add(&mut view);
+    for event in events.take() {
+        match event {
+            Event::NodeSelect(e) => {
+                let x = e.id as u32;
+                wasm_rs_dbg::dbg!(e.id);
+                if !graph_view_setting.selected_nodes.contains(&x) {
+                    graph_view_setting.selected_nodes.push(x);
+                }
+                // if let Some(n) = g.node_mut(x.into()) {
+                //     n.display_mut().pin();
+                // }
+                let mut s = egui_addon::force_layout::get_anime_state(ui, Some(id.to_string()));
+                s.extras.1.0.params.pin_node(x);
+                egui_addon::force_layout::set_layout_state(ui, s, Some(id.to_string()));
+            }
+            Event::NodeDeselect(e) => {
+                wasm_rs_dbg::dbg!(e.id);
+                if let Some(i) = graph_view_setting
+                    .selected_nodes
+                    .iter()
+                    .position(|x| *x == e.id as u32)
+                {
+                    graph_view_setting.selected_nodes.remove(i);
+                }
+            }
+            Event::NodeDoubleClick(e) => {
+                graph_view_setting.too_general.push(e.id as u32);
+                let pretty_queued = &mut graph_view_setting.pretty_queued;
+                handle_top_too_general(g, e.id, |g, ids| {
+                    let remaining = handle_new_tops(content, g, ids, usize::MAX);
+                    pretty_queued.extend(remaining);
+                });
+                // use egui_addon::force_layout::*;
+                // egui_graphs::Node::new(payload);
+                *g.g_mut() = build_bigraph(
+                    content,
+                    graph_view_setting,
+                    graph_view_setting.too_general.as_ref(),
+                    g.g_mut(),
+                );
+                // let g = build_bigraph(content, graph_view_setting, &[e.id as u32]);
+                // let g: GraphTy = to_graph(&g.into());
+                // *prepared_graph = Some(Box::new(g));
+                // return;
+            }
+            Event::NodeClick(e) => {
+                let x = e.id as u32;
+                let mut s = egui_addon::force_layout::get_anime_state(ui, Some(id.to_string()));
+                s.extras.1.0.params.pin_node(x);
+                egui_addon::force_layout::set_layout_state(ui, s, Some(id.to_string()));
+                // if let Some(n) = g.node_mut(x.into()) {
+                //     if n.display_mut().pinned() {
+                //         n.display_mut().unpin();
+                //     }
+                // }
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(feature = "force_layout")]
+fn build_bigraph(
+    content: &G,
+    graph_view_settings: &GVSetting,
+    too_general_list: &[u32],
+    old_g: &mut egui_addon::force_layout::PrettyGraphInner<Payload>,
+) -> egui_addon::force_layout::PrettyGraphInner<Payload> {
+    use egui_addon::force_layout::*;
+    let mut g: PrettyGraphInner<Payload> = simple_pet_graph();
+    // let limit = graph_view_settings.limit;
+    let limit = usize::MAX;
+    let mut ex_it = ExIt::new(content);
+    let succs = content.iter_successors().enumerate().take(limit);
+    let mut pretty_count = 0;
+    // in reverse topo order, go from bots to tops
+    wasm_rs_dbg::dbg!(content.queries_pretty.len());
+    wasm_rs_dbg::dbg!(content.queries.len());
+    let mut waiting_inits = vec![ExSet(0); content.queries.len().min(limit)];
+    let mut ex2init = vec![];
+    let mut ex2top: Vec<(u32, petgraph::graph::NodeIndex)> = vec![];
+    let mut to_remove = vec![];
+    let mut new_top_candidates = vec![];
+
+    for (x, succ) in succs {
+        let inits = ex_it.next_exset().unwrap();
+        let mut i = x as u32;
+        let mut all_too_general = true;
+        for &succ in succ {
+            i += succ;
+            if !too_general_list.contains(&i) {
+                all_too_general = false;
+            }
+            if i as usize >= limit {
+                break;
+            }
+            let i = i as usize;
+            // let x = (x as u32).into();
+            // simple_add_edge(&mut g, i, x);
+            waiting_inits[x] |= inits;
+            let curr = waiting_inits[x];
+            waiting_inits[i as usize] |= curr;
+        }
+        if x >= limit {
+            break;
+        }
+
+        assert!(!(inits.len() > 0 && succ.is_empty()), "need to factor");
+        // NOTE probably only happens in trivial cases that are not very interesting
+
+        if inits.len() > 0 {
+            let s = "".to_string();
+            let direct_ex = inits;
+            let inits = waiting_inits[x];
+            let i = g.add_node(egui_graphs::Node::new(Payload { pretty: s, inits }));
+            g.node_weight_mut(i).unwrap().set_id(i);
+            if let Some(old_n) = old_g.node_weight(i) {
+                g.node_weight_mut(i).unwrap().set_location(old_n.location());
+            }
+            for _ in 0..direct_ex.len() {
+                // wasm_rs_dbg::dbg!(i);
+                ex2init.push(i);
+            }
+            continue;
+        }
+
+        // if too_general_list.contains(&(x as u32)) {
+        //     continue;
+        // }
+
+        if succ.is_empty() {
+            let s = if pretty_count < graph_view_settings.pretty_nodes {
+                pretty_count += 1;
+                content.pretty_or_id(x)
+            } else {
+                "".to_string()
+            };
+            let inits = waiting_inits[x];
+            let is_too_general = too_general_list.contains(&(x as u32));
+            let s = if is_too_general {
+                format!("too general\n{s}")
+            } else {
+                s
+            };
+            let i = g.add_node(egui_graphs::Node::new(Payload { pretty: s, inits }));
+            g.node_weight_mut(i).unwrap().set_id(i);
+            if let Some(old_n) = old_g.node_weight(i) {
+                g.node_weight_mut(i).unwrap().set_location(old_n.location());
+            }
+            if is_too_general {
+                to_remove.push(i);
+            }
+            ex2top.extend(inits.iter().map(|ex| (ex, i)));
+            continue;
+        } else if all_too_general {
+            wasm_rs_dbg::dbg!(x);
+
+            let is_too_general = too_general_list.contains(&(x as u32));
+
+            let inits = waiting_inits[x];
+            let pretty = "".to_string();
+            let i = g.add_node(egui_graphs::Node::new(Payload { pretty, inits }));
+            g.node_weight_mut(i).unwrap().set_id(i);
+            if let Some(old_n) = old_g.node_weight(i) {
+                g.node_weight_mut(i).unwrap().set_location(old_n.location());
+            }
+            if is_too_general {
+                to_remove.push(i);
+            } else {
+                new_top_candidates.push((x, inits));
+            }
+            continue;
+        }
+        let i = g.add_node(egui_graphs::Node::new(Payload {
+            pretty: content.pretty_or_id(x),
+            inits: waiting_inits[x],
+        }));
+        g.node_weight_mut(i).unwrap().set_id(i);
+        if let Some(old_n) = old_g.node_weight(i) {
+            g.node_weight_mut(i).unwrap().set_location(old_n.location());
+        }
+        if !all_too_general {
+            to_remove.push(i);
+        }
+    }
+    // choose the new tops that must be displayed
+    // stop when all ex are covered
+    // first sort the number of covered ex
+    new_top_candidates.sort_by(|a, b| a.1.len().cmp(&b.1.len()));
+    let mut new_tops = vec![];
+    let mut covered = 0u64;
+    if let Some(a) = new_top_candidates.pop() {
+        covered |= a.1.0;
+        new_tops.push(a);
+    }
+    while covered.count_ones() != 0 && (covered.count_ones() as usize) < content.ex_query.len() {
+        // first try to find the largest complement
+        let mut cand = None;
+        let mut cand_added_cov = 0;
+        for i in (0..new_top_candidates.len()).rev() {
+            let cov = new_top_candidates[i].1.0;
+            let shared = covered & cov;
+            let shared = shared.count_ones();
+            if shared > 0 {
+                continue;
+            }
+            let added = !covered & cov;
+            let added = added.count_ones();
+            if added > cand_added_cov {
+                cand = Some(i);
+                cand_added_cov = added;
+            }
+        }
+        if let Some(i) = cand {
+            let cov = new_top_candidates[i].1.0;
+            covered |= cov;
+            new_tops.push(new_top_candidates.remove(i));
+            continue;
+        }
+        let mut cand_improvement_cov = 0;
+        // otherwise try to find the first one increasing coverage
+        for i in (0..new_top_candidates.len()).rev() {
+            let cov = new_top_candidates[i].1.0;
+            let added = !covered & cov;
+            let added = added.count_ones();
+            let shared = covered & cov;
+            let shared = shared.count_ones();
+            let improvement = added as i32 - shared as i32;
+            if improvement > cand_improvement_cov {
+                cand = Some(i);
+                cand_improvement_cov = improvement;
+            }
+        }
+        if let Some(i) = cand {
+            let cov = new_top_candidates[i].1.0;
+            covered |= cov;
+            new_tops.push(new_top_candidates.remove(i));
+            continue;
+        }
+        break;
+    }
+    for (x, inits) in new_tops {
+        let i = x as u32;
+        let i = i.into();
+        let s = if pretty_count < graph_view_settings.pretty_nodes {
+            pretty_count += 1;
+            content.pretty_or_id(x)
+        } else {
+            "".to_string()
+        };
+        g.node_weight_mut(i).unwrap().payload_mut().pretty = s;
+        ex2top.extend(inits.iter().map(|ex| (ex, i)));
+    }
+    let mut ex_it = ExIt::new(content);
+    for i in 0..content.queries.len().min(limit) {
+        let Some(v) = ex_it.next_agg(|mut inits: Vec<_>, i| {
+            inits.push(i);
+            inits
+        }) else {
+            continue;
+        };
+        for ex in v {
+            let s = content.ex_pretty[ex].to_string();
+            let j = g.add_node(egui_graphs::Node::new(Payload {
+                pretty: s,
+                inits: ExSet(0),
+            }));
+            g.node_weight_mut(j).unwrap().set_id(j);
+            if let Some(old_n) = old_g.node_weight(j) {
+                g.node_weight_mut(j).unwrap().set_location(old_n.location());
+            }
+            let i = ex2init[ex];
+            // let i = i as u32;
+            let id = g.add_edge(i.into(), j, egui_graphs::Edge::new(()));
+            g.edge_weight_mut(id).unwrap().set_id(id);
+        }
+    }
+    ex2top.sort();
+    // let mut prev_i = usize::MAX;
+    for (ex, top) in ex2top {
+        let init = ex2init[ex as usize];
+        // let j = ex2top[_i];
+        // if i.index() == prev_i {
+        //     continue;
+        // }
+        // prev_i = i.index();
+        let id = g.add_edge(top, init.into(), egui_graphs::Edge::new(()));
+        g.edge_weight_mut(id).unwrap().set_id(id);
+    }
+    let mut to_remove = to_remove.into_iter().peekable();
+    g.filter_map_owned(
+        |i, w| {
+            if to_remove.peek() == Some(&i) {
+                to_remove.next();
+                None
+            } else {
+                Some(w)
+            }
+        },
+        |_e, w| Some(w),
+    )
+}
+
+#[cfg(feature = "force_layout")]
+fn show_full_graph(
+    ui: &mut egui::Ui,
+    id: String,
+    prepared_graph: &mut Option<Box<dyn std::any::Any + Send + Sync>>,
+    content: &G,
+    graph_view_setting: &mut GVSetting,
+) {
+    let mut _s = egui_addon::force_layout::GVSettings::default();
+    _s.1 = _s.1.with_zoom_and_pan_enabled(true);
+    _s.1 =
+        _s.1.with_fit_to_screen_enabled(graph_view_setting.fit_to_screen_enabled);
+    _s.0 = _s.0.with_node_selection_enabled(true);
+
+    let settings_interaction = &_s.0;
+    let settings_navigation = &_s.1;
+    let settings_style = &_s.2;
+
+    let g: &mut GraphTy = if let Some(g) = prepared_graph.as_mut() {
+        g.downcast_mut::<GraphTy>().unwrap()
+    } else {
+        let g = build_graph(content, graph_view_setting);
+        use egui_addon::force_layout::*;
+        let g: GraphTy = to_graph(&g.into());
+        *prepared_graph = Some(Box::new(g));
+        (prepared_graph.as_mut().unwrap())
+            .downcast_mut::<GraphTy>()
+            .unwrap()
+    };
+
+    let events = std::rc::Rc::<std::cell::RefCell<Vec<Event>>>::default();
+    use egui_addon::force_layout::Event;
+    let mut view = egui_addon::force_layout::AnimatedGraphView::<Payload, _, _, _>::new(g)
+        .with_id(Some(id.clone()))
+        .with_interactions(settings_interaction)
+        .with_navigations(settings_navigation)
+        .with_styles(settings_style)
+        .with_event_sink(&events);
+    ui.add(&mut view);
+    for event in events.take() {
+        match event {
+            // Event::Pan(PayloadPan) => {}
+            // Event::Zoom(PayloadZoom) => {}
+            // Event::NodeMove(PayloadNodeMove) => {}
+            // Event::NodeDragStart(PayloadNodeDragStart) => {}
+            // Event::NodeDragEnd(PayloadNodeDragEnd) => {}
+            Event::NodeSelect(e) => {
+                if !graph_view_setting.selected_nodes.contains(&(e.id as u32)) {
+                    graph_view_setting.selected_nodes.push(e.id as u32);
+                }
+            }
+            Event::NodeDeselect(e) => {
+                if let Some(i) = graph_view_setting
+                    .selected_nodes
+                    .iter()
+                    .position(|x| *x == e.id as u32)
+                {
+                    graph_view_setting.selected_nodes.remove(i);
+                }
+            }
+            Event::NodeDoubleClick(e) => {
+                wasm_rs_dbg::dbg!(e.id);
+                graph_view_setting.too_general.push(e.id as u32);
+                let pretty_queued = &mut graph_view_setting.pretty_queued;
+                handle_top_too_general(g, e.id, |g, ids| {
+                    let remaining = handle_new_tops(content, g, ids, 8);
+                    pretty_queued.extend(remaining);
+                });
+            }
+            Event::NodeClick(_) => {}
+            Event::NodeHoverEnter(_) => {}
+            Event::NodeHoverLeave(_) => {}
+            // Event::EdgeClick(PayloadEdgeClick) => {}
+            // Event::EdgeSelect(PayloadEdgeSelect) => {}
+            // Event::EdgeDeselect(PayloadEdgeDeselect) => {}
+            _ => {}
+        }
+    }
+}
+
+#[cfg(feature = "force_layout")]
+fn build_graph(
+    content: &G,
+    graph_view_settings: &GVSetting,
+) -> egui_addon::force_layout::StableGraph<Payload, ()> {
+    use egui_addon::force_layout::*;
+    let mut g = simple_pet_graph();
+
+    // let mut r = petgraph::Graph::<IdN, ()>::with_capacity(
+    //     g.queries.len(),
+    //     g.succ.iter().filter(|x| x.is_zero()).count() + 1,
+    // );
+
+    let mut ex_it = ExIt::new(content);
+    for _i in 0..content.queries.len().min(graph_view_settings.limit) {
+        simple_add_node(
+            &mut g,
+            Payload {
+                pretty: Default::default(),
+                inits: ex_it.next_exset().unwrap(),
+            },
+        );
+    }
+    let mut pretty_count = 0;
+    // in reverse topo order, go from bots to tops
+    for (x, succ) in content
+        .iter_successors()
+        .enumerate()
+        .take(graph_view_settings.limit)
+    {
+        let mut i = x as u32;
+        for &succ in succ {
+            i += succ;
+            if i as usize >= graph_view_settings.limit {
+                break;
+            }
+            let i = i.into();
+            let x = (x as u32).into();
+            simple_add_edge(&mut g, i, x);
+            let curr = g.node_weight(x).unwrap().inits;
+            if let Some(inits) = g.node_weight_mut(i) {
+                inits.inits |= curr;
+            }
+        }
+        if x >= graph_view_settings.limit {
+            break;
+        }
+        if succ.is_empty() {
+            let s = if pretty_count < graph_view_settings.pretty_nodes {
+                pretty_count += 1;
+                content.pretty_or_id(x)
+            } else {
+                ".".to_string()
+            };
+            g.node_weight_mut((x as u32).into())
+                .as_mut()
+                .unwrap()
+                .pretty = s;
+        }
+    }
+    let mut ex_it = ExIt::new(content);
+    for i in 0..content.queries.len().min(graph_view_settings.limit) {
+        let Some(v) = ex_it.next_agg(|mut inits: Vec<_>, i| {
+            inits.push(i);
+            inits
+        }) else {
+            continue;
+        };
+        for ex in v {
+            let s = content.ex_pretty[ex].to_string();
+            let j = simple_add_node(
+                &mut g,
+                Payload {
+                    pretty: s,
+                    inits: ExSet(1 << ex),
+                },
+            );
+            let i = i as u32;
+            simple_add_edge(&mut g, i.into(), j);
+        }
+    }
+
+    // in reverse topo order, go from tops to bots
+    // for (x, succ) in content.succ.split(|x| *x == 0).enumerate().rev() {}
+    g
+}
+
+/// when a top is what we want but still too general
+///
+/// first find the new tops and promote them,
+/// then remove the one at id (and its edges).
+///
+/// NOTE could also fix the node in place or hide/dim it and its edges
+#[cfg(feature = "force_layout")]
+fn handle_top_too_general<N: Clone + egui_addon::force_layout::FlexPayload>(
+    g: &mut egui_addon::force_layout::PrettyGraph<N>,
+    id: usize,
+    mut handle_new_tops: impl FnMut(
+        &mut egui_addon::force_layout::PrettyGraph<N>,
+        Vec<egui_addon::force_layout::petgraph::graph::NodeIndex>,
+    ),
+) {
+    // if e.id >= g.node_count() {
+    //     log::warn!("trying to remove an out of range node");
+    //     return;
+    // }
+    let idx = (id as u32).into();
+    use egui_addon::force_layout::petgraph;
+    if g.g().neighbors_directed(idx, petgraph::Incoming).count() > 0 {
+        log::warn!("{} is not a top", id);
+        return;
+    }
+    let new_tops = g
+        .g()
+        .neighbors_directed(idx, petgraph::Outgoing)
+        .filter(|t| g.g().neighbors_directed(*t, petgraph::Incoming).count() <= 1)
+        .collect::<Vec<_>>();
+
+    handle_new_tops(g, new_tops);
+
+    // finally do the removal
+    g.remove_node(idx);
+}
+
+pub(crate) fn show_smells_result(
     ui: &mut egui::Ui,
     api_addr: &str,
     smells: &mut Config,
     fetched_files: &mut FetchedFiles,
-    smells_result: &mut RemoteResult,
-) -> Option<RemoteResult> {
-    let Some(result) = smells_result.ready() else {
-        let mut _smells_result = None;
-        let center = ui.available_rect_before_wrap().center();
-        let conf = smells.commits.as_mut().unwrap();
-        let examples = smells.diffs.as_mut().unwrap();
-        show_examples(ui, api_addr, examples, fetched_files);
-        egui::Window::new("Actions")
-            .default_pos(center)
-            .pivot(egui::Align2::CENTER_CENTER)
-            .show(ui.ctx(), |ui| {
-                if ui.button("Compute Queries").clicked() {
-                    _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                }
-                ui.spinner();
-            });
-        smells.bad_matches_bounds = 0..=0;
-        return None;
+    queries: &SearchResults,
+) -> Result<(), RemoteResult> {
+    let center = ui.available_rect_before_wrap().center();
+    let action_widget = egui::Window::new("Actions")
+        .default_pos(center)
+        .pivot(egui::Align2::CENTER_CENTER);
+
+    if init_slider(smells, queries) {
+        return Ok(());
     };
-    if let Err(error) = result {
-        // This should only happen if the fetch API isn't available or something similar.
-        let mut _smells_result = None;
-        let center = ui.available_rect_before_wrap().center();
-        let conf = smells.commits.as_mut().unwrap();
-        let examples = smells.diffs.as_mut().unwrap();
-        show_examples(ui, api_addr, examples, fetched_files);
-        egui::Window::new("Actions")
-            .default_pos(center)
-            .pivot(egui::Align2::CENTER_CENTER)
-            .show(ui.ctx(), |ui| {
-                ui.colored_label(
-                    ui.visuals().error_fg_color,
-                    if error.is_empty() { "Error" } else { error },
-                );
-                if ui.button("Retry Compute Queries").clicked() {
-                    _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                }
-            });
-        return None;
+
+    let conf = smells.commits.as_mut().unwrap();
+    let examples = smells.diffs.as_mut().unwrap();
+    let tot_len = queries.bad.len();
+    let predicate = |i: &usize| {
+        conf.wanted_matches.contains(&queries.bad[*i].matches)
+            || conf.wanted_matches.end == queries.bad[*i].matches
     };
+    if smells.bads.is_none() {
+        smells.bads = Some((0..tot_len).filter(predicate).collect())
+        // smells.bads = Some((0..tot_len).collect())
+    }
+    if !queries.good.is_empty() {
+        todo!("handle the queries matching the fixes")
+    }
+
+    let bads = smells.bads.as_ref().unwrap();
+    let len = bads.len();
+    if tot_len == 0 {
+        let mut _smells_result = Ok(());
+        action_widget.show(ui.ctx(), |ui| {
+            ui.colored_label(ui.visuals().error_fg_color, "No queries found");
+            ui.label(format!("{}", queries.graphs.len()));
+            ui.label(format!(
+                "{:?}",
+                (queries.graphs.iter())
+                    .map(|x| x.queries.len())
+                    .collect::<Vec<_>>()
+            ));
+            if ui.button("Retry Compute Queries").clicked() {
+                _smells_result = Err(fetch_results(ui.ctx(), api_addr, conf, &examples));
+            }
+        });
+        return _smells_result;
+    }
+
+    if len == 0 {
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            "No queries selected, change the hyperparameters",
+        );
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            "The hyperparameters can be found in the settings on the left panel",
+        );
+        return Ok(());
+    }
+
+    let scroll = egui::ScrollArea::vertical()
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+        // .id_salt(id_salt) // NOTE does not transmit id to children like push_id
+        ;
+    ui.push_id(
+        (
+            "query_with_example",
+            42,
+            (queries.prepare_time * 1000000.0) as u64,
+            (queries.search_time * 1000000.0) as u64,
+            queries.bad.len(),
+            queries.graphs.len(), // TODO precompute a better salt
+        ),
+        |ui| {
+            show_list_of_queries_with_examples(
+                ui,
+                scroll,
+                api_addr,
+                fetched_files,
+                queries,
+                examples,
+                bads,
+                len,
+            )
+        },
+    );
+
+    let mut _smells_result = Ok(());
+    action_widget.show(ui.ctx(), |ui| {
+        if ui.button("Compute Queries").clicked() {
+            _smells_result = Err(fetch_results(ui.ctx(), api_addr, conf, &examples));
+        }
+    });
+    _smells_result
+}
+
+fn init_slider(smells: &mut Config, queries: &SearchResults) -> bool {
+    if (smells.bad_matches_bounds) == (0..=0) {
+        let conf = smells.commits.as_mut().unwrap();
+        let matches = queries.bad.iter().map(|x| x.matches);
+        let start = matches.min().unwrap_or_default();
+        let matches = queries.bad.iter().map(|x| x.matches);
+        let end = matches.max().unwrap_or_default();
+        if start < end {
+            smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
+            conf.wanted_matches = start..end; // TODO better open the side panel
+            smells.bads = None; // to refresh
+            return true;
+        }
+    }
+    false
+}
+
+pub(crate) fn access_smells_results<'a>(
+    ui: &mut egui::Ui,
+    result: &'a Result<Resource<Result<SearchResults, SmellsError>>, String>,
+) -> Option<&'a SearchResults> {
     let Ok(resource) = result else {
         return None;
     };
@@ -467,127 +1642,97 @@ fn show_smells_result(
         });
         return None;
     };
-    let Ok(queries) = content else {
-        return None;
-    };
-    let conf = smells.commits.as_mut().unwrap();
-    let examples = smells.diffs.as_mut().unwrap();
-    let center = ui.available_rect_before_wrap().center();
-    let id = ui.id();
-    let tot_len = queries.bad.len();
-    let predicate = |i: &usize| conf.wanted_matches.contains(&queries.bad[*i].matches);
-    if smells.bads.is_none() {
-        smells.bads = Some((0..tot_len).filter(predicate).collect())
-    }
-    if !queries.good.is_empty() {
-        todo!("handle the queries matching the fixes")
-    }
+    content.as_ref().ok()
+}
 
-    if (smells.bad_matches_bounds) == (0..=0) {
-        let matches = queries.bad.iter().map(|x| x.matches);
-        let start = matches.min().unwrap_or_default();
-        let matches = queries.bad.iter().map(|x| x.matches);
-        let end = matches.max().unwrap_or_default();
-        if start < end {
-            smells.bad_matches_bounds = std::ops::RangeInclusive::new(start, end);
-            conf.wanted_matches = start..end; // TODO better open the side panel
-            smells.bads = None; // to refresh
-            return None;
-        }
-    }
-
-    let bads = smells.bads.as_ref().unwrap();
-    let len = bads.len();
-    if tot_len == 0 {
-        let mut _smells_result = None;
+pub(crate) fn prep_smells_results<'a>(
+    ui: &mut egui::Ui,
+    smells: &mut Config,
+    smells_result: &'a mut RemoteResult,
+) -> Result<&'a Result<Resource<Result<SearchResults, SmellsError>>, String>, Option<egui::Response>>
+{
+    let mut resp = None;
+    let Some(result) = smells_result.ready() else {
+        let center = ui.available_rect_before_wrap().center();
         egui::Window::new("Actions")
             .default_pos(center)
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ui.ctx(), |ui| {
-                ui.colored_label(ui.visuals().error_fg_color, "No queries found");
-                ui.label(format!("{}", queries.graphs.len()));
-                ui.label(format!(
-                    "{:?}",
-                    queries
-                        .graphs
-                        .iter()
-                        .map(|x| x.queries.len())
-                        .collect::<Vec<_>>()
-                ));
-                if ui.button("Retry Compute Queries").clicked() {
-                    _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                }
+                resp = Some(ui.button("Compute Queries"));
+                ui.spinner();
             });
-        return _smells_result;
-    }
-    if len == 0 {
-        ui.colored_label(
-            ui.visuals().error_fg_color,
-            "No queries selected, change the hyperparameters",
-        );
-        ui.colored_label(
-            ui.visuals().error_fg_color,
-            "The hyperparameters can be found in the settings on the left panel",
-        );
-        return None;
-    }
-    egui::ScrollArea::vertical()
-        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-        .show_rows(ui, H, len, |ui, rows| {
-            let (mut rect, _) = ui.allocate_exact_size(
-                egui::Vec2::new(
-                    ui.available_width(),
-                    H, // * (rows.end - rows.start) as f32,
-                ),
-                egui::Sense::hover(),
-            );
-            let top = rect.top();
-            for i in rows.start..rows.end - 1 {
-                let mut rect = {
-                    let (t, b) = rect.split_top_bottom_at_y(top + H * (i - rows.start + 1) as f32);
-                    rect = b;
-                    t
-                };
-                rect.bottom_mut().sub_assign(B);
+        smells.bad_matches_bounds = 0..=0;
+        return Err(resp);
+    };
+    if let Err(error) = result {
+        // This should only happen if the fetch API isn't available or something similar.
+        let center = ui.available_rect_before_wrap().center();
+        egui::Window::new("Actions")
+            .default_pos(center)
+            .pivot(egui::Align2::CENTER_CENTER)
+            .show(ui.ctx(), |ui| {
+                ui.colored_label(
+                    ui.visuals().error_fg_color,
+                    if error.is_empty() { "Error" } else { error },
+                );
+                resp = Some(ui.button("Retry Compute Queries"));
+            });
+        return Err(resp);
+    };
+    Ok(result)
+}
 
-                let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
-                    rect.left_bottom(),
-                    ui.pixels_per_point(),
-                );
-                let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
-                    rect.right_bottom(),
-                    ui.pixels_per_point(),
-                );
-                ui.painter()
-                    .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
-                rect.bottom_mut().sub_assign(B);
-                let mut ui = ui.new_child(
-                    egui::UiBuilder::new()
-                        .max_rect(rect)
-                        .layout(egui::Layout::top_down(egui::Align::Min)),
-                );
-                ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-                ui.push_id(
-                    id.with(bads[i])
-                        .with("query_with_example")
-                        .with(&resource.response.bytes),
-                    |ui| {
-                        let bad_query = &queries.bad[bads[i]];
-                        show_query_with_example(ui, api_addr, bad_query, examples, fetched_files);
-                    },
-                );
-            }
-        });
-    let mut _smells_result = None;
-    egui::Window::new("Actions")
-        .default_pos(center)
-        .pivot(egui::Align2::CENTER_CENTER)
-        .show(ui.ctx(), |ui| {
-            if ui.button("Compute Queries").clicked() {
-                _smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-            }
-        });
-    _smells_result
+fn show_list_of_queries_with_examples(
+    ui: &mut egui::Ui,
+    scroll: egui::ScrollArea,
+    api_addr: &str,
+    fetched_files: &mut FetchedFiles,
+    queries: &SearchResults,
+    examples: &mut ExamplesValues,
+    bads: &Vec<usize>,
+    len: usize,
+) {
+    scroll.show_rows(ui, H, len, |ui, rows| {
+        let (mut rect, _) = ui.allocate_exact_size(
+            egui::Vec2::new(
+                ui.available_width(),
+                H, // * (rows.end - rows.start) as f32,
+            ),
+            egui::Sense::hover(),
+        );
+        let top = rect.top();
+        wasm_rs_dbg::dbg!(rows.start..rows.end);
+        for i in rows.start..rows.end {
+            let mut rect = {
+                let (t, b) = rect.split_top_bottom_at_y(top + H * (i - rows.start + 1) as f32);
+                rect = b;
+                t
+            };
+            rect.bottom_mut().sub_assign(B);
+
+            let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
+                rect.left_bottom(),
+                ui.pixels_per_point(),
+            );
+            let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
+                rect.right_bottom(),
+                ui.pixels_per_point(),
+            );
+            ui.painter()
+                .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
+            rect.bottom_mut().sub_assign(B);
+            let mut ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(rect)
+                    .layout(egui::Layout::top_down(egui::Align::Min)),
+            );
+            ui.set_clip_rect(rect.intersect(ui.clip_rect()));
+            ui.push_id(ui.id().with(bads[i]), |ui| {
+                let bad_query = &queries.bad[bads[i]];
+                show_query_with_example(ui, api_addr, bad_query, examples, fetched_files);
+            });
+        }
+    });
 }
 
 pub(crate) fn show_examples(
@@ -596,49 +1741,64 @@ pub(crate) fn show_examples(
     examples: &mut ExamplesValues,
     fetched_files: &mut FetchedFiles,
 ) {
-    let id = ui.id();
+    // let id = ui.id();
     let len = examples.examples.len();
     assert!(len > 0);
-    egui::ScrollArea::vertical()
-        .id_salt("show_examples")
-        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-        .show_rows(ui, H, len, |ui, cols| {
-            let (mut rect, _) = ui.allocate_exact_size(
-                egui::Vec2::new(ui.available_width(), H * (cols.end - cols.start) as f32),
-                egui::Sense::hover(),
-            );
-            let top = rect.top();
-            for i in cols.clone() {
-                let mut rect = {
-                    let (t, b) = rect.split_top_bottom_at_y(top + H * (i - cols.start + 1) as f32);
-                    rect = b;
-                    t
-                };
-                rect.bottom_mut().sub_assign(B);
+    let scroll = egui::ScrollArea::vertical()
+        // .id_salt()
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible);
+    ui.push_id(
+        (
+            "show_examples",
+            examples.moves.len(),
+            examples.examples.len(), // TODO precompute a better salt
+        ),
+        |ui| {
+            scroll.show_rows(ui, H, len, |ui, cols| {
+                show_examples_aux(ui, api_addr, examples, fetched_files, cols);
+            })
+        },
+    );
+}
 
-                let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
-                    rect.left_bottom(),
-                    ui.pixels_per_point(),
-                );
-                let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
-                    rect.right_bottom(),
-                    ui.pixels_per_point(),
-                );
-                ui.painter()
-                    .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
-                rect.bottom_mut().sub_assign(B);
-                let mut ui = ui.new_child(
-                    egui::UiBuilder::new()
-                        .max_rect(rect)
-                        .layout(egui::Layout::top_down(egui::Align::Min)),
-                );
-                ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-                ui.push_id(id.with(i), |ui| {
-                    let example = &examples.examples[i];
-                    show_diff(ui, api_addr, example, fetched_files);
-                });
-            }
+fn show_examples_aux(
+    ui: &mut egui::Ui,
+    api_addr: &str,
+    examples: &mut ExamplesValues,
+    fetched_files: &mut FetchedFiles,
+    cols: Range<usize>,
+) {
+    let (mut rect, _) = ui.allocate_exact_size(
+        egui::Vec2::new(ui.available_width(), H * (cols.end - cols.start) as f32),
+        egui::Sense::hover(),
+    );
+    let top = rect.top();
+    for i in cols.clone() {
+        let mut rect = {
+            let (t, b) = rect.split_top_bottom_at_y(top + H * (i - cols.start + 1) as f32);
+            rect = b;
+            t
+        };
+        rect.bottom_mut().sub_assign(B);
+
+        let line_pos_1 =
+            egui::emath::GuiRounding::round_to_pixels(rect.left_bottom(), ui.pixels_per_point());
+        let line_pos_2 =
+            egui::emath::GuiRounding::round_to_pixels(rect.right_bottom(), ui.pixels_per_point());
+        ui.painter()
+            .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
+        rect.bottom_mut().sub_assign(B);
+        let mut ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+        );
+        ui.set_clip_rect(rect.intersect(ui.clip_rect()));
+        ui.push_id(ui.id().with(i), |ui| {
+            let example = &examples.examples[i];
+            show_diff(ui, api_addr, example, fetched_files);
         });
+    }
 }
 
 fn show_query_with_example(

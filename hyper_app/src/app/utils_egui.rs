@@ -333,13 +333,17 @@ pub trait MyUiExt: UiExt {
                 let slider = egui_double_slider::DoubleSlider::new(
                     &mut lower_value,
                     &mut upper_value,
-                    range,
+                    range.clone(),
                 )
                 .separation_distance(1f32);
-                let resp = ui.add(slider);
+                let mut resp = ui.add(slider);
                 *low = lower_value as usize;
                 *high = upper_value as usize;
-                ui.label(format!("{}..{}", low, high));
+                ui.spacing_mut().button_padding = Default::default();
+                ui.spacing_mut().interact_size = Default::default();
+                resp |= ui.add(egui::DragValue::new(low).range(range.clone()));
+                ui.label("..");
+                resp |= ui.add(egui::DragValue::new(high).range(range.clone()));
                 resp
             })
             .inner

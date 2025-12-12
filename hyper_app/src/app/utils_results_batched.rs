@@ -79,7 +79,7 @@ pub fn prep_compute_res_prom<'a, 'b, T: ComputeError + Send + Sync>(
     promise: &'a Option<ComputeResultsProm<T>>,
     ui: &mut egui::Ui,
 ) -> Option<&'a Result<ComputeResults, T>> {
-    let Some(promise) = &promise else {
+    let Some(promise) = promise else {
         ui.label("click on Compute");
         return None;
     };
@@ -98,10 +98,36 @@ pub fn prep_compute_res_prom<'a, 'b, T: ComputeError + Send + Sync>(
     result.as_ref().ok().and_then(|x| x.content.as_ref())
 }
 
+pub fn prep_compute_res_prom_mut<'a, 'b, T: ComputeError + Send + Sync>(
+    promise: &'a mut Option<ComputeResultsProm<T>>,
+    ui: &mut egui::Ui,
+) -> Option<&'a mut Result<ComputeResults, T>> {
+    let Some(promise) = promise else {
+        ui.label("click on Compute");
+        return None;
+    };
+    let Some(result) = promise.ready_mut() else {
+        ui.spinner();
+        return None;
+    };
+    if let Err(error) = result {
+        // This should only happen if the fetch API isn't available or something similar.
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            if error.is_empty() { "Error" } else { error },
+        );
+        return None;
+    }
+    result.as_mut().ok().and_then(|x| x.content.as_mut())
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct ComputeResults {
     pub prepare_time: f64,
     pub results: Vec<Result<ComputeResultIdentified, String>>,
+    #[cfg(feature = "force_layout")]
+    #[serde(skip)]
+    pub graph: Option<Box<dyn std::any::Any + Send + Sync>>,
 }
 
 pub type ComputeResultsProm<Err> = Promise<Result<Resource<Result<ComputeResults, Err>>, String>>;

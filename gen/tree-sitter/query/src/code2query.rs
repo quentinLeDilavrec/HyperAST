@@ -1,23 +1,25 @@
 #![allow(unused)]
-use crate::auto::tsq_ser_meta::Converter;
-use crate::auto::tsq_transform;
-use crate::search::try_ts_query;
-use hyperast::position;
-use hyperast::position::offsets_and_nodes::SolvedStructuralPosition;
-use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
-use hyperast::store::SimpleStores;
-use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{
-    self, Children, HashKind, HyperAST, RoleStore, TypeStore, TypedNodeId, WithHashs,
-    WithSerialization, WithStats,
-};
-use hyperast_tsquery::{Cursor, Node as _};
-use legion::query;
 use num::ToPrimitive;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+
+use hyperast::position;
+use hyperast::position::offsets_and_nodes::SolvedStructuralPosition;
+use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
+use hyperast::store::SimpleStores;
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast::types;
+use hyperast::types::{Children, HashKind, TypedNodeId};
+use hyperast::types::{HyperAST, RoleStore, TypeStore};
+use hyperast::types::{WithHashs, WithSerialization, WithStats};
+
+use hyperast_tsquery::{Cursor, Node as _};
+
+use crate::auto::tsq_ser_meta::Converter;
+use crate::auto::tsq_transform;
+use crate::search::try_ts_query;
 
 // use crate::legion as qgen; // includes indentation, such as spaces and new lines
 use crate::no_fmt_legion as qgen; // ignores spaces, new lines,...
@@ -27,6 +29,18 @@ type QStore = SimpleStores<crate::types::TStore>;
 type IdN = NodeIdentifier;
 type Idx = u16;
 type IdInit = SolvedStructuralPosition<IdN, Idx>;
+
+#[derive(enumset::EnumSetType)]
+pub enum TrMarker {
+    Init,
+    Uniqs,
+    RMs,
+    RMall,
+    SimpEQ,
+    Focus,
+}
+
+pub type TrMarkers = enumset::EnumSet<TrMarker>;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TR<E = IdInit, I = IdNQ> {
@@ -59,7 +73,7 @@ impl<E: PartialEq, I: PartialEq> PartialOrd for TR<E, I> {
     }
 }
 
-impl<E: PartialEq, I: PartialEq> TR<E, I> {
+impl<E, I> TR<E, I> {
     pub fn each(&self, mut f: impl FnMut(&'static str, &E), mut g: impl FnMut(&'static str, &I)) {
         match self {
             TR::Init(t) => f("Init", t),
@@ -239,6 +253,62 @@ impl<Init> QueryLattice<Init> {
         ;
         format!("{}", q)
     }
+
+    pub fn extract2(&self, k: IdNQ) -> (IdNQ, Vec<IdQ>) {
+        self._extract2(k, &self.raw_rels[&k])
+    }
+    fn _extract2(&self, k: IdNQ, v: &[TR<Init>]) -> (IdNQ, Vec<IdQ>) {
+        fn extract<'a, Init: 'a>(
+            map: &'a std::collections::HashMap<IdNQ, Vec<TR<Init>>>,
+            curr: IdNQ,
+            downs: impl Iterator<Item = &'a TR<Init>>,
+            already: &mut HashSet<IdNQ>,
+            r: &mut Vec<IdNQ>,
+            leafs: &[IdNQ],
+        ) {
+            for s in downs {
+                if let Some(_) = s.as_init() {
+                    if !r.contains(&curr) {
+                        assert!(leafs.contains(&curr), "{curr:?}");
+                        r.push(curr)
+                    }
+                } else if let Some(v) = s.no_init() {
+                    if !already.contains(v) {
+                        already.insert(*v);
+                        let downs = map.get(v).unwrap().iter();
+                        extract(map, *v, downs, already, r, leafs)
+                    }
+                }
+                // match s {
+                //     TR::Init(_) if !r.contains(&curr) => {
+                //         assert!(leafs.contains(&curr), "{curr:?}");
+                //         r.push(curr)
+                //     }
+                //     TR::RMs(v) | TR::Uniqs(v) | TR::SimpEQ(v) if !already.contains(v) => {
+                //         already.insert(*v);
+                //         let downs = map.get(v).unwrap().iter();
+                //         extract(map, *v, downs, already, r, leafs)
+                //     }
+                //     _ => (),
+                // }
+            }
+        }
+        let mut already = HashSet::default();
+        let mut r = vec![];
+        extract(
+            &self.raw_rels,
+            k,
+            v.iter(),
+            &mut already,
+            &mut r,
+            &self.leaf_queries,
+        );
+        let r = r
+            .into_iter()
+            .map(|x| self.leaf_queries.iter().position(|y| x == *y).unwrap() as u32)
+            .collect();
+        (k, r)
+    }
 }
 
 impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
@@ -286,11 +356,9 @@ impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
         TS::IdF: From<u16> + Into<u16>,
     {
         let mut s = Self::new();
-        // TODO do not use u32 but the entry_raw and compute the hash on the fly
         let mut md_cache = Default::default();
         let dedup = from
             .filter_map(|from| {
-                // TODO add variant with immediates
                 let x = generate_query_aux::<TS, TIdN, _, Init>(
                     &mut s.query_store,
                     &mut md_cache,
@@ -409,10 +477,7 @@ impl<TR> DerefMut for DedupBySize2<TR> {
 }
 impl<TR> Ded for DedupBySize2<TR> {
     fn queries(&self) -> Vec<IdNQ> {
-        (self.0.iter())
-            // .flat_map(|x| x.values().flat_map(|v| v.iter().map(|x| x)))
-            .flat_map(|x| x.keys().copied())
-            .collect()
+        (self.0.iter()).flat_map(|x| x.keys().copied()).collect()
     }
 }
 
@@ -423,38 +488,37 @@ pub fn group_by_size<Init: Clone + SolvedPosition<IdN> + Eq + Sync + Send>(
     use rayon::iter::IntoParallelIterator as _;
     use rayon::iter::ParallelIterator;
 
-    DedupBySize2(
-        from.into_iter()
-            // grouping on size of queries (i.e. number of nodes)
-            .fold(Vec::<Vec<(Init, (IdNQ, u32))>>::new(), |mut acc, x| {
-                let (fr, (query, (size, label_h))) = x;
-                let size = size as usize;
-                if size >= acc.len() {
-                    acc.resize(size + 1, Default::default());
-                }
-                acc[size].push((fr, (query, label_h)));
-                acc
-            })
-            .into_par_iter()
-            .map(|acc| {
-                // grouping by hash ignoring indentation and spaces (i.e., label hash)
-                acc.into_iter().fold(
-                    hashbrown::HashMap::<IdNQ, Vec<TR<Init>>>::new(),
-                    |mut acc, x| {
-                        let (from, (query, label_h)) = x;
-                        let v = &mut acc.entry(query).or_default();
-                        // dbg!(query);
-                        let x = (query, TR::Init(from));
-                        if !v.contains(&x.1) {
-                            v.push(x.1.clone());
-                            // v.sort_by(cmp_lat_entry(&s.query_store))
-                        }
-                        acc
-                    },
-                )
-            })
-            .collect::<Vec<_>>(),
-    )
+    let r = from
+        .into_iter()
+        // grouping on size of queries (i.e. number of nodes)
+        .fold(Vec::<Vec<(Init, (IdNQ, u32))>>::new(), |mut acc, x| {
+            let (fr, (query, (size, label_h))) = x;
+            let size = size as usize;
+            if size >= acc.len() {
+                acc.resize(size + 1, Default::default());
+            }
+            acc[size].push((fr, (query, label_h)));
+            acc
+        })
+        .into_par_iter()
+        .map(|acc| {
+            // grouping by id ignoring indentation and spaces (by leveraging crate::no_fmt_legion)
+            acc.into_iter().fold(
+                hashbrown::HashMap::<IdNQ, Vec<TR<Init>>>::new(),
+                |mut acc, x| {
+                    let (from, (query, label_h)) = x;
+                    let v = &mut acc.entry(query).or_default();
+                    // dbg!(query);
+                    let x = (query, TR::Init(from));
+                    if !v.contains(&x.1) {
+                        v.push(x.1.clone());
+                    }
+                    acc
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    DedupBySize2(r)
 }
 
 type IdQ = u32;
@@ -481,6 +545,22 @@ impl<'q, E, D> Builder<'q, E, D> {
             .sort_by_cached_key(|x| query_hash(&b.lattice.query_store, x));
         b.lattice.leaf_queries.dedup();
         b
+    }
+
+    #[cfg(feature = "synth_par")]
+    #[doc(hidden)]
+    fn by_pattern_metric<M, TR>(
+        &self,
+        uniques: Vec<(IdNQ, TR)>,
+        metric: impl Fn(hyperast::store::nodes::legion::HashedNodeRef<'_>) -> M + Sync,
+    ) -> BTreeMap<M, Vec<(IdNQ, TR)>>
+    where
+        M: Ord,
+        TR: Send + Sync,
+        M: Send + Sync,
+    {
+        let query_store = &self.lattice.query_store;
+        by_metric(uniques, |x: &IdNQ| metric(query_store.resolve(x)))
     }
 }
 
@@ -515,57 +595,44 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
                     };
                     let query = x[0].0;
                     simp_rms(&mut s.query_store, query, meta_simp)
-                        .map(|(new_q, label_h)| (label_h, (new_q, TR::RMs(query))))
+                        .map(|new_q| (new_q, TR::RMs(query)))
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
             dbg!(rms.len());
-            for (label_h, x) in rms {
-                let v = dedup.raw_entry_mut().from_hash(label_h as u64, |x| true);
-                use hashbrown::hash_map::RawEntryMut::*;
+            for x in rms {
+                let v = dedup.entry(x.0);
+                use hashbrown::hash_map::Entry::*;
                 let v = match v {
-                    Occupied(occ) => occ.into_key_value().1,
+                    Occupied(occ) => occ.into_mut(),
                     Vacant(vacant) => {
                         active.push(x.0);
-                        vacant
-                            .insert_with_hasher(label_h as u64, x.0, vec![], |query| {
-                                query_hash(&s.query_store, query)
-                            })
-                            .1
+                        vacant.insert(vec![])
                     }
                 };
                 if !v.contains(&x) {
                     v.push(x);
-                } else {
-                    dbg!()
                 }
             }
             // TODO add pass to replace some symbols with a wildcard
         }
         dbg!(dedup.0.len());
-        let simp_eq = dedup
-            .0
-            .values()
+        let simp_eq = (dedup.0.values())
             .filter_map(|x| {
                 let query = x[0].0;
-                let new_q = simp_imm_eq(&mut s.query_store, query, meta_simp)?;
-                let label_h = s.query_store.resolve(&new_q).hash(&HashKind::label());
-                Some((label_h, (new_q, TR::RMs(query))))
+                let new_q = simp_positional_eq(&mut s.query_store, query, meta_simp)?;
+                Some((new_q, TR::RMs(query)))
             })
             .collect::<Vec<_>>();
 
-        for (label_h, x) in simp_eq {
-            let v = dedup.0.raw_entry_mut().from_hash(label_h as u64, |x| true);
-            use hashbrown::hash_map::RawEntryMut::*;
+        for x in simp_eq {
+            let v = dedup.entry(x.0);
+            use hashbrown::hash_map::Entry::*;
             let v = match v {
-                Occupied(occ) => occ.into_key_value().1,
+                Occupied(occ) => occ.into_mut(),
                 Vacant(vacant) => {
                     active.push(x.0);
-                    vacant
-                        .insert_with_hasher(label_h as u64, x.0, vec![], |query| {
-                            query_hash(&s.query_store, query)
-                        })
-                        .1
+                    vacant.insert(vec![])
                 }
             };
             if !v.contains(&x) {
@@ -584,13 +651,11 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         Init: Eq,
     {
         let mut active_size = self.dedup.0.len() - 1;
-        // eprintln!("{active_size}: {}", pp_dedup(&self.dedup.0, active_size));
         let mut active: Vec<_> = self.actives(active_size);
 
         loop {
             dbg!(active_size);
             dbg!(active.len());
-            // eprintln!("{}", pp_dedup(&self.dedup.0, active_size));
             // TODO add pass to replace some symbols with a wildcard
             let rms = self.removes_par(active_size, &mut active);
             dbg!(rms.len());
@@ -603,11 +668,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
     /// Must use dedup_removes_par on output to properly progress
     #[must_use]
-    fn removes_par(
-        &mut self,
-        active_size: usize,
-        active: &mut Vec<IdNQ>,
-    ) -> Vec<(u32, (IdNQ, TR<Init>))> {
+    fn removes_par(&mut self, active_size: usize, active: &mut Vec<IdNQ>) -> Vec<(IdNQ, TR<Init>)> {
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
@@ -618,7 +679,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
             };
             let query = x;
             simp_rms(&mut s.query_store, query, meta_simp)
-                .map(|(new_q, label_h)| (label_h, (new_q, TR::RMs(query))))
+                .map(|new_q| (new_q, TR::RMs(query)))
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>()
@@ -628,64 +689,45 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         &mut self,
         active_size: usize,
         active: &mut Vec<IdNQ>,
-        rms: Vec<(u32, (IdNQ, TR<Init>))>,
+        rms: Vec<(IdNQ, TR<Init>)>,
     ) where
         Init: Eq,
     {
-        use rayon::iter::IndexedParallelIterator as _;
-        use rayon::iter::IntoParallelIterator as _;
-        use rayon::iter::IntoParallelRefMutIterator as _;
-        use rayon::iter::ParallelIterator;
+        let by_size = self.by_pattern_size(rms);
+        let act = dedup_patterns_by_metric(by_size, &mut self.dedup);
 
-        let s = &mut self.lattice;
-        let dedup = &mut self.dedup;
-        let fold = ParallelIterator::fold(
-            rms.into_par_iter(),
-            BTreeMap::default,
-            |mut acc: BTreeMap<usize, Vec<_>>, (label_h, x): (u32, (IdN, TR<Init>))| {
-                let size = s.query_store.resolve(&x.0).size();
-                acc.entry(size).or_default().push((label_h, x));
-                acc
-            },
-        );
-        let aaa = ParallelIterator::reduce(
-            fold,
-            BTreeMap::<usize, Vec<(LabelH, (IdN, TR<Init>))>>::default,
-            |mut acc, b| {
-                for (size, v) in b {
-                    acc.entry(size).or_default().extend(v);
-                }
-                acc
-            },
-        );
-        let aaa = aaa
-            .into_iter()
-            .fold(vec![vec![]; active_size], |mut acc, x| {
-                acc[x.0] = x.1;
-                acc
-            });
-        let act: Vec<_> = ParallelIterator::flat_map(
-            dedup.0[..active_size].par_iter_mut().enumerate(),
-            |(i, dedup)| {
-                let mut r = vec![];
-                for (label_h, x) in &aaa[i] {
-                    let v = dedup.entry(x.0);
-                    use hashbrown::hash_map::Entry;
-                    let v = match v {
-                        Entry::Occupied(x) => x.into_mut(),
-                        Entry::Vacant(x) => {
-                            r.push(*x.key());
-                            x.insert(vec![])
-                        }
-                    };
-                    if !v.contains(&x.1) {
-                        v.push(x.1.clone());
-                    }
-                }
-                r
-            },
-        )
-        .collect();
+        // use rayon::iter::IndexedParallelIterator as _;
+        // use rayon::iter::IntoParallelRefMutIterator as _;
+        // use rayon::iter::ParallelIterator;
+        // let by_size = by_size
+        //     .into_iter()
+        //     .fold(vec![vec![]; active_size], |mut acc, x| {
+        //         acc[x.0] = x.1;
+        //         acc
+        //     });
+        // let dedup = &mut self.dedup;
+        // let act: Vec<_> = ParallelIterator::flat_map(
+        //     dedup.0[..active_size].par_iter_mut().enumerate(),
+        //     |(i, dedup)| {
+        //         let mut r = vec![];
+        //         for x in &by_size[i] {
+        //             let v = dedup.entry(x.0);
+        //             use hashbrown::hash_map::Entry;
+        //             let v = match v {
+        //                 Entry::Occupied(x) => x.into_mut(),
+        //                 Entry::Vacant(x) => {
+        //                     r.push(*x.key());
+        //                     x.insert(vec![])
+        //                 }
+        //             };
+        //             if !v.contains(&x.1) {
+        //                 v.push(x.1.clone());
+        //             }
+        //         }
+        //         r
+        //     },
+        // )
+        // .collect();
         active.extend(act);
     }
 
@@ -693,66 +735,62 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         &mut self,
         active_size: usize,
         // size, origin, curr, tr
-        uniques: Vec<(u32, (IdNQ, TR<Init>))>,
+        uniques: Vec<(IdNQ, TR<Init>)>,
     ) -> Vec<IdNQ>
     where
         Init: Eq,
     {
-        use rayon::iter::IndexedParallelIterator as _;
-        use rayon::iter::IntoParallelIterator as _;
-        use rayon::iter::IntoParallelRefMutIterator as _;
-        use rayon::iter::ParallelIterator;
+        let by_size = self.by_pattern_size(uniques);
+        dedup_patterns_by_metric(by_size, &mut self.dedup)
 
-        let s = &mut self.lattice;
-        let dedup = &mut self.dedup;
-        let fold = ParallelIterator::fold(
-            uniques.into_par_iter(),
-            BTreeMap::<usize, Vec<_>>::default,
-            |mut acc, (label_h, x): (u32, (IdNQ, TR<Init>))| {
-                let size = s.query_store.resolve(&x.0).size();
-                acc.entry(size).or_default().push((label_h, x));
-                acc
-            },
-        );
-        let aaa = ParallelIterator::reduce(
-            fold,
-            BTreeMap::<usize, Vec<(LabelH, (IdNQ, TR<Init>))>>::default,
-            |mut acc, b| {
-                for (size, v) in b {
-                    acc.entry(size).or_default().extend(v);
-                }
-                acc
-            },
-        );
-        let aaa = aaa
-            .into_iter()
-            .fold(vec![vec![]; active_size], |mut acc, x| {
-                debug_assert!(x.0 < active_size);
-                acc[x.0] = x.1;
-                acc
-            });
-        ParallelIterator::flat_map(
-            dedup.0[..active_size].par_iter_mut().enumerate(),
-            |(i, dedup)| {
-                let mut r = vec![];
-                for (label_h, x) in &aaa[i] {
-                    let v = dedup.entry(x.0);
-                    use hashbrown::hash_map::Entry;
-                    let v = match v {
-                        Entry::Occupied(x) => x.into_mut(),
-                        Entry::Vacant(x) => {
-                            r.push(*x.key());
-                            x.insert(vec![])
-                        }
-                    };
-                    if !v.contains(&x.1) {
-                        v.push(x.1.clone());
-                    }
-                }
-                r
-            },
-        )
-        .collect()
+        // use rayon::iter::IndexedParallelIterator as _;
+        // use rayon::iter::IntoParallelRefMutIterator as _;
+        // use rayon::iter::ParallelIterator;
+
+        // // now use a Vec<T> in place of the BTree<usize, T>
+        // let by_size = by_size
+        //     .into_iter()
+        //     .fold(vec![vec![]; active_size], |mut acc, x| {
+        //         debug_assert!(x.0 < active_size);
+        //         acc[x.0] = x.1;
+        //         acc
+        //     });
+        // // dedup patterns in parallel (by size)
+        // let dedup = &mut self.dedup;
+        // ParallelIterator::flat_map(
+        //     dedup.0[..active_size].par_iter_mut().enumerate(),
+        //     |(i, dedup)| {
+        //         let mut r = vec![];
+        //         for x in &by_size[i] {
+        //             let v = dedup.entry(x.0);
+        //             use hashbrown::hash_map::Entry;
+        //             let v = match v {
+        //                 Entry::Occupied(x) => x.into_mut(),
+        //                 Entry::Vacant(x) => {
+        //                     r.push(*x.key());
+        //                     x.insert(vec![])
+        //                 }
+        //             };
+        //             if !v.contains(&x.1) {
+        //                 v.push(x.1.clone());
+        //             }
+        //         }
+        //         r
+        //     },
+        // )
+        // .collect()
+    }
+
+    #[cfg(feature = "synth_par")]
+    fn by_pattern_size(
+        &self,
+        uniques: Vec<(IdNQ, TR<Init>)>,
+    ) -> BTreeMap<usize, Vec<(IdNQ, TR<Init>)>>
+    where
+        Init: Eq + Clone + SolvedPosition<IdN>,
+        Init: Send + Sync,
+    {
+        self.by_pattern_metric(uniques, |q| q.size())
     }
 
     pub fn dedup_uniques_par2(
@@ -764,54 +802,11 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
     where
         Init: Eq,
     {
-        use rayon::iter::IndexedParallelIterator as _;
-        use rayon::iter::IntoParallelIterator as _;
-        use rayon::iter::IntoParallelRefMutIterator as _;
-        use rayon::iter::ParallelIterator;
-
-        let s = &mut self.lattice;
-        let dedup = &mut self.dedup;
-        let fold = ParallelIterator::fold(
-            uniques.into_par_iter(),
-            BTreeMap::default,
-            |mut acc: BTreeMap<usize, Vec<_>>, x: (IdNQ, TR<Init>)| {
-                let size = s.query_store.resolve(&x.0).size();
-                acc.entry(size).or_default().push(x);
-                acc
-            },
-        );
-        let aaa = ParallelIterator::reduce(
-            fold,
-            BTreeMap::<usize, Vec<(IdNQ, TR<Init>)>>::default,
-            |mut acc, b| {
-                for (size, v) in b {
-                    acc.entry(size).or_default().extend(v);
-                }
-                acc
-            },
-        );
-        let max_active = aaa.last_key_value().map_or(active_size, |x| *x.0);
-        let len = max_active.max(dedup.len());
-        dedup.resize(len, Default::default());
-        ParallelIterator::flat_map(dedup.0[..].par_iter_mut().enumerate(), |(i, dedup)| {
-            let mut r = vec![];
-            for x in aaa.get(&i).map_or(&vec![], |x| x) {
-                let v = dedup.entry(x.0);
-                use hashbrown::hash_map::Entry;
-                let v = match v {
-                    Entry::Occupied(x) => x.into_mut(),
-                    Entry::Vacant(x) => {
-                        r.push(*x.key());
-                        x.insert(vec![])
-                    }
-                };
-                if !v.contains(&x.1) {
-                    v.push(x.1.clone());
-                }
-            }
-            r
-        })
-        .collect()
+        let by_metric = self.by_pattern_size(uniques);
+        let max_active = by_metric.last_key_value().map_or(active_size, |x| *x.0);
+        let len = max_active.max(self.dedup.len());
+        self.dedup.resize(len, Default::default());
+        dedup_patterns_by_metric(by_metric, &mut self.dedup)
     }
 
     pub fn post(&mut self)
@@ -821,16 +816,13 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
         self.dedup.0.par_iter_mut().for_each(|x| {
             let qstores = &self.lattice.query_store;
-            for y in x.values_mut() {
-                // y.sort_by(cmp_lat_entry(&qstores))
-            }
+            for y in x.values_mut() {}
         });
         for v in self.dedup.iter().flat_map(|x| x.iter()) {
             self.lattice.add_raw_rels2(*v.0, v.1);
         }
-        // eprintln!("final: {}", pp_dedup(&self.dedup, self.dedup.len() - 1));
         for v in self.dedup.iter().flat_map(|x| x.iter()) {
-            let value = self.extract2(*v.0, v.1);
+            let value = self.lattice._extract2(*v.0, v.1);
             self.lattice.queries.push(value);
         }
     }
@@ -856,7 +848,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
             self.simp_focus(active_size);
             let mut a = self.actives(active_size);
-            let v = self.simp_eq(active_size, &mut a);
+            let v = self.simp_eq(&mut a);
             dbg!(v.0.len());
             let mut tmp_active_size = active_size;
             for (x, tr) in v.0 {
@@ -913,7 +905,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         &mut self,
         _active_size: usize,
         active: &mut Vec<IdNQ>,
-    ) -> Vec<(u32, (IdNQ, TR<Init>))> {
+    ) -> Vec<(IdNQ, TR<Init>)> {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -922,14 +914,17 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         let rms = std::mem::take(active).into_par_iter();
         let rms = ParallelIterator::flat_map(rms, |x| {
             let query = x;
-            try_simp_rms(&s.query_store, query, meta_simp)
+            let Some(cid) = meta_simp.capture_index_for_name("rm") else {
+                return vec![];
+            };
+            try_simp_rms(&s.query_store, query, meta_simp, cid)
                 .map(|x| match x {
-                    Ok((new_q, label_h)) => Ok((label_h, (new_q, TR::RMs(query)))),
+                    Ok(new_q) => Ok((new_q, TR::RMs(query))),
                     Err(e) => Err(e),
                 })
                 .collect::<Vec<_>>()
         });
-        let (remains, mut rms): (Vec<(IdN, Vec<u16>)>, Vec<(u32, (IdN, TR<Init>))>) =
+        let (remains, mut rms): (Vec<(IdN, Vec<u16>)>, Vec<(IdN, TR<Init>)>) =
             ParallelIterator::partition_map(rms, |x| x.into());
         log::info!("remains: {}", remains.len());
         log::info!("rms: {}", rms.len());
@@ -949,7 +944,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                     label_h = s.query_store.resolve(&query).hash(&HashKind::label());
                     query
                 };
-                Some((label_h, (new_q, TR::RMs(query))))
+                Some((new_q, TR::RMs(query)))
             }))
         });
         rms
@@ -970,7 +965,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         let rms = ParallelIterator::filter_map(rms, |x| {
             let query = x;
             try_simp_rmalls(&s.query_store, query, meta_simp, cid).map(|x| match x {
-                Ok((new_q, label_h)) => Ok((new_q, TR::RMall(query))),
+                Ok(new_q) => Ok((new_q, TR::RMall(query))),
                 Err(e) => Err(e),
             })
         });
@@ -980,8 +975,9 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         log::info!("rms: {}", rms.len());
 
         let rem_count = remains.len();
-        remains.chunks(1000).enumerate().for_each(|(i, x)| {
-            let i = i * 1000;
+        const CHUNK_SIZE: usize = 1000;
+        remains.chunks(CHUNK_SIZE).enumerate().for_each(|(i, x)| {
+            let i = i * CHUNK_SIZE;
             log::info!("remains removesall {i:4}/{rem_count}");
 
             rms.extend(x.iter().filter_map(|(query, curr, paths)| {
@@ -1012,7 +1008,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         &mut self,
         active_size: usize,
         active: &mut Vec<IdNQ>,
-    ) -> (Vec<(u32, (IdNQ, TR<Init>))>, Vec<IdNQ>) {
+    ) -> (Vec<(IdNQ, TR<Init>)>, Vec<IdNQ>) {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -1025,13 +1021,10 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 return vec![];
             };
             let query = x;
-            // let query = y[0].0;
             use rayon::iter::Either;
             try_simp_uniq(&s.query_store, query, meta_simp)
                 .map(|x| match x {
-                    ResSimpUniq::Deduplicated(new_q, label_h) => {
-                        Either::Right((label_h, (new_q, TR::Uniqs(query))))
-                    }
+                    ResSimpUniq::Deduplicated(new_q) => Either::Right((new_q, TR::Uniqs(query))),
                     ResSimpUniq::AlreadyUniq(i) => Either::Left(Either::Right(i)),
                     ResSimpUniq::NeedMut(a, b, c) => Either::Left(Either::Left((a, b, c))),
                 })
@@ -1040,14 +1033,17 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
         let ((remains, already), mut rms): (
             (Vec<(IdNQ, IdNQ, Vec<Vec<u16>>)>, Vec<IdNQ>),
-            Vec<(u32, (IdNQ, TR<Init>))>,
+            Vec<(IdNQ, TR<Init>)>,
         ) = ParallelIterator::partition_map(rms, |x| x);
         log::info!("remains: {}", remains.len());
         log::info!("uniqs: {}", rms.len());
         log::info!("already: {}", already.len());
 
+        // now handling the remaining patterns that require mut access to query_store,
+        // ie. they need to create new subtrees.
+        // TODO allow parallel reads of query_store at state before creating new mut handle
+        // by leveraging append only nature of HyperAST
         rms.extend(remains.into_iter().filter_map(|(query, mut curr, paths)| {
-            // dbg!(&paths);
             for path in paths.into_iter() {
                 curr = apply_rms_aux(&mut s.query_store, curr, &path)?;
             }
@@ -1061,11 +1057,78 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 // return None;
             }
             assert_ne!(new_q, query);
-            Some((label_h, (new_q, TR::Uniqs(query))))
+            Some((new_q, TR::Uniqs(query)))
         }));
         (rms, already)
     }
 }
+
+/// dedup using any usize representable metric,
+/// `by_metric` is indexed by the metric as its key
+/// `dedup` is also indexed by the metric as its offset
+fn dedup_patterns_by_metric<TR: Clone + PartialEq + Send + Sync>(
+    by_metric: BTreeMap<usize, Vec<(legion::Entity, TR)>>,
+    dedup: &mut Vec<hashbrown::HashMap<IdNQ, Vec<TR>>>,
+) -> Vec<legion::Entity> {
+    use rayon::iter::IndexedParallelIterator as _;
+    use rayon::iter::IntoParallelRefMutIterator as _;
+    use rayon::iter::ParallelIterator;
+    ParallelIterator::flat_map(dedup[..].par_iter_mut().enumerate(), |(i, dedup)| {
+        let mut r = vec![];
+        for x in by_metric.get(&i).map_or(&vec![], |x| x) {
+            let v = dedup.entry(x.0);
+            use hashbrown::hash_map::Entry;
+            let v = match v {
+                Entry::Occupied(x) => x.into_mut(),
+                Entry::Vacant(x) => {
+                    r.push(*x.key());
+                    x.insert(vec![])
+                }
+            };
+            if !v.contains(&x.1) {
+                v.push(x.1.clone());
+            }
+        }
+        r
+    })
+    .collect()
+}
+
+#[cfg(feature = "synth_par")]
+/// the rayon parallelization enabling fold-reduce
+fn by_metric<TR, M>(
+    uniques: Vec<(IdN, TR)>,
+    metric: impl Fn(&IdN) -> M + Sync,
+) -> BTreeMap<M, Vec<(IdN, TR)>>
+where
+    M: Ord,
+    TR: Send + Sync,
+    M: Send + Sync,
+{
+    use rayon::iter::IntoParallelIterator as _;
+    use rayon::iter::ParallelIterator;
+    let by_metric = ParallelIterator::fold(
+        uniques.into_par_iter(),
+        BTreeMap::<M, Vec<_>>::default,
+        |mut acc, x: (IdNQ, TR)| {
+            let size = metric(&x.0);
+            acc.entry(size).or_default().push(x);
+            acc
+        },
+    );
+    let by_metric = ParallelIterator::reduce(
+        by_metric,
+        BTreeMap::<M, Vec<(IdNQ, TR)>>::default,
+        |mut acc, b| {
+            for (size, v) in b {
+                acc.entry(size).or_default().extend(v);
+            }
+            acc
+        },
+    );
+    by_metric
+}
+
 #[cfg(feature = "synth_par")]
 impl<Init: Clone + SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
     pub fn actives(&mut self, active_size: usize) -> Vec<IdN> {
@@ -1138,11 +1201,7 @@ impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
 }
 
 impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
-    pub fn simp_eq(
-        &mut self,
-        active_size: usize,
-        active: &mut Vec<IdNQ>,
-    ) -> (Vec<(IdNQ, TR<Init>)>, Vec<IdNQ>) {
+    pub fn simp_eq(&mut self, active: &mut Vec<IdNQ>) -> (Vec<(IdNQ, TR<Init>)>, Vec<IdNQ>) {
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
@@ -1151,7 +1210,7 @@ impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
         let simp_eq = act
             .flat_map(|x| {
                 let query = x;
-                let Some(new_q) = simp_imm_eq(&mut s.query_store, query, meta_simp) else {
+                let Some(new_q) = simp_positional_eq(&mut s.query_store, query, meta_simp) else {
                     already.push(query);
                     return vec![];
                 };
@@ -1236,49 +1295,7 @@ impl<Init> Builder<'_, Init, DedupRawEntry<TR<Init>>> {
 
 impl<Init, D> Builder<'_, Init, D> {
     fn extract2(&self, k: IdNQ, v: &[TR<Init>]) -> (IdNQ, Vec<IdQ>) {
-        fn extract<'a, Init: 'a>(
-            map: &'a std::collections::HashMap<IdNQ, Vec<TR<Init>>>,
-            curr: IdNQ,
-            downs: impl Iterator<Item = &'a TR<Init>>,
-            already: &mut HashSet<IdNQ>,
-            r: &mut Vec<IdNQ>,
-            leafs: &[IdNQ],
-        ) {
-            for s in downs {
-                match s {
-                    TR::Init(_) if !r.contains(&curr) => {
-                        assert!(leafs.contains(&curr), "{curr:?}");
-                        r.push(curr)
-                    }
-                    TR::RMs(v) | TR::Uniqs(v) | TR::SimpEQ(v) if !already.contains(v) => {
-                        already.insert(*v);
-                        let downs = map.get(v).unwrap().iter();
-                        extract(map, *v, downs, already, r, leafs)
-                    }
-                    _ => (),
-                }
-            }
-        }
-        let mut already = HashSet::default();
-        let mut r = vec![];
-        extract(
-            &self.lattice.raw_rels,
-            // v[0].0,
-            k,
-            v.iter(),
-            &mut already,
-            &mut r,
-            &self.lattice.leaf_queries,
-        );
-        let r = r
-            .into_iter()
-            .map(|x| {
-                (self.lattice.leaf_queries.iter())
-                    .position(|y| x == *y)
-                    .unwrap() as u32
-            })
-            .collect();
-        (k, r)
+        self.lattice._extract2(k, v)
     }
 }
 
@@ -1505,19 +1522,19 @@ fn simp_focus(
         .collect()
 }
 
-fn simp_imm_eq(
+fn simp_positional_eq(
     query_store: &mut QStore,
     query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
 ) -> Option<IdNQ> {
-    // merge immediate predicates with identical labels
-    let mut per_label = simp_search_imm_preds(query_store, query, meta_simp);
+    // merge positional predicates with identical labels
+    let mut per_label = simp_search_positional_preds(query_store, query, meta_simp);
     let query = replace_preds_with_caps(query_store, query, per_label.values_mut().collect())?;
     let preds = format!("(_) {}", PerLabel(per_label));
     let mut md_cache = Default::default();
     let preds = try_ts_query(query_store, &mut md_cache, preds.as_bytes(), |n, t| {
         log::warn!(
-            "Error parsing predicates for simp_imm_eq: {}",
+            "Error parsing predicates for simp_positional_eq: {}",
             t.root_node().to_sexp()
         );
         Some(n)
@@ -1556,7 +1573,7 @@ fn simp_rms<'a>(
     query_store: &'a mut QStore,
     query: NodeIdentifier,
     meta_simp: &'a hyperast_tsquery::Query,
-) -> impl Iterator<Item = (NodeIdentifier, LabelH)> + 'a {
+) -> impl Iterator<Item = NodeIdentifier> + 'a {
     let rms = if let Some(cid) = meta_simp.capture_index_for_name("rm") {
         find_matches(query_store, query, meta_simp, cid)
     } else {
@@ -1567,9 +1584,7 @@ fn simp_rms<'a>(
         if !simp_search_need(query_store, query, meta_simp) {
             return None;
         }
-        // let query = hyperast::nodes::TextSerializer::<_, _>::new(&*query_store, query).to_string();
-        // crate::search::ts_query2_with_label_hash(query_store, query.as_bytes())
-        Some((query, query_store.resolve(&query).hash(&HashKind::label())))
+        Some(query)
     })
 }
 
@@ -1594,7 +1609,7 @@ fn simp_rmalls<'a>(
     vec![(query, query_store.resolve(&query).hash(&HashKind::label()))].into_iter()
 }
 
-type SimpRmsRemoves = (IdNQ, LabelH);
+type SimpRmsRemoves = IdNQ;
 type SimpRmsRemains = (IdNQ, PendingRmPath);
 type PendingRmPath = Vec<u16>;
 
@@ -1602,13 +1617,9 @@ fn try_simp_rms<'a>(
     query_store: &'a QStore,
     query: IdNQ,
     meta_simp: &'a hyperast_tsquery::Query,
+    cid: hyperast_tsquery::CaptureId,
 ) -> impl Iterator<Item = Result<SimpRmsRemoves, SimpRmsRemains>> + 'a {
-    let rms = if let Some(cid) = meta_simp.capture_index_for_name("rm") {
-        log::info!("trying to find matches to remove");
-        find_matches(query_store, query, meta_simp, cid)
-    } else {
-        vec![]
-    };
+    let rms = find_matches(query_store, query, meta_simp, cid);
     rms.into_iter().filter_map(move |path| {
         log::info!("to remove: {:?}", path);
         let Some(query) = try_apply_rms_aux(query_store, query, &path) else {
@@ -1617,10 +1628,7 @@ fn try_simp_rms<'a>(
         if !simp_search_need(query_store, query, meta_simp) {
             return None;
         }
-        Some(Ok((
-            query,
-            query_store.resolve(&query).hash(&HashKind::label()),
-        )))
+        Some(Ok(query))
     })
 }
 
@@ -1651,10 +1659,7 @@ fn try_simp_rmalls<'a>(
         return None;
     }
     let query = curr;
-    Some(Ok((
-        query,
-        query_store.resolve(&query).hash(&HashKind::label()),
-    )))
+    Some(Ok(query))
 }
 
 fn simp_uniq<'a>(
@@ -1683,12 +1688,12 @@ fn simp_uniq<'a>(
         if !simp_search_need(query_store, query, meta_simp) {
             return None;
         }
-        Some((query, query_store.resolve(&query).hash(&HashKind::label())))
+        Some(query)
     })
 }
 
 enum ResSimpUniq {
-    Deduplicated(IdNQ, LabelH),              // Some Ok
+    Deduplicated(IdNQ),                      // Some Ok
     NeedMut(IdNQ, IdNQ, Vec<PendingRmPath>), // Some Err
     AlreadyUniq(IdNQ),                       // None
 }
@@ -1733,7 +1738,7 @@ fn try_simp_uniq<'a>(
                 unimplemented!("don't know what to do there");
             }
             assert_ne!(curr, query);
-            ResSimpUniq::Deduplicated(curr, query_store.resolve(&curr).hash(&HashKind::label()))
+            ResSimpUniq::Deduplicated(curr)
         })
         .chain(already.into_iter().map(ResSimpUniq::AlreadyUniq))
 }
@@ -2015,7 +2020,6 @@ pub fn replace_preds_with_caps(
     let mut actions: Vec<_> = values
         .into_iter()
         .filter(|l| l.len() >= 2)
-        // .filter(|l| l.len() == 2)
         .flatten()
         .filter_map(|x| {
             let new = if x.0.is_empty() {
@@ -2025,14 +2029,9 @@ pub fn replace_preds_with_caps(
             } else {
                 make_cap(query_store, &x.0)
             };
-            // assert!(x.0.is_empty()); // for now lets not consider other cases than imm. eq
-            // x.0 = format!("p{}", count);
-            // count += 1;
-            // let new = make_cap(query_store, &x.0);
             let mut path = x.1.clone();
             path.pop();
             path.reverse();
-            // dbg!(&path);
             Some((path, new))
         })
         .collect();
@@ -2081,7 +2080,7 @@ type P = Vec<u16>;
 type Lab = String;
 type Cap = String;
 
-fn simp_search_imm_preds(
+fn simp_search_positional_preds(
     query_store: &QStore,
     query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,

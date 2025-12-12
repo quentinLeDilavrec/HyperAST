@@ -231,13 +231,34 @@ pub(crate) fn smells(
         b.build()
     };
 
-    let graphs = lattice::prep2(&query_lattice, |x| TextSerializer::new(sss, *x).to_string());
-
     let bad: Vec<_> = query_lattice
         .iter_pretty()
         .filter(|x| 5 < x.1.len() && x.1.len() * 2 < ex_map.len())
+        .map(|(s, x)| (s, std::borrow::Cow::Borrowed(x)))
         .take(10000)
         .collect();
+
+    let mut graphs = {
+        let g = lattice::Prep::extract_and_group(&query_lattice);
+        g.describe();
+        let f = |x: &IdN| TextSerializer::new(sss, *x).to_string();
+        g.log(&f);
+        g
+    };
+
+    // let mut idq_storage = vec![]; // temporary stuff for compatibility
+    let bad = if bad.is_empty() {
+        graphs
+            .tops()
+            .filter(|(q, _)| {
+                let lang = hyperast_gen_ts_java::language();
+                !q.is_empty() && hyperast_tsquery::Query::new(&q, lang).is_ok()
+            })
+            .map(|(s, x)| (s, std::borrow::Cow::Owned(x)))
+            .collect()
+    } else {
+        bad
+    };
     dbg!(bad.len());
     let matches = if simple_matching {
         matching::matches_default(with_spaces_stores, dst_tr, bad.iter().map(|x| x.0.as_str()))?
@@ -260,6 +281,8 @@ pub(crate) fn smells(
         // )
         // .map_err(|e| e.to_string())?;
     };
+    eprintln!("matches: {:?}", matches);
+    eprintln!("bads: {:?}", bad);
     assert_eq!(bad.len(), matches.len());
     let mut bad: Vec<_> = (matches.iter().enumerate())
         .map(|(i, v)| SearchResult {
@@ -269,6 +292,7 @@ pub(crate) fn smells(
             additional: vec![],
         })
         .collect();
+    dbg!(bad.len());
 
     bad.sort_by(|a, b| {
         let cmp = b.examples.len().cmp(&a.examples.len());
@@ -277,6 +301,11 @@ pub(crate) fn smells(
 
     let good = vec![]; // TODO generate the smell fixes
     let additional = vec![]; // TODO generate the added code not actively involved with a smell fix
+
+    let graphs = {
+        let f = |x: &IdN| TextSerializer::new(sss, *x).to_string();
+        graphs.compress(&f)
+    };
 
     let search_time = now.elapsed().as_secs_f64();
     Ok(SearchResults {
@@ -820,13 +849,23 @@ mod graph_compression {
 
         // Add edges — Csr expects `(NodeIndex, EdgeWeight)` tuples
         for edge in g.edge_references() {
+            eprintln!(
+                "{} {}",
+                edge.target().index() as u32,
+                edge.source().index() as u32,
+            );
             let added = csr.add_edge(
                 // reversed
                 edge.target().index() as u32,
                 edge.source().index() as u32,
                 edge.weight().clone(),
             );
-            assert!(added);
+            assert!(
+                added,
+                "{} {}",
+                edge.target().index() as u32,
+                edge.source().index() as u32,
+            );
         }
         csr
     }

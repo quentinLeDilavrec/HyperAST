@@ -1,5 +1,7 @@
 use hyperast::position::position_accessors::SolvedPosition;
 
+use crate::smells::IdNQ;
+
 use super::IdN;
 use super::Idx;
 
@@ -12,10 +14,18 @@ pub fn semi_interactive_poset_build<P>(
     #[derive(PartialEq, Eq, Debug)]
     enum Phase {
         Uniq,
-        SimpEq,
         Removes,
         RemovesAll,
+        SimpEq,
+        RemovesAll2,
+        Removes2,
     }
+
+    type BySize<T> = Vec<T>;
+    type SimpEqResult = IdN;
+    type SimpEqSource = IdN;
+    type SimpEqedSet = Vec<(SimpEqResult, Vec<SimpEqSource>)>;
+    // let mut simp_eq_valid_by_construction: BySize<SimpEqedSet> = vec![];
 
     let mut active_size = b.dedup.len() - 1;
     let mut active: Vec<_> = b.actives(active_size);
@@ -27,32 +37,37 @@ pub fn semi_interactive_poset_build<P>(
         // TODO find an alternative to phases
         // NOTE simp_eq creates larger pattern
         if phase == Phase::Uniq {
+            // do it first to reduce noise and remove as many patts as possible
             let (rms, _already) = b.uniques_par_par(active_size, &mut active);
             b.dedup_uniques_par(active_size, rms);
         } else if phase == Phase::SimpEq {
-            let (simps, already) = b.simp_eq(active_size, &mut active);
+            // the most tricky simp phase, as it adds a predicate and their captures
+            let (simps, not) = b.simp_eq(&mut active);
             let act = b.dedup_uniques_par2(active_size, simps);
-            // active.extend(already);
-            // removesall_par_par removes_par_par
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all") {
-                active = act;
+                active = act; // first rm on the ones that were simp
                 let rms = b.removesall_par_par(active_size, &mut active, cid);
                 b.dedup_uniques_par2(active_size, rms);
-                active = already;
+                active = not.clone(); // then the other that were not simp
                 let rms = b.removesall_par_par(active_size, &mut active, cid);
                 b.dedup_uniques_par2(active_size, rms);
             }
-        } else if phase == Phase::RemovesAll {
+            // TODO link all found simpeq (then rm.all) to previous respective simpeq action,
+            // ie. follow one back then re-apply same simpeq action and link to result
+            // let call this a reduction and model it as TR::SimpEqReduction(TR)
+        } else if phase == Phase::RemovesAll || phase == Phase::RemovesAll2 {
+            // do not use after simp_eq as it might remove captures
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
                 let rms = b.removesall_par_par(active_size, &mut active, cid);
                 b.dedup_uniques_par2(active_size, rms);
             }
-        } else if phase == Phase::Removes {
+        } else if phase == Phase::Removes || phase == Phase::Removes2 {
+            // do not use after simp_eq as it might remove captures
             for a in &active {
                 log::info!("try remove:\n{}", b.lattice.pretty(&a));
             }
             let rms = b.removes_par_par(active_size, &mut active);
-            for (_, (a, _)) in &rms {
+            for (a, _) in &rms {
                 log::info!("to remove:\n{}", b.lattice.pretty(&a));
             }
             b.dedup_removes_par(active_size, &mut active, rms);
@@ -64,22 +79,93 @@ pub fn semi_interactive_poset_build<P>(
             if phase == Phase::Uniq {
                 active_size = b.dedup.len() - 1;
                 active = b.actives(active_size);
-                phase = Phase::SimpEq;
-            } else if phase == Phase::SimpEq {
-                active_size = b.dedup.len() - 1;
-                active = b.actives(active_size);
                 phase = Phase::RemovesAll;
             } else if phase == Phase::RemovesAll {
                 active_size = b.dedup.len() - 1;
                 active = b.actives(active_size);
                 phase = Phase::Removes;
-            } else {
-                // phase = Phase::Uniq;
-                // active_size = b.dedup.len() - 1;
+            } else if phase == Phase::Removes {
+                active_size = b.dedup.len() - 1;
+                // this phase produce many variants so only reasonably sized patterns are considered
+                // tips consider more patterns in remove all
+                active_size = active_size.min(2000);
+                active = b.actives(active_size);
+                phase = Phase::SimpEq;
+            } else if phase == Phase::SimpEq {
+                active_size = b.dedup.len() - 1;
+                // these phases produc
+                active_size = active_size.min(2000);
+                active = b.actives(active_size);
+                phase = Phase::RemovesAll2;
+                // simp_eq_valid_by_construction = find_simpeqs_ascending(b, active_size).collect();
+                // dbg!(simp_eq_valid_by_construction.len());
+                // dbg!(
+                //     simp_eq_valid_by_construction
+                //         .iter()
+                //         .map(|x| x.len())
+                //         .collect::<Vec<_>>()
+                // );
+            } else if phase == Phase::RemovesAll2 {
+                active_size = b.dedup.len() - 1;
+                active = b.actives(active_size);
+                phase = Phase::Removes2;
+            } else if phase == Phase::Removes2 {
                 break;
+            } else {
+                unreachable!();
             }
         }
     }
+    // let simp_eq_all = collect_simpeqs(b, b.dedup.len() - 1);
+    // dbg!(simp_eq_all.len());
+    // dbg!(simp_eq_all.iter().map(|x| x.len()).collect::<Vec<_>>());
+
+    // remove invalid simp EQed patterns
+    // * find all simpEQs
+    // * find all constructively valid simp EQed patterns
+    //   for each patt at source of simp EQ
+    //   * find a path to init without simp EQ, they are valid by construction
+
+    // done in `simp_eq_valid_by_construction`
+
+    // * find all patterns leading to valid ones
+    //   for each constructively valid simp EQed pattern
+    //   * find reachable intermediate patterns, they should be valid
+    //     explanation simp eq are made invalid by partially removing elements of query produced by simp eq
+    //       if it reaches a valid simp EQed pattern it must also now be valid,
+    //         by the way all simp EQ are done in one shot such that only one instance exists at a time
+    //         it can be verified by checking for the absence of paths in the poet with more than one simpeq
+
+    // lets compute a topological sort of the patterns
+}
+
+fn find_simpeqs_ascending<P>(
+    b: &hyperast_gen_ts_tsquery::code2query::Builder<'_, P>,
+    active_size: usize,
+) -> impl Iterator<Item = Vec<(IdNQ, Vec<IdNQ>)>>
+where
+    P: Eq + Clone + SolvedPosition<IdN> + Sync + Send,
+{
+    use hyperast_gen_ts_tsquery::code2query::TR;
+    let simp_eqs = |v: &Vec<TR<P>>| {
+        v.iter()
+            .filter_map(|x| match x {
+                TR::SimpEQ(x) => Some(*x),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    (0..active_size).into_iter().map(move |size| {
+        (b.dedup[size].iter())
+            .filter_map(|x| {
+                let v = simp_eqs(x.1);
+                if v.is_empty() {
+                    return None;
+                }
+                Some((*x.0, v))
+            })
+            .collect::<Vec<_>>()
+    })
 }
 
 const Q: &str = r#"(named_node

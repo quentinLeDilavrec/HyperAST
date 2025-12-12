@@ -190,7 +190,7 @@ fn test_new_matcher_for_xml_eq() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn test_new_matcher_for_xml_imm_eq() -> Result<(), Box<dyn std::error::Error>> {
+fn test_new_matcher_for_xml_pos_eq() -> Result<(), Box<dyn std::error::Error>> {
     let path: std::path::PathBuf =
         std::path::Path::new("../../../gen/tree-sitter/xml/src/tests/pom.xml.test").to_path_buf();
 

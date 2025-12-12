@@ -1302,7 +1302,7 @@ mod test_tsg_queries {
     // provoke an infinite loop or is very slow.
     // aparently just very slow ie. the baseline is as slow.
     // no idea how to fix that
-    // NOTE immediate predicates would probably be beneficial there ie. shortcut
+    // NOTE positional predicates would probably be beneficial there ie. shortcut
     // Might be an issue of type of used collection.
     fn bl_155_spoon() {
         unsafe { crate::legion_with_refs::HIDDEN_NODES = true };

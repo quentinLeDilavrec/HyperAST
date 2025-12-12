@@ -46,6 +46,7 @@ impl Content {
 pub enum QueryingError {
     MissingLanguage(String),
     TsgParsing(String),
+    Preprocessing(String),
 }
 
 #[derive(Serialize)]
@@ -100,7 +101,7 @@ pub fn simple(
     log::warn!("done cloning {}", &repo.spec);
     let commits = (state.repositories.write().unwrap())
         .pre_process_with_limit(&mut repo, "", &commit, commits)
-        .unwrap();
+        .map_err(|e| QueryingError::Preprocessing(e.to_string()))?;
     let path = &path.unwrap_or_default();
 
     let tsg = {

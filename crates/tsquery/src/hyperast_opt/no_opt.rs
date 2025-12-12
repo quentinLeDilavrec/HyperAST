@@ -36,13 +36,13 @@ impl<HAST: HyperAST> PartialEq for Node<'_, HAST> {
     }
 }
 
-impl<'hast, HAST: HyperASTShared> Node<'hast, HAST> {
+impl<'hast, HAST: HyperAST> Node<'hast, HAST> {
     pub fn new(stores: &'hast HAST, pos: Pos<HAST>) -> Self {
         Self { stores, pos }
     }
 }
 
-impl<HAST: HyperASTShared> Clone for Node<'_, HAST> {
+impl<HAST: HyperAST> Clone for Node<'_, HAST> {
     fn clone(&self) -> Self {
         Self {
             stores: self.stores,

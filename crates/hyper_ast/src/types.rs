@@ -940,6 +940,12 @@ pub trait TypeStore {
         *unsafe { erazed.unerase_ref_unchecked::<Self::Ty>(tid) }
             .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
     }
+    fn try_decompress_type(
+        erazed: &impl PolyglotHolder,
+        tid: std::any::TypeId,
+    ) -> Option<Self::Ty> {
+        unsafe { erazed.unerase_ref_unchecked::<Self::Ty>(tid) }.map(|x| *x)
+    }
 }
 
 pub trait TTypeStore: TypeStore {

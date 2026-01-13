@@ -32,10 +32,10 @@ where
         let t = self.hyperast.resolve_type(s);
         for mut seed in seeds {
             while let Some(parent) = self.dst_arena.parent(&seed) {
-                if visited[parent.to_usize().unwrap()] {
+                if visited[parent.index()] {
                     break;
                 }
-                visited.set(parent.to_usize().unwrap(), true);
+                visited.set(parent.index(), true);
 
                 let p = &self.dst_arena.original(&parent);
                 if self.hyperast.resolve_type(p) == t
@@ -65,7 +65,7 @@ where
         let t = self.hyperast.resolve_type(s);
         for seed in seeds {
             while let Some(parent) = self.src_arena.parent(&seed) {
-                if visited[parent.to_usize().unwrap()] {
+                if visited[parent.index()] {
                     break;
                 }
                 visited.set(parent.to_usize().unwrap(), true);

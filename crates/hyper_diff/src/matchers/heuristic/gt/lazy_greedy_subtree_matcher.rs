@@ -121,11 +121,11 @@ where
                 }
             }
 
-            if !(ignored[src.shallow().to_usize().unwrap()] || is_mapping_unique) {
+            if !(ignored[src.shallow().index()] || is_mapping_unique) {
                 let adsts = multi_mappings.get_dsts(&src);
                 let asrcs = multi_mappings.get_srcs(&multi_mappings.get_dsts(&src)[0]);
                 for asrc in asrcs {
-                    ignored.set(asrc.shallow().to_usize().unwrap(), true);
+                    ignored.set(asrc.shallow().index(), true);
                     for adst in adsts {
                         ambiguous_list.push((*asrc, *adst));
                     }
@@ -140,8 +140,8 @@ where
 
         // Select the best ambiguous mappings
         for (src, dst) in mapping_list {
-            let src_i = src.shallow().to_usize().unwrap();
-            let dst_i = dst.shallow().to_usize().unwrap();
+            let src_i = src.shallow().index();
+            let dst_i = dst.shallow().index();
             if !(src_ignored[src_i] || dst_ignored[dst_i]) {
                 mapper.add_mapping_recursively_lazy(&src, &dst);
                 src_ignored.set(src_i, true);
@@ -149,13 +149,13 @@ where
                     .src_arena
                     .descendants(&src)
                     .iter()
-                    .for_each(|src| src_ignored.set(src.to_usize().unwrap(), true));
+                    .for_each(|src| src_ignored.set(src.index(), true));
                 dst_ignored.set(dst_i, true);
                 mapper
                     .dst_arena
                     .descendants(&dst)
                     .iter()
-                    .for_each(|dst| dst_ignored.set(dst.to_usize().unwrap(), true));
+                    .for_each(|dst| dst_ignored.set(dst.index(), true));
             }
             // TODO return additional mappings
         }
@@ -299,10 +299,8 @@ where
         blink: &(Dsrc::IdD, Ddst::IdD),
     ) -> std::cmp::Ordering {
         usize::cmp(
-            &(alink.0.shallow().to_usize().unwrap())
-                .abs_diff(alink.1.shallow().to_usize().unwrap()),
-            &(blink.0.shallow().to_usize().unwrap())
-                .abs_diff(blink.1.shallow().to_usize().unwrap()),
+            &(alink.0.shallow().index()).abs_diff(alink.1.shallow().index()),
+            &(blink.0.shallow().index()).abs_diff(blink.1.shallow().index()),
         )
     }
 }

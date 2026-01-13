@@ -210,24 +210,14 @@ where
         self.lcs_equal_matching_lazy(src, dst);
         self.lcs_structure_matching_lazy(src, dst);
 
-        let src_is_root = self.src_arena.parent(&src).is_none();
-        let dst_is_root = self.dst_arena.parent(&dst).is_none();
-        if src_is_root && dst_is_root {
+        let src_type = (self.src_arena.parent(&src))
+            .map(|p| self.src_arena.original(&p))
+            .map(|p| self.hyperast.resolve_type(&p));
+        let dst_type = (self.dst_arena.parent(&dst))
+            .map(|p| self.dst_arena.original(&p))
+            .map(|p| self.hyperast.resolve_type(&p));
+        if src_type == dst_type {
             self.histogram_matching_lazy(src, dst);
-        } else if !(src_is_root || dst_is_root) {
-            let src_type = self.hyperast.resolve_type(
-                &self
-                    .src_arena
-                    .original(&self.src_arena.parent(&src).unwrap()),
-            );
-            let dst_type = self.hyperast.resolve_type(
-                &self
-                    .dst_arena
-                    .original(&self.dst_arena.parent(&dst).unwrap()),
-            );
-            if src_type == dst_type {
-                self.histogram_matching_lazy(src, dst)
-            }
         }
     }
 
@@ -721,10 +711,10 @@ where
     for mut seed in seeds.iter().copied() {
         while let Some(parent) = arena.parent(&seed) {
             // If visited break, otherwise mark as visited
-            if visited[parent.to_usize().unwrap()] {
+            if visited[parent.index()] {
                 break;
             }
-            visited.set(parent.to_usize().unwrap(), true);
+            visited.set(parent.index(), true);
 
             let p = &arena.original(&parent);
             let p_type = hyperast.resolve_type(p);

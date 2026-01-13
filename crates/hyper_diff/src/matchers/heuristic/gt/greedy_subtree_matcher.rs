@@ -74,7 +74,7 @@ where
                 }
             }
 
-            if !(ignored[src.to_usize().unwrap()] || is_mapping_unique) {
+            if !(ignored[src.index()] || is_mapping_unique) {
                 let adsts = multi_mappings.get_dsts(&src);
                 let asrcs = multi_mappings.get_srcs(&multi_mappings.get_dsts(&src)[0]);
                 for asrc in asrcs {
@@ -82,9 +82,7 @@ where
                         ambiguous_list.push((*asrc, *adst));
                     }
                 }
-                asrcs
-                    .iter()
-                    .for_each(|x| ignored.set(x.to_usize().unwrap(), true))
+                asrcs.iter().for_each(|x| ignored.set(x.index(), true))
             }
         }
 
@@ -92,8 +90,8 @@ where
 
         // Select the best ambiguous mappings
         for (src, dst) in mapping_list {
-            let src_i = src.to_usize().unwrap();
-            let dst_i = dst.to_usize().unwrap();
+            let src_i = src.index();
+            let dst_i = dst.index();
             if !(src_ignored[src_i] || dst_ignored[dst_i]) {
                 mapper.add_mapping_recursively(&src, &dst);
                 src_ignored.set(src_i, true);
@@ -101,13 +99,13 @@ where
                     .src_arena
                     .descendants(&src)
                     .iter()
-                    .for_each(|src| src_ignored.set(src.to_usize().unwrap(), true));
+                    .for_each(|src| src_ignored.set(src.index(), true));
                 dst_ignored.set(dst_i, true);
                 mapper
                     .dst_arena
                     .descendants(&dst)
                     .iter()
-                    .for_each(|dst| dst_ignored.set(dst.to_usize().unwrap(), true));
+                    .for_each(|dst| dst_ignored.set(dst.index(), true));
             }
         }
     }
@@ -258,18 +256,7 @@ where
         alink: &(M::Src, M::Dst),
         blink: &(M::Src, M::Dst),
     ) -> std::cmp::Ordering {
-        (alink
-            .0
-            .to_usize()
-            .unwrap()
-            .abs_diff(alink.1.to_usize().unwrap()))
-        .cmp(
-            &blink
-                .0
-                .to_usize()
-                .unwrap()
-                .abs_diff(blink.1.to_usize().unwrap()),
-        )
+        (alink.0.index().abs_diff(alink.1.index())).cmp(&blink.0.index().abs_diff(blink.1.index()))
     }
 }
 
@@ -423,10 +410,9 @@ where
                 .unwrap()
                 / max_pos_diff.to_f64().unwrap());
         let po: f64 = 1.0_f64
-            - ((Ord::max(src.to_usize().unwrap(), dst.to_usize().unwrap())
-                - Ord::min(dst.to_usize().unwrap(), src.to_usize().unwrap()))
-            .to_f64()
-            .unwrap()
+            - ((Ord::max(src.index(), dst.index()) - Ord::min(dst.index(), src.index()))
+                .to_f64()
+                .unwrap()
                 / Self::get_max_tree_size(mapper).to_f64().unwrap());
         100. * jaccard + 10. * pos + po
     }

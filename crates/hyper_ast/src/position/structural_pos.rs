@@ -199,7 +199,7 @@ where
     where
         S: position_accessors::WithFullPostOrderPath<HAST::IdN, Idx = HAST::Idx>
             + position_accessors::SolvedPosition<HAST::IdN>,
-        for<'t> LendT<'t, HAST>: WithSerialization + WithChildren + WithStats,
+        for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
         B: bottom_up::ReceiveInFile<HAST::IdN, HAST::Idx, usize, O> + bottom_up::CreateBuilder,
         B::SB1<O>: bottom_up::ReceiveDir<HAST::IdN, HAST::Idx, O>,
     {
@@ -677,6 +677,25 @@ impl<IdN, Idx> CursorWithPersistenceOrderedSet<IdN, Idx> {
             self.handles.push(p.h.0);
         }
     }
+    pub fn register_ref(&mut self, p: RefNode<'_, IdN, Idx>) {
+        use std::ops::Deref;
+        let x = self.s.deref().borrow();
+        let x = x.deref();
+        let y = p.s.deref();
+        assert!(std::ptr::addr_eq(x, y));
+        if !self.handles.contains(&p.h.0) {
+            self.handles.push(p.h.0);
+        }
+    }
+    pub fn remove(&mut self, p: &PersistedNode<IdN, Idx>) -> bool {
+        assert!(Rc::ptr_eq(&self.s, &p.s));
+        if let Some(pos) = self.handles.iter().position(|&h| h == p.h.0) {
+            self.handles.swap_remove(pos);
+            true
+        } else {
+            false
+        }
+    }
     pub fn collect_vec<R>(self, f: impl Fn(RefNode<IdN, Idx>) -> R) -> Vec<R> {
         self.handles
             .into_iter()
@@ -685,6 +704,16 @@ impl<IdN, Idx> CursorWithPersistenceOrderedSet<IdN, Idx> {
                 f(RefNode { s, h: Handle(h) })
             })
             .collect()
+    }
+    pub fn into_iter<R>(self, f: impl Fn(RefNode<IdN, Idx>) -> R) -> impl Iterator<Item = R> {
+        self.handles.into_iter().map(move |h| {
+            let s = self.s.borrow();
+            f(RefNode { s, h: Handle(h) })
+        })
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.handles.is_empty()
     }
 }
 

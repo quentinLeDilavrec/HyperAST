@@ -69,7 +69,7 @@ impl<Ty, C> PreparedMatcher<Ty, C> {
     pub fn capture_quantifiers(
         &self,
         index: usize,
-    ) -> (impl std::ops::Index<usize, Output = tree_sitter::CaptureQuantifier> + '_) {
+    ) -> impl std::ops::Index<usize, Output = tree_sitter::CaptureQuantifier> + '_ {
         // struct A([tree_sitter::CaptureQuantifier]);
         // impl std::ops::Index<usize> for &A {
         //     type Output = tree_sitter::CaptureQuantifier;

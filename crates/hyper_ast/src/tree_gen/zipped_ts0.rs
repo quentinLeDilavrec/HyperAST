@@ -342,7 +342,7 @@ where
         let line_count = spacing
             .matches("\n")
             .count()
-            .to_u16()
+            .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
@@ -438,7 +438,7 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        
+
         self.make(&mut global, acc, label)
     }
 }
@@ -461,7 +461,7 @@ where
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
         let own_line_count = label.as_ref().map_or(0, |l| {
-            l.matches("\n").count().to_u16().expect("too many newlines")
+            l.matches("\n").count().to_u32().expect("too many newlines")
         });
         let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
 
@@ -513,12 +513,7 @@ where
             let compressed_node =
                 NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
 
-            self.md_cache.insert(
-                compressed_node,
-                DD {
-                    metrics,
-                },
-            );
+            self.md_cache.insert(compressed_node, DD { metrics });
             Local {
                 compressed_node,
                 metrics,
@@ -526,7 +521,6 @@ where
             }
         };
 
-        
         FullNode {
             global: global.simple(),
             local,

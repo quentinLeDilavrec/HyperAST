@@ -161,9 +161,9 @@ pub struct SubTreeMetrics<U> {
     pub size: u32,
     pub height: u32,
     pub size_no_spaces: u32,
-    /// should include lines inside labels
-    pub line_count: u16, // TODO u16 is definitely not enough at the directory level e.g. 1.6MLoCs for Hadoop
-                         // pub byte_len: u32,
+    // pub byte_len: u32,
+    /// count newlines inside labels
+    pub line_count: u32, // TODO u16 is definitely not enough at the directory level e.g. 1.6MLoCs for Hadoop
 }
 
 impl<U: NodeHashs> SubTreeMetrics<U> {
@@ -213,7 +213,7 @@ impl<U: crate::hashed::ComputableNodeHashs> SubTreeMetrics<U> {
         self,
         k: &K,
         l: &L,
-        line_count: u16,
+        line_count: u32,
     ) -> SubTreeMetrics<crate::hashed::HashesBuilder<U>> {
         let size_no_spaces = self.size_no_spaces + 1;
         use crate::hashed::IndexingHashBuilder;

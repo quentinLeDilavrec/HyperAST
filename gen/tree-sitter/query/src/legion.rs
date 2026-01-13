@@ -263,7 +263,7 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let line_count = spacing
             .matches("\n")
             .count()
-            .to_u16()
+            .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
@@ -513,7 +513,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
                         height: node.height().to_u32().unwrap(),
                         size_no_spaces: node.size_no_spaces().to_u32().unwrap(),
                         hashs,
-                        line_count: node.line_count().to_u16().unwrap(),
+                        line_count: node.line_count().to_u32().unwrap(),
                     }
                 };
                 Local {
@@ -643,7 +643,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
                         height: node.height().to_u32().unwrap(),
                         size_no_spaces: node.size_no_spaces().to_u32().unwrap(),
                         hashs,
-                        line_count: node.line_count().to_u16().unwrap(),
+                        line_count: node.line_count().to_u32().unwrap(),
                     }
                 };
                 Local {

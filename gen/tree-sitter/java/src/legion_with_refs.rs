@@ -1,23 +1,14 @@
 ///! fully compress all subtrees from a Java CST
+use crate::TNode;
 use crate::types::JavaEnabledTypeStore;
-use crate::{
-    TNode,
-    types::{TStore, Type},
-};
+use crate::types::{TStore, Type};
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::DedupMap;
-use hyperast::store::{
-    defaults::LabelIdentifier,
-    nodes::{
-        EntityBuilder,
-        legion::{HashedNodeRef, eq_node, subtree_builder},
-    },
-};
+use hyperast::store::nodes::legion::{HashedNodeRef, eq_node, subtree_builder};
+use hyperast::store::{defaults::LabelIdentifier, nodes::EntityBuilder};
+use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
-use hyperast::tree_gen::{
-    self, Parents, PreResult, SubTreeMetrics, TreeGen, WithByteRange,
-    parser::{Node, TreeCursor},
-};
+use hyperast::tree_gen::{self, Parents, PreResult, SubTreeMetrics, TreeGen, WithByteRange};
 use hyperast::tree_gen::{
     GlobalData as _, StatsGlobalData, TextedGlobalData, TotalBytesGlobalData as _,
 };
@@ -644,7 +635,7 @@ where
         let line_count = spacing
             .matches("\n")
             .count()
-            .to_u16()
+            .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
@@ -868,7 +859,7 @@ where
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
         let own_line_count = label.as_ref().map_or(0, |l| {
-            l.matches("\n").count().to_u16().expect("too many newlines")
+            l.matches("\n").count().to_u32().expect("too many newlines")
         });
         let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
 
@@ -1091,7 +1082,7 @@ where
                         height: node.height().to_u32().unwrap(),
                         size_no_spaces: node.size_no_spaces().to_u32().unwrap(),
                         hashs,
-                        line_count: node.line_count().to_u16().unwrap(),
+                        line_count: node.line_count().to_u32().unwrap(),
                     };
                     let mcc = node
                         .get_component::<Mcc>()
@@ -1121,7 +1112,7 @@ where
 
             let interned_kind = TS::intern(acc.simple.kind);
             let own_line_count = label.as_ref().map_or(0, |l| {
-                l.matches("\n").count().to_u16().expect("too many newlines")
+                l.matches("\n").count().to_u32().expect("too many newlines")
             });
             let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
 

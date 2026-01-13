@@ -463,7 +463,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
                         height: node.height().to_u32().unwrap(),
                         size_no_spaces: node.size_no_spaces().to_u32().unwrap(),
                         hashs,
-                        line_count: node.line_count().to_u16().unwrap(),
+                        line_count: node.line_count().to_u32().unwrap(),
                     }
                 };
                 Local {

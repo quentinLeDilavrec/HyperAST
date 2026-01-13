@@ -288,7 +288,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         let line_count = spacing
             .matches("\n")
             .count()
-            .to_u16()
+            .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =

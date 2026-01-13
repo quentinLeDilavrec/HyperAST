@@ -97,7 +97,7 @@ impl<L: Clone, Idx: PrimInt, I: Clone> ActionsTree<SimpleAction<L, CompressedTre
         }
         let action = match &action.action {
             Act::Delete {} => todo!(),
-            Act::Update { new } => todo!(),
+            Act::Update { new, before } => todo!(),
             Act::Move { from } => todo!(),
             Act::MovUpd { from, new } => todo!(),
             Act::Insert { sub } => todo!(),
@@ -126,7 +126,7 @@ impl<L: Clone, Idx: PrimInt, I: Clone> ActionsTree<SimpleAction<L, CompressedTre
                 },
                 u32::MAX,
             ),
-            Act::Update { new } => Self::merge_aux(
+            Act::Update { new, before } => Self::merge_aux(
                 action.path.ori.iter(),
                 &mut self.atomics,
                 |p| &mut p.ori,
@@ -135,7 +135,10 @@ impl<L: Clone, Idx: PrimInt, I: Clone> ActionsTree<SimpleAction<L, CompressedTre
                         ori: path.into(),
                         mid: action.path.mid.clone(),
                     },
-                    action: Act::Update { new: new.clone() },
+                    action: Act::Update {
+                        new: new.clone(),
+                        before: before.clone(),
+                    },
                 },
                 u32::MAX,
             ),

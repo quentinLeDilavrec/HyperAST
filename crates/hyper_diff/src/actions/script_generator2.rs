@@ -47,7 +47,7 @@ impl<P: Debug> Debug for ApplicablePath<P> {
 #[derive(Clone)]
 pub enum Act<L, P, I> {
     Delete {},
-    Update { new: L },
+    Update { before: ApplicablePath<P>, new: L },
     Move { from: ApplicablePath<P> },
     MovUpd { from: ApplicablePath<P>, new: L },
     Insert { sub: I },
@@ -56,11 +56,11 @@ pub enum Act<L, P, I> {
 impl<L, Idx, I> Debug for Act<L, Idx, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Delete {} => f.write_str("Delete"),
-            Self::Update { new } => f.write_str("Update"),
-            Self::Move { from } => f.write_str("Move"),
-            Self::MovUpd { from, new } => f.write_str("MovUpd"),
-            Self::Insert { sub } => f.write_str("Insert"),
+            Self::Delete { .. } => f.write_str("Delete"),
+            Self::Update { .. } => f.write_str("Update"),
+            Self::Move { .. } => f.write_str("Move"),
+            Self::MovUpd { .. } => f.write_str("MovUpd"),
+            Self::Insert { .. } => f.write_str("Insert"),
         }
     }
 }
@@ -68,7 +68,16 @@ impl<L, Idx, I> Debug for Act<L, Idx, I> {
 impl<L: PartialEq, Idx: PartialEq, I: PartialEq> PartialEq for Act<L, Idx, I> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Update { new: l_new }, Self::Update { new: r_new }) => l_new == r_new,
+            (
+                Self::Update {
+                    before: l_before,
+                    new: l_new,
+                },
+                Self::Update {
+                    before: r_before,
+                    new: r_new,
+                },
+            ) => l_before == r_before && l_new == r_new,
             (Self::Move { from: l_from }, Self::Move { from: r_from }) => l_from == r_from,
             (
                 Self::MovUpd {
@@ -103,7 +112,7 @@ impl<L: Debug, P: Debug, I: Debug> Debug for SimpleAction<L, P, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.action {
             Act::Delete {} => write!(f, "Del {:?}", self.path),
-            Act::Update { new } => write!(f, "Upd {:?} {:?}", new, self.path),
+            Act::Update { new, before } => write!(f, "Upd {:?} {:?} {:?}", new, before, self.path),
             Act::Move { from } => write!(f, "Mov {:?} {:?}", from, self.path),
             Act::MovUpd { from, new } => write!(f, "MoU {:?} {:?} {:?}", from, new, self.path),
             Act::Insert { sub } => write!(f, "Ins {:?} {:?}", sub, self.path),
@@ -595,7 +604,13 @@ where
                         let path = ApplicablePath { ori, mid };
                         let action = SimpleAction {
                             path,
-                            action: Act::Update { new: x_l.unwrap() },
+                            action: Act::Update {
+                                new: x_l.unwrap(),
+                                before: ApplicablePath {
+                                    ori: self.orig_src(w),
+                                    mid: self.path(w),
+                                },
+                            },
                         };
                         // dbg!(&action);
                         self.mid_arena[w.to_usize().unwrap()].compressed =
@@ -634,13 +649,22 @@ where
                     self.actions.push(action);
                 } else if w_l != x_l {
                     // rename
-                    let path = ApplicablePath {
+                    let mid = self.path(w);
+                    let before = ApplicablePath {
                         ori: self.orig_src(w),
-                        mid: self.path(w),
+                        mid,
+                    };
+                    let mid = self.path(w);
+                    let path = ApplicablePath {
+                        ori: self.path_dst(&self.dst_arena.root(), &x),
+                        mid,
                     };
                     let action = SimpleAction {
                         path,
-                        action: Act::Update { new: x_l.unwrap() },
+                        action: Act::Update {
+                            new: x_l.unwrap(),
+                            before,
+                        },
                     };
                     self.mid_arena[w.to_usize().unwrap()].compressed = self.dst_arena.original(&x);
                     self.mid_arena[w.to_usize().unwrap()].action = Some(self.actions.len());

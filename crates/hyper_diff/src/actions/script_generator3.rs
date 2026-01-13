@@ -10,7 +10,7 @@ use std::hash::Hash;
 use hyperast::PrimInt;
 use num_traits::{ToPrimitive, cast};
 
-use hyperast::types::{HyperAST, HyperASTShared, Labeled};
+use hyperast::types::{HyperAST, HyperASTShared, HyperType, Labeled};
 
 use super::Actions;
 use super::action_vec::ActionsVec;
@@ -50,7 +50,7 @@ impl<IdC: Debug, IdD: Debug> Debug for MidNode<IdC, IdD> {
     }
 }
 
-pub struct ScriptGenerator<'a1, 'a2, IdD, SS, SD, HAST, M, P>
+pub struct ScriptGenerator<'a1, 'a2, IdM, SS, SD, HAST, M, P>
 where
     HAST: HyperASTShared,
     M: MonoMappingStore,
@@ -59,8 +59,8 @@ where
     src_arena_dont_use: &'a1 SS,
     cpy2ori: Vec<M::Src>,
     #[allow(unused)]
-    mid_arena: Vec<MidNode<HAST::IdN, IdD>>,
-    mid_root: Vec<IdD>,
+    mid_arena: Vec<MidNode<HAST::IdN, IdM>>,
+    mid_root: Vec<IdM>,
     dst_arena: &'a2 SD,
     cpy_mappings: M,
     dirty: bitvec::vec::BitVec,
@@ -341,11 +341,18 @@ where
             } else {
                 vec![k].into()
             };
+            let ori = self.orig_src(w);
+            let before = ApplicablePath { ori, mid };
             let ori = self.path_dst(&self.dst_arena.root(), &x);
+            let mid = if let Some(z) = z {
+                self.path(z).extend(&[k])
+            } else {
+                vec![k].into()
+            };
             let path = ApplicablePath { ori, mid };
             let x_l =
                 x_l.expect("no label on x, a given node type either always or never has a label");
-            let action = self._upd(x, w, x_l, path)?;
+            let action = self._upd(x, w, x_l, before, path)?;
             self.actions.push(action);
             Act::Move { from }
         } else {
@@ -378,12 +385,16 @@ where
         w: IdD,
         x_l: Option<HAST::Label>,
     ) -> Result<(), EditScriptError> {
-        let path = ApplicablePath {
+        let before = ApplicablePath {
             ori: self.orig_src(w),
             mid: self.path(w),
         };
+        let path = ApplicablePath {
+            ori: self.path_dst(&self.dst_arena.root(), &x),
+            mid: self.path(w),
+        };
         let x_l = x_l.expect("no label on x, a given node type either always or never has a label");
-        let action = self._upd(x, w, x_l, path)?;
+        let action = self._upd(x, w, x_l, before, path)?;
         self.actions.push(action);
         Ok(())
     }
@@ -393,10 +404,13 @@ where
         x: IdD,
         w: IdD,
         x_l: HAST::Label,
+        before: ApplicablePath<P>,
         path: ApplicablePath<P>,
     ) -> Result<SimpleAction<HAST::Label, P, HAST::IdN>, EditScriptError> {
-        let action = Act::Update { new: x_l };
+        let action = Act::Update { new: x_l, before };
         let action = SimpleAction { path, action };
+        assert!(self.cpy_mappings.is_src(&w));
+        assert!(self.cpy_mappings.is_dst(&x));
         self.mid_arena[w.index()].compressed = self.dst_arena.original(&x);
         self.mid_arena[w.index()].action = Some(self.actions.len());
         Ok(action)

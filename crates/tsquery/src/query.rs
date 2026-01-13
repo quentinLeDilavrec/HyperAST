@@ -1193,10 +1193,8 @@ impl Query {
                         ));
                     }
                     "EQ?" | "NOT-EQ?" | "MATCH?" | "ANY" => {
-                        // dbg!(byte_offset, row, operator_name);
                         let p1 = string_values[p[1].value_id as usize].to_string();
                         immediate_matches_calls.push((operator_name, p1));
-                        // dbg!(&immediate_matches_calls);
                     }
                     _ => general_predicates_vec.push(crate::predicate::QueryPredicate {
                         operator: operator_name.to_string().into(),

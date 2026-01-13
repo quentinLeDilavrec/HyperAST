@@ -129,7 +129,6 @@ where
 
             // Exit the current node.
             if self.ascending {
-                // dbg!();
                 did_match |= self.when_ascending();
                 // Leave this node by stepping to its next sibling or to its parent.
                 match self.cursor.goto_next_sibling_internal() {
@@ -177,7 +176,6 @@ where
             }
             // Enter a new node.
             else {
-                // dbg!();
                 let (m, node_intersects_range) = self.when_entering(stop_on_definite_step);
                 did_match |= m;
                 if self.should_descend(node_intersects_range) {

@@ -723,6 +723,12 @@ pub trait WithHashs {
     type HK: HashKind;
     type HP: PrimInt + PartialEq + Eq;
     fn hash(&self, kind: impl Deref<Target = Self::HK>) -> Self::HP;
+    fn hash_label(&self) -> Self::HP {
+        self.hash(&<Self::HK as HashKind>::label())
+    }
+    fn hash_structural(&self) -> Self::HP {
+        self.hash(&<Self::HK as HashKind>::structural())
+    }
 }
 
 pub trait Labeled {

@@ -133,6 +133,9 @@ where
     /// Matches all structurally isomorphic nodes in the descendants of src and dst (step 2 of simple recovery)
     fn lcs_structure_matching_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
         self.lcs_matching_lazy(src, dst, move |s, src, dst| {
+            if s.mapping.src_arena.descendants_count(&src) < 1 {
+                return false;
+            }
             s.isomorphic_lazy::<true>(src, dst)
         })
     }
@@ -246,15 +249,34 @@ where
             });
 
         for src_type in src_histogram.keys() {
-            if dst_histogram.contains_key(src_type)
-                && src_histogram[src_type].len() == 1
-                && dst_histogram[src_type].len() == 1
-            {
+            if !dst_histogram.contains_key(src_type) {
+                continue;
+            }
+            if src_histogram[src_type].len() == 1 && dst_histogram[src_type].len() == 1 {
                 let t1 = src_histogram[src_type][0];
                 let t2 = dst_histogram[src_type][0];
                 self.mappings
                     .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
                 self.last_chance_match_histogram_lazy(t1, t2);
+                continue;
+            }
+            let mut v: Vec<_> = src_histogram[src_type]
+                .iter()
+                .filter(|x| self.mapping.src_arena.descendants_count(x) == 0)
+                .flat_map(|x| {
+                    dst_histogram[src_type]
+                        .iter()
+                        .filter(|y| self.mapping.dst_arena.descendants_count(y) == 0)
+                        .map(|y| (*x, *y))
+                })
+                .collect();
+            v.sort_by(|alink, blink| {
+                (alink.0.index().abs_diff(alink.1.index()))
+                    .cmp(&blink.0.index().abs_diff(blink.1.index()))
+            });
+            for (t1, t2) in v {
+                self.mappings
+                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
             }
         }
     }

@@ -742,16 +742,16 @@ impl<IdN, Idx> CursorWithPersistence<IdN, Idx> {
             h: p,
         })
     }
-    pub fn ref_node(&self) -> RefNode<IdN, Idx> {
+    pub fn ref_node(&self) -> RefNode<'_, IdN, Idx> {
         let s = self.s.borrow();
         RefNode { s, h: self.h }
     }
-    pub fn ref_parent(&self) -> Option<RefNode<IdN, Idx>> {
+    pub fn ref_parent(&self) -> Option<RefNode<'_, IdN, Idx>> {
         let p = self.s.borrow().parent(self.h)?;
         let s = self.s.borrow();
         Some(RefNode { s, h: p })
     }
-    pub fn ext(&self) -> ExtRefNode<IdN, Idx> {
+    pub fn ext(&self) -> ExtRefNode<'_, IdN, Idx> {
         let s = self.s.borrow();
         ExtRefNode::new(s, self.h)
     }
@@ -834,12 +834,12 @@ where
     IdN: Copy,
     Idx: Copy,
 {
-    pub fn build(&self) -> ExtRefNode<IdN, Idx> {
+    pub fn build(&self) -> ExtRefNode<'_, IdN, Idx> {
         let s = self.s.borrow();
         ExtRefNode::new(s, self.h)
     }
 
-    pub fn ext(&self) -> ExtRefNode<IdN, Idx> {
+    pub fn ext(&self) -> ExtRefNode<'_, IdN, Idx> {
         let s = self.s.borrow();
         ExtRefNode::new(s, self.h)
     }
@@ -855,7 +855,7 @@ where
         r
     }
 
-    pub fn ref_node(&self) -> RefNode<IdN, Idx> {
+    pub fn ref_node(&self) -> RefNode<'_, IdN, Idx> {
         let s = self.s.borrow();
         RefNode { s, h: self.h }
     }

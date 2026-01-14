@@ -85,7 +85,7 @@ where
     (with_spaces, x)
 }
 
-impl<'store, 'a, Idx: PrimInt, HAST>
+impl<'store, Idx: PrimInt, HAST>
     WithHyperAstPositionConverter<
         'store,
         '_,
@@ -274,7 +274,7 @@ type SpFull<IdN, Idx> =
 type FileAndOffsetFull =
     Filtered<super::file_and_offset::Position<PathBuf, usize>, node_filters::Full>;
 
-impl<'a, HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
+impl<HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
 where
     HAST: HyperAST,
     S: super::position_accessors::WithPreOrderOffsets<Idx = HAST::Idx>,

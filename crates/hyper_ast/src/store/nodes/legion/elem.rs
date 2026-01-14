@@ -95,9 +95,9 @@ where
     }
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> Eq for HashedNode<Id> where Id::IdN: Eq {}
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> Eq for HashedNode<Id> where Id::IdN: Eq {}
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNode<Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNode<Id> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.hashs.hash(&Default::default()).hash(state)
     }
@@ -110,7 +110,7 @@ impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNode<Id> {
 //     }
 // }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNode<Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNode<Id> {
     type Label = LabelIdentifier;
 
     fn get_label_unchecked(&self) -> &LabelIdentifier {

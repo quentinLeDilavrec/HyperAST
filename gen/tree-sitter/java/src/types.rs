@@ -88,7 +88,7 @@ mod impls {
             r.into()
         }
     }
-    impl<'a> JavaEnabledTypeStore for TStore {
+    impl JavaEnabledTypeStore for TStore {
         fn resolve(t: Self::Ty) -> Type {
             t.e()
         }

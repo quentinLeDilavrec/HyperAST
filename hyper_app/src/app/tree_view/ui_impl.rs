@@ -608,7 +608,7 @@ impl<'a> FetchedViewImpl<'a> {
                 }
             } else if kind.is_syntax() {
                 action = Action::Keep;
-                if self.aspects.syntax || self.aspects.syntax {
+                if self.aspects.syntax {
                     ui.horizontal(add_contents).response.rect
                 } else {
                     egui::Rect::from_min_max(min, min)
@@ -771,7 +771,7 @@ impl<'a> FetchedViewImpl<'a> {
                 rt = Some(egui::RichText::new(text));
             }
         } else if kind.is_syntax() {
-            if self.aspects.syntax || self.aspects.syntax {
+            if self.aspects.syntax {
                 let text = format!("{}", kind);
                 rt = Some(egui::RichText::new(text));
             }

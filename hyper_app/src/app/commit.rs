@@ -479,7 +479,7 @@ impl SelectedProjects {
     }
 
     pub(crate) fn project_ids(&self) -> impl Iterator<Item = ProjectId> + use<> {
-        (0..self.repositories.len()).into_iter().map(ProjectId)
+        (0..self.repositories.len()).map(ProjectId)
     }
 
     pub fn get<'a>(&'a mut self, ProjectId(i): ProjectId) -> Option<&'a Repo> {

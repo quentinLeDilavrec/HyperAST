@@ -367,8 +367,8 @@ impl<IdN> Default for HashInstVec<IdN> {
 
 impl<IdN> HashInstVec<IdN> {
     fn into_iter(self) -> impl Iterator<Item = ((u32, u32), IdN)> {
-        let keys = self.struc.into_iter().zip(self.label.into_iter());
-        keys.zip(self.inst.into_iter())
+        let keys = self.struc.into_iter().zip(self.label);
+        keys.zip(self.inst)
     }
 }
 

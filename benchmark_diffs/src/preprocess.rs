@@ -152,7 +152,7 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
                     let name = java_gen.main_stores.label_store.get_or_insert(
                         x.path()
                             .components()
-                            .last()
+                            .next_back()
                             .unwrap()
                             .as_os_str()
                             .to_string_lossy(),

@@ -426,13 +426,13 @@ impl<T: PrimInt> MultiMappingStore for MultiVecStore<T> {
             .unwrap_or(&[])
     }
 
-    fn all_mapped_srcs(&self) -> Iter<Self::Src> {
+    fn all_mapped_srcs(&self) -> Iter<'_, Self::Src> {
         Iter {
             v: self.src_to_dsts.iter().enumerate(),
         }
     }
 
-    fn all_mapped_dsts(&self) -> Iter<Self::Dst> {
+    fn all_mapped_dsts(&self) -> Iter<'_, Self::Dst> {
         Iter {
             v: self.dst_to_srcs.iter().enumerate(),
         }

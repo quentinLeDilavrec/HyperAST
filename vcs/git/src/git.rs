@@ -147,7 +147,7 @@ pub fn retrieve_commit<'a>(
     }
 }
 
-pub fn all_commits_from_head(repository: &Repository) -> Revwalk {
+pub fn all_commits_from_head(repository: &Repository) -> Revwalk<'_> {
     use git2::*;
     // let REMOTE_REFS_PREFIX = "refs/remotes/origin/";
     // let branch: Option<&str> = None;

@@ -697,12 +697,12 @@ mod owned {
         type ChildIdx: PrimInt;
 
         fn child_count(&self) -> Self::ChildIdx;
-        fn get_child(&self, idx: &Self::ChildIdx) -> RefMut<Self>;
-        fn get_child_mut(&mut self, idx: &Self::ChildIdx) -> Ref<Self>;
+        fn get_child(&self, idx: &Self::ChildIdx) -> RefMut<'_, Self>;
+        fn get_child_mut(&mut self, idx: &Self::ChildIdx) -> Ref<'_, Self>;
     }
     pub trait WithParent: Node {
-        fn get_parent(&self) -> Ref<Self>;
-        fn get_parent_mut(&mut self) -> RefMut<Self>;
+        fn get_parent(&self) -> Ref<'_, Self>;
+        fn get_parent_mut(&mut self) -> RefMut<'_, Self>;
     }
 }
 

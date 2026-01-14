@@ -69,7 +69,7 @@ impl<'a> PendingInsert<'a> {
             _ => None,
         }
     }
-    pub fn resolve<T>(&self, id: NodeIdentifier) -> HashedNodeRef<T> {
+    pub fn resolve<T>(&self, id: NodeIdentifier) -> HashedNodeRef<'_, T> {
         self.1
             .1
             .internal
@@ -199,7 +199,7 @@ impl NodeStore {
         symbol
     }
 
-    pub fn resolve(&self, id: NodeIdentifier) -> HashedNodeRef<NodeIdentifier> {
+    pub fn resolve(&self, id: NodeIdentifier) -> HashedNodeRef<'_, NodeIdentifier> {
         self.inner
             .internal
             .entry_ref(id)
@@ -207,7 +207,7 @@ impl NodeStore {
             .unwrap()
     }
 
-    pub unsafe fn _resolve<T>(&self, id: &NodeIdentifier) -> HashedNodeRef<T> {
+    pub unsafe fn _resolve<T>(&self, id: &NodeIdentifier) -> HashedNodeRef<'_, T> {
         self.inner
             .internal
             .entry_ref(*id)
@@ -218,7 +218,7 @@ impl NodeStore {
     pub fn resolve_with_type<T: 'static + TypedNodeId<IdN = NodeIdentifier>>(
         &self,
         id: &T::IdN,
-    ) -> (T::Ty, HashedNodeRef<T>) {
+    ) -> (T::Ty, HashedNodeRef<'_, T>) {
         let n = self
             .inner
             .internal
@@ -228,7 +228,7 @@ impl NodeStore {
         (n.get_type(), n)
     }
 
-    pub fn try_resolve(&self, id: NodeIdentifier) -> Option<HashedNodeRef<NodeIdentifier>> {
+    pub fn try_resolve(&self, id: NodeIdentifier) -> Option<HashedNodeRef<'_, NodeIdentifier>> {
         self.inner
             .internal
             .entry_ref(id)
@@ -239,7 +239,7 @@ impl NodeStore {
     pub fn resolve_typed<TIdN: 'static + TypedNodeId<IdN = NodeIdentifier>>(
         &self,
         id: &TIdN,
-    ) -> HashedNodeRef<TIdN> {
+    ) -> HashedNodeRef<'_, TIdN> {
         let x = self.inner.internal.entry_ref(*id.as_id()).unwrap();
         HashedNodeRef::new(x)
     }
@@ -247,7 +247,7 @@ impl NodeStore {
     pub fn try_resolve_typed<TIdN: 'static + TypedNodeId<IdN = NodeIdentifier>>(
         &self,
         id: &TIdN::IdN,
-    ) -> Option<(HashedNodeRef<TIdN>, TIdN)> {
+    ) -> Option<(HashedNodeRef<'_, TIdN>, TIdN)> {
         let x = self.inner.internal.entry_ref(*id).unwrap();
         x.get_component::<TIdN::Ty>().ok()?;
         Some((HashedNodeRef::new(x), unsafe { TIdN::from_id(*id) }))
@@ -258,7 +258,7 @@ impl NodeStore {
     >(
         &self,
         id: &NodeIdentifier,
-    ) -> Option<(HashedNodeRef<NodeIdentifier>, L::E)> {
+    ) -> Option<(HashedNodeRef<'_, NodeIdentifier>, L::E)> {
         let x = self.inner.internal.entry_ref(*id).unwrap();
         let ty = x.get_component::<crate::types::TypeU16<L>>().ok()?;
         let ty = ty.e();
@@ -270,7 +270,7 @@ impl NodeStore {
     >(
         &self,
         id: &NodeIdentifier,
-    ) -> Option<TypedNode<HashedNodeRef<NodeIdentifier>, L::E>> {
+    ) -> Option<TypedNode<HashedNodeRef<'_, NodeIdentifier>, L::E>> {
         let x = self.inner.internal.entry_ref(*id).unwrap();
         let ty = x.get_component::<crate::types::TypeU16<L>>().ok()?;
         let ty = ty.e();
@@ -319,7 +319,7 @@ impl NodeStoreInner {
     pub fn try_resolve_typed<TIdN: 'static + TypedNodeId<IdN = NodeIdentifier>>(
         &self,
         id: &TIdN::IdN,
-    ) -> Option<(HashedNodeRef<TIdN>, TIdN)> {
+    ) -> Option<(HashedNodeRef<'_, TIdN>, TIdN)> {
         let x = self.internal.entry_ref(*id).unwrap();
         x.get_component::<TIdN::Ty>().ok()?;
         Some((HashedNodeRef::new(x), unsafe { TIdN::from_id(*id) }))

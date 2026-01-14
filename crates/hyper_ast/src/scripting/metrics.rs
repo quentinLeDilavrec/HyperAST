@@ -1081,7 +1081,7 @@ fn test_hyperast_construction_interface_level_push() {
             &mut self,
             hash: u64,
             eq: impl Fn(&AnyTy, &str, &[Self::Id]) -> bool,
-        ) -> Prepared<Self>;
+        ) -> Prepared<'_, Self>;
         /// primary/prepare_insertion
         /// distinguishes identifying fields such that metadata only have to be computed if node is absent
         fn primaries<'a>(

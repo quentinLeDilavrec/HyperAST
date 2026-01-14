@@ -39,7 +39,7 @@ impl<IdN, Idx> Default for StructuralPositionStore<IdN, Idx> {
 }
 
 impl<IdN: NodeId, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
-    pub fn get(&self, s: SpHandle) -> ExploreStructuralPositions<IdN, Idx> {
+    pub fn get(&self, s: SpHandle) -> ExploreStructuralPositions<'_, IdN, Idx> {
         ExploreStructuralPositions {
             sps: self,
             i: s.0,

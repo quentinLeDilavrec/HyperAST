@@ -343,7 +343,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         }
     }
 
-    pub fn new(stores: &mut SimpleStores<TS>) -> XmlTreeGen<TS> {
+    pub fn new(stores: &mut SimpleStores<TS>) -> XmlTreeGen<'_, TS> {
         XmlTreeGen {
             line_break: "\n".as_bytes().to_vec(),
             stores,

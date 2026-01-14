@@ -17,20 +17,23 @@ mod data;
 pub use data::DATASET;
 pub mod queries;
 
-use std::{
-    env,
-    fmt::Display,
-    fs, io, path,
-    time::{self, Duration},
-};
+pub mod synth;
+pub mod synth_init_inst;
+
+pub use hyperast_gen_ts_tsquery::meta_queries;
+
+use std::fmt::Display;
+use std::time::{Duration, Instant};
+use std::{env, fs, io, path};
 
 pub fn tempfile() -> io::Result<(path::PathBuf, fs::File)> {
     let mut path = env::temp_dir();
-    let file_name = time::SystemTime::UNIX_EPOCH;
+    let file_name = std::time::SystemTime::UNIX_EPOCH;
     path.push(file_name.elapsed().unwrap().as_nanos().to_string());
     let file = fs::File::create(&path)?;
     Ok((path, file))
 }
+
 pub fn commit_rw(
     commit: &str,
     limit: Option<usize>,
@@ -42,6 +45,30 @@ pub fn commit_rw(
         .walk()?
         .take(limit.unwrap_or(1))
         .map(|x| x.expect("a valid commit oid")))
+}
+
+pub fn enable_logging() {
+    use tracing_subscriber::layer::SubscriberExt as _;
+    use tracing_subscriber::util::SubscriberInitExt;
+    let layer = tracing_subscriber::EnvFilter::try_from_default_env();
+    tracing_subscriber::registry()
+        .with(layer.unwrap_or_else(|_| "off".into()))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+}
+
+pub fn read_subpatterns_file(sub: &std::path::Path) -> Vec<String> {
+    fs::read_to_string(sub)
+        .expect("Failed to read provided subpattern file")
+        .lines()
+        .fold(vec![String::new()], |mut acc, line| {
+            if line.trim().is_empty() {
+                acc.push(String::new());
+            } else {
+                acc.last_mut().unwrap().push_str(line);
+            }
+            acc
+        })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -85,7 +112,7 @@ pub(crate) trait ResultLogger<R> {
 }
 
 pub struct Cumulative<R> {
-    start_time: time::Instant,
+    start_time: Instant,
     timeout: Timeout,
     cumulative: Vec<(LogEntry<R>, Duration)>,
 }
@@ -99,7 +126,7 @@ impl<R> Default for Cumulative<R> {
 impl<R> Cumulative<R> {
     fn with_timeout(timeout: Timeout) -> Self {
         Cumulative {
-            start_time: time::Instant::now(),
+            start_time: Instant::now(),
             timeout,
             cumulative: Vec::with_capacity(100),
         }
@@ -336,7 +363,7 @@ impl Display for CsvHeader<usize> {
 }
 
 pub struct NonBlockingResLogger<R> {
-    start_time: time::Instant,
+    start_time: Instant,
     timeout: Timeout,
     writer: tracing_appender::non_blocking::NonBlocking,
     _guard: tracing_appender::non_blocking::WorkerGuard,
@@ -365,7 +392,7 @@ where
         )
         .unwrap();
         NonBlockingResLogger {
-            start_time: time::Instant::now(),
+            start_time: Instant::now(),
             timeout,
             first_commit_prep: Duration::ZERO,
             prev: Duration::ZERO,
@@ -402,6 +429,7 @@ impl<R: Display> ResultLogger<R> for NonBlockingResLogger<R> {
         )
         .unwrap();
 
+        let duration = self.start_time.elapsed();
         if duration > self.timeout.0 {
             Err(TimeoutError(duration))
         } else {
@@ -430,7 +458,7 @@ pub struct ReadSearches {
 impl ReadSearches {
     pub fn new(file: std::path::PathBuf) -> Self {
         let mut b = false;
-        let file = std::fs::read_to_string(file)
+        let file = fs::read_to_string(file)
             .expect("Failed to read provided pattern file")
             .lines()
             .fold(vec![String::new()], |mut acc, line| {

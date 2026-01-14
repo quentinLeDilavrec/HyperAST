@@ -9,7 +9,7 @@
 use std::str::FromStr;
 
 use clap::Parser;
-use hyperast_benchmark_search::{Timeout, no_hyperast};
+use hyperast_benchmark_search::{Timeout, enable_logging, no_hyperast, read_subpatterns_file};
 
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;
@@ -222,14 +222,20 @@ fn main() {
             use hyperast_benchmark_search::with_hyperast;
             if language == "Java" {
                 let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-                let per_blob = if cached {
-                    with_hyperast::per_blob_cached
-                } else if nospace {
-                    with_hyperast::per_blob_nospaces
-                } else {
-                    with_hyperast::per_blob
+                let config = hyperast_benchmark_search::Config {
+                    config: RepoConfig::Java,
+                    first_chunk: 1,
+                    chunk_interval: 1,
+                    depth,
                 };
-                per_blob(repo, &sub, commit, depth, &language, queries, timeout);
+                let per_blob = if cached {
+                    with_hyperast::per_blob_cached::<hyperast_gen_ts_java::types::TStore>
+                } else if nospace {
+                    with_hyperast::per_blob_nospaces::<hyperast_gen_ts_java::types::TStore>
+                } else {
+                    with_hyperast::per_blob::<hyperast_gen_ts_java::types::TStore>
+                };
+                per_blob(repo, &sub, commit, config, &language, queries, timeout);
             } else if c == RepoConfig::JavaMaven {
                 assert!(!cached);
                 let language = hyperast_vcs_git::resolve_language("Java").unwrap();
@@ -251,96 +257,6 @@ fn main() {
         }
     }
 }
-
-fn read_subpatterns_file(sub: &std::path::Path) -> Vec<String> {
-    std::fs::read_to_string(sub)
-        .expect("Failed to read provided subpattern file")
-        .lines()
-        .fold(vec![String::new()], |mut acc, line| {
-            if line.trim().is_empty() {
-                acc.push(String::new());
-            } else {
-                acc.last_mut().unwrap().push_str(line);
-            }
-            acc
-        })
-}
-
-fn enable_logging() {
-    use tracing_subscriber::layer::SubscriberExt as _;
-    use tracing_subscriber::util::SubscriberInitExt;
-    let layer = tracing_subscriber::EnvFilter::try_from_default_env();
-    tracing_subscriber::registry()
-        .with(layer.unwrap_or_else(|_| "off".into()))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-}
-
-// impl From<Bench> for clap::builder::OsStr {
-//     fn from(value: Bench) -> Self {
-//         match value {
-//             Bench::TS {
-//                 blob,
-//                 tree,
-//                 prepare,
-//                 cache, } => "TS".into(),
-//             Bench::TSQ2 {
-//                 blob,
-//                 tree,
-//                 prepare,
-//                 cache,
-//             } => if prepare {
-//                 if blob && tree {
-//                     "TSQ2 --PREPARE --BLOB --TREE"
-//                 } else if tree {
-//                     "TSQ2 --PREPARE --TREE"
-//                 } else {
-//                     panic!()
-//                 }
-//             } else if blob && tree {
-//                 "TSQ2 --BLOB --TREE"
-//             } else if tree {
-//                 "TSQ2 --TREE"
-//             } else if blob {
-//                 "TSQ2 --BLOB"
-//             } else {
-//                 "TSQ2"
-//             }
-//             .into(),
-//             Bench::OURS {
-//                 sub,
-//                 language,
-//                 s: _,
-//                 cached: _,
-//                 nospace: _,
-//             } => if let Some(_) = sub {
-//                 if language == "JavaMaven" {
-//                     "OURS --sub <sub> JavaMaven"
-//                 } else if language == "Java" {
-//                     "OURS --sub <sub> Java"
-//                 } else if language == "Cpp" {
-//                     "OURS --sub <sub> Cpp"
-//                 } else if language == "CppMake" {
-//                     "OURS --sub <sub> CppMake"
-//                 } else {
-//                     panic!()
-//                 }
-//             } else if language == "JavaMaven" {
-//                 "OURS JavaMaven"
-//             } else if language == "Java" {
-//                 "OURS Java"
-//             } else if language == "Cpp" {
-//                 "OURS Cpp"
-//             } else if language == "CppMake" {
-//                 todo!()
-//             } else {
-//                 unimplemented!()
-//             }
-//             .into(),
-//             Bench::WRITE => "WRITE".into(),
-//         }
-//     }
-// }
 
 mod write_speed {
     use std::time::Instant;

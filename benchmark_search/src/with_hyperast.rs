@@ -6,15 +6,15 @@
 //!   - including variants resulting from profile driven optimizations
 //! - `+` using preprocessed subpatterns
 
+use git2::Oid;
 use std::fmt::{Debug, Display};
 use std::ops::AddAssign;
 
-use git2::Oid;
 use hyperast::compat::HashMap;
 use hyperast::position::structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence};
-use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{HyperAST, HyperType, NodeStore, WithPrecompQueries, WithRoles, WithStats};
+use hyperast::types::{HyperAST, HyperType, NodeStore};
+use hyperast::types::{WithHashs, WithPrecompQueries, WithRoles, WithStats};
 use hyperast::utils::memusage;
 use hyperast_tsquery::Query;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
@@ -26,17 +26,14 @@ use crate::{Cumulative, NonBlockingResLogger, ResultLogger, Timeout};
 
 type Idx = u16;
 
-pub(crate) fn multi_run<TS: 'static, H, P, Ex: Executor<TS>, R, C: ResultLogger<R>>(
+pub(crate) fn multi_run<H, P, Ex: CreatedExecutor, R, C: ResultLogger<R>>(
     cumulative: &mut C,
     repositories: &mut H,
     language: &tree_sitter::Language,
     sub: &[&str],
     queries: impl Iterator<Item = String>,
     parse_and_execute: impl Fn(&mut C, &mut H, Ex) -> Result<(), Error>,
-) where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
-{
+) {
     for query in queries {
         let executor = match Ex::create(sub, &query, language) {
             Ok(executor) => executor,
@@ -56,9 +53,7 @@ pub(crate) fn multi_run<TS: 'static, H, P, Ex: Executor<TS>, R, C: ResultLogger<
     }
 }
 
-pub trait Executor<TS: 'static> {
-    type P<IdN, Idx>;
-    type R;
+pub trait CreatedExecutor {
     fn create(
         sub: &[&str],
         query: &str,
@@ -66,21 +61,21 @@ pub trait Executor<TS: 'static> {
     ) -> Result<Self, tree_sitter::QueryError>
     where
         Self: Sized;
+}
 
-    fn execute<HAST: HyperAST<TS = TS>>(
+pub trait Executor<HAST: HyperAST>: CreatedExecutor {
+    type P<IdN, Idx>;
+    type R;
+
+    fn execute(
         &self,
         stores: &HAST,
         pos: Self::P<HAST::IdN, HAST::Idx>,
-        count: &mut Self::R,
-    ) -> Self::P<HAST::IdN, HAST::Idx>
-    where
-        HAST::IdN: Copy + Debug,
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
-            WithPrecompQueries + WithRoles + WithStats,
-        HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>;
+        acc: &mut Self::R,
+    ) -> Self::P<HAST::IdN, HAST::Idx>;
 }
 
-pub trait SkippingExecutor<TS: 'static>: Executor<TS> {
+pub trait SkippingExecutor<HAST: HyperAST>: Executor<HAST> {
     fn can_skip<N: WithPrecompQueries>(&self, n: &N) -> bool;
 }
 
@@ -126,14 +121,7 @@ impl<R: Display> Display for RichResult<R> {
     }
 }
 
-impl<TS: 'static> Executor<TS> for hyperast_tsquery::Query
-where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
-{
-    type P<IdN, Idx> = CursorWithPersistence<IdN, Idx>;
-    type R = RichResult<usize>;
-
+impl CreatedExecutor for hyperast_tsquery::Query {
     fn create(
         sub: &[&str],
         query: &str,
@@ -141,31 +129,38 @@ where
     ) -> Result<Self, tree_sitter::QueryError> {
         compile_query(query, sub, language.clone())
     }
+}
 
-    fn execute<HAST: HyperAST<TS = TS>>(
+impl<HAST: HyperAST> Executor<HAST> for hyperast_tsquery::Query
+where
+    HAST::TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    HAST::IdN: Copy + Debug,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+        WithPrecompQueries + WithRoles + WithStats + WithHashs,
+    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+{
+    type P<IdN, Idx> = CursorWithPersistence<IdN, Idx>;
+    type R = RichResult<usize>;
+
+    fn execute(
         &self,
         stores: &HAST,
         pos: Self::P<HAST::IdN, HAST::Idx>,
-        count: &mut Self::R,
-    ) -> Self::P<HAST::IdN, HAST::Idx>
-    where
-        HAST::IdN: Copy + Debug,
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
-            WithPrecompQueries + WithRoles + WithStats,
-        HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
-    {
+        acc: &mut Self::R,
+    ) -> Self::P<HAST::IdN, HAST::Idx> {
         use hyperast_tsquery::hyperast_opt::TreeCursor;
         {
             let n = stores.node_store().resolve(&pos.node());
-            count.node_count += n.size();
+            acc.node_count += n.size();
         }
         let cursor = TreeCursor::new(stores, pos);
         let mut qcursor = self.matches(cursor);
         while let Some(_) = qcursor.next() {
-            count.result += 1;
+            acc.result += 1;
         }
-        count.status_count += qcursor.status_count;
-        count.goto_count += qcursor.goto_count;
+        acc.status_count += qcursor.status_count;
+        acc.goto_count += qcursor.goto_count;
         while qcursor.cursor.pos.node() != qcursor.cursor.pos.p.node() {
             assert!(qcursor.cursor.pos.up());
         }
@@ -173,60 +168,33 @@ where
     }
 }
 
-impl<TS: 'static> SkippingExecutor<TS> for hyperast_tsquery::Query
+impl<HAST: HyperAST> SkippingExecutor<HAST> for hyperast_tsquery::Query
 where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    HAST::TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    HAST::IdN: Copy + Debug,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+        WithPrecompQueries + WithRoles + WithStats + WithHashs,
+    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
 {
     fn can_skip<N: WithPrecompQueries>(&self, n: &N) -> bool {
         self.used_precomputed != 0 && n.wont_match_given_precomputed_queries(self.used_precomputed)
     }
 }
 
-pub fn tsquery_execute_count<TS: 'static>(
-    query: &str,
-    language: &tree_sitter::Language,
-) -> impl Fn(
-    &SimpleStores<TS>,
-    CursorWithPersistence<NodeIdentifier>,
-    &mut usize,
-) -> CursorWithPersistence<NodeIdentifier>
-+ use<TS>
-where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
-{
-    use hyperast_tsquery::hyperast_opt::TreeCursor;
-    let query = hyperast_tsquery::Query::new(query, language.clone()).unwrap();
-    move |stores, pos, count| {
-        let cursor = TreeCursor::new(stores, pos);
-        let mut qcursor = query.matches(cursor);
-        while let Some(_) = qcursor.next() {
-            *count += 1;
-        }
-        while qcursor.cursor.pos.node() != qcursor.cursor.pos.p.node() {
-            assert!(qcursor.cursor.pos.up());
-        }
-        qcursor.cursor.pos.pos
-    }
-}
-
-pub fn per_blob(
+pub fn per_blob<TS: 'static>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
-    depth: usize,
+    config: crate::Config,
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
-) {
-    let config = crate::Config {
-        config: RepoConfig::Java,
-        first_chunk: 1,
-        chunk_interval: 1,
-        depth,
-    };
-
+) where
+    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
+    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+{
     // let mut cumulative = Cumulative::<usize>::with_timeout(timeout);
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     dbg!(memusage().to_string());
@@ -238,13 +206,12 @@ pub fn per_blob(
         return;
     }
 
-    let first_chunk = depth.min(config.first_chunk);
+    let first_chunk = config.depth.min(config.first_chunk);
 
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    use hyperast_gen_ts_java::types::TStore;
-    multi_run::<TStore, _, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -252,11 +219,11 @@ pub fn per_blob(
         queries,
         |cumulative, mut repositories, executor| {
             dbg!(memusage().to_string());
-            let mut rw = commit_rw(commit, Some(depth), &repository.repo).unwrap();
+            let mut rw = commit_rw(commit, Some(config.depth), &repository.repo).unwrap();
             let commits = repositories.pre_process_chunk(&mut rw, &repository, first_chunk);
             cumulative.commit_prepared(commits.len())?;
             dbg!(memusage().to_string());
-            execute_on_commits_per_blob::<_, TStore, _>(
+            execute_on_commits_per_blob::<_, TS, _>(
                 config,
                 &mut repositories,
                 &repository,
@@ -271,22 +238,19 @@ pub fn per_blob(
     cumulative.finish();
 }
 
-pub fn per_blob_nospaces(
+pub fn per_blob_nospaces<TS: 'static>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
-    depth: usize,
+    config: crate::Config,
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
-) {
-    let config = crate::Config {
-        config: RepoConfig::Java,
-        first_chunk: 1,
-        chunk_interval: 1,
-        depth,
-    };
-
+) where
+    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
+    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+{
     // let mut cumulative = Cumulative::<usize>::with_timeout(timeout);
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     dbg!(memusage().to_string());
@@ -298,13 +262,13 @@ pub fn per_blob_nospaces(
         return;
     }
 
-    let first_chunk = depth.min(config.first_chunk);
+    let first_chunk = config.depth.min(config.first_chunk);
 
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
     use hyperast_gen_ts_java::types::TStore;
-    multi_run::<TStore, _, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -312,7 +276,7 @@ pub fn per_blob_nospaces(
         queries,
         |cumulative, mut repositories, executor| {
             dbg!(memusage().to_string());
-            let mut rw = commit_rw(commit, Some(depth), &repository.repo).unwrap();
+            let mut rw = commit_rw(commit, Some(config.depth), &repository.repo).unwrap();
             let commits = repositories.pre_process_chunk(&mut rw, &repository, first_chunk);
             cumulative.commit_prepared(commits.len())?;
             dbg!(memusage().to_string());
@@ -331,21 +295,19 @@ pub fn per_blob_nospaces(
     cumulative.finish();
 }
 
-pub fn per_blob_cached(
+pub fn per_blob_cached<TS: 'static>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
-    depth: usize,
+    config: crate::Config,
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
-) {
-    let config = crate::Config {
-        config: RepoConfig::Java,
-        first_chunk: 1,
-        chunk_interval: 1,
-        depth,
-    };
+) where
+    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
+    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+{
     // let mut cumulative = Cumulative::<usize>::with_timeout(timeout);
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     dbg!(memusage().to_string());
@@ -357,13 +319,13 @@ pub fn per_blob_cached(
         return;
     }
 
-    let first_chunk = depth.min(config.first_chunk);
+    let first_chunk = config.depth.min(config.first_chunk);
 
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
     use hyperast_gen_ts_java::types::TStore;
-    multi_run::<TStore, _, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -371,7 +333,7 @@ pub fn per_blob_cached(
         queries,
         |cumulative, mut repositories, executor| {
             dbg!(memusage().to_string());
-            let mut rw = commit_rw(commit, Some(depth), &repository.repo).unwrap();
+            let mut rw = commit_rw(commit, Some(config.depth), &repository.repo).unwrap();
             let commits = repositories.pre_process_chunk(&mut rw, &repository, first_chunk);
             cumulative.commit_prepared(commits.len())?;
             dbg!(memusage().to_string());
@@ -422,7 +384,7 @@ pub fn polyglot(
 
     use hyperast::position::structural_pos::CursorWithPersistence;
     use hyperast_vcs_git::TStore;
-    multi_run::<TStore, _, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -449,7 +411,7 @@ pub fn polyglot(
     cumulative.write_to(std::io::stdout());
 }
 
-pub(crate) fn execute_on_commits_per_blob<P, TS: 'static, R: Default + Display>(
+pub(crate) fn execute_on_commits_per_blob<P, TS: 'static, R: Default>(
     config: crate::Config,
     repositories: &mut PreProcessedRepositories,
     repository: &ConfiguredRepo2,
@@ -457,7 +419,11 @@ pub(crate) fn execute_on_commits_per_blob<P, TS: 'static, R: Default + Display>(
     mut rw: impl Iterator<Item = Oid>,
     mut commits: std::vec::IntoIter<Oid>,
     make_pos: impl Fn(NodeIdentifier) -> P,
-    executor: impl SkippingExecutor<TS, P<NodeIdentifier, Idx> = P, R = R>,
+    executor: impl SkippingExecutor<
+        hyperast::store::SimpleStores<TS>,
+        P<NodeIdentifier, Idx> = P,
+        R = R,
+    >,
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
@@ -493,7 +459,7 @@ where
             use hyperast::types::WithChildren;
             if down {
                 let id = pos.node();
-                let k = stores.resolve_type(&id);
+                let k = repositories.processor.main_stores.resolve_type(&id);
                 let n = stores.node_store.resolve(id);
 
                 if executor.can_skip(&n) {
@@ -506,6 +472,13 @@ where
                     } else {
                         down = false;
                     }
+                } else if TS::try_decompress_type(
+                    &n,
+                    std::any::TypeId::of::<<TS as hyperast::types::TypeStore>::Ty>(),
+                )
+                .is_none()
+                {
+                    down = false;
                 } else if k.is_file() {
                     pos = executor.execute(stores, pos, &mut count);
                     down = false;
@@ -539,7 +512,11 @@ pub(crate) fn execute_on_commits_per_blob_nospaces<P, TS: 'static, R: Default + 
     mut rw: impl Iterator<Item = Oid>,
     mut commits: std::vec::IntoIter<Oid>,
     make_pos: impl Fn(NodeIdentifier) -> P,
-    executor: impl SkippingExecutor<TS, P<NodeIdentifier, Idx> = P, R = R>,
+    executor: impl SkippingExecutor<
+        hyperast::store::SimpleStores<TS, hyperast_vcs_git::no_space2::NoSpaceNodeStoreWrapper>,
+        P<NodeIdentifier, Idx> = P,
+        R = R,
+    >,
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
@@ -626,7 +603,11 @@ pub(crate) fn execute_on_commits_per_blob_cached<
     mut rw: impl Iterator<Item = Oid>,
     mut commits: std::vec::IntoIter<Oid>,
     make_pos: impl Fn(NodeIdentifier) -> P,
-    executor: impl SkippingExecutor<TS, P<NodeIdentifier, Idx> = P, R = R>,
+    executor: impl SkippingExecutor<
+        hyperast::store::SimpleStores<TS>,
+        P<NodeIdentifier, Idx> = P,
+        R = R,
+    >,
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
@@ -708,27 +689,27 @@ where
     Ok(())
 }
 
-fn compile_query(
+pub(crate) fn compile_query(
     query: &str,
     sub: &[&str],
     language: tree_sitter::Language,
 ) -> Result<Query, tree_sitter::QueryError> {
-    log::error!("input sub: {:?}", sub);
-    log::error!("input query: {:?}", query);
+    // log::error!("input sub: {:?}", sub);
+    // log::error!("input query: {:?}", query);
 
     let query = if sub.is_empty() {
         Query::new(query, language.clone())?
     } else {
         let query = Query::with_precomputed(query, language.clone(), sub);
         let query = query?;
-        log::error!("sub: {}", query.0);
+        // log::error!("sub: {}", query.0);
         query.1
     };
-    log::error!("main: {}", query);
+    // log::error!("main: {}", query);
     Ok(query)
 }
 
-fn prepare_hyperast(
+pub fn prepare_hyperast(
     repo: hyperast_vcs_git::git::Repo,
     config: RepoConfig,
     sub: &[&str],
@@ -868,7 +849,11 @@ pub fn execute_on_commits_polyglot<P, R: Default + Display>(
     mut rw: impl Iterator<Item = Oid>,
     mut commits: std::vec::IntoIter<Oid>,
     make_pos: impl Fn(NodeIdentifier) -> P,
-    executor: impl SkippingExecutor<hyperast_vcs_git::TStore, P<NodeIdentifier, Idx> = P, R = R>,
+    executor: impl SkippingExecutor<
+        hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
+        P<NodeIdentifier, Idx> = P,
+        R = R,
+    >,
 ) -> Result<(), Error>
 where
     P: CursorHead<NodeIdentifier, Idx>,

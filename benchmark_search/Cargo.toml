@@ -27,8 +27,8 @@ clap = { version = "4.5", features = ["derive"] }
 
 env_logger = "0.11.3"
 log = { version = "0.4.6", features = [
-    "max_level_debug",
-    "release_max_level_warn",
+    # "max_level_debug",
+    # "release_max_level_warn",
 ] }
 
 num-traits = "0.2.14"
@@ -40,3 +40,7 @@ jemallocator = { package = "tikv-jemallocator", version = "0.5.0" }
 
 # [profile.release]
 # debug=true
+
+[features]
+default = ["synth"]
+synth = ["hyperast_gen_ts_tsquery/synth_par", "hyperast_gen_ts_tsquery/lattice"]

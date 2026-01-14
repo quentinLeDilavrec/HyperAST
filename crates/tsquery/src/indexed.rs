@@ -190,7 +190,7 @@ impl CaptureId {
     // fn one() -> Self {
     //     Self(1)
     // }
-    pub(crate) fn to_usize(&self) -> usize {
+    pub(crate) fn to_usize(self) -> usize {
         self.0 as usize
     }
 }
@@ -505,7 +505,7 @@ impl Symbol {
     pub const WILDCARD_SYMBOL: Symbol = Symbol(0);
     // const WILDCARD_SYMBOL: index::Symbol = index::Symbol(0);
 
-    pub(crate) fn to_usize(&self) -> usize {
+    pub(crate) fn to_usize(self) -> usize {
         self.0 as usize
     }
     pub fn is_error(&self) -> bool {

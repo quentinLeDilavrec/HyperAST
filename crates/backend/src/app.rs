@@ -246,16 +246,16 @@ pub fn tsg_app(_st: SharedState) -> Router<SharedState> {
 }
 
 async fn smells(
-    axum::extract::Path(path): axum::extract::Path<smells::Param>,
+    axum::extract::Path(path): axum::extract::Path<smells::Path>,
     axum::extract::State(state): axum::extract::State<SharedState>,
-    axum::extract::Json(examples): axum::extract::Json<smells::Examples>,
+    axum::extract::Json(e): axum::extract::Json<smells::ExamplesExt>,
 ) -> axum::response::Result<Json<smells::SearchResults>> {
-    let r = smells::smells(examples, state, path)?;
+    let r = smells::smells(e.examples, state, path, e.more)?;
     Ok(r.into())
 }
 
 async fn smells_ex_from_diffs(
-    axum::extract::Path(path): axum::extract::Path<smells::Param>,
+    axum::extract::Path(path): axum::extract::Path<smells::Path>,
     axum::extract::State(state): axum::extract::State<SharedState>,
 ) -> axum::response::Result<Json<smells::ExamplesResults>> {
     let r = smells::smells_ex_from_diffs(state, path)?;

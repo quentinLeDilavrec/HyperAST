@@ -8,6 +8,8 @@ use super::Idx;
 pub fn semi_interactive_poset_build<P>(
     b: &mut hyperast_gen_ts_tsquery::code2query::Builder<'_, P>,
     meta_simp: &hyperast_tsquery::Query,
+    mut timeout: impl FnMut() -> bool,
+    size_threshold: impl Fn(usize) -> usize,
 ) where
     P: Eq + Clone + SolvedPosition<IdN> + Sync + Send,
 {
@@ -27,10 +29,17 @@ pub fn semi_interactive_poset_build<P>(
     type SimpEqedSet = Vec<(SimpEqResult, Vec<SimpEqSource>)>;
     // let mut simp_eq_valid_by_construction: BySize<SimpEqedSet> = vec![];
 
+    let mut too_slow = hyperast_gen_ts_tsquery::code2query::DedupBySize2::<
+        hyperast_gen_ts_tsquery::code2query::TR<P>,
+    >::default();
+
     let mut active_size = b.dedup.len() - 1;
     let mut active: Vec<_> = b.actives(active_size);
     let mut phase = Phase::Uniq;
     loop {
+        if timeout() {
+            break;
+        }
         log::info!("dedup len: {}", b.dedup.len());
         log::info!("active_size: {}", active_size);
         log::info!("actives: {}", active.len());
@@ -39,39 +48,118 @@ pub fn semi_interactive_poset_build<P>(
         if phase == Phase::Uniq {
             // do it first to reduce noise and remove as many patts as possible
             let (rms, _already) = b.uniques_par_par(active_size, &mut active);
-            b.dedup_uniques_par(active_size, rms);
+            // b.dedup_uniques_par(active_size, rms);
+            // avoid hanging, by ignoring the patterns not shrinking enough
+            use hyperast_gen_ts_tsquery::code2query::dedup_patterns_by_metric;
+            let mut by_size = b.by_pattern_size(rms);
+            let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+            let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+            active.extend(act);
+            log::info!("actives after remove all: {}", active.len());
+
+            hyperast_gen_ts_tsquery::code2query::filter_by_key_par(&mut largest_by_size, &b.dedup);
+            let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+            log::info!("too_slow added: {}", act.len());
         } else if phase == Phase::SimpEq {
             // the most tricky simp phase, as it adds a predicate and their captures
+            // only do it on patterns under size threshold
             let (simps, not) = b.simp_eq(&mut active);
-            let act = b.dedup_uniques_par2(active_size, simps);
+            let act = {
+                b.dedup_uniques_par2(active_size, simps)
+
+                // // avoid hanging, by ignoring the patterns not shrinking enough
+                // use hyperast_gen_ts_tsquery::code2query::dedup_patterns_by_metric;
+                // let mut by_size = b.by_pattern_size(simps);
+                // {
+                //     let max_active = by_size.last_key_value().map_or(active_size, |x| *x.0);
+                //     let len = max_active.max(b.dedup.len());
+                //     b.dedup.resize(len, Default::default());
+                // }
+                // let shrank_enough =
+                //     by_size.split_off(&skink_threshold.min(active_size / skink_factor));
+                // let act = dedup_patterns_by_metric(shrank_enough, &mut b.dedup);
+                // log::info!("actives after remove all: {}", active.len());
+
+                // hyperast_gen_ts_tsquery::code2query::filter_by_key_par(&mut by_size, &b.dedup);
+                // let _act = dedup_patterns_by_metric(by_size, &mut too_slow);
+                // log::info!("too_slow added: {}", _act.len());
+                // act
+            };
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all") {
                 active = act; // first rm on the ones that were simp
                 let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.repair_par(rms);
                 b.dedup_uniques_par2(active_size, rms);
                 active = not.clone(); // then the other that were not simp
                 let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.repair_par(rms);
                 b.dedup_uniques_par2(active_size, rms);
             }
             // TODO link all found simpeq (then rm.all) to previous respective simpeq action,
             // ie. follow one back then re-apply same simpeq action and link to result
             // let call this a reduction and model it as TR::SimpEqReduction(TR)
         } else if phase == Phase::RemovesAll || phase == Phase::RemovesAll2 {
-            // do not use after simp_eq as it might remove captures
+            // do not use naively after simp_eq as it might remove captures
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
                 let rms = b.removesall_par_par(active_size, &mut active, cid);
-                b.dedup_uniques_par2(active_size, rms);
+                let rms = if phase == Phase::RemovesAll2 {
+                    b.repair_par(rms)
+                } else {
+                    rms
+                };
+                // TODO add post-removal to make invalid patterns valid again
+
+                // avoid hanging, by ignoring the patterns not shrinking enough
+                use hyperast_gen_ts_tsquery::code2query::dedup_patterns_by_metric;
+                let mut by_size = b.by_pattern_size(rms);
+                let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+                let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+                active.extend(act);
+                log::info!("actives after remove all: {}", active.len());
+
+                hyperast_gen_ts_tsquery::code2query::filter_by_key_par(
+                    &mut largest_by_size,
+                    &b.dedup,
+                );
+                let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+                log::info!("too_slow added: {}", act.len());
             }
         } else if phase == Phase::Removes || phase == Phase::Removes2 {
-            // do not use after simp_eq as it might remove captures
+            // do not use naively after simp_eq as it might remove captures
             for a in &active {
-                log::info!("try remove:\n{}", b.lattice.pretty(&a));
+                log::trace!("try remove: {:?}", b.lattice.pretty(&a));
             }
             let rms = b.removes_par_par(active_size, &mut active);
             for (a, _) in &rms {
-                log::info!("to remove:\n{}", b.lattice.pretty(&a));
+                log::info!("to remove: {:?}", b.lattice.pretty(&a));
             }
-            b.dedup_removes_par(active_size, &mut active, rms);
+            let rms = if phase == Phase::Removes2 {
+                b.repair_par(rms)
+            } else {
+                rms
+            };
+            for (a, _) in &rms {
+                log::info!("repaired: {:?}", b.lattice.pretty(&a));
+            }
+            // TODO add post-removal to make invalid patterns valid again
+            // not that difficult, just need to remove predicate using absent capture
+            // and then also remove the unused captures to help with deduplication
+            // TODO or put invalid patterns in a separated set
+            // detecting invalid is easy, for now I only see capture predicates missing captures
+            // then can try to do removals
+            // NOTE directly removing the rest is probably faster
+
+            // reduce hanging, by ignoring the patterns not shrinking enough
+            use hyperast_gen_ts_tsquery::code2query::dedup_patterns_by_metric;
+            let mut by_size = b.by_pattern_size(rms);
+            let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+            let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+            active.extend(act);
             log::info!("actives after removes: {}", active.len());
+
+            hyperast_gen_ts_tsquery::code2query::filter_by_key_par(&mut largest_by_size, &b.dedup);
+            let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+            log::info!("too_slow added: {}", act.len());
         }
 
         if b.between(&mut active_size, &mut active) {
@@ -88,15 +176,17 @@ pub fn semi_interactive_poset_build<P>(
                 active_size = b.dedup.len() - 1;
                 // this phase produce many variants so only reasonably sized patterns are considered
                 // tips consider more patterns in remove all
-                active_size = active_size.min(2000);
-                active = b.actives(active_size);
+                // active_size = active_size.min(2000);
                 phase = Phase::SimpEq;
-            } else if phase == Phase::SimpEq {
-                active_size = b.dedup.len() - 1;
-                // these phases produc
-                active_size = active_size.min(2000);
+                // this phase is complex, so only reasonably sized patterns are considered
+                // tips consider more patterns in remove all
+                active_size = active_size.min(size_threshold(0));
                 active = b.actives(active_size);
+            } else if phase == Phase::SimpEq {
                 phase = Phase::RemovesAll2;
+                active_size = b.dedup.len() - 1;
+                active = b.actives(active_size);
+                active_size = active_size.min(size_threshold(0));
                 // simp_eq_valid_by_construction = find_simpeqs_ascending(b, active_size).collect();
                 // dbg!(simp_eq_valid_by_construction.len());
                 // dbg!(
@@ -106,9 +196,10 @@ pub fn semi_interactive_poset_build<P>(
                 //         .collect::<Vec<_>>()
                 // );
             } else if phase == Phase::RemovesAll2 {
+                phase = Phase::Removes2;
                 active_size = b.dedup.len() - 1;
                 active = b.actives(active_size);
-                phase = Phase::Removes2;
+                active_size = active_size.min(size_threshold(0));
             } else if phase == Phase::Removes2 {
                 break;
             } else {

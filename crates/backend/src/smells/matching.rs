@@ -14,6 +14,7 @@ pub(crate) fn matches_default<'a>(
             format!("{}\n\n", x)
         })
         .collect::<String>();
+    log::info!("collect lines: {}", collect.lines().count());
     let qqq =
         hyperast_tsquery::Query::new(&collect, hyperast_gen_ts_java::language()).map_err(|e| {
             format!(

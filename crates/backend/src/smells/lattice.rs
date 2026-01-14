@@ -1,5 +1,6 @@
 use num::ToPrimitive;
 use petgraph::data::FromElements;
+use petgraph::visit::NodeCount;
 use serde::Serialize;
 
 use hyperast::position::StructuralPosition;
@@ -7,8 +8,7 @@ use hyperast::types::WithStats;
 use hyperast_gen_ts_tsquery::code2query::QueryLattice;
 use hyperast_vcs_git::TStore;
 
-use crate::smells::IdNQ;
-
+use super::IdNQ;
 use super::graph_compression;
 
 use super::IdN;
@@ -356,7 +356,6 @@ fn _compress<F: Fn(&IdNQ) -> String>(
     let (ex_pretty, mut ex_query) = (g.raw_nodes().into_iter().enumerate())
         .flat_map(|(i, x)| pretty_ex(&x.weight).into_iter().map(move |x| (x, i as u32)))
         .unzip::<_, _, _, Vec<_>>();
-    dbg!(&ex_query);
     // now delta encoding
     let mut x = 0u32;
     for y in ex_query.iter_mut() {
@@ -455,18 +454,24 @@ fn describe_lattice<P: PartialEq>(
 ) {
     println!("lattice {i} description:");
     for i in g.node_indices() {
-        print!("{} {:?} ", i.index(), idn_to_u64(g[i]));
+        print!("{} {:?}", i.index(), idn_to_u64(g[i]));
         print!(
-            "{:?}",
+            " {:?}",
             (lattice.raw_rels.get(&g[i]).unwrap().iter())
                 .filter_map(|x| x.as_init())
                 .map(|_| 1)
                 .collect::<Vec<_>>()
         );
-        println!(
+        print!(
             "{:?}",
             (lattice.raw_rels.get(&g[i]).unwrap().iter())
                 .filter_map(|x| x.no_init().map(|x| idn_to_u64(*x)))
+                .collect::<Vec<_>>()
+        );
+        println!(
+            "{:?}",
+            g.neighbors_directed(i, petgraph::Direction::Outgoing)
+                .map(|j| idn_to_u64(*g.node_weight(j).unwrap()))
                 .collect::<Vec<_>>()
         );
     }
@@ -641,9 +646,13 @@ fn print_topo_numbers<P, Bitset>(
         let qid = g[n];
         let c = total_inits(&dense_inits_counts, &bitsets[n.index()]);
         let s = lattice.query_store.node_store.resolve(qid).size();
+        if c == 0 {
+            println!("---top--------inits:{c}/{ex}-----size:{s}--------\nERROR 0 inits",);
+            continue;
+        }
         println!(
             "---top--------inits:{c}/{ex}-----size:{s}--------\n{}",
-            lattice.pretty(&qid),
+            lattice.pretty(&qid).chars().take(200).collect::<String>(),
         );
     }
     println!("snd level patterns:");
@@ -715,15 +724,25 @@ where
     where
         P: PartialEq,
     {
-        let csr = graph_compression::graph_to_csr(&g);
-        for n in 0..csr.node_count() {
-            use petgraph::visit::IntoNeighbors;
-            let x = csr.neighbors(n as u32); //, petgraph::Direction::Outgoing
-            print!("{:2} ", x.count()); // direct targeted
-            let x = csr.neighbors(n as u32);
-            print!("{:2?} ", x.collect::<Vec<_>>()); // direct targeted
+        for i in 0..g.node_count() {
+            let n = petgraph::prelude::NodeIndex::new(i);
+            eprint!("|{:>3} {} ", i, idn_to_u64(*g.node_weight(n).unwrap()));
+            for j in g.neighbors_directed(n, petgraph::Direction::Outgoing) {
+                eprint!("{}:{},", j.index(), idn_to_u64(*g.node_weight(j).unwrap()));
+            }
+            eprintln!();
         }
-        println!();
+        let csr = graph_compression::graph_to_csr(&g);
+        assert_eq!(g.node_count(), csr.node_count());
+        assert_eq!(g.edge_count(), csr.edge_count());
+        // for n in 0..csr.node_count() {
+        //     use petgraph::visit::IntoNeighbors;
+        //     let x = csr.neighbors(n as u32); //, petgraph::Direction::Outgoing
+        //     print!("{:2} ", x.count()); // direct targeted
+        //     let x = csr.neighbors(n as u32);
+        //     print!("{:2?} ", x.collect::<Vec<_>>()); // direct targeted
+        // }
+        // println!();
         let preped = PreparedInits::compute(&csr, |query| {
             (lattice.raw_rels.get(&query).unwrap())
                 .iter()
@@ -737,17 +756,22 @@ where
         let mut min_dist_inits = MinDistInits::<u8>::new(csr.node_count());
         let mut max_dist_inits = MaxDistInits::<u8>::new(csr.node_count());
         // indexes into dense_inits_counts
-        for (i, _) in iter_topo(&csr) {
+        for (i, _e) in iter_topo(&csr) {
+            eprint!("{} {}", i, idn_to_u64(_e));
             // retrieve
             let curr = reachable_inits.retrieve(&preped, i);
             let curr_min = min_dist_inits.retrieve(&preped, i);
             let curr_max = max_dist_inits.retrieve(&preped, i);
+            eprint!("({}) ", curr_min);
             // then diffuse
             for j in iter_succ(&csr, i) {
+                eprint!("{},", j);
+
                 reachable_inits.diffuse(j, &curr);
                 min_dist_inits.diffuse(j, &curr_min);
                 max_dist_inits.diffuse(j, &curr_max);
             }
+            eprintln!();
         }
         println!("min dist to an initial pattern:");
         for i in min_dist_inits.iter() {
@@ -984,7 +1008,7 @@ where
                 let x = dag.neighbors_directed(n, petgraph::Direction::Incoming);
                 print!("{:2} ", x.count()); // direct targeted
                 let x = dag.neighbors_directed(n, petgraph::Direction::Outgoing);
-                print!("{:2?} ", x.map(|x| x.index()).collect::<Vec<_>>()); // direct targeted
+                println!("{:2?} ", x.map(|x| x.index()).collect::<Vec<_>>()); // direct targeted
             }
             println!();
             Some(dag)
@@ -1067,12 +1091,15 @@ impl<'g, N: Clone, E: Clone + 'static, N2, E2> ToDag<'g, N, E, petgraph::Graph<N
     // can return None when node is not available
     // End when advance_edge returns after advance_node itself has returned None
     fn advance_edge(&mut self, f: impl Fn(E) -> E2) -> Option<&E2> {
-        if self.nodes_index_edges.saturating_sub(1) >= self.graph.node_count() {
+        if self.nodes_index_edges.saturating_sub(1) >= self.reduction.node_count() {
             return None;
         }
         let Some(y) = self.nodes_index_succ.pop() else {
             self.nodes_index_edges += 1;
             let x = petgraph::graph::NodeIndex::new(self.nodes_index_edges - 1);
+            if self.nodes_index_edges - 1 >= self.reduction.node_count() {
+                return None;
+            }
             // let n = graph.neighbors_directed(a, dir)
             let mut e: Vec<_> = self
                 .reduction
@@ -1081,7 +1108,7 @@ impl<'g, N: Clone, E: Clone + 'static, N2, E2> ToDag<'g, N, E, petgraph::Graph<N
                 .map(|x| x.1)
                 .collect();
             if e.is_empty() {
-                return None;
+                return self.advance_edge(f);
             }
             e.sort();
             e.dedup();
@@ -1193,7 +1220,7 @@ fn to_dag<N: Clone, E: Clone + 'static>(graph: &petgraph::Graph<N, E>) -> petgra
     // g
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, enumset::EnumSetType)]
 pub enum SimpKind {
     Init,
     Uniqs,

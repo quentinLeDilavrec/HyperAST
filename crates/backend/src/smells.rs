@@ -22,17 +22,34 @@ mod diffing;
 type Idx = u16;
 
 #[derive(Deserialize, Clone)]
-pub struct Param {
+pub struct Path {
     user: String,
     name: String,
     commit: String,
     len: usize,
 }
 
-impl Param {
+impl Path {
     pub fn repo(&self) -> hyperast_vcs_git::git::Repo {
         hyperast_vcs_git::git::Forge::Github.repo(&self.user, &self.name)
     }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct More {
+    #[serde(default = "default_u64::<40>")]
+    timeout: u64,
+    #[serde(default = "default_usize::<400>")]
+    size_threshold: usize,
+    #[serde(default = "default_usize::<75>")]
+    shrink_threshold_factor: usize, // in percent
+}
+
+fn default_usize<const V: usize>() -> usize {
+    V
+}
+fn default_u64<const V: u64>() -> u64 {
+    V
 }
 
 #[derive(Deserialize, Clone)]
@@ -73,6 +90,14 @@ pub struct Examples {
     meta_simp: String,
     /// the list of examples driving the query generation
     examples: Vec<ExamplesValue>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ExamplesExt {
+    #[serde(flatten)]
+    pub examples: Examples,
+    #[serde(flatten)]
+    pub more: More,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -125,11 +150,12 @@ pub struct ExamplesValue<Idx = usize> {
 pub(crate) fn smells(
     examples: Examples,
     state: SharedState,
-    path: Param,
+    path: Path,
+    more: More,
 ) -> Result<SearchResults, String> {
     let now = Instant::now();
     let repo_spec = path.repo();
-    let Param { commit, len, .. } = path;
+    let Path { commit, len, .. } = path;
     log::warn!("use len value={len}");
     let Examples {
         meta_gen,
@@ -145,6 +171,12 @@ pub(crate) fn smells(
     } else {
         true
     };
+
+    let More {
+        timeout,
+        size_threshold,
+        shrink_threshold_factor,
+    } = more;
 
     let repo_handle = (state.repositories.read().unwrap())
         .get_config(repo_spec)
@@ -222,19 +254,48 @@ pub(crate) fn smells(
             hyperast_gen_ts_tsquery::code2query::group_by_size(from)
         });
 
-        poset_exploration::semi_interactive_poset_build(&mut b, &meta_simp);
-        log::trace!(
-            "final lattice size: {}",
-            b.dedup.iter().map(|x| x.len()).sum::<usize>()
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(timeout);
+        let mut timeouted = false;
+        let mut timeout = || {
+            if start.elapsed() > timeout {
+                log::warn!("Timeout reached");
+                timeouted = true;
+                return true;
+            }
+            false
+        };
+
+        let size_threshold: usize = 400;
+        let shrink_threshold_factor: usize = 75; // in percent
+        let mut size_threshold = |s| size_threshold.max(s * shrink_threshold_factor / 100);
+        poset_exploration::semi_interactive_poset_build(
+            &mut b,
+            &meta_simp,
+            &mut timeout,
+            size_threshold,
         );
+        if timeouted {
+            log::trace!(
+                "timeouted lattice size: {}",
+                b.dedup.iter().map(|x| x.len()).sum::<usize>()
+            );
+            // TIP simplify more aggressively
+        } else {
+            log::trace!(
+                "final lattice size: {}",
+                b.dedup.iter().map(|x| x.len()).sum::<usize>()
+            );
+        }
         b.post();
         b.build()
     };
 
+    // naive filtering
     let bad: Vec<_> = query_lattice
         .iter_pretty()
         .filter(|x| 5 < x.1.len() && x.1.len() * 2 < ex_map.len())
-        .map(|(s, x)| (s, std::borrow::Cow::Borrowed(x)))
+        .map(|(s, x)| (s, std::borrow::Cow::Borrowed(x))) // enable additional selections
         .take(10000)
         .collect();
 
@@ -246,21 +307,19 @@ pub(crate) fn smells(
         g
     };
 
-    // let mut idq_storage = vec![]; // temporary stuff for compatibility
-    let bad = if bad.is_empty() {
-        graphs
-            .tops()
-            .filter(|(q, _)| {
-                let lang = hyperast_gen_ts_java::language();
-                !q.is_empty() && hyperast_tsquery::Query::new(&q, lang).is_ok()
-            })
-            .map(|(s, x)| (s, std::borrow::Cow::Owned(x)))
-            .collect()
-    } else {
-        bad
-    };
-    dbg!(bad.len());
+    let bad: Vec<_> = graphs
+        .tops()
+        .filter(|(q, _)| {
+            let lang = hyperast_gen_ts_java::language();
+            !q.is_empty()
+                && q.lines().count() < 50
+                && hyperast_tsquery::Query::new(&q, lang).is_ok()
+        })
+        .map(|(s, x)| (s, std::borrow::Cow::Owned(x)))
+        .collect();
+    log::info!("bad len: {}", bad.len());
     let matches = if simple_matching {
+        log::info!("now matching the patterns against the whole code base");
         matching::matches_default(with_spaces_stores, dst_tr, bad.iter().map(|x| x.0.as_str()))?
     } else if prepro_matching {
         let precomputeds = (state.repositories.read().unwrap())
@@ -281,8 +340,8 @@ pub(crate) fn smells(
         // )
         // .map_err(|e| e.to_string())?;
     };
-    eprintln!("matches: {:?}", matches);
-    eprintln!("bads: {:?}", bad);
+    log::trace!("matches: {:?}", matches);
+    log::trace!("bads: {:?}", bad);
     assert_eq!(bad.len(), matches.len());
     let mut bad: Vec<_> = (matches.iter().enumerate())
         .map(|(i, v)| SearchResult {
@@ -292,7 +351,7 @@ pub(crate) fn smells(
             additional: vec![],
         })
         .collect();
-    dbg!(bad.len());
+    log::info!("final bad len: {}", bad.len());
 
     bad.sort_by(|a, b| {
         let cmp = b.examples.len().cmp(&a.examples.len());
@@ -350,11 +409,11 @@ fn examples4idqs(
 
 pub(crate) fn smells_ex_from_diffs(
     state: SharedState,
-    path: Param,
+    path: Path,
 ) -> Result<ExamplesResults, String> {
     let now = Instant::now();
     let repo_spec = path.repo();
-    let Param { commit, len, .. } = path;
+    let Path { commit, len, .. } = path;
     log::warn!("use len value={len}");
     let repo_handle = (state.repositories.write().unwrap())
         .get_config(repo_spec)
@@ -492,7 +551,7 @@ mod tests {
         let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
         let commit = "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde";
         let language = "Java";
-        let param = Param {
+        let param = Path {
             user: user.to_string(),
             name: name.to_string(),
             commit: commit.to_string(),
@@ -558,7 +617,12 @@ mod tests {
             meta_simp: META_SIMP.into(),
             examples: examples.examples,
         };
-        let res = smells(examples, state, param)?;
+        let more = More {
+            timeout: 30,
+            size_threshold: 400,
+            shrink_threshold_factor: 75,
+        };
+        let res = smells(examples, state, param, more)?;
         // for x in res.bad {
         //     eprintln!();
         //     eprintln!("{}", x.query);
@@ -849,11 +913,6 @@ mod graph_compression {
 
         // Add edges — Csr expects `(NodeIndex, EdgeWeight)` tuples
         for edge in g.edge_references() {
-            eprintln!(
-                "{} {}",
-                edge.target().index() as u32,
-                edge.source().index() as u32,
-            );
             let added = csr.add_edge(
                 // reversed
                 edge.target().index() as u32,

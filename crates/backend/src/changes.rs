@@ -416,9 +416,9 @@ fn compute_and_cache_full_diff(
     dst_oid: hyperast_vcs_git::git::Oid,
 ) {
     let repositories = state.repositories.read().unwrap();
-    let commit_src = repositories.get_commit(&config, &src_oid).unwrap();
+    let commit_src = repositories.get_commit(config, &src_oid).unwrap();
     let src_tr = commit_src.ast_root;
-    let commit_dst = repositories.get_commit(&config, &dst_oid).unwrap();
+    let commit_dst = repositories.get_commit(config, &dst_oid).unwrap();
     let dst_tr = commit_dst.ast_root;
     let with_spaces_stores = &repositories.processor.main_stores;
     let stores = &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores);

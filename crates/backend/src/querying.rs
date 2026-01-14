@@ -760,7 +760,7 @@ pub fn differential(
                 continue;
             }
             if cfg!(debug_assertions) {
-                let mut s = format!("");
+                let mut s = String::new();
                 for name in &names {
                     s += &format!("{},", TextSerializer::new(stores, *name));
                 }
@@ -815,11 +815,11 @@ pub fn differential(
             other_idx.sort();
             let mut baseline_results = baseline_results
                 .into_iter()
-                .map(|x| Some(x))
+                .map(Some)
                 .collect::<Vec<_>>();
             let mut other_results = other_results
                 .into_iter()
-                .map(|x| Some(x))
+                .map(Some)
                 .collect::<Vec<_>>();
             let baseline_results = baseline_idx
                 .into_iter()
@@ -879,12 +879,12 @@ pub fn differential(
             "differential mapping parameters: full_diff={full_diff}, multimap={multimap}, only_top_down={only_top_down}"
         );
         (full_diff, multimap, only_top_down)
-    } else if baseline_results.len() == 0 {
+    } else if baseline_results.is_empty() {
         log::debug!(
             "differential mapping auto: choosing `only_top_down` because there are only deletions"
         );
         (false, false, true)
-    } else if baseline_results.len() == 0 {
+    } else if baseline_results.is_empty() {
         log::debug!(
             "differential mapping auto: choosing `only_top_down` because there are only additions"
         );
@@ -931,12 +931,12 @@ pub fn differential(
             .map(|a| remap(stores, a, &mut mapper.dst_arena, other_tr))
             .collect::<hashbrown::HashSet<_>>();
         for a in &baseline_candidates {
-            let is_mapped = mapper.mappings.is_src(&a);
+            let is_mapped = mapper.mappings.is_src(a);
             if is_mapped {
                 continue;
             }
             use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore;
-            let a = mapper.mapping.src_arena.decompress_to(&a);
+            let a = mapper.mapping.src_arena.decompress_to(a);
             if !mapper.src_has_children_lazy(a) {
                 continue;
             }
@@ -1023,7 +1023,7 @@ pub fn differential(
         let baseline_pos = p.make_position(stores);
         let mut pos = baseline_pos.clone();
         pos.set_len(1);
-        let path_ids = p.iter_nodes().map(|x| x).collect();
+        let path_ids = p.iter_nodes().collect();
         let offsets = p.iter_offsets().map(|x| x as usize).collect();
         let bl_pos = LocalPieceOfCode::from_position(&baseline_pos, offsets, path_ids);
         let path_ids = vec![]; // TODO
@@ -1043,7 +1043,7 @@ pub fn differential(
         let offsets = p.iter_offsets().map(|x| x as usize).collect();
         let bl_pos = LocalPieceOfCode::from_position(&pos, offsets, path_ids);
         let bl_pos = bl_pos.globalize(&repo.spec, baseline);
-        let path_ids = p.iter_nodes().map(|x| x).collect();
+        let path_ids = p.iter_nodes().collect();
         let offsets = p.iter_offsets().map(|x| x as usize).collect();
         let other_pos = LocalPieceOfCode::from_position(&other_pos, offsets, path_ids);
         let other_pos = other_pos.globalize(&repo.spec, commit);

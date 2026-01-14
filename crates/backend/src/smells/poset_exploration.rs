@@ -127,11 +127,11 @@ pub fn semi_interactive_poset_build<P>(
         } else if phase == Phase::Removes || phase == Phase::Removes2 {
             // do not use naively after simp_eq as it might remove captures
             for a in &active {
-                log::trace!("try remove: {:?}", b.lattice.pretty(&a));
+                log::trace!("try remove: {:?}", b.lattice.pretty(a));
             }
             let rms = b.removes_par_par(active_size, &mut active);
             for (a, _) in &rms {
-                log::info!("to remove: {:?}", b.lattice.pretty(&a));
+                log::info!("to remove: {:?}", b.lattice.pretty(a));
             }
             let rms = if phase == Phase::Removes2 {
                 b.repair_par(rms)
@@ -139,7 +139,7 @@ pub fn semi_interactive_poset_build<P>(
                 rms
             };
             for (a, _) in &rms {
-                log::info!("repaired: {:?}", b.lattice.pretty(&a));
+                log::info!("repaired: {:?}", b.lattice.pretty(a));
             }
             // TODO add post-removal to make invalid patterns valid again
             // not that difficult, just need to remove predicate using absent capture
@@ -246,7 +246,7 @@ where
             })
             .collect::<Vec<_>>()
     };
-    (0..active_size).into_iter().map(move |size| {
+    (0..active_size).map(move |size| {
         (b.dedup[size].iter())
             .filter_map(|x| {
                 let v = simp_eqs(x.1);

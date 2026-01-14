@@ -43,7 +43,7 @@ pub fn commit_metadata(_state: SharedState, path: Param) -> Result<Json<Metadata
     log::debug!("done cloning {repo_spec}");
     let commit = retrieve_commit(&repo, &version);
     if let Err(err) = &commit {
-        log::error!("{}", err.to_string());
+        log::error!("{}", err);
     }
     let commit = commit.map_err(|err| err.to_string())?;
     log::debug!("done retrieving commit {version}");

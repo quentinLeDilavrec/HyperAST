@@ -477,9 +477,9 @@ impl IntoResponse for fetch::FetchedNodes {
     fn into_response(self) -> Response {
         let to_string = serde_json::to_string(&self);
         let var_name = to_string.unwrap();
-        let resp = var_name.into_response();
+        
         // let resp = Json(self).into_response();
-        resp
+        var_name.into_response()
     }
 }
 

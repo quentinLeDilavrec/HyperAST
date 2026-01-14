@@ -87,8 +87,8 @@ fn lazy_mapping<'a>(
 }
 
 // WARN lazy subtrees are not complete
-fn lazy_subtree_mapping<'a, 'b>(
-    repositories: &'b PreProcessedRepositories,
+fn lazy_subtree_mapping<'a>(
+    repositories: &PreProcessedRepositories,
     partial_comp_cache: &'a crate::PartialDecompCache,
     src_tr: IdN,
     dst_tr: IdN,

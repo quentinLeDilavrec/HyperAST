@@ -507,7 +507,7 @@ pub(crate) fn extract_updates2<'a>(
     actions: &'a ActionsVec<A>,
 ) -> impl Iterator<Item = (Pos, Pos)> + 'a {
     actions.0.iter().filter_map(move |a| {
-        let from = match &a.action {
+        match &a.action {
             Act::Update { .. } => (),
             _ => return None,
         };
@@ -680,7 +680,7 @@ pub(crate) fn extract_focuses<'a>(
 ) -> impl Iterator<Item = (Pos, Pos)> + 'a {
     let mut a_tree = ActionsTree::new();
     for a in actions.0.iter().rev() {
-        let from = match &a.action {
+        match &a.action {
             Act::Delete { .. } => a_tree.merge_ori(a),
             Act::Move { .. } => a_tree.merge_ori(a),
             // Act::Move { from } | Act::MovUpd { from, .. } => a_tree.merge_ori(&SimpleAction {

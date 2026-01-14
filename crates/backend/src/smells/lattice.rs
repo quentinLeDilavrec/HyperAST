@@ -125,7 +125,7 @@ impl Constraining for () {
     type Tr = ();
     fn generalize(&mut self, other: Self::Tr) {}
     fn merge_generalization_paths(self, other: Self) -> Self {
-        ()
+        
     }
 }
 
@@ -174,7 +174,7 @@ use hyperast_gen_ts_tsquery::code2query::TrMarker;
 use hyperast_gen_ts_tsquery::code2query::TrMarkers;
 
 impl _G {
-    pub fn succs<'a>(&'a self) -> impl Iterator<Item = (u32, &'a [u32])> {
+    pub fn succs(&self) -> impl Iterator<Item = (u32, &[u32])> {
         self.succ
             .split(|x| *x == 0)
             .filter(|_| !self.succ.is_empty())
@@ -182,11 +182,8 @@ impl _G {
             // .filter(|_| !self.ex_query.is_empty() && !self.queries.is_empty())
             .map(|(i, succ)| (i as u32, succ))
     }
-    pub fn tops<'a>(&'a self) -> impl Iterator<Item = IdNQ> {
-        self.succs().filter_map(|(x, succ)| {
-            succ.is_empty()
-                .then(|| u64_to_idn(self.queries[x as usize] as u64))
-        })
+    pub fn tops(&self) -> impl Iterator<Item = IdNQ> {
+        self.succs().filter(|&(x, succ)| succ.is_empty()).map(|(x, succ)| u64_to_idn(self.queries[x as usize] as u64))
     }
 }
 
@@ -289,7 +286,7 @@ impl<'a, P> Prep<'a, P> {
         fn tops_plus_one(
             g: &petgraph::Graph<IdNQ, ()>,
         ) -> impl Iterator<Item = petgraph::prelude::NodeIndex> {
-            tops(g).flat_map(|x| g.neighbors_directed(x, Down).chain([x].into_iter()))
+            tops(g).flat_map(|x| g.neighbors_directed(x, Down).chain([x]))
         }
         self.g
             .iter()
@@ -297,7 +294,7 @@ impl<'a, P> Prep<'a, P> {
                 let mut dedup = hashbrown::HashSet::new();
                 tops_plus_one(g)
                     .map(|x| g[x])
-                    .filter(move |x| dedup.insert(x.clone()))
+                    .filter(move |x| dedup.insert(*x))
             })
             .map(|top| (self.lattice.pretty(&top), self.lattice.extract2(top).1))
     }
@@ -312,7 +309,7 @@ fn u64_to_idn(x: u64) -> IdN {
 
 fn idn_to_u32(x: IdN) -> Result<u32, u64> {
     let x = idn_to_u64(x);
-    ToPrimitive::to_u32(&x).ok_or_else(|| x)
+    ToPrimitive::to_u32(&x).ok_or(x)
 }
 
 fn compress<F: Fn(&IdNQ) -> String>(
@@ -331,10 +328,10 @@ fn _compress<F: Fn(&IdNQ) -> String>(
     pretty_ex: &impl Fn(&IdNQ) -> Vec<String>,
 ) -> _G {
     use num::ToPrimitive;
-    let queries = (g.raw_nodes().into_iter())
+    let queries = (g.raw_nodes().iter())
         .map(|x| idn_to_u32(x.weight).expect("too many query subtrees to fit in u32"))
         .collect();
-    let queries_pretty = (g.raw_nodes().into_iter())
+    let queries_pretty = (g.raw_nodes().iter())
         .map(|x| pretty_q(&x.weight))
         .collect();
     let mut succ = vec![];
@@ -353,7 +350,7 @@ fn _compress<F: Fn(&IdNQ) -> String>(
             i = x;
         }
     }
-    let (ex_pretty, mut ex_query) = (g.raw_nodes().into_iter().enumerate())
+    let (ex_pretty, mut ex_query) = (g.raw_nodes().iter().enumerate())
         .flat_map(|(i, x)| pretty_ex(&x.weight).into_iter().map(move |x| (x, i as u32)))
         .unzip::<_, _, _, Vec<_>>();
     // now delta encoding
@@ -732,7 +729,7 @@ where
             }
             eprintln!();
         }
-        let csr = graph_compression::graph_to_csr(&g);
+        let csr = graph_compression::graph_to_csr(g);
         assert_eq!(g.node_count(), csr.node_count());
         assert_eq!(g.edge_count(), csr.edge_count());
         // for n in 0..csr.node_count() {
@@ -1097,7 +1094,7 @@ impl<'g, N: Clone, E: Clone + 'static, N2, E2> ToDag<'g, N, E, petgraph::Graph<N
         let Some(y) = self.nodes_index_succ.pop() else {
             self.nodes_index_edges += 1;
             let x = petgraph::graph::NodeIndex::new(self.nodes_index_edges - 1);
-            if self.nodes_index_edges - 1 >= self.reduction.node_count() {
+            if self.nodes_index_edges > self.reduction.node_count() {
                 return None;
             }
             // let n = graph.neighbors_directed(a, dir)
@@ -1154,7 +1151,7 @@ fn to_dag<N: Clone, E: Clone + 'static>(graph: &petgraph::Graph<N, E>) -> petgra
     );
     while let Some(x) = td.advance_node(|w| w) {}
     while let Some(x) = td.advance_edge(|w| w) {}
-    return td.new_graph;
+    td.new_graph
     // dbg!();
     // use petgraph::prelude::*;
     // let toposort = petgraph::algo::toposort(&graph, None).expect("acyclic");
@@ -1277,7 +1274,7 @@ impl<'a> ExIt<'a> {
             ex_curr: 0,
             ex_offset: 1,
             ex_pretty: 0,
-            it: (0..content.queries.len()).into_iter(),
+            it: (0..content.queries.len()),
             content,
         }
     }

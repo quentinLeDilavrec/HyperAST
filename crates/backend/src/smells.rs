@@ -313,7 +313,7 @@ pub(crate) fn smells(
             let lang = hyperast_gen_ts_java::language();
             !q.is_empty()
                 && q.lines().count() < 50
-                && hyperast_tsquery::Query::new(&q, lang).is_ok()
+                && hyperast_tsquery::Query::new(q, lang).is_ok()
         })
         .map(|(s, x)| (s, std::borrow::Cow::Owned(x)))
         .collect();
@@ -373,7 +373,7 @@ pub(crate) fn smells(
         bad,
         good,
         additional,
-        graphs: graphs,
+        graphs,
     })
 }
 

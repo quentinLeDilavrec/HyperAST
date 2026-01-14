@@ -263,8 +263,8 @@ where
 
     let (pos, _) = compute_position(other_tr, &mut path.iter().copied(), with_spaces_stores);
     let fallback = LocalPieceOfCode::from_position(&pos, path, path_ids);
-    let fallback = postprocess_matching(fallback);
-    fallback
+    
+    postprocess_matching(fallback)
 }
 
 fn track_with_mappings<P, M: MappingStore>(
@@ -450,7 +450,7 @@ where
             with_spaces_stores,
             flags,
             target,
-            &dst_tree,
+            dst_tree,
             current_tr,
             other_tr,
             &tracker_nospace,
@@ -510,10 +510,10 @@ where
             with_spaces_stores,
             flags,
             target,
-            &dst_tree,
+            dst_tree,
             current_tr,
             other_tr,
-            &tracker_nospace,
+            tracker_nospace,
             mappeds,
             path,
             postprocess_matching,
@@ -532,10 +532,10 @@ where
             with_spaces_stores,
             flags,
             target,
-            &dst_tree,
+            dst_tree,
             current_tr,
             other_tr,
-            &tracker_nospace,
+            tracker_nospace,
             mappeds,
             path,
             postprocess_matching,
@@ -550,10 +550,10 @@ where
         with_spaces_stores,
         flags,
         target,
-        &dst_tree,
+        dst_tree,
         current_tr,
         other_tr,
-        &tracker_nospace,
+        tracker_nospace,
         mappeds,
         path,
         postprocess_matching,

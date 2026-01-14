@@ -252,7 +252,7 @@ pub(crate) fn string_to_oid<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Oid, D::Error> {
     let s = <&str as serde::Deserialize>::deserialize(deserializer)?;
-    Oid::from_str(s).map_err(|e| serde::de::Error::custom(e))
+    Oid::from_str(s).map_err(serde::de::Error::custom)
 }
 
 fn custom_ser<IdN: Clone + Into<self::IdN>, S>(
@@ -351,7 +351,7 @@ impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
         PieceOfCode {
             user: spec.user().to_string(),
             name: spec.name().to_string(),
-            commit: commit,
+            commit,
             path: self.path,
             path_ids: self.path_ids,
             file: self.file,

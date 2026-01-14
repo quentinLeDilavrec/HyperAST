@@ -235,7 +235,7 @@ fn simple_aux(
             dbg!();
             use tree_sitter_graph::execution::error::StatementContext;
             let error_context = StatementContext::raw(
-                &statement,
+                statement,
                 stanza.range.start,
                 tree_sitter_graph::Location { row: 0, column: 0 },
                 node.kind().to_string(),
@@ -253,7 +253,7 @@ fn simple_aux(
                 &tsg.shorthands,
                 &config,
                 &current_regex_captures,
-                &statement,
+                statement,
                 error_context,
             );
             if let Err(err) = r {
@@ -296,7 +296,8 @@ fn configure<'a, 'b, 'g, SNode, HAST>(
     globals: &'b Globals<'g>,
     functions: &'a Functions<Graph<SNode, HAST>>,
 ) -> tree_sitter_graph::ExecutionConfig<'a, 'g, 'b, Graph<SNode, HAST>> {
-    let config = tree_sitter_graph::ExecutionConfig::new(functions, globals)
+    
+    tree_sitter_graph::ExecutionConfig::new(functions, globals)
         .lazy(true)
         .debug_attributes(
             [DEBUG_ATTR_PREFIX, "tsg_location"].concat().as_str().into(),
@@ -305,8 +306,7 @@ fn configure<'a, 'b, 'g, SNode, HAST>(
                 .concat()
                 .as_str()
                 .into(),
-        );
-    config
+        )
 }
 
 // NOTE syntax nodes are not needed here,

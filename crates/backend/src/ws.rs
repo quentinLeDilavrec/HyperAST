@@ -352,8 +352,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
                 let shared = vecs[session].as_ref();
                 let rw_lock_write_guard = &mut shared.unwrap().write().unwrap();
                 let doc = &mut rw_lock_write_guard.deref_mut().doc;
-                let msg = doc.sync().generate_sync_message(&mut sync_state);
-                msg
+                
+                doc.sync().generate_sync_message(&mut sync_state)
             };
             if let Some(a) = msg {
                 dbg!(who);
@@ -369,8 +369,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
             cnt += 1;
             let mut recv = r.recv().await;
             let mut changed = false;
-            if let Some(aaa) = &mut recv {
-                if let Some(d) = aaa.take() {
+            if let Some(aaa) = &mut recv
+                && let Some(d) = aaa.take() {
                     dbg!(who);
                     if d.is_empty() {
                     } else {
@@ -386,8 +386,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
                             .unwrap();
                     }
                     changed = true;
-                }
-            };
+                };
             match recv {
                 // Ok(heads) => {
                 Some(_) => {
@@ -397,8 +396,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
                         let shared = vecs[session].as_ref();
                         let shared = &mut shared.unwrap().write().unwrap();
                         let shared = shared.deref_mut();
-                        let msg = shared.doc.sync().generate_sync_message(&mut sync_state);
-                        msg
+                        
+                        shared.doc.sync().generate_sync_message(&mut sync_state)
                     };
                     if let Some(a) = msg {
                         dbg!(who);
@@ -545,8 +544,8 @@ async fn handle_socket_automerge_sync(socket: WebSocket, who: SocketAddr, state:
         {
             let msg = {
                 let doc = &mut state.doc.0.write().unwrap();
-                let msg = doc.sync().generate_sync_message(&mut sync_state);
-                msg
+                
+                doc.sync().generate_sync_message(&mut sync_state)
             };
             if let Some(a) = msg {
                 dbg!(who);
@@ -562,8 +561,8 @@ async fn handle_socket_automerge_sync(socket: WebSocket, who: SocketAddr, state:
             cnt += 1;
             let mut recv = r.recv().await;
             let mut changed = false;
-            if let Some(aaa) = &mut recv {
-                if let Some(d) = aaa.take() {
+            if let Some(aaa) = &mut recv
+                && let Some(d) = aaa.take() {
                     dbg!(who);
                     if d.is_empty() {
                     } else {
@@ -574,16 +573,15 @@ async fn handle_socket_automerge_sync(socket: WebSocket, who: SocketAddr, state:
                             .unwrap();
                     }
                     changed = true;
-                }
-            };
+                };
             match recv {
                 // Ok(heads) => {
                 Some(_) => {
                     dbg!(who);
                     let msg = {
                         let doc = &mut state.doc.0.write().unwrap();
-                        let msg = doc.sync().generate_sync_message(&mut sync_state);
-                        msg
+                        
+                        doc.sync().generate_sync_message(&mut sync_state)
                     };
                     if let Some(a) = msg {
                         dbg!(who);

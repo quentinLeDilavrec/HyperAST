@@ -56,7 +56,7 @@ impl TrackingAtPathParam {
         hyperast_vcs_git::git::Forge::Github.repo(&self.user, &self.name)
     }
     pub fn path<T: std::str::FromStr>(&self) -> Vec<T> {
-        (self.path.as_ref().map(|s| s.as_str()).unwrap_or_default())
+        (self.path.as_deref().unwrap_or_default())
             .split("/")
             .filter_map(|x| T::from_str(x).ok())
             .collect()
@@ -455,12 +455,12 @@ fn handle_tracked(
             if next.len() > 1 {
                 log::warn!("multiple matches: {} matches", next.len());
             }
-            let Some(next) = next.get(0) else {
+            let Some(next) = next.first() else {
                 unreachable!("MappingResult::Missing should have been used if there is no match")
             };
             // TODO stop on branching ?
             tracking.path = Some(next.path.clone());
-            tracking.commit = next.commit.clone();
+            tracking.commit = next.commit;
 
             if tracking.file.is_some() {
                 tracking.file = Some(next.file.to_string());
@@ -529,9 +529,9 @@ enum MappingResult<IdN, Idx, T = PieceOfCode<IdN, Idx>> {
     },
 }
 
-impl<IdN, Idx, T> Into<Result<MappingResult<IdN, Idx, T>, String>> for MappingResult<IdN, Idx, T> {
-    fn into(self) -> Result<MappingResult<IdN, Idx, T>, String> {
-        match self {
+impl<IdN, Idx, T> From<MappingResult<IdN, Idx, T>> for Result<MappingResult<IdN, Idx, T>, String> {
+    fn from(val: MappingResult<IdN, Idx, T>) -> Self {
+        match val {
             MappingResult::Error(e) => Err(e),
             x => Ok(x),
         }
@@ -618,15 +618,15 @@ fn target_code_elem(
     let (pos, target_node, no_spaces_path_to_target) =
         compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
     let range = pos.range();
-    let target = TargetCodeElement::<IdN, Idx> {
+    
+    TargetCodeElement::<IdN, Idx> {
         start: range.start,
         end: range.end,
         path: path_to_target.clone(),
         path_no_spaces: no_spaces_path_to_target,
         node: target_node,
         root: src_tr,
-    };
-    target
+    }
 }
 
 fn get_commit_root(

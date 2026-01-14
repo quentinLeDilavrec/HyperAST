@@ -196,6 +196,7 @@ fn resolve_in_file(
         return Err(d);
     }
     let mut l = 0;
+    #[allow(clippy::never_loop)]
     'l: loop {
         let Some(n) = n.children() else {
             return Err(d);

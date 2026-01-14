@@ -36,6 +36,8 @@ pub mod refinements;
 pub mod lattice_graph;
 
 pub mod meta_queries;
+pub mod synth_display;
+
 pub fn prepare_matcher<Ty>(query: &str) -> crate::search::PreparedMatcher<Ty, Conv<Ty>>
 where
     Ty: std::fmt::Debug,

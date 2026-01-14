@@ -177,13 +177,7 @@ pub fn per_blob<TS: 'static>(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    crate::with_hyperast::multi_run::<
-        _,
-        CursorWithPersistence<NodeIdentifier>,
-        ChangesDetection,
-        _,
-        _,
-    >(
+    crate::with_hyperast::multi_run::<_, ChangesDetection, _, _>(
         &mut cumulative,
         &mut repositories,
         language,

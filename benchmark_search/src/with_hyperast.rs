@@ -26,7 +26,7 @@ use crate::{Cumulative, NonBlockingResLogger, ResultLogger, Timeout};
 
 type Idx = u16;
 
-pub(crate) fn multi_run<H, P, Ex: CreatedExecutor, R, C: ResultLogger<R>>(
+pub(crate) fn multi_run<H, Ex: CreatedExecutor, R, C: ResultLogger<R>>(
     cumulative: &mut C,
     repositories: &mut H,
     language: &tree_sitter::Language,
@@ -211,7 +211,7 @@ pub fn per_blob<TS: 'static>(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -268,7 +268,7 @@ pub fn per_blob_nospaces<TS: 'static>(
 
     use hyperast::position::structural_pos::CursorWithPersistence;
     use hyperast_gen_ts_java::types::TStore;
-    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -325,7 +325,7 @@ pub fn per_blob_cached<TS: 'static>(
 
     use hyperast::position::structural_pos::CursorWithPersistence;
     use hyperast_gen_ts_java::types::TStore;
-    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,
@@ -383,7 +383,7 @@ pub fn polyglot(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
+    multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
         language,

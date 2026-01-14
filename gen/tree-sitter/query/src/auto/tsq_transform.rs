@@ -6,11 +6,20 @@ use hyperast::{
 
 use crate::types::TIdN;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Action<Idx, IdN = NodeIdentifier> {
     Delete { path: Vec<Idx> },
     Replace { path: Vec<Idx>, new: IdN },
     Insert { path: Vec<Idx>, new: IdN },
+}
+impl Action<Idx, IdN> {
+    pub fn path(&self) -> &Vec<Idx> {
+        match self {
+            Action::Delete { path } => path,
+            Action::Replace { path, .. } => path,
+            Action::Insert { path, .. } => path,
+        }
+    }
 }
 type Idx = u16;
 type IdN = NodeIdentifier;

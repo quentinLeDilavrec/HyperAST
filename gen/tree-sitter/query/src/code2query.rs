@@ -30,7 +30,7 @@ type IdN = NodeIdentifier;
 type Idx = u16;
 type IdInit = SolvedStructuralPosition<IdN, Idx>;
 
-#[derive(enumset::EnumSetType)]
+#[derive(enumset::EnumSetType, Debug)]
 pub enum TrMarker {
     Init,
     Uniqs,
@@ -38,6 +38,25 @@ pub enum TrMarker {
     RMall,
     SimpEQ,
     Focus,
+}
+
+impl std::fmt::Display for TrMarker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_static_str())
+    }
+}
+
+impl TrMarker {
+    fn as_static_str(&self) -> &'static str {
+        match self {
+            TrMarker::Init => "Init",
+            TrMarker::Uniqs => "Uniqs",
+            TrMarker::RMs => "RMs",
+            TrMarker::RMall => "RMall",
+            TrMarker::SimpEQ => "SimpEQ",
+            TrMarker::Focus => "Focus",
+        }
+    }
 }
 
 pub type TrMarkers = enumset::EnumSet<TrMarker>;
@@ -74,14 +93,30 @@ impl<E: PartialEq, I: PartialEq> PartialOrd for TR<E, I> {
 }
 
 impl<E, I> TR<E, I> {
-    pub fn each(&self, mut f: impl FnMut(&'static str, &E), mut g: impl FnMut(&'static str, &I)) {
+    pub fn each_str(
+        &self,
+        mut f: impl FnMut(&'static str, &E),
+        mut g: impl FnMut(&'static str, &I),
+    ) {
+        self._each(|m, x| match x {
+            Ok(t) => f(m.as_static_str(), t),
+            Err(t) => g(m.as_static_str(), t),
+        })
+    }
+    pub fn each(&self, mut f: impl FnMut(TrMarker, &E), mut g: impl FnMut(TrMarker, &I)) {
+        self._each(|m, x| match x {
+            Ok(t) => f(m, t),
+            Err(t) => g(m, t),
+        })
+    }
+    pub fn _each(&self, mut f: impl FnMut(TrMarker, Result<&E, &I>)) {
         match self {
-            TR::Init(t) => f("Init", t),
-            TR::Uniqs(t) => g("Uniqs", t),
-            TR::RMall(t) => g("RMall", t),
-            TR::RMs(t) => g("RMs", t),
-            TR::SimpEQ(t) => g("SimpEQ", t),
-            TR::Focus(t) => g("Focus", t),
+            TR::Init(t) => f(TrMarker::Init, Ok(t)),
+            TR::Uniqs(t) => f(TrMarker::Uniqs, Err(t)),
+            TR::RMall(t) => f(TrMarker::RMall, Err(t)),
+            TR::RMs(t) => f(TrMarker::RMs, Err(t)),
+            TR::SimpEQ(t) => f(TrMarker::SimpEQ, Err(t)),
+            TR::Focus(t) => f(TrMarker::Focus, Err(t)),
         }
     }
 
@@ -109,6 +144,8 @@ pub struct QueryLattice<E> {
     pub raw_rels: std::collections::HashMap<IdNQ, Vec<TR<E>>>,
     pub queries: Vec<(IdNQ, Vec<IdQ>)>,
     sort_cache: Vec<u32>,
+    pub(crate) root_cap: IdNQ,
+    pub(crate) auto_caps: Vec<IdNQ>,
 }
 
 /// make the deduplication through raw entries, probably slower, is it marginal ?
@@ -461,8 +498,13 @@ impl Ded for DedupBySize {
     }
 }
 
-#[derive(Default)]
 pub struct DedupBySize2<TR = self::TR>(Vec<hashbrown::HashMap<IdNQ, Vec<TR>>>);
+
+impl<TR> Default for DedupBySize2<TR> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
 
 impl<TR> Deref for DedupBySize2<TR> {
     type Target = Vec<hashbrown::HashMap<IdNQ, Vec<TR>>>;
@@ -525,6 +567,7 @@ type IdQ = u32;
 
 pub struct Builder<'q, E, D = DedupBySize2<TR<E>>> {
     pub lattice: QueryLattice<E>,
+    // the deduplicated patterns
     pub dedup: D,
     pub meta_simp: &'q hyperast_tsquery::Query,
 }
@@ -620,7 +663,8 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
         let simp_eq = (dedup.0.values())
             .filter_map(|x| {
                 let query = x[0].0;
-                let new_q = simp_positional_eq(&mut s.query_store, query, meta_simp)?;
+                let new_q =
+                    simp_positional_eq(&mut s.query_store, query, meta_simp, &mut s.auto_caps)?;
                 Some((new_q, TR::RMs(query)))
             })
             .collect::<Vec<_>>();
@@ -695,39 +739,6 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
     {
         let by_size = self.by_pattern_size(rms);
         let act = dedup_patterns_by_metric(by_size, &mut self.dedup);
-
-        // use rayon::iter::IndexedParallelIterator as _;
-        // use rayon::iter::IntoParallelRefMutIterator as _;
-        // use rayon::iter::ParallelIterator;
-        // let by_size = by_size
-        //     .into_iter()
-        //     .fold(vec![vec![]; active_size], |mut acc, x| {
-        //         acc[x.0] = x.1;
-        //         acc
-        //     });
-        // let dedup = &mut self.dedup;
-        // let act: Vec<_> = ParallelIterator::flat_map(
-        //     dedup.0[..active_size].par_iter_mut().enumerate(),
-        //     |(i, dedup)| {
-        //         let mut r = vec![];
-        //         for x in &by_size[i] {
-        //             let v = dedup.entry(x.0);
-        //             use hashbrown::hash_map::Entry;
-        //             let v = match v {
-        //                 Entry::Occupied(x) => x.into_mut(),
-        //                 Entry::Vacant(x) => {
-        //                     r.push(*x.key());
-        //                     x.insert(vec![])
-        //                 }
-        //             };
-        //             if !v.contains(&x.1) {
-        //                 v.push(x.1.clone());
-        //             }
-        //         }
-        //         r
-        //     },
-        // )
-        // .collect();
         active.extend(act);
     }
 
@@ -782,7 +793,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
     }
 
     #[cfg(feature = "synth_par")]
-    fn by_pattern_size(
+    pub fn by_pattern_size(
         &self,
         uniques: Vec<(IdNQ, TR<Init>)>,
     ) -> BTreeMap<usize, Vec<(IdNQ, TR<Init>)>>
@@ -1002,6 +1013,371 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         rms
     }
 
+    #[must_use]
+    // remove incomplete predicates and unused predicates from a pattern so they compile
+    pub fn repair_par(&mut self, rms: Vec<(IdNQ, TR<Init>)>) -> Vec<(IdNQ, TR<Init>)> {
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::ParallelIterator;
+
+        let s = &mut self.lattice;
+        let repair_query = r#"(predicate
+            (identifier) (#EQ? "eq")
+            (parameters
+                (capture) @id1
+                (capture) @id2
+            )
+        ) @pred
+        (predicate
+            (parameters
+                (capture) @ref
+            )
+        )
+        (named_node (capture) @decl)
+        (anonymous_node (capture) @decl)
+        (grouping (capture) @decl)
+        (list (capture) @decl)
+        "#;
+        let repair_query = &hyperast_tsquery::Query::new(&repair_query, crate::language())
+            .map_err(|e| format!("error in repair_query: {e}"))
+            .unwrap();
+        let pred_cid = repair_query.capture_index_for_name("pred").unwrap();
+        let id1_cid = repair_query.capture_index_for_name("id1").unwrap();
+        let id2_cid = repair_query.capture_index_for_name("id2").unwrap();
+        let decl_cid = repair_query.capture_index_for_name("decl").unwrap();
+        let ref_cid = repair_query.capture_index_for_name("ref").unwrap();
+        let root_cap = s.root_cap;
+
+        let rms = ParallelIterator::map(rms.into_par_iter(), |x| {
+            use hyperast::position::structural_pos::CursorHead;
+            let mut candidates = vec![];
+            let mut decls = HashSet::new();
+            let query = x.0;
+            let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
+            let mut to_rm = pos.build_empty_set();
+            let mut decl_nodes = pos.build_empty_set();
+            let mut refs = pos.build_empty_set();
+            let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&s.query_store, pos);
+            let mut matches = repair_query.matches(cursor);
+            loop {
+                let Some(m) = matches.next() else {
+                    break;
+                };
+                if let Some(r) = m.nodes_for_capture_index(ref_cid).next() {
+                    refs.register(&r.pos);
+                } else if let Some(decl) = m.nodes_for_capture_index(decl_cid).next() {
+                    decl_nodes.register(&decl.pos);
+                    decls.insert(decl.pos.node());
+                } else if let Some(pred) = m.nodes_for_capture_index(pred_cid).next() {
+                    let id1 = m.nodes_for_capture_index(id1_cid).next().unwrap();
+                    let id2 = m.nodes_for_capture_index(id2_cid).next().unwrap();
+                    candidates.push((id1.pos.clone(), id2.pos.clone(), pred.pos.clone()));
+                }
+            }
+            if candidates.is_empty() {
+                return Ok((query, x.1));
+            }
+
+            // (id_missing, id_useless, caps_useless)
+            // let invalid_preds =
+            candidates
+                .into_iter()
+                .filter(|x| {
+                    if !decls.contains(&x.0.node()) {
+                        refs.remove(&x.1);
+                        true
+                    } else if !decls.contains(&x.1.node()) {
+                        refs.remove(&x.0);
+                        true
+                    } else {
+                        false
+                    }
+                })
+                // .map(|x| x.2.offsets())
+                // .collect::<Vec<_>>();
+                .for_each(|x| to_rm.register(&x.2));
+
+            let refs: HashSet<_> = refs
+                .into_iter(|x| x.node())
+                .chain([root_cap].into_iter())
+                .collect();
+
+            // let unused_decls =
+            decl_nodes
+                .iter()
+                .filter(|x| !refs.contains(&x.node()))
+                .for_each(|x| to_rm.register_ref(x));
+            // .map(|x| x.offsets())
+            // .collect::<Vec<_>>();
+
+            // removes preds with absent caps and remove unused caps
+            // unused_decls.iter().for_each(|x|rm(x));
+            // invalid_preds.iter().for_each(|x|rm(x.2));
+
+            // let to_rm = invalid_preds.into_iter().chain(unused_decls.into_iter());
+            // let to_rm: Vec<_> = to_rm.into_iter().collect();
+            let mut to_rm: Vec<_> = to_rm
+                .into_iter(|x| x.offsets())
+                // .collect_vec(|x| x.offsets())
+                // .into_iter()
+                .map(|mut path| {
+                    path.pop();
+                    path.reverse();
+                    path
+                })
+                .collect();
+            to_rm.sort_by(|a, b| b.cmp(a));
+            let mut curr = query;
+            log::info!("to_rm: {:?}", to_rm);
+            for rm in 0..to_rm.len() {
+                let mut path = to_rm[rm].clone();
+                // path.pop();
+                // path.reverse();
+                let actions = vec![tsq_transform::Action::Delete { path }];
+                match tsq_transform::try_regen_query(&s.query_store, curr, actions.clone()) {
+                    Some(query) => curr = query,
+                    None => {
+                        return Err((
+                            query,
+                            curr,
+                            x.1.clone(),
+                            to_rm[rm..].iter().map(|x| x.clone()).collect(),
+                        ));
+                    }
+                }
+            }
+
+            Ok((curr, x.1))
+
+            // let mut to_rm: Vec<_> = to_rm
+            //     .into_iter()
+            //     .map(|path| tsq_transform::Action::Delete { path })
+            //     .collect();
+            // to_rm.sort_by(|a, b| b.path().cmp(a.path()));
+            // match tsq_transform::try_regen_query(&s.query_store, query, to_rm.clone()) {
+            //     Some(query) => Some(Ok((query, x.1))),
+            //     None => return Some(Err((query, x.1.clone(), to_rm))),
+            // }
+        });
+        let (remains, mut rms): (
+            Vec<(IdNQ, IdNQ, TR<Init>, Vec<Vec<u16>>)>,
+            Vec<(IdNQ, TR<Init>)>,
+        ) = ParallelIterator::partition_map(rms, |x| x.into());
+        log::info!("remains: {}", remains.len());
+        log::info!("rms: {}", rms.len());
+
+        let rem_count = remains.len();
+        const CHUNK_SIZE: usize = 1000;
+        rms.extend(remains.into_iter().enumerate().filter_map(
+            |(i, (_query, curr, tr, mut paths))| {
+                if i % CHUNK_SIZE == 0 {
+                    log::info!("remains repairs {i:4}/{rem_count}");
+                }
+
+                log::info!("to_rm mut: {:?}", paths);
+                // dbg!(&paths);
+                // eprintln!(
+                //     "{}",
+                //     hyperast::nodes::SyntaxSerializer::new(&s.query_store, curr)
+                // );
+                let mut curr = curr;
+                for path in paths {
+                    // dbg!(&path);
+                    let actions = vec![tsq_transform::Action::Delete { path }];
+                    curr = tsq_transform::regen_query(&mut s.query_store, curr, actions)?;
+                }
+                let new_q = curr;
+                Some((new_q, tr))
+            },
+        ));
+        rms
+    }
+
+    #[must_use]
+    /// normalize captures to avoid duplicates due to what are actually free variable
+    fn norm_caps(&mut self, rms: Vec<(IdNQ, TR<Init>)>) -> Vec<(IdNQ, TR<Init>)> {
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::ParallelIterator;
+
+        let s = &mut self.lattice;
+        let norm_query = r#"(program
+            (predicate
+                (identifier) (#EQ? "eq")
+                (parameters
+                    (capture) @id1
+                    (capture) @id2
+                )
+            ) @pred
+        )
+        (named_node (capture) @decl)
+        (anonymous_node (capture) @decl)
+        (grouping (capture) @decl)
+        (list (capture) @decl)
+        "#;
+        let norm_query = &hyperast_tsquery::Query::new(&norm_query, crate::language())
+            .map_err(|e| format!("error in norm_query: {e}"))
+            .unwrap();
+        let pred_cid = norm_query.capture_index_for_name("pred").unwrap();
+        let id1_cid = norm_query.capture_index_for_name("id1").unwrap();
+        let id2_cid = norm_query.capture_index_for_name("id2").unwrap();
+        let decl_cid = norm_query.capture_index_for_name("decl").unwrap();
+        let root_cap = s.root_cap;
+
+        let rms = ParallelIterator::map(rms.into_par_iter(), |x| {
+            use hyperast::nodes::TextSerializer;
+            use hyperast::position::structural_pos::CursorHead;
+            let mut candidates = vec![];
+            let query = x.0;
+            let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
+            let mut to_rm = pos.build_empty_set();
+            let mut decl_nodes = pos.build_empty_set();
+            let mut refs = pos.build_empty_set();
+            let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&s.query_store, pos);
+            let mut matches = norm_query.matches(cursor);
+            loop {
+                let Some(m) = matches.next() else {
+                    break;
+                };
+                if let Some(decl) = m.nodes_for_capture_index(decl_cid).next() {
+                    let cap = TextSerializer::new(&s.query_store, decl.pos.node()).to_string();
+                    if cap.matches("^[@]p[0-9]+$").next().is_some() {
+                        decl_nodes.register(&decl.pos);
+                    }
+                } else if let Some(pred) = m.nodes_for_capture_index(pred_cid).next() {
+                    let id1 = m.nodes_for_capture_index(id1_cid).next().unwrap();
+                    let id2 = m.nodes_for_capture_index(id2_cid).next().unwrap();
+                    candidates.push((id1.pos.clone(), id2.pos.clone(), pred.pos.clone()));
+                }
+            }
+            if candidates.is_empty() && decl_nodes.is_empty() {
+                return Ok((query, x.1));
+            }
+
+            // @p3 @p2 @p0 @p1                // decl_nodes
+            // (#eq? @p1 @p2) (#eq? @p0 @p3)  // candidates
+            // p3 -> p0 ; p2 -> p1 ; p0 -> p2 ; p1 -> p3
+
+            let mut map: Vec<IdNQ> = vec![];
+            let mut repl_decls: Vec<(Vec<u16>, IdNQ)> = vec![];
+            for c in decl_nodes.iter() {
+                if let Some(i) = map.iter().position(|p| p.node() == c.node()) {
+                    repl_decls.push((c.offsets(), s.auto_caps[i]));
+                } else {
+                    let i = map.len();
+                    map.push(c.node());
+                    repl_decls.push((c.offsets(), s.auto_caps[i]));
+                }
+            }
+            // @p0 @p1 @p2 @p3
+            // p1 == p2 ; p0 == p3
+            // p0 <- p3 == p0 -> p2 ; p1 <- p2 == p1 -> p3
+            // p0 => p2 ; p1 => p3
+
+            // ( p p) ( p p) ( p p)
+            let mut eq_id_rels = candidates
+                .iter()
+                .map(|(id1, id2, _)| {
+                    let p1 = map
+                        .iter()
+                        .position(|x| *x == id1.node())
+                        .unwrap_or(usize::MAX - 1); // to preserve order of non auto preds
+                    let p2 = map
+                        .iter()
+                        .position(|x| *x == id1.node())
+                        .unwrap_or(usize::MAX);
+                    if p1 < p2 { (p1, p2) } else { (p2, p1) }
+                })
+                .collect::<Vec<_>>();
+            eq_id_rels.sort();
+
+            let repl_refs = candidates.into_iter().zip(eq_id_rels.into_iter()).flat_map(
+                |((id1, id2, pred), (i1, i2))| {
+                    let i1 = s.auto_caps.get(i1).copied();
+                    let i2 = s.auto_caps.get(i2).copied();
+                    if Some(id1.node()) == i1 && Some(id2.node()) == i2 {
+                        return Default::default();
+                    }
+                    let i1 = i1.unwrap_or(id1.node());
+                    let i2 = i2.unwrap_or(id2.node());
+                    vec![(id1.offsets(), i1), (id2.offsets(), i2)]
+                },
+            );
+            let mut repl = repl_decls;
+            repl.extend(repl_refs);
+            repl.iter_mut().for_each(|(path, _)| {
+                path.pop();
+                path.reverse();
+            });
+            repl.sort_by(|a, b| b.0.cmp(&a.0));
+            let mut curr = query;
+            log::info!("repl: {} {:?}", repl.len(), repl);
+            for rm in 0..repl.len() {
+                let (path, new) = repl[rm].clone();
+                // path.pop();
+                // path.reverse();
+                let actions = vec![tsq_transform::Action::Replace { path, new }];
+                match tsq_transform::try_regen_query(&s.query_store, curr, actions.clone()) {
+                    Some(query) => curr = query,
+                    None => {
+                        return Err((
+                            query,
+                            curr,
+                            x.1.clone(),
+                            repl[rm..].iter().map(|x| x.clone()).collect(),
+                        ));
+                    }
+                }
+            }
+            // eprintln!(
+            //     "{}",
+            //     hyperast::nodes::SyntaxSerializer::new(&s.query_store, curr)
+            // );
+
+            Ok((curr, x.1))
+
+            // let mut to_rm: Vec<_> = to_rm
+            //     .into_iter()
+            //     .map(|path| tsq_transform::Action::Delete { path })
+            //     .collect();
+            // to_rm.sort_by(|a, b| b.path().cmp(a.path()));
+            // match tsq_transform::try_regen_query(&s.query_store, query, to_rm.clone()) {
+            //     Some(query) => Some(Ok((query, x.1))),
+            //     None => return Some(Err((query, x.1.clone(), to_rm))),
+            // }
+        });
+        let (remains, mut rms): (
+            Vec<(IdNQ, IdNQ, TR<Init>, Vec<(Vec<u16>, IdNQ)>)>,
+            Vec<(IdNQ, TR<Init>)>,
+        ) = ParallelIterator::partition_map(rms, |x| x.into());
+        log::info!("remains: {}", remains.len());
+        log::info!("rms: {}", rms.len());
+
+        let rem_count = remains.len();
+        const CHUNK_SIZE: usize = 1000;
+        rms.extend(remains.into_iter().enumerate().filter_map(
+            |(i, (_query, curr, tr, mut paths))| {
+                if i % CHUNK_SIZE == 0 {
+                    log::info!("remains repairs {i:4}/{rem_count}");
+                }
+
+                log::info!("repl mut: {:?}", paths);
+                // dbg!(&paths);
+                // eprintln!(
+                //     "{}",
+                //     hyperast::nodes::SyntaxSerializer::new(&s.query_store, curr)
+                // );
+                let mut curr = curr;
+                for (path, new) in paths {
+                    // dbg!(&path);
+                    let actions = vec![tsq_transform::Action::Replace { path, new }];
+                    curr = tsq_transform::regen_query(&mut s.query_store, curr, actions)?;
+                }
+                let new_q = curr;
+                Some((new_q, tr))
+            },
+        ));
+        rms
+    }
+
     /// Must use dedup_uniques_par on output to properly progress
     #[must_use]
     pub fn uniques_par_par(
@@ -1066,7 +1442,8 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 /// dedup using any usize representable metric,
 /// `by_metric` is indexed by the metric as its key
 /// `dedup` is also indexed by the metric as its offset
-fn dedup_patterns_by_metric<TR: Clone + PartialEq + Send + Sync>(
+#[cfg(feature = "synth_par")]
+pub fn dedup_patterns_by_metric<TR: Clone + PartialEq + Send + Sync>(
     by_metric: BTreeMap<usize, Vec<(legion::Entity, TR)>>,
     dedup: &mut Vec<hashbrown::HashMap<IdNQ, Vec<TR>>>,
 ) -> Vec<legion::Entity> {
@@ -1128,7 +1505,19 @@ where
     );
     by_metric
 }
-
+#[cfg(feature = "synth_par")]
+pub fn filter_by_key_par<TR: Clone + PartialEq + Send + Sync>(
+    by_metric: &mut BTreeMap<usize, Vec<(legion::Entity, TR)>>,
+    dedup: &Vec<hashbrown::HashMap<IdNQ, Vec<TR>>>,
+) {
+    use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+    by_metric.par_iter_mut().for_each(|(s, x)| {
+        x.extract_if(.., |x| {
+            dedup.get(*s).map_or(false, |y| y.contains_key(&x.0))
+        })
+        .for_each(|_| ());
+    });
+}
 #[cfg(feature = "synth_par")]
 impl<Init: Clone + SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
     pub fn actives(&mut self, active_size: usize) -> Vec<IdN> {
@@ -1148,7 +1537,6 @@ impl<Init: Clone + SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
             .collect()
     }
     pub fn between(&mut self, active_size: &mut usize, active: &mut Vec<IdNQ>) -> bool {
-        dbg!((active.len(), &active_size));
         if !active.is_empty() {
             return false;
         }
@@ -1210,7 +1598,9 @@ impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
         let simp_eq = act
             .flat_map(|x| {
                 let query = x;
-                let Some(new_q) = simp_positional_eq(&mut s.query_store, query, meta_simp) else {
+                let Some(new_q) =
+                    simp_positional_eq(&mut s.query_store, query, meta_simp, &mut s.auto_caps)
+                else {
                     already.push(query);
                     return vec![];
                 };
@@ -1218,7 +1608,6 @@ impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
                 vec![(new_q, TR::<Init>::SimpEQ(query))]
             })
             .collect::<Vec<_>>();
-        dbg!(dedup.len());
         (simp_eq, already)
     }
 }
@@ -1355,12 +1744,16 @@ pub struct QueryId(
 
 impl<E> QueryLattice<E> {
     pub fn new() -> Self {
+        let mut query_store = crate::search::ts_query_store();
+        let root_cap = make_cap(&mut query_store, "_root");
         Self {
-            query_store: crate::search::ts_query_store(),
+            query_store,
             leaf_queries: vec![],
             queries: vec![],
             raw_rels: Default::default(),
             sort_cache: Default::default(),
+            root_cap,
+            auto_caps: vec![],
         }
     }
 }
@@ -1526,25 +1919,33 @@ fn simp_positional_eq(
     query_store: &mut QStore,
     query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,
+    auto_caps: &mut Vec<IdNQ>,
 ) -> Option<IdNQ> {
     // merge positional predicates with identical labels
     let mut per_label = simp_search_positional_preds(query_store, query, meta_simp);
-    let query = replace_preds_with_caps(query_store, query, per_label.values_mut().collect())?;
+    let query = replace_preds_with_caps(
+        query_store,
+        query,
+        per_label.values_mut().collect(),
+        auto_caps,
+    )?;
     let preds = format!("(_) {}", PerLabel(per_label));
     let mut md_cache = Default::default();
     let preds = try_ts_query(query_store, &mut md_cache, preds.as_bytes(), |n, t| {
         log::warn!(
-            "Error parsing predicates for simp_positional_eq: {}",
-            t.root_node().to_sexp()
+            "Error parsing predicates for simp_positional_eq: {}\n{}",
+            t.root_node().to_sexp(),
+            preds
         );
+        panic!();
         Some(n)
     })?;
     let preds = preds.local.compressed_node;
     use hyperast::types::WithChildren;
-    eprintln!(
-        "{}",
-        hyperast::nodes::SyntaxSerializer::new(query_store, preds)
-    );
+    // eprintln!(
+    //     "{}",
+    //     hyperast::nodes::SyntaxSerializer::new(query_store, preds)
+    // );
 
     // dbg!(qgen::PP::<_, _>::new(&*query_store, preds).to_string());
     let main_query = query_store.node_store.resolve(query).child(&0).unwrap();
@@ -1953,7 +2354,6 @@ pub fn find_matches_aux(
     meta_simp: &hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
 ) -> position::structural_pos::CursorWithPersistenceOrderedSet<IdNQ> {
-    // let mut result = vec![];
     let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let mut set = pos.build_empty_set();
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
@@ -1962,11 +2362,9 @@ pub fn find_matches_aux(
         let Some(m) = matches.next() else {
             break;
         };
-        log::info!("found match {}", m.pattern_index.to_usize());
+        log::trace!("found match {}", m.pattern_index.to_usize());
         for p in m.nodes_for_capture_index(cid) {
-            log::info!("found capture for match");
-            // let p = p.pos.clone().offsets();
-            // result.push(p);
+            log::trace!("found capture for match");
             set.register(&p.pos);
         }
     }
@@ -2013,6 +2411,7 @@ pub fn replace_preds_with_caps(
     query_store: &mut QStore,
     query: IdNQ,
     per_label_values: Vec<&mut Vec<(String, PendingRmPath)>>,
+    auto_caps: &mut Vec<IdNQ>,
 ) -> Option<IdNQ> {
     let mut count = 0;
     let mut values: Vec<_> = per_label_values;
@@ -2021,18 +2420,24 @@ pub fn replace_preds_with_caps(
         .into_iter()
         .filter(|l| l.len() >= 2)
         .flatten()
-        .filter_map(|x| {
+        .map(|x| {
             let new = if x.0.is_empty() {
                 x.0 = format!("p{}", count);
+                let cap = if let Some(cap) = auto_caps.get(count) {
+                    *cap
+                } else {
+                    auto_caps.push(make_cap(query_store, &x.0));
+                    *auto_caps.get(count).unwrap()
+                };
                 count += 1;
-                make_cap(query_store, &x.0)
+                cap
             } else {
                 make_cap(query_store, &x.0)
             };
             let mut path = x.1.clone();
             path.pop();
             path.reverse();
-            Some((path, new))
+            (path, new)
         })
         .collect();
     if actions.is_empty() {
@@ -2043,18 +2448,6 @@ pub fn replace_preds_with_caps(
         .into_iter()
         .map(|(path, new)| tsq_transform::Action::Replace { path, new })
         .collect();
-    eprintln!("[{}:{}]", file!(), line!());
-    for a in actions.iter() {
-        match a {
-            tsq_transform::Action::Replace { path, new } => {
-                eprintln!("replace {path:?}");
-                println!("\t`{}`", qgen::PP::<_, _>::new(&*query_store, *new));
-            }
-            x => {
-                dbg!(x);
-            }
-        }
-    }
 
     tsq_transform::regen_query(query_store, query, actions)
 }
@@ -2062,6 +2455,7 @@ pub fn replace_preds_with_caps(
 // can be cached for a given query_store, but such caching is better done by caller.
 // note most importantly it would not require to hold the store mutably
 pub fn make_cap(query_store: &mut QStore, name: &str) -> IdNQ {
+    assert!(!name.is_empty());
     let q = format!("_ @{}", name);
     let mut md_cache = Default::default();
     let q = try_ts_query(query_store, &mut md_cache, q.as_bytes(), |n, t| Some(n))
@@ -2122,16 +2516,229 @@ impl<P: Ord> std::fmt::Display for PerLabel<P> {
         values.sort_by_key(|x| x.iter().map(|x| &x.1).max().unwrap());
         for x in values {
             if x.len() == 2 {
+                assert!(!x[0].0.is_empty());
+                assert!(!x[1].0.is_empty());
                 writeln!(f, "(#eq? @{} @{})", x[0].0, x[1].0)?;
             } else if x.len() == 1 {
                 // noop
             } else {
                 for y in &x[1..] {
+                    assert!(!x[0].0.is_empty());
+                    assert!(!y.0.is_empty());
                     writeln!(f, "(#eq? @{} @{})", x[0].0, y.0)?;
                 }
                 // todo!("need to do combination")
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "synth_par")]
+pub fn semi_interactive_poset_build<P>(
+    b: &mut Builder<'_, P>,
+    meta_simp: &hyperast_tsquery::Query,
+    mut timeout: impl FnMut() -> bool,
+    size_threshold: impl Fn(usize) -> usize,
+) where
+    P: Eq + Clone + SolvedPosition<IdN> + Sync + Send,
+{
+    #[derive(PartialEq, Eq, Debug)]
+    enum Phase {
+        Uniq,
+        Removes,
+        RemovesAll,
+        SimpEq,
+        RemovesAll2,
+        Removes2,
+    }
+
+    type BySize<T> = Vec<T>;
+    type SimpEqResult = IdN;
+    type SimpEqSource = IdN;
+    type SimpEqedSet = Vec<(SimpEqResult, Vec<SimpEqSource>)>;
+    // let mut simp_eq_valid_by_construction: BySize<SimpEqedSet> = vec![];
+
+    let mut too_slow = DedupBySize2::<TR<P>>::default();
+
+    assert!(!b.dedup.is_empty());
+    let mut active_size = b.dedup.len() - 1;
+    let mut active: Vec<_> = b.actives(active_size);
+    let mut phase = Phase::Uniq;
+    loop {
+        if timeout() {
+            break;
+        }
+        log::info!("dedup len: {}", b.dedup.len());
+        log::info!("active_size: {}", active_size);
+        log::info!("actives: {}", active.len());
+        // TODO find an alternative to phases
+        // NOTE simp_eq creates larger pattern
+        if phase == Phase::Uniq {
+            // do it first to reduce noise and remove as many patts as possible
+            let (rms, _already) = b.uniques_par_par(active_size, &mut active);
+            // b.dedup_uniques_par(active_size, rms);
+            // avoid hanging, by ignoring the patterns not shrinking enough
+            let mut by_size = b.by_pattern_size(rms);
+            let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+            let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+            active.extend(act);
+            log::info!("actives after remove all: {}", active.len());
+
+            filter_by_key_par(&mut largest_by_size, &b.dedup);
+            let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+            log::info!("too_slow added: {}", act.len());
+        } else if phase == Phase::SimpEq {
+            // the most tricky simp phase, as it adds a predicate and their captures
+            // only do it on patterns under size threshold
+            let (simps, not) = b.simp_eq(&mut active);
+            let act = {
+                b.dedup_uniques_par2(active_size, simps)
+
+                // // avoid hanging, by ignoring the patterns not shrinking enough
+                // use hyperast_gen_ts_tsquery::code2query::dedup_patterns_by_metric;
+                // let mut by_size = b.by_pattern_size(simps);
+                // {
+                //     let max_active = by_size.last_key_value().map_or(active_size, |x| *x.0);
+                //     let len = max_active.max(b.dedup.len());
+                //     b.dedup.resize(len, Default::default());
+                // }
+                // let shrank_enough =
+                //     by_size.split_off(&skink_threshold.min(active_size / skink_factor));
+                // let act = dedup_patterns_by_metric(shrank_enough, &mut b.dedup);
+                // log::info!("actives after remove all: {}", active.len());
+
+                // hyperast_gen_ts_tsquery::code2query::filter_by_key_par(&mut by_size, &b.dedup);
+                // let _act = dedup_patterns_by_metric(by_size, &mut too_slow);
+                // log::info!("too_slow added: {}", _act.len());
+                // act
+            };
+            if let Some(cid) = meta_simp.capture_index_for_name("rm.all") {
+                active = act; // first rm on the ones that were simp
+                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.repair_par(rms);
+                let rms = b.norm_caps(rms);
+                b.dedup_uniques_par2(active_size, rms);
+                active = not.clone(); // then the other that were not simp
+                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.repair_par(rms);
+                let rms = b.norm_caps(rms);
+                b.dedup_uniques_par2(active_size, rms);
+            }
+            // TODO link all found simpeq (then rm.all) to previous respective simpeq action,
+            // ie. follow one back then re-apply same simpeq action and link to result
+            // let call this a reduction and model it as TR::SimpEqReduction(TR)
+        } else if phase == Phase::RemovesAll || phase == Phase::RemovesAll2 {
+            // do not use naively after simp_eq as it might remove captures
+            if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
+                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = if phase == Phase::RemovesAll2 {
+                    let rms = b.repair_par(rms);
+                    let rms = b.norm_caps(rms);
+                    rms
+                } else {
+                    rms
+                };
+                // TODO add post-removal to make invalid patterns valid again
+
+                // avoid hanging, by ignoring the patterns not shrinking enough
+                let mut by_size = b.by_pattern_size(rms);
+                let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+                let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+                active.extend(act);
+                log::info!("actives after remove all: {}", active.len());
+
+                filter_by_key_par(&mut largest_by_size, &b.dedup);
+                let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+                log::info!("too_slow added: {}", act.len());
+            }
+        } else if phase == Phase::Removes || phase == Phase::Removes2 {
+            // do not use naively after simp_eq as it might remove captures
+            for a in &active {
+                log::trace!("try remove: {:?}", b.lattice.pretty(&a));
+            }
+            let rms = b.removes_par_par(active_size, &mut active);
+            for (a, _) in &rms {
+                log::info!("to remove: {:?}", b.lattice.pretty(&a));
+            }
+            let rms = if phase == Phase::Removes2 {
+                let rms = b.repair_par(rms);
+                let rms = b.norm_caps(rms);
+                rms
+            } else {
+                rms
+            };
+            for (a, _) in &rms {
+                log::info!("repaired: {:?}", b.lattice.pretty(&a));
+            }
+            // TODO add post-removal to make invalid patterns valid again
+            // not that difficult, just need to remove predicate using absent capture
+            // and then also remove the unused captures to help with deduplication
+            // TODO or put invalid patterns in a separated set
+            // detecting invalid is easy, for now I only see capture predicates missing captures
+            // then can try to do removals
+            // NOTE directly removing the rest is probably faster
+
+            // reduce hanging, by ignoring the patterns not shrinking enough
+            let mut by_size = b.by_pattern_size(rms);
+            let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+            let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+            active.extend(act);
+            log::info!("actives after removes: {}", active.len());
+
+            filter_by_key_par(&mut largest_by_size, &b.dedup);
+            let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+            log::info!("too_slow added: {}", act.len());
+        }
+        log::error!("{phase:?} size: {} actives: {}", &active_size, active.len());
+        log::warn!("");
+        log::info!("");
+        if b.between(&mut active_size, &mut active) {
+            log::error!("finish phase: {phase:?}");
+            if phase == Phase::Uniq {
+                // assert!(!b.dedup.is_empty());
+                // active_size = b.dedup.len() - 1;
+                // active = b.actives(active_size);
+                // phase = Phase::RemovesAll;
+                phase = Phase::SimpEq;
+                // // this phase is complex, so only reasonably sized patterns are considered
+                // // tips consider more patterns in remove all
+                assert!(!b.dedup.is_empty());
+                active_size = b.dedup.len() - 1;
+                active = b.actives(active_size);
+            } else if phase == Phase::RemovesAll {
+                assert!(!b.dedup.is_empty());
+                active_size = b.dedup.len() - 1;
+                active = b.actives(active_size);
+                phase = Phase::Removes;
+            } else if phase == Phase::Removes {
+                assert!(!b.dedup.is_empty());
+                active_size = b.dedup.len() - 1;
+                // this phase produce many variants so only reasonably sized patterns are considered
+                // tips consider more patterns in remove all
+                // active_size = active_size.min(2000);
+                phase = Phase::SimpEq;
+                // this phase is complex, so only reasonably sized patterns are considered
+                // tips consider more patterns in remove all
+                active_size = active_size.min(size_threshold(0));
+                active = b.actives(active_size);
+            } else if phase == Phase::SimpEq {
+                phase = Phase::Removes2;
+                assert!(!b.dedup.is_empty());
+                active_size = b.dedup.len() - 1;
+                // active_size = active_size.min(size_threshold(0));
+                active = b.actives(active_size);
+            } else if phase == Phase::Removes2 {
+                phase = Phase::RemovesAll2;
+                assert!(!b.dedup.is_empty());
+                active_size = b.dedup.len() - 1;
+                // active_size = active_size.min(size_threshold(0));
+                active = b.actives(active_size);
+            } else if phase == Phase::RemovesAll2 {
+                break;
+            } else {
+                unreachable!();
+            }
+        }
     }
 }

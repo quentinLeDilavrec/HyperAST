@@ -467,7 +467,12 @@ pub fn try_pattern_renames(
         let per_label_values = per_label.values_mut().collect();
         let query_store = &mut lattice.query_store;
         let query = *top;
-        let p = code2query::replace_preds_with_caps(query_store, query, per_label_values);
+        let p = code2query::replace_preds_with_caps(
+            query_store,
+            query,
+            per_label_values,
+            &mut lattice.auto_caps,
+        );
         if let Some(p) = p {
             new_tops.entry(p).or_default().extend(count);
             let p = lattice.pretty(&p);

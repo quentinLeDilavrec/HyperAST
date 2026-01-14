@@ -268,9 +268,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         // let hsyntax = hbuilder.most_discriminating();
         // let hashable = &hsyntax;
 
-        let metrics = acc
-            .metrics
-            .finalize(&interned_kind, &label, size_no_spaces as u16);
+        let metrics = acc.metrics.finalize(&interned_kind, &label, size_no_spaces);
 
         let hashable = &metrics.hashs.most_discriminating();
 
@@ -378,9 +376,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         // let hsyntax = hbuilder.most_discriminating();
         // let hashable = &hsyntax;
 
-        let metrics = acc
-            .metrics
-            .finalize(&interned_kind, &label, size_no_spaces as u16);
+        let metrics = acc.metrics.finalize(&interned_kind, &label, size_no_spaces);
         let hashable = &metrics.hashs.most_discriminating();
 
         let label_id = l;

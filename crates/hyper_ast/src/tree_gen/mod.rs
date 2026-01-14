@@ -885,7 +885,8 @@ pub mod utils_ts {
         pub fn new(cursor: &C) -> Self {
             use bitvec::prelude::Lsb0;
             let mut vis = bitvec::bitvec![];
-            vis.push(Visibility::Hidden == Visibility::Hidden);
+            let v = Visibility::Hidden;
+            vis.push(v == Visibility::Hidden);
             Self {
                 has: super::zipped::Has::Down,
                 stack: vec![cursor.clone()],

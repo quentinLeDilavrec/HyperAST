@@ -618,7 +618,6 @@ fn target_code_elem(
     let (pos, target_node, no_spaces_path_to_target) =
         compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
     let range = pos.range();
-    
     TargetCodeElement::<IdN, Idx> {
         start: range.start,
         end: range.end,

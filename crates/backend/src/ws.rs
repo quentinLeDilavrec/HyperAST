@@ -161,7 +161,7 @@ async fn handle_socket_db(socket: WebSocket, who: SocketAddr, state: SharedState
         loop {
             cnt += 1;
             match r.recv().await {
-                Ok(x) //if &x.owner != &usr 
+                Ok(x) //if &x.owner != &usr
                 => {
                     sender
                         .send(Message::Text(serde_json::to_string(&x).unwrap()))
@@ -354,7 +354,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
                 let shared = vecs[session].as_ref();
                 let rw_lock_write_guard = &mut shared.unwrap().write().unwrap();
                 let doc = &mut rw_lock_write_guard.deref_mut().doc;
-                
+
                 doc.sync().generate_sync_message(&mut sync_state)
             };
             if let Some(a) = msg {
@@ -372,23 +372,24 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
             let mut recv = r.recv().await;
             let mut changed = false;
             if let Some(aaa) = &mut recv
-                && let Some(d) = aaa.take() {
-                    dbg!(who);
-                    if d.is_empty() {
-                    } else {
-                        let vecs = state.doc2.docs.read().unwrap();
-                        let shared = vecs[session].as_ref();
-                        let shared = &mut shared.unwrap().write().unwrap();
-                        let shared = shared.deref_mut();
-                        let message = automerge::sync::Message::decode(&d).unwrap();
-                        shared
-                            .doc
-                            .sync()
-                            .receive_sync_message(&mut sync_state, message)
-                            .unwrap();
-                    }
-                    changed = true;
-                };
+                && let Some(d) = aaa.take()
+            {
+                dbg!(who);
+                if d.is_empty() {
+                } else {
+                    let vecs = state.doc2.docs.read().unwrap();
+                    let shared = vecs[session].as_ref();
+                    let shared = &mut shared.unwrap().write().unwrap();
+                    let shared = shared.deref_mut();
+                    let message = automerge::sync::Message::decode(&d).unwrap();
+                    shared
+                        .doc
+                        .sync()
+                        .receive_sync_message(&mut sync_state, message)
+                        .unwrap();
+                }
+                changed = true;
+            };
             match recv {
                 // Ok(heads) => {
                 Some(_) => {
@@ -398,7 +399,7 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, state: SharedState, s
                         let shared = vecs[session].as_ref();
                         let shared = &mut shared.unwrap().write().unwrap();
                         let shared = shared.deref_mut();
-                        
+
                         shared.doc.sync().generate_sync_message(&mut sync_state)
                     };
                     if let Some(a) = msg {
@@ -546,7 +547,7 @@ async fn handle_socket_automerge_sync(socket: WebSocket, who: SocketAddr, state:
         {
             let msg = {
                 let doc = &mut state.doc.0.write().unwrap();
-                
+
                 doc.sync().generate_sync_message(&mut sync_state)
             };
             if let Some(a) = msg {
@@ -564,25 +565,26 @@ async fn handle_socket_automerge_sync(socket: WebSocket, who: SocketAddr, state:
             let mut recv = r.recv().await;
             let mut changed = false;
             if let Some(aaa) = &mut recv
-                && let Some(d) = aaa.take() {
-                    dbg!(who);
-                    if d.is_empty() {
-                    } else {
-                        let doc = &mut state.doc.0.write().unwrap();
-                        let message = automerge::sync::Message::decode(&d).unwrap();
-                        doc.sync()
-                            .receive_sync_message(&mut sync_state, message)
-                            .unwrap();
-                    }
-                    changed = true;
-                };
+                && let Some(d) = aaa.take()
+            {
+                dbg!(who);
+                if d.is_empty() {
+                } else {
+                    let doc = &mut state.doc.0.write().unwrap();
+                    let message = automerge::sync::Message::decode(&d).unwrap();
+                    doc.sync()
+                        .receive_sync_message(&mut sync_state, message)
+                        .unwrap();
+                }
+                changed = true;
+            };
             match recv {
                 // Ok(heads) => {
                 Some(_) => {
                     dbg!(who);
                     let msg = {
                         let doc = &mut state.doc.0.write().unwrap();
-                        
+
                         doc.sync().generate_sync_message(&mut sync_state)
                     };
                     if let Some(a) = msg {

@@ -304,14 +304,6 @@ impl<I, T, const INTERM: u16> SubFinder<I, T, INTERM> {
             self.max_sub_len = self.max_sub_len.max(len);
         }
     }
-
-    pub(crate) fn matches<Q, SId>(&self, query: &Q, sid: SId) -> Vec<PatternId> {
-        let mut res = vec![];
-        let hasher = IncHasher(std::hash::DefaultHasher::new(), 0);
-        let mut stack = [(hasher, sid)];
-        loop {}
-        res
-    }
 }
 
 struct PrecomputedPatterns2(SubFinder<PatternId, u64, { PrecomputedPatterns2::INTERM }>);

@@ -326,9 +326,10 @@ impl IncHasher {
 }
 impl IncHasher {
     fn inc<'a>(&'a mut self, inc_v: &mut Vec<u64>) -> &'a mut std::hash::DefaultHasher {
-        if self.1 % PrecomputedPatterns::INTERM == 1 {
-            inc_v.push(self.0.clone().finish());
-        }
+        // TODO debug to enable skipping some intermediate hashing
+        // if self.1 % PrecomputedPatterns::INTERM == 1 {
+        //     inc_v.push(self.0.clone().finish());
+        // }
         self.1 += 1;
         &mut self.0
     }
@@ -354,9 +355,10 @@ impl PrecomputedPatterns {
                 // dbg!(&self.intermediate_hashes);
                 return;
             };
-            if hasher.1 % PrecomputedPatterns::INTERM == 0 {
-                self.intermediate_hashes.push(hasher.0.clone().finish());
-            }
+            // TODO debug to enable skipping some intermediate hashing
+            // if hasher.1 % PrecomputedPatterns::INTERM == 0 {
+            self.intermediate_hashes.push(hasher.0.clone().finish());
+            // }
             let step = &query.steps[id];
             if step.done() {
                 // finish current
@@ -401,7 +403,9 @@ impl PrecomputedPatterns {
                 // need to do this preparation in the add step
                 continue;
             }
-            if hasher.1 % PrecomputedPatterns::INTERM == 0 && hasher.1 > 0 {
+            // TODO debug to enable skipping some intermediate hashing
+            // hasher.1 % PrecomputedPatterns::INTERM == 0 &&
+            if hasher.1 > 0 {
                 let hash = hasher.0.clone().finish();
                 // dbg!(&hash);
                 if self.intermediate_hashes.binary_search(&hash).is_err() {
@@ -506,13 +510,14 @@ impl PrecomputedPatterns {
         mut hasher: IncHasher,
         res: &mut Vec<PatternId>,
     ) {
-        if hasher.1 % PrecomputedPatterns::INTERM == 1
-            && !self
-                .intermediate_hashes
-                .contains(&hasher.0.clone().finish())
-        {
-            return;
-        }
+        // TODO debug to enable skipping some intermediate hashing
+        // if hasher.1 % PrecomputedPatterns::INTERM == 1
+        //     && !self
+        //         .intermediate_hashes
+        //         .contains(&hasher.0.clone().finish())
+        // {
+        //     return;
+        // }
 
         if id != stepid {
             let k = hasher.0.clone().finish();

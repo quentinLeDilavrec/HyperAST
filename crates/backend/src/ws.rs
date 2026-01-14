@@ -57,10 +57,12 @@ use std::sync::Arc;
 use std::sync::RwLock;
 
 pub(crate) struct SharedDocs {
-    pub docs: Arc<RwLock<Vec<Option<Arc<RwLock<SharedDoc>>>>>>,
+    pub docs: Arc<RwLock<RwLockSparseVec<SharedDoc>>>,
     s: tokio::sync::broadcast::Sender<DbMsgOut>,
     r: tokio::sync::broadcast::Receiver<DbMsgOut>,
 }
+type RwLockSparseVec<T> = Vec<Option<Arc<RwLock<T>>>>;
+
 impl Default for SharedDocs {
     fn default() -> Self {
         let (s, r) = tokio::sync::broadcast::channel(50);

@@ -69,20 +69,14 @@ pub(crate) struct PairLock<T> {
     hasher: std::hash::RandomState,
 }
 
-impl
-    PairLock<
-        &clashmap::RwLock<hashbrown::HashTable<(IdN, lazy_post_order::LazyPostOrder<IdN, u32>)>>,
-    >
-{
+type HashTablePairLockRef<'a, T> = PairLock<&'a clashmap::RwLock<hashbrown::HashTable<T>>>;
+type HashTablePairLockWrite<'a, T> =
+    PairLock<lock_api::RwLockWriteGuard<'a, clashmap::RawRwLock, hashbrown::HashTable<T>>>;
+
+impl HashTablePairLockRef<'_, (IdN, lazy_post_order::LazyPostOrder<IdN, u32>)> {
     pub fn lock(
         &self,
-    ) -> PairLock<
-        lock_api::RwLockWriteGuard<
-            '_,
-            clashmap::RawRwLock,
-            hashbrown::HashTable<(IdN, lazy_post_order::LazyPostOrder<IdN, u32>)>,
-        >,
-    > {
+    ) -> HashTablePairLockWrite<'_, (IdN, lazy_post_order::LazyPostOrder<IdN, u32>)> {
         PairLock {
             shard1: self.shard1.write(),
             shard2: self.shard2.as_ref().map(|x| x.write()),
@@ -93,15 +87,7 @@ impl
     }
 }
 
-impl
-    PairLock<
-        lock_api::RwLockWriteGuard<
-            '_,
-            clashmap::RawRwLock,
-            hashbrown::HashTable<(IdN, lazy_post_order::LazyPostOrder<IdN, u32>)>,
-        >,
-    >
-{
+impl HashTablePairLockWrite<'_, (IdN, lazy_post_order::LazyPostOrder<IdN, u32>)> {
     pub fn as_mut<HAST: HyperAST<IdN = IdN> + Copy>(
         &mut self,
         hyperast: HAST,

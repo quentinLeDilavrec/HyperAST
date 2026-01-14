@@ -867,17 +867,13 @@ fn eq_expr(e1: &Expr, e2: &Expr) -> bool {
         (Expr::Property(v1, ..), Expr::Property(v2, ..)) => v1 == v2,
         (Expr::MethodCall(v1, ..), Expr::MethodCall(v2, ..)) => soft_todo!(false),
         (Expr::FnCall(v1, ..), Expr::FnCall(v2, ..)) => {
-            v1.name == v1.name
-                && v1.args.len() == v1.args.len()
-                && v1.capture_parent_scope == v1.capture_parent_scope
-                && v1.hashes == v1.hashes
-                && v1.namespace == v1.namespace
-                && v1.op_token == v1.op_token
-                && v1
-                    .args
-                    .iter()
-                    .zip(v2.args.iter())
-                    .all(|(e1, e2)| eq_expr(e1, e2))
+            v1.name == v2.name
+                && v1.args.len() == v2.args.len()
+                && (v1.capture_parent_scope == v2.capture_parent_scope)
+                && v1.hashes == v2.hashes
+                && v1.namespace == v2.namespace
+                && v1.op_token == v2.op_token
+                && Iterator::zip(v1.args.iter(), v2.args.iter()).all(|(e1, e2)| eq_expr(e1, e2))
         }
         (Expr::Index(v1, f1, ..), Expr::Index(v2, f2, ..)) => {
             f1.bits() == f2.bits() && soft_todo!(false)

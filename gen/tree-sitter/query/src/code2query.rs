@@ -2241,80 +2241,80 @@ pub fn pred_uniq(query_store: &QStore, query: IdNQ, meta_simp: &hyperast_tsquery
     }
 }
 
-fn simp_search_need2(
-    query_store: &QStore,
-    query: IdNQ,
-    meta_simp: &hyperast_tsquery::Query,
-) -> bool {
-    let need = meta_simp.capture_index_for_name("need");
-    let uniq = meta_simp.capture_index_for_name("uniq");
-    if need.is_none() && uniq.is_none() {
-        return true;
-    };
-    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
-    let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
-    let mut matches = meta_simp.matches(cursor);
-    // // at least one match
-    // loop {
-    //     let Some(m) = matches.next() else {
-    //         return false;
-    //     };
-    //     if m.nodes_for_capture_index(cid).next().is_some() {
-    //         return true;
-    //     }
-    // }
-    // // exactly one match, unique
-    // let mut found = false;
-    // loop {
-    //     let Some(m) = matches.next() else {
-    //         return found;
-    //     };
-    //     if m.nodes_for_capture_index(cid).next().is_some() {
-    //         if found {
-    //             return false;
-    //         }
-    //         found = true;
-    //     }
-    // }
-    // both
-    let mut found = false;
-    let mut found_need = false;
-    loop {
-        let Some(m) = matches.next() else {
-            return found;
-        };
-        if let Some(_cid) = uniq {}
-        if let Some(cid) = need {
-            let q = meta_simp.quant(m.pattern_index, cid);
-            if matches!(
-                q,
-                hyperast_tsquery::CaptureQuantifier::One
-                    | hyperast_tsquery::CaptureQuantifier::OneOrMore
-            ) {}
-        }
+// fn simp_search_need2(
+//     query_store: &QStore,
+//     query: IdNQ,
+//     meta_simp: &hyperast_tsquery::Query,
+// ) -> bool {
+//     let need = meta_simp.capture_index_for_name("need");
+//     let uniq = meta_simp.capture_index_for_name("uniq");
+//     if need.is_none() && uniq.is_none() {
+//         return true;
+//     };
+//     let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
+//     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
+//     let mut matches = meta_simp.matches(cursor);
+//     // // at least one match
+//     // loop {
+//     //     let Some(m) = matches.next() else {
+//     //         return false;
+//     //     };
+//     //     if m.nodes_for_capture_index(cid).next().is_some() {
+//     //         return true;
+//     //     }
+//     // }
+//     // // exactly one match, unique
+//     // let mut found = false;
+//     // loop {
+//     //     let Some(m) = matches.next() else {
+//     //         return found;
+//     //     };
+//     //     if m.nodes_for_capture_index(cid).next().is_some() {
+//     //         if found {
+//     //             return false;
+//     //         }
+//     //         found = true;
+//     //     }
+//     // }
+//     // both
+//     let mut found = false;
+//     let mut found_need = false;
+//     loop {
+//         let Some(m) = matches.next() else {
+//             return found;
+//         };
+//         if let Some(_cid) = uniq {}
+//         if let Some(cid) = need {
+//             let q = meta_simp.quant(m.pattern_index, cid);
+//             if matches!(
+//                 q,
+//                 hyperast_tsquery::CaptureQuantifier::One
+//                     | hyperast_tsquery::CaptureQuantifier::OneOrMore
+//             ) {}
+//         }
 
-        let mut need = need.iter().flat_map(|cid| m.nodes_for_capture_index(*cid));
-        let mut uniq = uniq.iter().flat_map(|cid| m.nodes_for_capture_index(*cid));
-        loop {
-            if uniq.next().is_some() {
-                found = true;
-            }
-            if need.next().is_some() {
-                if found {
-                    panic!("cannot match @uniq and @need in the same pattern")
-                    // TODO think about sem. of this case
-                }
-                return true;
-            }
-        }
-        // if m.nodes_for_capture_index(cid).next().is_some() {
-        //     if found {
-        //         return false;
-        //     }
-        //     found = true;
-        // }
-    }
-}
+//         let mut need = need.iter().flat_map(|cid| m.nodes_for_capture_index(*cid));
+//         let mut uniq = uniq.iter().flat_map(|cid| m.nodes_for_capture_index(*cid));
+//         loop {
+//             if uniq.next().is_some() {
+//                 found = true;
+//             }
+//             if need.next().is_some() {
+//                 if found {
+//                     panic!("cannot match @uniq and @need in the same pattern")
+//                     // TODO think about sem. of this case
+//                 }
+//                 return true;
+//             }
+//         }
+//         // if m.nodes_for_capture_index(cid).next().is_some() {
+//         //     if found {
+//         //         return false;
+//         //     }
+//         //     found = true;
+//         // }
+//     }
+// }
 
 fn simp_search_rm(
     query_store: &QStore,

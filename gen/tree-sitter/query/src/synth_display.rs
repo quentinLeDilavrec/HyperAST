@@ -1,17 +1,19 @@
+use std::fmt::Display;
+
 use hyperast::PrimInt;
+use hyperast::position::PositionConverter;
+use hyperast::position::StructuralPosition;
 use hyperast::types::HyperAST;
 use hyperast::types::HyperASTShared;
 use hyperast::types::LendT;
 use hyperast::types::WithSerialization;
 use hyperast::types::WithStats;
-use petgraph::visit::{EdgeRef, IntoNodeReferences};
-use std::fmt::Display;
 
 use crate::code2query::QueryLattice;
+#[cfg(feature = "lattice")]
 use crate::lattice_graph::GroupedLattices;
-use hyperast::position::PositionConverter;
-use hyperast::position::StructuralPosition;
 
+#[cfg(feature = "lattice")]
 use mermaid::Mermaid;
 
 type IdNQ = hyperast::store::defaults::NodeIdentifier;
@@ -154,8 +156,6 @@ where
 
         // content
         for (i, (stats, graph)) in graphs.iter().enumerate() {
-            use crate::lattice_graph::pattern_stats;
-
             writeln!(f, "## Connex SubLattice {i}")?;
             writeln!(f, "| nodes | edges | leafs |")?;
             writeln!(f, "|-------|-------|-------|")?;
@@ -163,110 +163,135 @@ where
             writeln!(f, "")?;
             // let dot = petgraph::dot::Dot::new(&graph);
             // writeln!(file, "```graphviz\n{}\n```", dot)?;
-            let mermaid = Mermaid::new(&graph);
-            writeln!(f, "```mermaid\n{}\n```", mermaid)?;
-            let mut patt_ranked: Vec<_> = graph
-                .node_references()
-                .map(|(id, query)| (id, pattern_stats(&lattice.query_store, (*query).into())))
-                .collect();
-            patt_ranked.sort_by(|a, b| a.1.cmp(&b.1));
-            for (j, (node_id, s)) in patt_ranked.into_iter().enumerate() {
-                let open = j < 4;
-                let query = graph.node_weight(node_id).unwrap();
-                let id = *query;
-                let query = query.pp();
-                let summary_head = |f: &mut Fmt<'_>| writeln!(f, "Pattern {query}");
 
-                let query = id.into();
-                let summary_content = |f: &mut Fmt<'_>| {
-                    writeln!(f, "{}", s.header())?;
-                    writeln!(f, "| {s} |")?;
-                    writeln!(f, "")?;
-                    writeln!(f, "")?;
-                    let init_count = lattice
-                        .raw_rels
-                        .get(&query)
-                        .unwrap()
-                        .iter()
-                        .filter_map(|x| {
-                            let crate::code2query::TR::Init(x) = x else {
-                                return None;
-                            };
-                            Some(x)
-                        })
-                        .count();
-
-                    if init_count == 0 {
-                        return Ok(());
-                    }
-
-                    let summary_head = |f: &mut Fmt<'_>| writeln!(f, "{init_count} inits");
-
-                    let summary_content = |_f: &mut Fmt<'_>| Ok(());
-
-                    let details_content = |f: &mut Fmt<'_>| pp_inits(lattice, *stores, f, query);
-
-                    let id = id.pp();
-                    pp_detail_block(
-                        f,
-                        j < 3,
-                        &id,
-                        summary_head,
-                        summary_content,
-                        details_content,
-                    )
-                };
-
-                let pattern = lattice.pretty(&query);
-                let details_content = |f: &mut std::fmt::Formatter<'_>| {
-                    let inc = graph.edges_directed(node_id, petgraph::Direction::Incoming);
-                    let mut b = false;
-                    for inc in inc {
-                        if !b {
-                            writeln!(f, "generalizes to ")?;
-                        }
-                        if b {
-                            writeln!(f, ",")?;
-                        }
-                        let kind = inc.weight();
-                        let node_id = inc.source();
-                        let query = graph.node_weight(node_id).unwrap();
-                        let query = query.pp();
-                        write!(f, "<a href='#{query}'>{kind}:{query}</a>")?;
-                        b = true;
-                    }
-                    if b {
-                        writeln!(f, "")?;
-                        writeln!(f, "")?;
-                    }
-                    writeln!(f, "```scheme\n{}\n```", pattern)?;
-                    let mut b = false;
-                    for out in graph.edges(node_id) {
-                        if !b {
-                            writeln!(f, "specializes to ")?;
-                        }
-                        if b {
-                            writeln!(f, ",")?;
-                        }
-                        let kind = out.weight();
-                        let node_id = out.target();
-                        let query = graph.node_weight(node_id).unwrap();
-                        let query = query.pp();
-                        write!(f, "<a href='#{query}'>{kind}:{query}</a>")?;
-                        b = true;
-                    }
-                    if b {
-                        writeln!(f, "")?;
-                    }
-
-                    Ok(())
-                };
-                let id = id.pp();
-                pp_detail_block(f, open, &id, summary_head, summary_content, details_content)?;
-            }
+            #[cfg(feature = "lattice")]
+            print_mermaid_graph(f, lattice, stores, graph)?;
         }
         Ok(())
     }
+}
+
+#[cfg(feature = "lattice")]
+fn print_mermaid_graph<HAST: HyperAST, Q, P>(
+    f: &mut std::fmt::Formatter<'_>,
+    lattice: &QueryLattice<P>,
+    stores: &HAST,
+    graph: &petgraph::Graph<Q, enumset::EnumSet<crate::code2query::TrMarker>>,
+) -> Result<(), std::fmt::Error>
+where
+    HAST::IdN: std::fmt::Debug + Copy,
+    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
+    Q: Copy + Into<IdNQ> + PQ,
+    P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy,
+    for<'t> (&'t HAST, P): PPP,
+{
+    use crate::lattice_graph::pattern_stats;
+    use petgraph::visit::EdgeRef;
+    use petgraph::visit::IntoNodeReferences;
+    use std::fmt::Formatter as Fmt;
+    let mermaid = Mermaid::new(&graph);
+    writeln!(f, "```mermaid\n{}\n```", mermaid)?;
+    let mut patt_ranked: Vec<_> = graph
+        .node_references()
+        .map(|(id, query)| (id, pattern_stats(&lattice.query_store, (*query).into())))
+        .collect();
+    patt_ranked.sort_by(|a, b| a.1.cmp(&b.1));
+    for (j, (node_id, s)) in patt_ranked.into_iter().enumerate() {
+        let open = j < 4;
+        let query = graph.node_weight(node_id).unwrap();
+        let id = *query;
+        let query = query.pp();
+        let summary_head = |f: &mut Fmt<'_>| writeln!(f, "Pattern {query}");
+
+        let query = id.into();
+        let summary_content = |f: &mut Fmt<'_>| {
+            writeln!(f, "{}", s.header())?;
+            writeln!(f, "| {s} |")?;
+            writeln!(f, "")?;
+            writeln!(f, "")?;
+            let init_count = lattice
+                .raw_rels
+                .get(&query)
+                .unwrap()
+                .iter()
+                .filter_map(|x| {
+                    let crate::code2query::TR::Init(x) = x else {
+                        return None;
+                    };
+                    Some(x)
+                })
+                .count();
+
+            if init_count == 0 {
+                return Ok(());
+            }
+
+            let summary_head = |f: &mut Fmt<'_>| writeln!(f, "{init_count} inits");
+
+            let summary_content = |_f: &mut Fmt<'_>| Ok(());
+
+            let details_content = |f: &mut Fmt<'_>| pp_inits(lattice, stores, f, query);
+
+            let id = id.pp();
+            pp_detail_block(
+                f,
+                j < 3,
+                &id,
+                summary_head,
+                summary_content,
+                details_content,
+            )
+        };
+
+        let pattern = lattice.pretty(&query);
+        let details_content = |f: &mut std::fmt::Formatter<'_>| {
+            let inc = graph.edges_directed(node_id, petgraph::Direction::Incoming);
+            let mut b = false;
+            for inc in inc {
+                if !b {
+                    writeln!(f, "generalizes to ")?;
+                }
+                if b {
+                    writeln!(f, ",")?;
+                }
+                let kind = inc.weight();
+                let node_id = inc.source();
+                let query = graph.node_weight(node_id).unwrap();
+                let query = query.pp();
+                write!(f, "<a href='#{query}'>{kind}:{query}</a>")?;
+                b = true;
+            }
+            if b {
+                writeln!(f, "")?;
+                writeln!(f, "")?;
+            }
+            writeln!(f, "```scheme\n{}\n```", pattern)?;
+            let mut b = false;
+            for out in graph.edges(node_id) {
+                if !b {
+                    writeln!(f, "specializes to ")?;
+                }
+                if b {
+                    writeln!(f, ",")?;
+                }
+                let kind = out.weight();
+                let node_id = out.target();
+                let query = graph.node_weight(node_id).unwrap();
+                let query = query.pp();
+                write!(f, "<a href='#{query}'>{kind}:{query}</a>")?;
+                b = true;
+            }
+            if b {
+                writeln!(f, "")?;
+            }
+
+            Ok(())
+        };
+        let id = id.pp();
+        pp_detail_block(f, open, &id, summary_head, summary_content, details_content)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn pp_detail_block<W: std::fmt::Write>(

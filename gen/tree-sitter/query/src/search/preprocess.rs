@@ -396,9 +396,13 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
                     quantifier,
                     pat: Arc::new(res),
                 };
-            } else if t == Type::Spaces {
-            } else if t == Type::Quantifier {
+                log::error!("when should we go out of the loop ?");
                 break;
+                // NOTE before we were breaking on quantifiers
+
+                // } else if t == Type::Quantifier {
+                //     break;
+            } else if t == Type::Spaces {
             } else {
                 todo!("{}", t)
             }

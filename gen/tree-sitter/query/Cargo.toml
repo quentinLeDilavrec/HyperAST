@@ -3,6 +3,9 @@ name = "hyperast_gen_ts_tsquery"
 version = "0.3.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 tree-sitter = { workspace = true, optional = true }
 tree-sitter-query = { git = "https://github.com/tree-sitter-grammars/tree-sitter-query", rev = "d25e8d183f319497b8b22a2a1585975b020da722", version = "0.3.0", optional = true }

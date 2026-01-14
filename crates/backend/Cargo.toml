@@ -3,6 +3,9 @@ name = "backend"
 version = "0.3.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 tree-sitter = { workspace = true }
 tree-sitter-cli = "0.23.0"

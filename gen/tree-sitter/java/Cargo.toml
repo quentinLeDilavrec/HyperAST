@@ -2,7 +2,9 @@
 name = "hyperast_gen_ts_java"
 version = "0.3.0"
 edition = "2024"
-include = ["/src", "tree-sitter-java/"]
+
+[lints]
+workspace = true
 
 [dependencies]
 tree-sitter = { workspace = true, optional = true }

@@ -3,6 +3,9 @@ name = "hyperast_gen_ts_cpp"
 version = "0.3.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 tree-sitter = { workspace = true, optional = true }
 # tree-sitter = { path="../../../../tree-sitter/lib", version="0.20", optional = true}

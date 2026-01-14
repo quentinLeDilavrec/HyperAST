@@ -3,6 +3,9 @@ name = "hyperast_vcs_git"
 version = "0.3.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 git2 = { version = "0.19", features = ["vendored-libgit2", "vendored-openssl"] }
 tree-sitter = { workspace = true }

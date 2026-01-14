@@ -3,6 +3,9 @@ name = "egui_addon"
 version = "0.3.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 egui = { version = "0.32.0", default-features = false }
 eframe = { version = "0.32.0", default-features = false }

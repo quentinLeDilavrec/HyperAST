@@ -58,3 +58,31 @@ tree-sitter-graph = { git = "https://github.com/quentinLeDilavrec/tree-sitter-gr
 # tree-sitter-graph = { path = "../tree-sitter-graph", optional = true }
 legion = { git = "https://github.com/quentinLeDilavrec/legion", rev = "9929c5cdd1f0b844071a00725632c7c39b6fff39" }
 # legion = { path = "../legion" }
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "allow" }
+
+[workspace.lints.clippy]
+# dbg_macro = "deny" // TODO
+# todo = "deny" // TODO
+
+# declare_interior_mutable_const = "deny" # TODO
+
+# redundant_clone = "deny" # TODO
+# disallowed_methods = "deny" # TODO
+
+# Lets see
+style = { level = "allow", priority = -1 } # TODO
+
+type_complexity = "allow"
+
+# in Rust it can be very tedious to reduce argument count without
+# running afoul of the borrow checker.
+too_many_arguments = "allow"
+
+# We often have large enum variants yet we rarely actually bother with splitting them up.
+large_enum_variant = "allow"
+
+unnecessary_mut_passed = "allow" # temporary
+needless_borrow = "allow" # temporary
+unused = "allow" # temporary

@@ -201,7 +201,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         let mut i = self.parents.len() - 1;
         if from_file {
             loop {
-                if i <= 0 {
+                if i == 0 {
                     break;
                 }
                 let p = self.parents[i - 1];
@@ -303,7 +303,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         let mut i = self.parents.len() - 1;
         if from_file {
             loop {
-                if i <= 0 {
+                if i == 0 {
                     break;
                 }
                 let p = self.parents[i - 1];

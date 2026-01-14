@@ -84,7 +84,7 @@ mod impls {
 
         fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
             let r = ROLE2FIELD[role as usize];
-            assert!(r <= u16::MAX);
+            assert!(r < u16::MAX, "Role not found");
             r.into()
         }
     }

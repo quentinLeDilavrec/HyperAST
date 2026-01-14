@@ -1,18 +1,11 @@
 use std::fmt::Debug;
 
-use hyperast::{
-    position::compute_range,
-    types::{
-        HyperAST, HyperType, LabelStore, Labeled, NodeId, NodeStore, NodeStoreExt, WithChildren,
-    },
-};
+use hyperast::types::{HyperAST, HyperType, LabelStore, Labeled, NodeId, NodeStore, NodeStoreExt};
 
 use crate::tree::tree_path::TreePath;
 
-use super::{
-    Actions,
-    script_generator2::{Act, SimpleAction},
-};
+use super::Actions;
+use super::script_generator2::{Act, SimpleAction};
 
 pub struct ActionsVec<A>(pub Vec<A>);
 
@@ -133,6 +126,7 @@ where
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
     HAST::IdN: Copy + NodeId<IdN = HAST::IdN> + Debug,
 {
+    use hyperast::types::WithChildren;
     type Pos = hyperast::position::file_and_range::Position<std::path::PathBuf, usize>;
     type Pos2<IdN, Idx> = hyperast::position::offsets_and_nodes::StructuralPosition<IdN, Idx>;
     match &a.action {
@@ -175,7 +169,7 @@ where
                 l,
             )
         }
-        Act::Update { new, before } => {
+        Act::Update { new, before: _ } => {
             use hyperast::position::position_accessors::SolvedPosition;
             type P<IdN, Idx> = hyperast::position::CompoundPositionPreparer<Pos, Pos2<IdN, Idx>>;
             let of = hyperast::position::Offsets::from_iterator(a.path.ori.iter()).with_root(dst);

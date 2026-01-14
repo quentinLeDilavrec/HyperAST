@@ -1,10 +1,9 @@
 use std::time::Instant;
 
 use clap::Parser as _;
-use hyperast::store::defaults::NodeIdentifier;
 use hyperast_benchmark_search::{Timeout, enable_logging, read_subpatterns_file, synth_init_inst};
 
-use hyperast_gen_ts_tsquery::{code2query::QueryLattice, lattice_graph::GroupedLattices};
+use hyperast_gen_ts_tsquery::{lattice_graph::GroupedLattices};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use synth_init_inst::per_blob;
 

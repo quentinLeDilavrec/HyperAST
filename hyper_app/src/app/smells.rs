@@ -35,8 +35,6 @@
 //! about fixing try catches in tests
 
 use std::hash::Hash;
-#[cfg(feature = "force_layout")]
-use std::ops::Deref;
 use std::ops::{Range, SubAssign};
 use wasm_rs_dbg::dbg;
 
@@ -504,7 +502,7 @@ pub(crate) fn show_config(
     ui.grouped_wrapped_list(
         smells.prepared_graphs.iter().map(|x| x.as_ref()),
         |ui, i, pg| {
-            let (mode, pg) = pg.downcast_ref::<(ViewMode, GraphTy)>().unwrap();
+            let (_mode, pg) = pg.downcast_ref::<(ViewMode, GraphTy)>().unwrap();
             ui.label(format!("graph {} n:{}", i, pg.node_count()));
         },
     );

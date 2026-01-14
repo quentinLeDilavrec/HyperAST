@@ -1,21 +1,15 @@
 use num::ToPrimitive;
 use petgraph::csr::Csr;
 use petgraph::{Directed, Graph};
-use std::ops::Deref;
 
 use hashbrown::{HashMap, HashSet};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 
-use hyperast::position::StructuralPosition;
-
 use crate::code2query::QueryLattice;
 
 type IdN = hyperast::store::defaults::NodeIdentifier;
-type Idx = u16;
 type Latt<'a, P> = &'a QueryLattice<&'a P>;
-type Lattice<'a> = Latt<'a, StructuralPosition<IdN, Idx>>;
-// use crate::utils::Q;
 
 pub fn make_poset_graph<N, E: 'static, P: PartialEq>(
     lattice: &QueryLattice<P>,
@@ -1084,7 +1078,7 @@ impl<D: hyperast::PrimInt> MaxDistInits<D> {
     fn new(node_count: usize) -> Self {
         Self(vec![D::zero(); node_count])
     }
-    fn retrieve(&mut self, preped: &PreparedInits, i: IdG) -> D {
+    fn retrieve(&mut self, _preped: &PreparedInits, i: IdG) -> D {
         self.0[i]
     }
     fn diffuse(&mut self, j: IdG, curr: &D) {

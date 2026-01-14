@@ -383,7 +383,6 @@ pub fn polyglot(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    use hyperast_vcs_git::TStore;
     multi_run::<_, CursorWithPersistence<NodeIdentifier>, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,

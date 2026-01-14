@@ -35,6 +35,7 @@ pub mod refinements;
 #[cfg(feature = "lattice")]
 pub mod lattice_graph;
 
+pub mod meta_queries;
 pub fn prepare_matcher<Ty>(query: &str) -> crate::search::PreparedMatcher<Ty, Conv<Ty>>
 where
     Ty: std::fmt::Debug,

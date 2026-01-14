@@ -506,17 +506,6 @@ type QueriesDifferentialResults = (
     u64, // hash of query and selected_baseline
 );
 
-#[derive(Deserialize, Serialize, Default)]
-#[serde(untagged)]
-pub(super) enum LocalOrRemote<R: std::marker::Send + 'static> {
-    #[serde(skip)]
-    #[expect(unused)]
-    Remote(crate::utils_poll::Remote<R>),
-    Local(R),
-    #[default]
-    None,
-}
-
 impl Default for AppData {
     fn default() -> Self {
         // 20 days
@@ -1451,12 +1440,10 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     &mut self.data.api_addr,
                     &mut self.data.smells,
                     &mut self.data.smells_result,
-                    &mut self.data.smells_diffs_result,
-                    &mut self.data.fetched_files,
                     actions,
                 );
                 if let Some(pg_id) = pg_id {
-                    let tid = self.tabs.push(Tab::SmellsPatternGraph(pg_id));
+                    let _tid = self.tabs.push(Tab::SmellsPatternGraph(pg_id));
                     self.data.command_sender.send_ui(UICommand::OpenLastTab);
                     // let child = self.tree.tiles.insert_pane(tid);
                     // match self.tree.tiles.get_mut(self.tree.root.unwrap()) {

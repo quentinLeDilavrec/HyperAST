@@ -738,7 +738,7 @@ impl<T: PrimInt, U: PrimInt> Iterator for HMIter<'_, T, U> {
 }
 
 #[derive(Debug)]
-struct MultiHashStore<T> {
+pub struct MultiHashStore<T> {
     pub src_to_dst: Vec<HashMap<T, T>>,
     pub dst_to_src: Vec<HashMap<T, T>>,
 }

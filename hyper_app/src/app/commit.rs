@@ -575,39 +575,6 @@ impl<'a> CommitSlice<'a> {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub(crate) struct CommitsLayout {
-    pub(crate) commits: Vec<CommitId>,
-    pub(crate) pos: Vec<egui::Pos2>,
-    // indexing in subs
-    pub(crate) branches: Vec<usize>,
-    pub(crate) subs: Vec<Subs>,
-    pub(crate) rect: egui::Rect,
-}
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Subs {
-    // indexing in CommitsLayout.commits
-    pub(crate) prev: usize,
-    // indexing in CommitsLayout.commits
-    pub(crate) start: usize,
-    // indexing in CommitsLayout.commits
-    pub(crate) end: usize,
-    // indexing in CommitsLayout.commits
-    pub(crate) succ: usize,
-}
-
-impl Default for CommitsLayout {
-    fn default() -> Self {
-        Self {
-            commits: Default::default(),
-            pos: Default::default(),
-            branches: Default::default(),
-            subs: Default::default(),
-            rect: egui::Rect::ZERO,
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct SubsTimed {
     // indexing in CommitsLayout.subs

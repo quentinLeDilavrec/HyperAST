@@ -86,6 +86,7 @@ impl Default for ComputeConfigQuery {
             examples: vec![
                 config_examples::BASE_TRY_FAIL_CATCH_EX.clone(),
                 config_examples::MORE_TRY_FAIL_CATCH_EX.clone(),
+                config_examples::BALANCED_EX.clone(),
             ],
             ..Into::into(&config_examples::MORE_TRY_FAIL_CATCH_EX)
         }
@@ -523,8 +524,6 @@ pub fn handle_actions(
     api_addr: &str,
     smells: &mut Config,
     smells_result: &mut Option<RemoteResult>,
-    smells_diffs_result: &mut Option<RemoteResultDiffs>,
-    fetched_files: &mut FetchedFiles,
     actions: Actions,
 ) -> Option<u16> {
     if actions.is_empty() {
@@ -910,7 +909,7 @@ fn show_pattern_details(
     pinned: &mut bool,
 ) {
     if let Some(_pg) = prepared_graph {
-        let (mode, pg) = _pg.downcast_ref::<(ViewMode, GraphTy)>().unwrap();
+        let (_mode, pg) = _pg.downcast_ref::<(ViewMode, GraphTy)>().unwrap();
         let Some(nn) = pg.node(n.into()).map(|x| x.id()) else {
             return;
         };
@@ -941,7 +940,7 @@ fn show_pattern_details(
             .horizontal_wrapped(|ui| ["too general", "ignore", pin_label].map(|txt| ui.button(txt)))
             .inner;
         if general.clicked() {
-            let (mode, pg) = _pg.downcast_mut::<(ViewMode, GraphTy)>().unwrap();
+            let (_mode, pg) = _pg.downcast_mut::<(ViewMode, GraphTy)>().unwrap();
             log::info!("pattern {n} deemed too general");
             if let Some(rg) = raw_graph {
                 to_deselect.push(i);
@@ -1372,7 +1371,7 @@ fn build_bigraph(
         ex2top.extend(inits.iter().map(|ex| (ex, i)));
     }
     let mut ex_it = ExIt::new(content);
-    for i in 0..content.queries.len().min(limit) {
+    for _ in 0..content.queries.len().min(limit) {
         let Some(v) = ex_it.next_agg(|mut inits: Vec<_>, i| {
             inits.push(i);
             inits

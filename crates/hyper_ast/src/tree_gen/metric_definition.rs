@@ -109,12 +109,8 @@ impl<S: Subtree> MetricComputing for NoMetrics<S> {
         o
     }
     type Acc = ();
-    fn init(&self, _ty: Ty, _l: Option<&str>) -> Self::Acc {
-        
-    }
-    fn acc(&self, _acc: Self::Acc, _current: &Self::S) -> Self::Acc {
-        
-    }
+    fn init(&self, _ty: Ty, _l: Option<&str>) -> Self::Acc {}
+    fn acc(&self, _acc: Self::Acc, _current: &Self::S) -> Self::Acc {}
     type M = ();
     fn finish(&self, _acc: Self::Acc, current: Self::S) -> Self::S {
         current
@@ -136,7 +132,7 @@ impl<F0: MetricComputing, F1: MetricComputing<S = F0::S>> MetricComputing for Ch
     }
     fn finish(&self, acc: Self::Acc, current: Self::S) -> Self::S {
         let current = self.0.finish(acc.0, current);
-        
+
         self.1.finish(acc.1, current)
     }
 }
@@ -145,7 +141,7 @@ impl<F0: MetricComputing, F1: MetricComputing<S = F0::S>> MetricComputing for Ch
 // region: functional
 
 /// Defining computation behavior of a metric with functions
-struct Functional<T, U>(T, std::marker::PhantomData<U>);
+pub struct Functional<T, U>(T, std::marker::PhantomData<U>);
 impl<
     A,
     M: 'static,

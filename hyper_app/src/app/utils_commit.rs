@@ -136,23 +136,6 @@ impl egui::util::cache::ComputerMut<(&str, &Commit), String> for ComputeCommitSt
     }
 }
 
-#[derive(Hash)]
-struct AAA {}
-
-#[derive(Default)]
-pub struct ComputeCommitStr2 {
-    // map:
-}
-
-impl egui::util::cache::ComputerMut<(&str, &Commit, &AAA), String> for ComputeCommitStr2 {
-    fn compute(&mut self, (forge, commit, _): (&str, &Commit, &AAA)) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            forge, commit.repo.user, commit.repo.name, commit.id
-        )
-    }
-}
-
 pub struct CommitTextBuffer<'a, 'b, 'c> {
     pub(crate) commit: &'a mut Commit,
     pub(crate) forge: String,

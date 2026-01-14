@@ -1,6 +1,7 @@
 use std::fmt;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[allow(unused)]
 pub(crate) struct Pair<T1, T2>(pub(crate) T1, pub(crate) T2);
 
 impl<T1, T2> From<(T1, T2)> for Pair<T1, T2> {

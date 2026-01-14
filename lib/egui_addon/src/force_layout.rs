@@ -1081,16 +1081,6 @@ impl<N: Clone + FlexPayload, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Direct
             },
         );
     }
-
-    fn reset(&mut self) {
-        self.global.zoom = 10.0;
-        self.global.pan = [0., 0.];
-        self.global.settings_navigation.fit_to_screen_enabled = false;
-        self.global.settings_simulation.dt = 0.001;
-        // TODO call the reset from egui_graphs
-        // self.force = init_force(&self.global.settings_simulation);
-        // self.sim = fdg::init_force_graph_uniform(self.g.g().clone(), 1.0);
-    }
 }
 
 impl Global {

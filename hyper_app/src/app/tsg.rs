@@ -337,7 +337,6 @@ pub(crate) fn show_result_graph(
     type Ty = GraphTy;
 
     let _id = "TSG force_graph";
-    let id = egui::Id::new(_id);
 
     let Some(content) = content.as_mut().ok() else {
         ui.label("no data to show yet");
@@ -379,7 +378,7 @@ pub(crate) fn show_result_graph(
 
                 let edges = v.get("edges").unwrap().as_array().unwrap();
                 for e in edges {
-                    let attrs = e.get("attrs").unwrap().as_object().unwrap();
+                    let _attrs = e.get("attrs").unwrap().as_object().unwrap();
                     let sink = e.get("sink").unwrap().as_number().unwrap();
                     e_vec.push((id, sink.as_u64().unwrap()));
                 }
@@ -413,8 +412,6 @@ pub(crate) fn show_result_graph(
 
             ui.add(&mut view);
         });
-
-
 }
 
 fn handle_interactions(

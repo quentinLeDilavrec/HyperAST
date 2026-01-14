@@ -425,8 +425,8 @@ impl<IdN: Clone> AddAssign<&HashInstAccumulator<IdN>> for HashInstAccumulator<Id
 
 pub struct UniqInst {
     pub set: std::collections::HashMap<(u32, u32), NodeIdentifier>,
-    prev_struc: u32,
-    prev_label: u32,
+    // prev_struc: u32,
+    // prev_label: u32,
     start_time: Instant,
     timeout: Timeout,
 }
@@ -435,8 +435,8 @@ impl UniqInst {
     fn with_timeout(timeout: Timeout) -> Self {
         Self {
             set: Default::default(),
-            prev_struc: 0,
-            prev_label: 0,
+            // prev_struc: 0,
+            // prev_label: 0,
             start_time: Instant::now(),
             timeout,
         }

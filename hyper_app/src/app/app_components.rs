@@ -405,7 +405,7 @@ impl super::HyperApp {
                         scripting_context,
                         querying_context,
                         tsg_context,
-                        smells_context,
+                        smells_context: _,
                         languages: _,
                         single,
                         query,

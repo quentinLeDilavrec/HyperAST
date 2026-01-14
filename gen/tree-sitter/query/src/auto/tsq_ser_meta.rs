@@ -1,5 +1,4 @@
-use hyperast::store;
-use hyperast::types::{self, Childrn, HyperASTShared, HyperType};
+use hyperast::types::{self, Childrn, HyperType};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::sync::LazyLock;
@@ -32,61 +31,6 @@ impl<TS: Default> Default for QStore<TS> {
         let stores = hyperast::store::SimpleStores::default();
         Self(std::sync::RwLock::new(stores))
     }
-}
-pub(crate) struct QStoreRef<
-    'a,
-    TS,
-    NS = hyperast::store::nodes::DefaultNodeStore,
-    LS = hyperast::store::labels::LabelStore,
->(std::sync::RwLockReadGuard<'a, hyperast::store::SimpleStores<TS, NS, LS>>);
-
-impl<TS, NS, LS> std::ops::Deref for QStoreRef<'_, TS, NS, LS> {
-    type Target = store::SimpleStores<TS, NS, LS>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<TS> types::HyperASTShared for QStoreRef<'_, TS, store::nodes::DefaultNodeStore> {
-    type IdN = store::nodes::DefaultNodeIdentifier;
-    type Idx = u16;
-    type Label = store::labels::DefaultLabelIdentifier;
-}
-
-impl<'a, TS> hyperast::types::NLending<'a, <Self as HyperASTShared>::IdN>
-    for QStoreRef<'_, TS, store::nodes::DefaultNodeStore>
-{
-    type N = <store::nodes::DefaultNodeStore as hyperast::types::NLending<
-        'a,
-        <Self as HyperASTShared>::IdN,
-    >>::N;
-}
-
-impl<'a, TS> hyperast::types::AstLending<'a> for QStoreRef<'_, TS, store::nodes::DefaultNodeStore>
-where
-    TS: types::TypeStore<Ty = types::AnyType>,
-{
-    type RT = <store::nodes::DefaultNodeStore as hyperast::types::NLending<'a, Self::IdN>>::N;
-}
-
-impl<TS> types::HyperAST for QStoreRef<'_, TS, store::nodes::DefaultNodeStore>
-where
-    TS: types::TypeStore<Ty = types::AnyType>,
-{
-    type NS = store::nodes::legion::NodeStore;
-
-    fn node_store(&self) -> &Self::NS {
-        &self.0.node_store
-    }
-
-    type LS = store::labels::LabelStore;
-
-    fn label_store(&self) -> &Self::LS {
-        &self.0.label_store
-    }
-
-    type TS = TS;
 }
 
 pub trait Converter: Default {

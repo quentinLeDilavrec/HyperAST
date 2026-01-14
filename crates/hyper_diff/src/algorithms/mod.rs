@@ -372,6 +372,7 @@ impl std::ops::Add for AllocatedMemory {
 //     }
 // }
 
+/// display [`crate::actions::action_vec::print_action`]
 pub struct DiffResult<A, M, MD> {
     pub mapper: M,
     pub actions: Option<ActionsVec<A>>,
@@ -424,7 +425,6 @@ impl<'a, MD> ResultsSummary<MD> {
     }
 }
 
-// WIP
 impl<HAST, Dsrc, Ddst, M, MD> std::fmt::Display
     for DiffResult<
         crate::actions::script_generator2::SimpleAction<
@@ -437,23 +437,26 @@ impl<HAST, Dsrc, Ddst, M, MD> std::fmt::Display
     >
 where
     Dsrc: ShallowDecompressedTreeStore<HAST, u32>,
+    Ddst: ShallowDecompressedTreeStore<HAST, u32>,
     HAST: types::HyperAST + Copy,
-    // MD: ComputeTime,
-    // MD::T: std::fmt::Debug,
     for<'t> <HAST as types::AstLending<'t>>::RT: types::WithSerialization,
     for<'t> <HAST as types::AstLending<'t>>::RT: types::WithStats,
     HAST::IdN: Copy + types::NodeId<IdN = HAST::IdN> + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // writeln!(f, "structural diff {:?}s", self.time())?;
-        let ori = self
+        let src = self
             .mapper
             .src_arena
             .original(&self.mapper.src_arena.root());
+        let dst = self
+            .mapper
+            .dst_arena
+            .original(&self.mapper.dst_arena.root());
         let Some(actions) = &self.actions else {
             return Ok(());
         };
-        crate::actions::action_vec::actions_vec_f(f, actions, self.mapper.hyperast, ori)
+        crate::actions::action_vec::actions_vec_f(f, actions, self.mapper.hyperast, src, dst)
     }
 }
 

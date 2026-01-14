@@ -676,12 +676,16 @@ where
     <T as WithChildren>::ChildIdx: num_traits::ToPrimitive,
     P: TreePath<Item = T::ChildIdx> + From<Vec<T::ChildIdx>>,
 {
+    let before = ApplicablePath {
+        ori: path.0.to_vec().into(),
+        mid: path.1.to_vec().into(),
+    };
     SimpleAction {
         path: ApplicablePath {
             ori: path.0.to_vec().into(),
             mid: path.1.to_vec().into(),
         },
-        action: Act::Update { new },
+        action: Act::Update { new, before },
     }
 }
 

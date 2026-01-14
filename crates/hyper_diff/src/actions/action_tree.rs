@@ -230,7 +230,6 @@ impl<L: Clone, Idx: PrimInt, I: Clone> ActionsTree<SimpleAction<L, CompressedTre
                 );
                 match sh {
                     SharedPath::Exact(_) => {
-                        dbg!(&path);
                         let action = g(path);
                         let _action = &r[i].action;
                         // TODO also compare content of action
@@ -277,7 +276,6 @@ impl<L: Clone, Idx: PrimInt, I: Clone> ActionsTree<SimpleAction<L, CompressedTre
                         );
                         let p = f(&mut tmp.action.path);
                         *p = p.iter().skip(_s.len() - 1).collect::<Vec<_>>().into();
-                        dbg!(&p);
                         r[i].children.push(tmp);
                         return;
                     }

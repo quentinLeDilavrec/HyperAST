@@ -19,6 +19,7 @@ use crate::matchers::heuristic::gt::lazy_hybrid_marriage_bottom_up_matcher::Lazy
 type M = VecStore<u32>;
 type MM = DefaultMultiMappingStore<u32>;
 
+/// display [`crate::actions::action_vec::print_action`]
 pub fn diff<HAST: HyperAST + Copy>(
     hyperast: HAST,
     src: &HAST::IdN,
@@ -36,7 +37,7 @@ where
     let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
     let measure = measure.start();
 
-    let mapper = LazyGreedySubtreeMatcher::<_, 6>::match_it::<MM>(mapper);
+    let mapper = LazyGreedySubtreeMatcher::<_, 3>::match_it::<MM>(mapper);
     let subtree_mappings_s = mapper.mappings().len();
     tr!(subtree_mappings_s);
 

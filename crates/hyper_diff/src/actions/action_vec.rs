@@ -28,11 +28,13 @@ impl<A> Default for ActionsVec<A> {
     }
 }
 
+/// [`crate::actions::action_vec::print_action`]
 pub fn actions_vec_f<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
     f: &mut std::fmt::Formatter<'_>,
     v: &ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>,
     stores: HAST,
-    ori: HAST::IdN,
+    src: HAST::IdN,
+    dst: HAST::IdN,
 ) -> std::fmt::Result
 where
     HAST: HyperAST,
@@ -41,7 +43,7 @@ where
     HAST::IdN: Copy + NodeId<IdN = HAST::IdN> + Debug,
 {
     for a in v.iter() {
-        print_action(f, ori, stores, a)?;
+        print_action(f, src, dst, stores, a)?;
     }
     Ok(())
 }
@@ -53,7 +55,8 @@ fn format_action_pos<'store, P: TreePath<Item = HAST::Idx>, HAST>(
 ) -> String
 where
     HAST: HyperAST,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
+    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+        hyperast::types::WithSerialization + hyperast::types::WithStats,
     HAST::IdN: Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN> + Debug,
 {
@@ -101,19 +104,26 @@ where
         curr: &mut end,
         it: a.path.ori.iter(),
     };
-    let p = compute_range(ori, &mut it, stores);
+    type Pos = hyperast::position::file_and_range::Position<std::path::PathBuf, usize>;
+    let p = {
+        let of = hyperast::position::Offsets::from_iterator(&mut it).with_root(ori);
+        let p = hyperast::position::PositionConverter::new(&of)
+            .with_stores(&stores)
+            .compute_pos_pre_order::<_, Pos>();
+        p.range()
+    };
+    // let p = compute_range(ori, &mut it, stores);
     format!(
         "{:?} at {:?}",
         p,
-        it.it
-            .chain(vec![end.unwrap()].into_iter())
-            .collect::<Vec<_>>()
+        it.it.chain(end.into_iter()).collect::<Vec<_>>()
     )
 }
 
-fn print_action<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
+pub(crate) fn print_action<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
     f: &mut std::fmt::Formatter<'_>,
-    ori: HAST::IdN,
+    src: HAST::IdN,
+    dst: HAST::IdN,
     stores: HAST,
     a: &SimpleAction<HAST::Label, P, HAST::IdN>,
 ) -> std::fmt::Result
@@ -123,12 +133,11 @@ where
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
     HAST::IdN: Copy + NodeId<IdN = HAST::IdN> + Debug,
 {
+    type Pos = hyperast::position::file_and_range::Position<std::path::PathBuf, usize>;
+    type Pos2<IdN, Idx> = hyperast::position::offsets_and_nodes::StructuralPosition<IdN, Idx>;
     match &a.action {
         Act::Delete {} => {
-            let of = hyperast::position::Offsets::from_iterator(a.path.ori.iter()).with_root(ori);
-            type Pos = hyperast::position::file_and_range::Position<std::path::PathBuf, usize>;
-            type Pos2<IdN, Idx> =
-                hyperast::position::offsets_and_nodes::StructuralPosition<IdN, Idx>;
+            let of = hyperast::position::Offsets::from_iterator(a.path.ori.iter()).with_root(src);
             let p2 = hyperast::position::PositionConverter::new(&of)
                 .with_stores(&stores)
                 .compute_pos_pre_order::<_, Pos2<HAST::IdN, HAST::Idx>>();
@@ -166,24 +175,35 @@ where
                 l,
             )
         }
-        Act::Update { new } => writeln!(
-            f,
-            "Upd {:?} {:?}",
-            stores.label_store().resolve(new),
-            compute_range(ori, &mut a.path.ori.iter(), stores)
-        ),
-        Act::Insert { sub } => writeln!(
-            f,
-            "Ins {:?} {}",
-            stores.resolve_type(sub).to_string(),
-            format_action_pos(ori, stores, a)
-        ),
-        Act::Move { from } => writeln!(
-            f,
-            "Mov {} {:?} {}",
-            {
-                let mut e = ori;
-                let mut node = stores.node_store().resolve(&ori);
+        Act::Update { new, before } => {
+            use hyperast::position::position_accessors::SolvedPosition;
+            type P<IdN, Idx> = hyperast::position::CompoundPositionPreparer<Pos, Pos2<IdN, Idx>>;
+            let of = hyperast::position::Offsets::from_iterator(a.path.ori.iter()).with_root(dst);
+            writeln!(f, "Upd")?;
+            let (p, p2) = hyperast::position::PositionConverter::new(&of)
+                .with_stores(&stores)
+                .compute_pos_pre_order::<_, P<HAST::IdN, HAST::Idx>>()
+                .into();
+            writeln!(
+                f,
+                " {} {:?}",
+                stores.resolve_type(&p2.node()).as_static_str(),
+                stores.label_store().resolve(new),
+            )?;
+            writeln!(
+                f,
+                " {:?}",
+                p.range() // compute_range(ori, &mut a.path.ori.iter(), stores)
+            )
+        }
+        Act::Insert { sub } => {
+            write!(f, "Ins {}", stores.resolve_type(sub).as_static_str())?;
+            writeln!(f, " {}", format_action_pos(dst, stores, a))
+        }
+        Act::Move { from } => {
+            let fmtd_ty = {
+                let mut e = src;
+                let mut node = stores.node_store().resolve(&src);
                 for x in from.ori.iter() {
                     e = node.child(&x).unwrap();
                     node = stores.node_store().resolve(&e);
@@ -205,16 +225,29 @@ where
                         .unwrap();
                 }
                 fmtd_ty
-            },
-            compute_range(ori, &mut from.ori.iter(), stores),
-            format_action_pos(ori, stores, a)
-        ),
+            };
+            write!(f, "Mov")?;
+            write!(f, " {}", fmtd_ty)?;
+            writeln!(f, " {:?}", {
+                let of = hyperast::position::Offsets::from_iterator(from.ori.iter()).with_root(src);
+                let p = hyperast::position::PositionConverter::new(&of)
+                    .with_stores(&stores)
+                    .compute_pos_pre_order::<_, Pos>();
+                p.range()
+            },)?;
+            writeln!(
+                f,
+                " {}",
+                // compute_range(ori, &mut from.ori.iter(), stores),
+                format_action_pos(dst, stores, a)
+            )
+        }
         Act::MovUpd { from, new } => writeln!(
             f,
             "MovUpd {:?} {:?} {:?} {}",
             {
-                let mut e = ori;
-                let mut node = stores.node_store().resolve(&ori);
+                let mut e = src;
+                let mut node = stores.node_store().resolve(&src);
                 for x in from.ori.iter() {
                     e = node.child(&x).unwrap();
                     node = stores.node_store().resolve(&e);
@@ -222,8 +255,15 @@ where
                 stores.resolve_type(&e).to_string()
             },
             stores.label_store().resolve(new),
-            compute_range(ori, &mut from.ori.iter(), stores),
-            format_action_pos(ori, stores, a)
+            {
+                let of = hyperast::position::Offsets::from_iterator(from.ori.iter()).with_root(src);
+                let p = hyperast::position::PositionConverter::new(&of)
+                    .with_stores(&stores)
+                    .compute_pos_pre_order::<_, Pos>();
+                p.range()
+            },
+            // compute_range(ori, &mut from.ori.iter(), stores),
+            format_action_pos(dst, stores, a)
         ),
     }
 }
@@ -236,6 +276,9 @@ impl<A> Actions for ActionsVec<A> {
 impl<A> ActionsVec<A> {
     pub fn iter(&self) -> impl Iterator<Item = &A> + '_ {
         self.0.iter()
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut A> + '_ {
+        self.0.iter_mut()
     }
 }
 

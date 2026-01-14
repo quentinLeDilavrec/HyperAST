@@ -1125,7 +1125,7 @@ where
             let dedup = self.dedup.as_mut().map_or(dedup, |x| &mut x.0);
             let insertion = node_store.prepare_insertion(dedup, &hashable, eq);
 
-            let local = if let Some(id) = insertion.occupied_id() {
+            if let Some(id) = insertion.occupied_id() {
                 let md = self.md_cache.get(&id).unwrap();
                 let ana = md.ana.clone();
                 let metrics = md.metrics;
@@ -1208,8 +1208,7 @@ where
                     stmt_count: acc.stmt_count,
                     member_import_count: acc.member_import_count,
                 }
-            };
-            local
+            }
         };
         post.compressed_node
     }

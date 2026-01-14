@@ -536,7 +536,7 @@ impl hyperast::types::LLang<hyperast::types::TypeU16<Self>> for Xml {
     const TE: &[Self::E] = S_T_L;
 
     fn as_lang_wrapper() -> hyperast::types::LangWrapper<hyperast::types::TypeU16<Self>> {
-        From::<&'static (dyn LangRef<_>)>::from(&Lang)
+        From::<&'static dyn LangRef<_>>::from(&Lang)
     }
 }
 

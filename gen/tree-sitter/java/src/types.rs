@@ -789,7 +789,7 @@ impl hyperast::types::LLang<TType> for Java {
     const TE: &[Self::E] = S_T_L;
 
     fn as_lang_wrapper() -> hyperast::types::LangWrapper<TType> {
-        From::<&'static (dyn LangRef<_>)>::from(&Lang)
+        From::<&'static dyn LangRef<_>>::from(&Lang)
     }
 }
 #[repr(u16)]

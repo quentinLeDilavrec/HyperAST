@@ -324,7 +324,7 @@ impl HyperType for Type {
     where
         Self: Sized,
     {
-        From::<&'static (dyn LangRef<Self>)>::from(&Lang)
+        From::<&'static dyn LangRef<Self>>::from(&Lang)
     }
     fn lang_ref(&self) -> hyperast::types::LangWrapper<AnyType> {
         hyperast::types::LangWrapper::from(&Lang as &(dyn LangRef<AnyType> + 'static))
@@ -451,7 +451,7 @@ impl hyperast::types::LLang<hyperast::types::TypeU16<Self>> for TsQuery {
     const TE: &[Self::E] = S_T_L;
 
     fn as_lang_wrapper() -> hyperast::types::LangWrapper<hyperast::types::TypeU16<Self>> {
-        From::<&'static (dyn LangRef<_>)>::from(&Lang)
+        From::<&'static dyn LangRef<_>>::from(&Lang)
     }
 }
 

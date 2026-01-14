@@ -95,7 +95,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation<'a>(&'a self) -> &'a Spaces {
+    fn indentation(&self) -> &Spaces {
         &self.indentation
     }
 }

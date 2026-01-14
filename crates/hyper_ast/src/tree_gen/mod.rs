@@ -881,7 +881,7 @@ pub mod utils_ts {
         vis: bitvec::vec::BitVec,
     }
 
-    impl<'a, C: super::parser::TreeCursor + Clone> PrePost<C> {
+    impl<C: super::parser::TreeCursor + Clone> PrePost<C> {
         pub fn new(cursor: &C) -> Self {
             use bitvec::prelude::Lsb0;
             let mut vis = bitvec::bitvec![];

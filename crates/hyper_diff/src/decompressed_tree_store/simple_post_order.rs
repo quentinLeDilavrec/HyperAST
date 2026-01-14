@@ -233,7 +233,7 @@ where
 //     }
 // }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
     for SimplePostOrder<HAST::IdN, IdD>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -245,7 +245,7 @@ where
     }
 }
 
-impl<'b, HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, SimplePostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -562,7 +562,7 @@ where
     HAST::IdN: Debug,
     for<'t> <HAST as types::AstLending<'t>>::RT: WithSerialization,
 {
-    pub fn position<'b>(&mut self, c: &IdD) -> &Position {
+    pub fn position(&mut self, c: &IdD) -> &Position {
         let stores = self.ds.hyperast;
         if self.cache.contains_key(c) {
             self.cache.get(c).unwrap()
@@ -691,7 +691,7 @@ where
     F: Fn(U, HAST::IdN) -> U,
     G: Fn(U, HAST::IdN) -> U,
 {
-    pub fn position<'b>(&mut self, c: &IdD) -> &U {
+    pub fn position(&mut self, c: &IdD) -> &U {
         let stores = self.ds.hyperast;
         if self.cache.contains_key(c) {
             self.cache.get(c).unwrap()

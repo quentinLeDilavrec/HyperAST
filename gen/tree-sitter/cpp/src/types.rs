@@ -45,7 +45,7 @@ impl TypeStore for TStore {
     type Ty = TypeU16<Cpp>;
 }
 
-impl<'a> hyperast::types::ETypeStore for TStore {
+impl hyperast::types::ETypeStore for TStore {
     type Ty2 = Type;
 
     fn intern(ty: Self::Ty2) -> Self::Ty {
@@ -60,7 +60,7 @@ mod legion_impls {
 
     use hyperast::types::{LangWrapper, RoleStore};
 
-    impl<'a> CppEnabledTypeStore for TStore {
+    impl CppEnabledTypeStore for TStore {
         fn resolve(t: Self::Ty) -> Type {
             t.e()
         }

@@ -437,7 +437,7 @@ where
     }
 }
 
-fn goto_parent_virt<'a, 'hast, HAST: HyperAST>(
+fn goto_parent_virt<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
     mut types: &[<HAST::TS as TypeStore>::Ty],
     misc_stacks: &MiscStacks,

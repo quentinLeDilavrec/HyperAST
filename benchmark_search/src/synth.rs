@@ -9,9 +9,9 @@ pub struct SynthConfig {
     pub shrink_threshold_factor: usize,
 }
 
-pub fn synth<'a, P: SolvedPosition<NodeIdentifier>>(
+pub fn synth<P: SolvedPosition<NodeIdentifier>>(
     timeout: &crate::Timeout,
-    inst: &'a [P],
+    inst: &[P],
     stores: &hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>,
     meta_gen: &str,
     meta_simp: &str,

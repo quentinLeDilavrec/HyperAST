@@ -340,7 +340,7 @@ fn run_stepped2(query: &str, text: &[u8]) -> usize {
     count
 }
 
-fn prep_stepped2<'store>(query: &str, text: &[u8]) -> (hyperast_tsquery::Query, tree_sitter::Tree) {
+fn prep_stepped2(query: &str, text: &[u8]) -> (hyperast_tsquery::Query, tree_sitter::Tree) {
     let query = hyperast_tsquery::Query::new(query, crate::language()).unwrap();
 
     let mut parser = tree_sitter::Parser::new();
@@ -416,7 +416,7 @@ fn run_prepro(query: &str, subqueries: &[&str], text: &[u8]) -> usize {
     count
 }
 
-fn prep_stepped<'store>(
+fn prep_stepped(
     query: &str,
     text: &[u8],
 ) -> (
@@ -445,7 +445,7 @@ fn prep_stepped<'store>(
     (query, stores, full_node.local.compressed_node)
 }
 
-fn prep_prepro<'store>(
+fn prep_prepro(
     query: &str,
     subqueries: &[&str],
     text: &[u8],

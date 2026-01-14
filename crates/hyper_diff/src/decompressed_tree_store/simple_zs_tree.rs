@@ -111,7 +111,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Debug> super::DecompressedSubtree<HAST::IdN>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, SimpleZsTree<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -133,7 +133,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
     for SimpleZsTree<HAST::IdN, IdD>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,

@@ -18,7 +18,7 @@ impl Default for TStore {
     }
 }
 
-impl<'a> hyperast::types::RoleStore for TStore {
+impl hyperast::types::RoleStore for TStore {
     type IdF = u16;
 
     type Role = hyperast::types::Role;

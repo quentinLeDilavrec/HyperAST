@@ -49,13 +49,13 @@ mod legion_impls {
     impl TypeStore for TStore {
         type Ty = TypeU16<C>;
     }
-    impl<'a> CEnabledTypeStore for TStore {
+    impl CEnabledTypeStore for TStore {
         fn resolve(t: Self::Ty) -> Type {
             t.e()
         }
     }
 
-    impl<'a> hyperast::types::ETypeStore for TStore {
+    impl hyperast::types::ETypeStore for TStore {
         type Ty2 = Type;
 
         fn intern(ty: Self::Ty2) -> Self::Ty {

@@ -176,7 +176,7 @@ impl<'a, T> types::WithHashs for NoSpaceWrapper<'a, T> {
     type HK = hyperast::hashed::SyntaxNodeHashsKinds;
     type HP = hyperast::nodes::HashSize;
 
-    fn hash<'b>(&'b self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP {
+    fn hash(&self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP {
         self.0.hash(kind)
     }
 }

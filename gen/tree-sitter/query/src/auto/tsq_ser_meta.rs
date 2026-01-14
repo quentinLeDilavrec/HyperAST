@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<'store, 'a, HAST: types::TypedHyperAST<TIdN>, TIdN: hyperast::types::TypedNodeId>
+impl<'store, HAST: types::TypedHyperAST<TIdN>, TIdN: hyperast::types::TypedNodeId>
     TreeToQuery<'store, HAST, TIdN, Conv<TIdN::Ty>>
 where
     TIdN::Ty: for<'b> TryFrom<&'b str> + std::fmt::Debug,
@@ -74,7 +74,6 @@ where
 
 impl<
     'store,
-    'a,
     HAST: types::TypedHyperAST<TIdN>,
     TIdN: hyperast::types::TypedNodeId,
     C: Converter<Ty = TIdN::Ty>,

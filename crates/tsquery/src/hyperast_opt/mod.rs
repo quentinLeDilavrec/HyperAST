@@ -281,7 +281,7 @@ pub mod tsg_impl {
     pub use super::TreeCursorNoRef as TreeCursor;
     use super::*;
 
-    impl<'hast, HAST: HyperAST> SimpleNode for Node<HAST>
+    impl<HAST: HyperAST> SimpleNode for Node<HAST>
     where
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
@@ -295,7 +295,7 @@ pub mod tsg_impl {
         }
     }
 
-    impl<'hast, HAST: HyperAST> SyntaxNode for Node<HAST>
+    impl<HAST: HyperAST> SyntaxNode for Node<HAST>
     where
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
@@ -501,7 +501,7 @@ pub mod tsg_impl {
         // pub node: Node<HAST, Pos<HAST>>,
     }
 
-    impl<'a, 'query, It, HAST: HyperAST> QueryWithLang for MyQMatches<'query, It, HAST> {
+    impl<'query, It, HAST: HyperAST> QueryWithLang for MyQMatches<'query, It, HAST> {
         type Lang = tree_sitter::Language;
         type I = CaptureId;
     }
@@ -534,7 +534,7 @@ pub mod tsg_impl {
         pub i: CaptureId,
     }
 
-    impl<'a, HAST: HyperAST, P> QueryWithLang for MyQMatch<HAST, P> {
+    impl<HAST: HyperAST, P> QueryWithLang for MyQMatch<HAST, P> {
         type Lang = tree_sitter::Language;
         type I = CaptureId;
     }

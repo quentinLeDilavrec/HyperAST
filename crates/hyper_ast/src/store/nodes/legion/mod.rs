@@ -404,7 +404,7 @@ pub fn _resolve<'a, T>(
     slf.entry_ref(*id).map(|x| HashedNodeRef::new(x))
 }
 
-impl<'a> crate::types::NStore for NodeStoreInner {
+impl crate::types::NStore for NodeStoreInner {
     type IdN = NodeIdentifier;
     type Idx = u16;
 }
@@ -609,7 +609,7 @@ mod stores_impl {
         type RT = <NS as types::NLending<'a, <NS as NStore>::IdN>>::N;
     }
 
-    impl<'store, TS, NS, LS> HyperAST for SimpleStores<TS, NS, LS>
+    impl<TS, NS, LS> HyperAST for SimpleStores<TS, NS, LS>
     where
         TS: TypeStore,
         NS: NStore,
@@ -671,7 +671,7 @@ mod stores_impl {
         }
     }
 
-    impl<'store, TS, NS, LS> HyperAST for &SimpleStores<TS, NS, LS>
+    impl<TS, NS, LS> HyperAST for &SimpleStores<TS, NS, LS>
     where
         TS: TypeStore,
         NS: NStore,
@@ -700,7 +700,7 @@ mod stores_impl {
         type TS = TS;
     }
 
-    impl<'store, TIdN: TypedNodeId<IdN = Self::IdN>, TS, NS, LS> TypedHyperAST<TIdN>
+    impl<TIdN: TypedNodeId<IdN = Self::IdN>, TS, NS, LS> TypedHyperAST<TIdN>
         for SimpleStores<TS, NS, LS>
     where
         TIdN::Ty: TypeTrait,

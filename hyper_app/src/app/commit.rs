@@ -37,7 +37,7 @@ impl CommitMetadata {
             ui.label(format!("Date:\t{:?}", date));
         } else {
         }
-        fn join<'a, I: Iterator>(it: I, s: I::Item) -> I::Item
+        fn join<I: Iterator>(it: I, s: I::Item) -> I::Item
         where
             I::Item: ToString + Clone,
             I::Item: FromIterator<I::Item>,

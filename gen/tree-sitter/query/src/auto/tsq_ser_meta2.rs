@@ -23,7 +23,7 @@ pub struct TreeToQuery<
     meta: hyperast_tsquery::Query,
     phantom: std::marker::PhantomData<TIdN>,
 }
-impl<'store, 'a, HAST: types::TypedHyperAST<TIdN>, TIdN: hyperast::types::TypedNodeId>
+impl<'store, HAST: types::TypedHyperAST<TIdN>, TIdN: hyperast::types::TypedNodeId>
     TreeToQuery<'store, HAST, TIdN>
 {
     pub fn new(

@@ -67,7 +67,7 @@ where
     type SNode = Node<HAST, &'acc Acc>;
 }
 
-impl<'a, 'acc, 'hast, HAST, Acc> MatchesLending<'a> for QueryMatcher<HAST, &'acc Acc>
+impl<'a, 'acc, HAST, Acc> MatchesLending<'a> for QueryMatcher<HAST, &'acc Acc>
 where
     HAST: types::HyperAST + Copy,
     HAST::IdN: Copy + Hash + Debug,
@@ -177,7 +177,7 @@ where
     }
 }
 
-impl<'acc, 'hast, HAST, Acc> tree_sitter_graph::ExtendedableQuery
+impl<'acc, HAST, Acc> tree_sitter_graph::ExtendedableQuery
     for ExtendingStringQuery<QueryMatcher<HAST, &'acc Acc>, tree_sitter::Language>
 where
     HAST: HyperAST + Copy,
@@ -233,7 +233,7 @@ where
     }
 }
 
-impl<'hast, 'acc, 'l, HAST, Acc> graph::SimpleNode for Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> graph::SimpleNode for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::IdN: Hash + Copy + Debug,
@@ -253,7 +253,7 @@ where
     }
 }
 
-impl<'hast, 'acc, 'l, HAST, Acc> graph::SyntaxNode for Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> graph::SyntaxNode for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::IdN: Hash + Copy + Debug,

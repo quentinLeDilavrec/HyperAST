@@ -247,7 +247,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> PostOrderIterable<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrderIterable<HAST, IdD>
     for Decompressible<HAST, CompletePostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -276,7 +276,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
     for CompletePostOrder<HAST::IdN, IdD>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -293,7 +293,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, CompletePostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -318,7 +318,7 @@ where {
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, CompletePostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -574,7 +574,7 @@ where
     F: Fn(U, IdN) -> U,
     G: Fn(U, IdN) -> U,
 {
-    pub fn position<'b, S>(&mut self, store: S, c: &IdD) -> &U
+    pub fn position<S>(&mut self, store: S, c: &IdD) -> &U
     where
         D: DecompressedTreeStore<S, IdD> + DecompressedWithSiblings<S, IdD> + PostOrder<S, IdD>,
         S: for<'t> HyperAST<IdN = IdN> + Copy,

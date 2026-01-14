@@ -436,7 +436,7 @@ impl<'store, 'cache, TS: CppEnabledTypeStore>
     }
 }
 
-impl<'store, 'cache, 'acc, TS, More> CppTreeGen<'store, 'cache, TS, More, true> {
+impl<'store, 'cache, TS, More> CppTreeGen<'store, 'cache, TS, More, true> {
     pub fn without_hidden_nodes(self) -> CppTreeGen<'store, 'cache, TS, More, false> {
         CppTreeGen {
             line_break: self.line_break,

@@ -21,7 +21,7 @@ pub const QUERIES: &[(&[&str], &str, &str, &str)] = &[
     ),
 ];
 
-fn prep_default<'store>(
+fn prep_default(
     query: &str,
     name: &str,
     text: &[u8],
@@ -47,7 +47,7 @@ fn prep_default<'store>(
     (query, stores, full_node.local.compressed_node)
 }
 
-fn prep_precomputed<'store>(
+fn prep_precomputed(
     precomp: &[&str],
     query: &str,
     name: &str,

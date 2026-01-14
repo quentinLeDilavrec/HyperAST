@@ -175,7 +175,7 @@ pub fn all_commits_from_head(repository: &Repository) -> Revwalk<'_> {
     // return walk;
 }
 
-pub fn fetch_repository<'a, T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
+pub fn fetch_repository<T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
 where
     <T as TryInto<Url>>::Error: std::fmt::Debug,
 {
@@ -212,7 +212,7 @@ where
     nofetch_repository(url, path)
 }
 
-pub fn nofetch_repository<'a, T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
+pub fn nofetch_repository<T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
 where
     <T as TryInto<Url>>::Error: std::fmt::Debug,
 {

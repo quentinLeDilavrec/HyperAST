@@ -22,7 +22,7 @@ pub struct BreadthFirst<IdN, IdD: PrimInt> {
     phantom: PhantomData<*const IdN>,
 }
 
-impl<'d, HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstContiguousSiblings<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstContiguousSiblings<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -215,7 +215,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,

@@ -180,7 +180,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedParentsLending<'a, IdD
     type PIt = <Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>> as DecompressedParentsLending<'a, IdD>>::PIt;
 }
 
-impl<'d, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
     for Decompressible<HAST, CompletePostOrder<'_, HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,

@@ -86,7 +86,7 @@ pub struct HashedNode<Id: TypedNodeId<IdN = NodeIdentifier>> {
 
 // * hashed node impl
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNode<Id>
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNode<Id>
 where
     Id::IdN: PartialEq,
 {
@@ -510,8 +510,8 @@ impl<T: crate::types::NodeId> crate::types::Stored for HashedNodeRef<'_, T> {
     type TreeId = T;
 }
 
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Node for HashedNode<Id> {}
-impl<'a, Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Stored for HashedNode<Id> {
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Node for HashedNode<Id> {}
+impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Stored for HashedNode<Id> {
     type TreeId = Id::IdN;
 }
 

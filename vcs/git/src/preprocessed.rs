@@ -542,9 +542,9 @@ pub(crate) trait CommitProcessor<Sys> {
     /// In rust to avoid loosing performances you might have to enable link time optimizations (lto).
     ///
     /// RMS: Resursive Module Search
-    fn handle_module<'a, 'b, const RMS: bool>(
+    fn handle_module<'b, const RMS: bool>(
         &mut self,
-        repository: &'a Repository,
+        repository: &Repository,
         dir_path: &'b mut Peekable<Components<'b>>,
         name: &[u8],
         oid: git2::Oid,
@@ -666,9 +666,9 @@ impl IdHolder for NodeIdentifier {
 #[cfg(feature = "maven")]
 impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
     type Module = (NodeIdentifier, crate::maven::MD);
-    fn handle_module<'a, 'b, const RMS: bool>(
+    fn handle_module<'b, const RMS: bool>(
         &mut self,
-        _repository: &'a Repository,
+        _repository: &Repository,
         _dir_path: &'b mut Peekable<Components<'b>>,
         _name: &[u8],
         _oid: git2::Oid,
@@ -691,9 +691,9 @@ impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
 #[cfg(feature = "java")]
 impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
     type Module = (NodeIdentifier, crate::maven::MD);
-    fn handle_module<'a, 'b, const RMS: bool>(
+    fn handle_module<'b, const RMS: bool>(
         &mut self,
-        _repository: &'a Repository,
+        _repository: &Repository,
         _dir_path: &'b mut Peekable<Components<'b>>,
         _name: &[u8],
         _oid: git2::Oid,
@@ -715,9 +715,9 @@ impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
 #[cfg(feature = "make")]
 impl CommitProcessor<file_sys::Make> for RepositoryProcessor {
     type Module = (NodeIdentifier, crate::make::MD);
-    fn handle_module<'a, 'b, const RMS: bool>(
+    fn handle_module<'b, const RMS: bool>(
         &mut self,
-        _repository: &'a Repository,
+        _repository: &Repository,
         _dir_path: &'b mut Peekable<Components<'b>>,
         _name: &[u8],
         _oid: git2::Oid,
@@ -763,9 +763,9 @@ impl CommitProcessor<file_sys::Make> for RepositoryProcessor {
 #[cfg(feature = "npm")]
 impl CommitProcessor<file_sys::Npm> for RepositoryProcessor {
     type Module = (NodeIdentifier, DefaultMetrics);
-    fn handle_module<'a, 'b, const RMS: bool>(
+    fn handle_module<'b, const RMS: bool>(
         &mut self,
-        _repository: &'a Repository,
+        _repository: &Repository,
         _dir_path: &'b mut Peekable<Components<'b>>,
         _name: &[u8],
         _oid: git2::Oid,
@@ -887,9 +887,9 @@ mod experiments {
     }
 
     impl PreProcessedRepository2 {
-        fn handle_maven_module<'a, 'b, const RMS: bool, const FFWD: bool>(
+        fn handle_maven_module<'b, const RMS: bool, const FFWD: bool>(
             &mut self,
-            repository: &'a Repository,
+            repository: &Repository,
             dir_path: &'b mut Peekable<Components<'b>>,
             name: &[u8],
             oid: git2::Oid,

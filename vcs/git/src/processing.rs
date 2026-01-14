@@ -242,7 +242,7 @@ impl<'a> TryInto<&'a str> for &'a ObjectName {
     }
 }
 
-impl<'a> TryInto<String> for &ObjectName {
+impl TryInto<String> for &ObjectName {
     type Error = std::str::Utf8Error;
 
     fn try_into(self) -> Result<String, Self::Error> {
@@ -250,7 +250,7 @@ impl<'a> TryInto<String> for &ObjectName {
     }
 }
 
-impl<'a> TryInto<String> for ObjectName {
+impl TryInto<String> for ObjectName {
     type Error = std::str::Utf8Error;
 
     fn try_into(self) -> Result<String, Self::Error> {

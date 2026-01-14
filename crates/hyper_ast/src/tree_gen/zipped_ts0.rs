@@ -154,7 +154,7 @@ impl<'acc, T> tree_gen::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
-impl<'store, 'cache, 's, TS: TsEnableTS>
+impl<'store, 'cache, TS: TsEnableTS>
     TsTreeGen<'store, 'cache, TS, tree_gen::NoOpMore<TS, Acc<TS::Ty2>>, true>
 where
     TS::Ty2: TsType,
@@ -173,7 +173,7 @@ pub trait TsEnableTS: crate::types::ETypeStore
 where
     Self::Ty2: TsType,
 {
-    fn obtain_type<'a, N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
+    fn obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
 }
 
 pub trait TsType: HyperType + Copy {

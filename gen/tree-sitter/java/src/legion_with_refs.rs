@@ -525,7 +525,7 @@ impl<'stores, 'cache, TS: JavaEnabledTypeStore, X>
     }
 }
 
-impl<'stores, 'cache, 'acc, TS, More>
+impl<'stores, 'cache, TS, More>
     JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, true>
 {
     pub fn without_hidden_nodes(
@@ -542,7 +542,7 @@ impl<'stores, 'cache, 'acc, TS, More>
     }
 }
 
-impl<'stores, 'cache, 'acc, TS: JavaEnabledTypeStore + 'static, More>
+impl<'stores, 'cache, TS: JavaEnabledTypeStore + 'static, More>
     JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, true>
 {
     pub fn with_preprocessing(
@@ -560,7 +560,7 @@ impl<'stores, 'cache, 'acc, TS: JavaEnabledTypeStore + 'static, More>
         }
     }
 }
-impl<'stores, 'cache, 'acc, TS: JavaEnabledTypeStore + 'static, More>
+impl<'stores, 'cache, TS: JavaEnabledTypeStore + 'static, More>
     JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, true>
 {
     /// Replaces the default dedup map when deriving different data.
@@ -588,7 +588,7 @@ impl<'stores, 'cache, 'acc, TS: JavaEnabledTypeStore + 'static, More>
     }
 }
 
-impl<'stores, 'cache, 'acc, TS: JavaEnabledTypeStore + 'static, More, const HIDDEN_NODES: bool>
+impl<'stores, 'cache, TS: JavaEnabledTypeStore + 'static, More, const HIDDEN_NODES: bool>
     JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, HIDDEN_NODES>
 {
     pub fn with_more<M>(

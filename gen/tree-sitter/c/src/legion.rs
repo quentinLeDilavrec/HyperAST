@@ -115,7 +115,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation<'a>(&'a self) -> &'a Spaces {
+    fn indentation(&self) -> & Spaces {
         &self.indentation
     }
 }
@@ -337,7 +337,7 @@ impl<'store, 'cache, TS: CEnabledTypeStore> CTreeGen<'store, 'cache, TS, NoOpMor
     }
 }
 
-impl<'store, 'cache, 'acc, TS, More> CTreeGen<'store, 'cache, TS, More, true> {
+impl<'store, 'cache, TS, More> CTreeGen<'store, 'cache, TS, More, true> {
     pub fn without_hidden_nodes(self) -> CTreeGen<'store, 'cache, TS, More, false> {
         CTreeGen {
             line_break: self.line_break,

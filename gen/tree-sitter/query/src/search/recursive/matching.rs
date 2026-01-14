@@ -11,7 +11,7 @@ use hyperast::types::HyperType;
 use hyperast::types::TypedHyperAST;
 use hyperast::types::{Childrn, Typed, TypedNodeStore, WithChildren};
 
-impl<'a, Ty: TypeTrait, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
+impl<Ty: TypeTrait, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
     pub fn is_matching<HAST, TIdN>(&self, code_store: &HAST, id: HAST::IdN) -> bool
     where
         HAST: TypedHyperAST<TIdN>,

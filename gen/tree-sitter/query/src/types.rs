@@ -7,7 +7,7 @@ use hyperast::types::{
     TypedNodeId,
 };
 
-impl<'a> hyperast::types::ETypeStore for TStore {
+impl hyperast::types::ETypeStore for TStore {
     type Ty2 = Type;
 
     fn intern(ty: Self::Ty2) -> Self::Ty {

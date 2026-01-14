@@ -55,7 +55,7 @@ impl<HAST: HyperASTShared, Acc: tree_gen::WithLabel> Node<HAST, Acc> {
     }
 }
 
-impl<'acc, 'l, HAST: HyperASTShared + Clone, Acc> Clone for Node<HAST, &'acc Acc>
+impl<'acc, HAST: HyperASTShared + Clone, Acc> Clone for Node<HAST, &'acc Acc>
 where
     &'acc Acc: tree_gen::WithLabel,
 {
@@ -354,7 +354,7 @@ where
     }
 }
 
-impl<'acc, 'l, HAST, Acc> self::TreeCursor<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> self::TreeCursor<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
     HAST::TS: EnabledTypeStore<Ty2 = Acc::Type> + types::RoleStore<IdF = IdF, Role = Role>,
@@ -580,7 +580,7 @@ where
     }
 }
 
-impl<'acc, 'l, HAST, Acc> Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
     HAST::TS: EnabledTypeStore<Ty2 = Acc::Type> + types::RoleStore<IdF = IdF, Role = Role>,
@@ -627,7 +627,7 @@ where
     }
 }
 
-impl<'acc, 'l, HAST, Acc> Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
     HAST::TS: EnabledTypeStore<Ty2 = Acc::Type>,
@@ -652,7 +652,7 @@ where
     }
 }
 
-impl<'acc, 'l, HAST, Acc> Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Clone,
     HAST::TS: EnabledTypeStore<Ty2 = Acc::Type>,

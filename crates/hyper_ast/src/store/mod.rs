@@ -72,7 +72,7 @@ impl<TS: Clone, NS: Clone, LS: Clone> Clone for SimpleStores<TS, NS, LS> {
     }
 }
 
-impl<'store, TS, NS, LS> crate::types::RoleStore for SimpleStores<TS, NS, LS>
+impl<TS, NS, LS> crate::types::RoleStore for SimpleStores<TS, NS, LS>
 where
     TS: crate::types::RoleStore,
 {
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<'store, TS, NS, LS> crate::types::LabelStore<str> for SimpleStores<TS, NS, LS>
+impl<TS, NS, LS> crate::types::LabelStore<str> for SimpleStores<TS, NS, LS>
 where
     LS: crate::types::LabelStore<str>,
 {
@@ -120,7 +120,7 @@ where
     }
 }
 
-impl<'store, TS, NS, LS> crate::types::TypeStore for SimpleStores<TS, NS, LS>
+impl<TS, NS, LS> crate::types::TypeStore for SimpleStores<TS, NS, LS>
 where
     TS::Ty: 'static + std::hash::Hash,
     TS: TypeStore,

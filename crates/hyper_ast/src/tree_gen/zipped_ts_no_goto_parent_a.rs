@@ -128,7 +128,7 @@ impl<'acc, T> tree_gen::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
-impl<'store, 'cache, 's, TS: TsEnableTS>
+impl<'store, 'cache, TS: TsEnableTS>
     TsTreeGen<'store, 'cache, TS, tree_gen::NoOpMore<TS, Acc<TS::Ty2>>, true>
 where
     TS::Ty2: TsType,
@@ -143,7 +143,7 @@ where
     }
 }
 
-impl<'stores, 'cache, 'acc, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
+impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
     pub fn with_preprocessing(
         stores: &'stores mut SimpleStores<TS>,
         md_cache: &'cache mut MDCache,

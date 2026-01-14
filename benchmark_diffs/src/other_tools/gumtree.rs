@@ -9,7 +9,7 @@ use hyperast::{nodes::JsonSerializer2 as JsonSerializer, types};
 
 use crate::tempfile;
 
-pub fn subprocess<'a, HAST>(
+pub fn subprocess<HAST>(
     stores: HAST,
     src_root: HAST::IdN,
     dst_root: HAST::IdN,
@@ -40,7 +40,7 @@ where
     }
     res.ok()
 }
-pub fn subprocess_checked<'a, HAST>(
+pub fn subprocess_checked<HAST>(
     stores: HAST,
     src_root: HAST::IdN,
     dst_root: HAST::IdN,

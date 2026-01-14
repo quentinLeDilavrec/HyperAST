@@ -439,7 +439,7 @@ impl<IdN: Clone, IdD: PrimInt> LazyPostOrder<IdN, IdD> {
     }
 }
 
-impl<'a, IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
+impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
     // #[time("warn")]
     pub fn complete<HAST: HyperAST<IdN = IdN> + Copy>(
         mut self,
@@ -466,7 +466,7 @@ impl<'a, IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -632,7 +632,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Debug> super::DecompressedSubtree<HAST::IdN>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, LazyPostOrder<HAST::IdN, IdD>>
 where
     for<'t> <HAST as AstLending<'t>>::RT: WithStats,
@@ -732,7 +732,7 @@ where
     }
 }
 
-impl<'d, IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
+impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
     pub fn child_decompressed<HAST>(
         mut self,
         store: HAST,
@@ -768,7 +768,7 @@ impl<'d, IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
     }
 }
 
-impl<'d, HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -1012,7 +1012,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Eq>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,

@@ -76,7 +76,7 @@ impl Tree {
     }
 }
 
-impl<'a, HAST> From<(HAST, HAST::IdN, &CompressedTreePath<HAST::Idx>)> for Tree
+impl<HAST> From<(HAST, HAST::IdN, &CompressedTreePath<HAST::Idx>)> for Tree
 where
     HAST: types::HyperAST + Copy,
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,

@@ -141,7 +141,6 @@ pub struct ScriptGenerator<
 }
 
 impl<
-    's,
     'a,
     'b,
     'c,

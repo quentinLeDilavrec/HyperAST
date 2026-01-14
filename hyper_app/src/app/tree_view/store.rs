@@ -139,13 +139,12 @@ impl<'b> hyperast::types::LabelStore<str> for LockedFetchedHyperAST<'b> {
     }
 }
 
-impl<'a, 'b> hyperast::types::TypeStore for LockedFetchedHyperAST<'b> {
+impl<'b> hyperast::types::TypeStore for LockedFetchedHyperAST<'b> {
     type Ty = AnyType;
 }
 
-impl<'a, 'b: 'a> hyperast::types::HyperASTShared for LockedFetchedHyperAST<'a>
+impl<'a> hyperast::types::HyperASTShared for LockedFetchedHyperAST<'a>
 where
-    Self: 'b,
 {
     type IdN = NodeIdentifier;
     type Idx = u16;

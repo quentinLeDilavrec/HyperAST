@@ -4,7 +4,7 @@ use hyperast::tree_gen::{TsEnableTS, TsType};
 use hyperast::types::TypeStore;
 use hyperast::types::{AAAA, AnyType, HyperType, LangRef, NodeId, TypeTrait, TypeU16, TypedNodeId};
 
-impl<'a> hyperast::types::ETypeStore for TStore {
+impl hyperast::types::ETypeStore for TStore {
     type Ty2 = Type;
 
     fn intern(ty: Self::Ty2) -> Self::Ty {

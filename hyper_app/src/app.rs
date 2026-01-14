@@ -2232,7 +2232,7 @@ fn show_commits_as_tree_it<'a, const BUTTON: bool>(
     total
 }
 
-fn show_commits_as_tree<'a, const BUTTON: bool>(
+fn show_commits_as_tree<const BUTTON: bool>(
     ui: &mut egui::Ui,
     id: &CommitId,
     commit_md: &CommitMdStore,

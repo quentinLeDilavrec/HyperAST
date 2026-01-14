@@ -75,7 +75,7 @@ pub(crate) fn show_long_result(
     }
 }
 
-pub fn prep_compute_res_prom<'a, 'b, T: ComputeError + Send + Sync>(
+pub fn prep_compute_res_prom<'a, T: ComputeError + Send + Sync>(
     promise: &'a Option<ComputeResultsProm<T>>,
     ui: &mut egui::Ui,
 ) -> Option<&'a Result<ComputeResults, T>> {
@@ -98,7 +98,7 @@ pub fn prep_compute_res_prom<'a, 'b, T: ComputeError + Send + Sync>(
     result.as_ref().ok().and_then(|x| x.content.as_ref())
 }
 
-pub fn prep_compute_res_prom_mut<'a, 'b, T: ComputeError + Send + Sync>(
+pub fn prep_compute_res_prom_mut<'a, T: ComputeError + Send + Sync>(
     promise: &'a mut Option<ComputeResultsProm<T>>,
     ui: &mut egui::Ui,
 ) -> Option<&'a mut Result<ComputeResults, T>> {
@@ -157,7 +157,7 @@ impl std::hash::Hash for ComputeResult {
     }
 }
 
-fn show_long_result_compute_failure<'a>(ui: &mut egui::Ui, error: &impl ComputeError) {
+fn show_long_result_compute_failure(ui: &mut egui::Ui, error: &impl ComputeError) {
     ui.label(
         egui::RichText::new(error.head())
             .heading()

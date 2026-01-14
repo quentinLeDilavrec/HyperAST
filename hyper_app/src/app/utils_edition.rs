@@ -776,7 +776,7 @@ fn compute_hi_color(
 #[derive(Default)]
 pub(crate) struct HiHighlighter2;
 
-impl<'a, 'b, MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
+impl<MH: MakeHighlights, G: AsRef<std::sync::Arc<egui::Galley>>>
     egui::util::cache::ComputerMut<(G, MH), Vec<(egui::Color32, Vec<egui::Rect>)>>
     for HiHighlighter2
 {

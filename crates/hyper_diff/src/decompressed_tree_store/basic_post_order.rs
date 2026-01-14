@@ -61,7 +61,7 @@ impl<T: Debug, IdD: PrimInt + Debug> Debug for BasicPostOrder<T, IdD> {
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
     for Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -99,7 +99,7 @@ where
     }
 }
 
-impl<'d, T, IdD: PrimInt> BasicPostOrder<T, IdD> {
+impl<T, IdD: PrimInt> BasicPostOrder<T, IdD> {
     pub(crate) fn size(&self, i: &IdD) -> IdD {
         *i - self.llds[(*i).to_usize().unwrap()] + one()
     }
@@ -121,7 +121,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
     for BasicPostOrder<HAST::IdN, IdD>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
@@ -169,7 +169,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPOSlice<'_, 
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPostOrder<HAST::IdN, IdD>> {
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPostOrder<HAST::IdN, IdD>> {
     /// WARN oposite order than id_compressed
     pub fn compute_kr(&self) -> Box<[IdD]> {
         self.as_slice().compute_kr()
@@ -362,7 +362,7 @@ where
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Eq>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
     Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,

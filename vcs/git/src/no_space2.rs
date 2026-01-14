@@ -8,9 +8,9 @@ use hyperast::{
     types::{self, AAAA, Children, NodeId},
 };
 
-pub fn as_nospaces<'a, TS>(
-    stores: &'a hyperast::store::SimpleStores<TS>,
-) -> &'a hyperast::store::SimpleStores<
+pub fn as_nospaces<TS>(
+    stores: & hyperast::store::SimpleStores<TS>,
+) -> & hyperast::store::SimpleStores<
     TS,
     NoSpaceNodeStoreWrapper,
     hyperast::store::labels::LabelStore,
@@ -188,7 +188,7 @@ impl<'a, T> types::WithHashs for NoSpaceWrapper<'a, T> {
     type HK = hyperast::hashed::SyntaxNodeHashsKinds;
     type HP = hyperast::nodes::HashSize;
 
-    fn hash<'b>(&'b self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP {
+    fn hash(&self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP {
         self.0.hash(kind)
     }
 }

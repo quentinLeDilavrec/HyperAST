@@ -44,7 +44,7 @@ pub struct Node<
 );
 // pub use crate::cursor_on_unbuild::Node;
 
-impl<'hast, 'acc, HAST: HyperASTShared + Clone, Acc> Clone for Node<HAST, &'acc Acc>
+impl<'acc, HAST: HyperASTShared + Clone, Acc> Clone for Node<HAST, &'acc Acc>
 where
     &'acc Acc: WithLabel,
 {
@@ -53,7 +53,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperASTShared, Acc: WithLabel> PartialEq for Node<HAST, Acc> {
+impl<HAST: HyperASTShared, Acc: WithLabel> PartialEq for Node<HAST, Acc> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
@@ -61,14 +61,14 @@ impl<'hast, HAST: HyperASTShared, Acc: WithLabel> PartialEq for Node<HAST, Acc> 
 
 type IdF = u16;
 
-impl<'hast, 'acc, HAST: HyperAST, Acc> super::TextLending<'_> for self::Node<HAST, &'acc Acc>
+impl<'acc, HAST: HyperAST, Acc> super::TextLending<'_> for self::Node<HAST, &'acc Acc>
 where
     &'acc Acc: WithLabel,
 {
     type TP = ();
 }
 
-impl<'hast, 'acc, HAST, Acc> crate::Node for self::Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> crate::Node for self::Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type>,
@@ -124,7 +124,7 @@ where
     type IdF = IdF;
 }
 
-impl<'hast, 'acc, HAST, Acc> crate::CNLending<'_> for Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> crate::CNLending<'_> for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type> + RoleStore<IdF = IdF, Role = Role>,
@@ -139,7 +139,7 @@ where
     type NR = Self;
 }
 
-impl<'hast, 'acc, HAST, Acc> crate::StatusLending<'_> for Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> crate::StatusLending<'_> for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type> + RoleStore<IdF = IdF, Role = Role>,
@@ -154,7 +154,7 @@ where
     type Status = crate::cursor_on_unbuild::CursorStatus<<Self as crate::Node>::IdF>;
 }
 
-impl<'hast, 'acc, HAST, Acc> crate::Cursor for Node<HAST, &'acc Acc>
+impl<'acc, HAST, Acc> crate::Cursor for Node<HAST, &'acc Acc>
 where
     HAST: HyperAST + Copy,
     HAST::TS: ETypeStore<Ty2 = Acc::Type> + RoleStore<IdF = IdF, Role = Role>,
@@ -220,7 +220,7 @@ where
     }
 }
 
-impl<'hast, HAST: HyperASTShared, Acc: WithLabel> Node<HAST, Acc> {
+impl<HAST: HyperASTShared, Acc: WithLabel> Node<HAST, Acc> {
     pub fn new(
         stores: HAST,
         acc: Acc,

@@ -188,7 +188,7 @@ impl<IdN, Idx> ExploreStructuralPositions<'_, IdN, Idx> {
     }
 }
 
-impl<'a, HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
+impl<HAST, S> WithHyperAstPositionConverter<'_, '_, S, HAST>
 where
     S: super::node_filter_traits::Full,
     HAST: HyperAST,

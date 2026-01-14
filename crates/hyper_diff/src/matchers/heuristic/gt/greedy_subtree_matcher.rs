@@ -265,7 +265,6 @@ pub struct SubtreeMatcher<Mpr, const MIN_HEIGHT: usize> {
 }
 
 impl<
-    'a,
     Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
     Ddst: DecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
     HAST,
@@ -509,16 +508,19 @@ struct PriorityTreeList<'b, D, IdD, HAST, const MIN_HEIGHT: usize> {
 
 impl<
     'a,
-    'b,
     D: DecompressedTreeStore<HAST, IdD>,
     IdD: PrimInt,
     HAST: HyperAST + Copy,
     const MIN_HEIGHT: usize,
-> PriorityTreeList<'b, D, IdD, HAST, MIN_HEIGHT>
+> PriorityTreeList<'a, D, IdD, HAST, MIN_HEIGHT>
 where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    pub(super) fn new(store: HAST, arena: &'b D, tree: IdD) -> Self {
+    pub(super) fn new(
+        store: HAST,
+        arena: &'a D,
+        tree: IdD,
+    ) -> PriorityTreeList<'a, D, IdD, HAST, MIN_HEIGHT> {
         let h = super::height(store.node_store(), &arena.original(&tree)); // TODO subtree opti, use metadata
         let list_size = if h >= MIN_HEIGHT {
             h + 1 - MIN_HEIGHT

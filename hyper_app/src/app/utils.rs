@@ -51,16 +51,17 @@ impl From<f64> for SecFmt {
 
 impl std::fmt::Display for SecFmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const UP_TO_HOURS: bool = true;
         // f.precision()
         let x = self.0;
-        let (t, n) = if x > 60.0 * 60.0 {
-            let n = if f.alternate() { "minutes" } else { "m" };
+        let (t, n) = if UP_TO_HOURS && x > 60.0 * 60.0 {
+            let n = if f.alternate() { "hours" } else { "m" };
             (x / 60.0, n)
         } else if x > 60.0 * 60.0 * 24.0 {
-            let n = if f.alternate() { "minutes" } else { "d" };
+            let n = if f.alternate() { "days" } else { "d" };
             (x / 60.0, n)
         } else if x > 60.0 * 60.0 {
-            let n = if f.alternate() { "minutes" } else { "m" };
+            let n = if f.alternate() { "hours" } else { "h" };
             (x / 60.0, n)
         } else if x > 60.0 {
             let n = if f.alternate() { "minutes" } else { "m" };

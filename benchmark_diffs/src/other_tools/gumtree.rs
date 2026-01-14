@@ -134,7 +134,7 @@ where
         fs::remove_file(&dst).unwrap();
         if !status.success() {
             eprintln!("gumtree process terminated with exit code {}", status);
-            Err(format!(""))
+            Err(Default::default())
         } else {
             Ok(gt_out)
         }

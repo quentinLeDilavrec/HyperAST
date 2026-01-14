@@ -158,7 +158,7 @@ impl super::HyperApp {
         } else if bad == acc.len() {
             notifs.add_log(re_log::LogMsg {
                 level: log::Level::Error,
-                target: format!("clipboard"),
+                target: "clipboard".to_string(),
                 msg: format!("Wrong input from clipboard:\n{}", paste),
             });
         // } else if bad <= 2 && bad * 4 <= acc.len() { // TODO later if annoying
@@ -168,7 +168,7 @@ impl super::HyperApp {
                 .collect();
             notifs.add_log(re_log::LogMsg {
                 level: log::Level::Error,
-                target: format!("clipboard"),
+                target: "clipboard".to_string(),
                 msg: format!(
                     "{bad} Wrong inputs from clipboard but {:?} could be accepted:\n{}",
                     good, paste
@@ -199,7 +199,7 @@ impl super::HyperApp {
                 log::warn!("Wrong input from clipboard: {}:\n{}", err, paste);
                 notifs.add_log(re_log::LogMsg {
                     level: log::Level::Warn,
-                    target: format!("clipboard"),
+                    target: "clipboard".to_string(),
                     msg: format!("Wrong input from clipboard: {}:\n{}", err, paste),
                 });
             }

@@ -212,7 +212,7 @@ impl crate::HyperApp {
             let url = r.clone().url();
             self.notifs.add_log(re_log::LogMsg {
                 level: log::Level::Info,
-                target: format!("graph/commits"),
+                target: "graph/commits".to_string(),
                 msg: format!(
                     "Selected\n{url}/compare/{}..{}",
                     &cached.commits[after], cached.commits[i]
@@ -224,7 +224,7 @@ impl crate::HyperApp {
             let commit = r.clone().with(cached.commits[after]).url();
             self.notifs.add_log(re_log::LogMsg {
                 level: log::Level::Info,
-                target: format!("graph/commits"),
+                target: "graph/commits".to_string(),
                 msg: format!("Selected\n{} vs {}", commit, cached.commits[i]),
             });
 
@@ -793,7 +793,7 @@ fn update_results_per_commit(
 
 fn time_axis_format(v: i64, step_size: i64) -> String {
     if v == 0 {
-        format!("0")
+        "0".to_string()
     } else if step_size > 60 * 60 * 24 * 364 {
         format!("{:+}y", v / (60 * 60 * 24 * 364))
     } else if step_size > 60 * 60 * 24 * 20 {

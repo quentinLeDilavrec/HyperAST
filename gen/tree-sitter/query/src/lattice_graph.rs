@@ -41,7 +41,7 @@ pub fn make_poset_graph<N, E: 'static, P: PartialEq>(
                         let e = g(source, target, kind);
                         graph
                             .try_add_edge(source, target, e)
-                            .expect(&format!("{:?}", kind));
+                            .unwrap_or_else(|_| panic!("{:?}", kind));
                     },
                 )
             });

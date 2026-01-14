@@ -399,10 +399,12 @@ impl<'a, T: TreePathMut<NodeIdentifier, u16> + Debug + Clone> Iterator for IterM
                         }
                         self.path.inc(child);
                         assert_eq!(*self.path.offset().unwrap(), offset + 1);
-                        self.path.check(self.stores).expect(&format!(
-                            "{:?} {} {:?} {:?} {:?}",
-                            node, offset, child, children, self.path
-                        ));
+                        self.path.check(self.stores).unwrap_or_else(|_| {
+                            panic!(
+                                "{:?} {} {:?} {:?} {:?}",
+                                node, offset, child, children, self.path
+                            )
+                        });
                     }
                     self.stack.push((node, offset + 1, Some(children)));
                     self.stack.push((child, 0, None));

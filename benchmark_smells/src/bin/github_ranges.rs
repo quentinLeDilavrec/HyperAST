@@ -114,16 +114,7 @@ fn bench_conditional_logic() {
     ) @root"#
         )
     };
-    let query = &format!(
-        // "{}\n{}\n{}\n{}\n{}",
-        // "{}\n{}",
-        "{}",
-        around("assertThat"),
-        // around("assertEquals"),
-        // around("assertSame"),
-        // around("assertTrue"),
-        // around("assertNull"),
-    );
+    let query = &around("assertThat");
 
     let subs = [
         "(if_statement)",

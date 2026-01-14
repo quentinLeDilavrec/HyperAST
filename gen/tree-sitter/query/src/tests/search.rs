@@ -115,7 +115,7 @@ fn match_xml() {
     );
     println!();
     println!("{}", TextSerializer::new(&code_store, pat));
-    let q0 = format!("(element (STag (Name) @id (#eq? @id \"artifactId\")))");
+    let q0 = "(element (STag (Name) @id (#eq? @id \"artifactId\")))".to_string();
     let (query_store, query) = crate::search::ts_query(q0.as_bytes());
     use hyperast_gen_ts_xml::types::Type as Xml;
     type XmlTIdN = hyperast_gen_ts_xml::types::TIdN<NodeIdentifier>;

@@ -1700,9 +1700,7 @@ fn test_all() {
             .len();
             let processing_time = now.elapsed().as_secs_f64();
             println!("tt={} evos={}", processing_time, len);
-            break;
         }
-        break;
     }
     // match guard.report().build() {
     //     Ok(report) => {

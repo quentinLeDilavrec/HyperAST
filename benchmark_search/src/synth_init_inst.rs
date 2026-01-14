@@ -2,30 +2,20 @@ use std::fmt::{Debug, Display};
 use std::ops::AddAssign;
 use std::time::Instant;
 
-use git2::Oid;
-use hyperast::compat::HashMap;
-use hyperast::position::structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence};
+use hyperast::position::structural_pos::{CursorHead, CursorWithPersistence};
+use hyperast::store::TyDown;
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::store::{SimpleStores, TyDown};
-use hyperast::types::{
-    HashKind, HyperAST, HyperType, NodeStore, WithHashs, WithPrecompQueries, WithRoles, WithStats,
-};
+use hyperast::types::{HyperAST, NodeStore};
+use hyperast::types::{WithHashs, WithPrecompQueries, WithRoles, WithStats};
 use hyperast::utils::memusage;
-use hyperast_tsquery::Query;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use hyperast_vcs_git::processing::{ConfiguredRepo2, RepoConfig};
 use num_traits::ToPrimitive;
 
-use crate::TimeoutError as Error;
 use crate::commit_rw;
-use crate::{Cumulative, NonBlockingResLogger, ResultLogger, Timeout};
-
-use crate::with_hyperast::{
-    CreatedExecutor, Executor, SkippingExecutor, compile_query, execute_on_commits_per_blob,
-    prepare_hyperast,
-};
-
-type Idx = u16;
+use crate::with_hyperast::{CreatedExecutor, Executor, SkippingExecutor};
+use crate::with_hyperast::{compile_query, execute_on_commits_per_blob, prepare_hyperast};
+use crate::{NonBlockingResLogger, ResultLogger, Timeout};
 
 struct ChangesDetection {
     query: hyperast_tsquery::Query,

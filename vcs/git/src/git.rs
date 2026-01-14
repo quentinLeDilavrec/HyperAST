@@ -293,12 +293,12 @@ impl Repo {
     }
     pub fn fetch(&self) -> Repository {
         let url = self.url();
-        let path = format!("{}", "/tmp/hyperastgitresources/repo/");
+        let path = "/tmp/hyperastgitresources/repo/".to_string();
         fetch_repository(url, path)
     }
     pub fn nofetch(&self) -> Repository {
         let url = self.url();
-        let path = format!("{}", "/tmp/hyperastgitresources/repo/");
+        let path = "/tmp/hyperastgitresources/repo/".to_string();
         nofetch_repository(url, path)
     }
 
@@ -354,7 +354,7 @@ impl std::str::FromStr for Repo {
 
 pub fn fetch_github_repository(repo_name: &str) -> Repository {
     let url = format!("{}{}", "https://github.com/", repo_name);
-    let path = format!("{}", "/tmp/hyperastgitresources/repo/");
+    let path = "/tmp/hyperastgitresources/repo/".to_string();
     fetch_repository(url, path)
 }
 

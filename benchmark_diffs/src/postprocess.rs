@@ -249,47 +249,47 @@ pub mod compressed_bf_post_process {
                 if bf_f >= 1
                     && is_not_here(u32::rotate_left(l1 ^ l2, 2) ^ u32::rotate_right(l3 ^ l4, 2))
                 {
-                    return Err(format!("1"));
+                    return Err("1".to_string());
                 }
                 if bf_f >= 2
                     && is_not_here(u32::rotate_left(l1 ^ l3, 2) ^ u32::rotate_right(l2 ^ l4, 2))
                 {
-                    return Err(format!("1"));
+                    return Err("1".to_string());
                 }
                 if bf_f >= 3
                     && is_not_here(u32::rotate_left(l1 ^ l4, 2) ^ u32::rotate_right(l2 ^ l3, 2))
                 {
-                    return Err(format!("3"));
+                    return Err("3".to_string());
                 }
                 if bf_f >= 4 && is_not_here(l1) {
-                    return Err(format!("l1"));
+                    return Err("l1".to_string());
                 }
                 if bf_f >= 5 && is_not_here(l2) {
-                    return Err(format!("l2"));
+                    return Err("l2".to_string());
                 }
                 if bf_f >= 6 && is_not_here(l3) {
-                    return Err(format!("l3"));
+                    return Err("l3".to_string());
                 }
                 if bf_f >= 7 && is_not_here(l4) {
-                    return Err(format!("l4"));
+                    return Err("l4".to_string());
                 }
                 if bf_f >= 8 && is_not_here(l2 ^ l1) {
-                    return Err(format!("l2 ^ l1"));
+                    return Err("l2 ^ l1".to_string());
                 }
                 if bf_f >= 9 && is_not_here(l3 ^ l4) {
-                    return Err(format!("l3 ^ l4"));
+                    return Err("l3 ^ l4".to_string());
                 }
                 if bf_f >= 10 && is_not_here(l2 ^ l3) {
                     return Err(format!("l2 ^ l3 = {}", l2 ^ l3));
                 }
                 if bf_f >= 11 && is_not_here(l1 ^ l4) {
-                    return Err(format!("l1 ^ l4"));
+                    return Err("l1 ^ l4".to_string());
                 }
                 if bf_f >= 12 && is_not_here(l1 ^ l2 ^ l3) {
-                    return Err(format!("l1 ^ l2 ^ l3"));
+                    return Err("l1 ^ l2 ^ l3".to_string());
                 }
                 if bf_f >= 13 && is_not_here(l1 ^ l2 ^ l4) {
-                    return Err(format!("l1 ^ l2 ^ l4"));
+                    return Err("l1 ^ l2 ^ l4".to_string());
                 }
                 if bf_f > 13 {
                     return Err(format!("need more hashs l, hf = {},{}", bf_l, bf_f));

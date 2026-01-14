@@ -555,7 +555,7 @@ fn test_match_for_removes_not_matching() {
         };
         dbg!(m.pattern_index);
         log::info!("found match {}", m.pattern_index.to_usize());
-        for p in m.nodes_for_capture_index(cid) {
+        if let Some(p) = m.nodes_for_capture_index(cid).next() {
             dbg!();
             return;
         }

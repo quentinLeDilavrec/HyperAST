@@ -81,10 +81,10 @@ impl<'a> hyperast::types::RoleStore for TStore {
 
 impl TypeStore for TStore {
     type Ty = AnyType;
-    fn decompress_type(
+    fn try_decompress_type(
         erazed: &impl hyperast::store::nodes::PolyglotHolder,
         _tid: std::any::TypeId,
-    ) -> Self::Ty {
+    ) -> Option<Self::Ty> {
         use HyperType;
         let id = erazed.lang_id();
         macro_rules! decomp_t {
@@ -94,18 +94,26 @@ impl TypeStore for TStore {
                     let tid = std::any::TypeId::of::<types::TType>();
                     return erazed
                         .unerase_ref::<types::TType>(tid)
-                        .unwrap()
-                        .as_static()
-                        .into();
+                        .map(|x| *x)
+                        .map(|x| x.as_static().into());
                 }
             }};
         }
         decomp_t!(hyperast_gen_ts_java::types);
         decomp_t!(hyperast_gen_ts_cpp::types);
         decomp_t!(hyperast_gen_ts_xml::types);
-
+        None
+    }
+    fn decompress_type(
+        erazed: &impl hyperast::store::nodes::PolyglotHolder,
+        _tid: std::any::TypeId,
+    ) -> Self::Ty {
+        if let Some(t) = Self::try_decompress_type(erazed, _tid) {
+            return t;
+        }
         #[cfg(not(debug_assertions))]
         panic!();
+        let id = erazed.lang_id();
         #[cfg(debug_assertions)]
         panic!("{} is not handled", id.name());
     }

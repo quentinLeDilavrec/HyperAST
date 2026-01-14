@@ -320,15 +320,6 @@ impl<'a, T> HashedNodeRef<'a, T> {
     pub fn get_component<C: Component>(&self) -> Result<&C, ComponentError> {
         self.0.get_component::<C>()
     }
-
-    /// Returns a mutable reference to one of the entity's components.
-    ///
-    /// # Safety
-    /// This function bypasses static borrow checking. The caller must ensure that the component reference
-    /// will not be mutably aliased.
-    pub unsafe fn get_component_unchecked<C: Component>(&self) -> Result<&mut C, ComponentError> {
-        unsafe { self.0.get_component_unchecked::<C>() }
-    }
 }
 
 impl<'a, T: crate::types::NodeId<IdN = NodeIdentifier>> HashedNodeRef<'a, T> {

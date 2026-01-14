@@ -35,6 +35,8 @@
 //! about fixing try catches in tests
 
 use std::hash::Hash;
+#[cfg(feature = "force_layout")]
+use std::ops::Deref;
 use std::ops::{Range, SubAssign};
 use wasm_rs_dbg::dbg;
 
@@ -42,14 +44,15 @@ use egui_addon::InteractiveSplitter;
 use egui_addon::MultiSplitter;
 
 use super::code_tracking::FetchedFiles;
+use super::code_tracking::try_fetch_remote_file;
 use super::types;
+use super::types::CommitId;
 use super::types::{CodeRange, Commit, SelectedConfig};
 use super::utils_edition::MakeHighlights;
-use crate::app::code_tracking::try_fetch_remote_file;
-use crate::app::types::CommitId;
 use crate::utils_poll::{Remote, Resource};
 
 mod config_examples;
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(default)]
 pub(super) struct ComputeConfigQuery {
@@ -481,19 +484,10 @@ pub(crate) fn show_config(
     ui.add_space(10.0);
     let mut sel_ex = None;
     ui.label("examples:");
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            let mut rest = false;
-            for (i, e) in conf.examples.iter().enumerate() {
-                if rest {
-                    ui.separator();
-                }
-                rest = true;
-                if e.show(ui).clicked() {
-                    sel_ex = Some(i);
-                }
-            }
-        })
+    ui.grouped_wrapped_list(conf.examples.iter().map(Some), |ui, i, e| {
+        if e.show(ui).clicked() {
+            sel_ex = Some(i);
+        }
     });
     if let Some(sel_ex) = sel_ex {
         *conf = ComputeConfigQuery {
@@ -503,9 +497,99 @@ pub(crate) fn show_config(
             ..Into::into(&conf.examples[sel_ex])
         };
     }
+
+    #[cfg(feature = "force_layout")]
+    ui.label("lattices:");
+    #[cfg(feature = "force_layout")]
+    ui.grouped_wrapped_list(
+        smells.prepared_graphs.iter().map(|x| x.as_ref()),
+        |ui, i, pg| {
+            let (mode, pg) = pg.downcast_ref::<(ViewMode, GraphTy)>().unwrap();
+            ui.label(format!("graph {} n:{}", i, pg.node_count()));
+        },
+    );
+
     (resp_repo, resp_commit)
 }
+#[derive(enumset::EnumSetType)]
+pub enum Action {
+    OpenGraph,
+    Compute,
+    Recompute,
+    Waiting,
+}
+pub type Actions = enumset::EnumSet<Action>;
 
+pub fn handle_actions(
+    ui: &mut egui::Ui,
+    api_addr: &str,
+    smells: &mut Config,
+    smells_result: &mut Option<RemoteResult>,
+    smells_diffs_result: &mut Option<RemoteResultDiffs>,
+    fetched_files: &mut FetchedFiles,
+    actions: Actions,
+) -> Option<u16> {
+    if actions.is_empty() {
+        return None;
+    }
+    let mut pg_id = None;
+    let center = ui.available_rect_before_wrap().center();
+    egui::Window::new("Actions")
+        .default_pos(center)
+        .pivot(egui::Align2::CENTER_CENTER)
+        .show(ui.ctx(), |ui| {
+            if actions.contains(Action::Recompute) {
+                if ui.button("Recompute Queries").clicked() {
+                    let conf = smells.commits.as_mut().unwrap();
+                    let examples = smells.diffs.as_mut().unwrap();
+                    *smells_result = Some(fetch_results(ui.ctx(), &api_addr, conf, &examples));
+                }
+            } else if actions.contains(Action::Compute) {
+                if ui.button("Compute Queries").clicked() {
+                    let conf = smells.commits.as_mut().unwrap();
+                    let examples = smells.diffs.as_mut().unwrap();
+                    *smells_result = Some(fetch_results(ui.ctx(), &api_addr, conf, &examples));
+                }
+            }
+
+            if actions.contains(Action::Waiting) {
+                ui.spinner();
+            }
+
+            handle_open_synth_graph(ui, smells, smells_result, &mut pg_id);
+        });
+    pg_id
+}
+
+fn handle_open_synth_graph(
+    ui: &mut egui::Ui,
+    smells: &mut Config,
+    smells_result: &mut Option<RemoteResult>,
+    pg_id: &mut Option<u16>,
+) {
+    #[cfg(feature = "force_layout")]
+    let Some(prom) = smells_result.as_mut() else {
+        return;
+    };
+    let Ok(result) = prep_smells_results(ui, smells, prom) else {
+        return;
+    };
+    let Some(queries) = access_smells_results(ui, result) else {
+        return;
+    };
+    use crate::app::utils_egui::MyUiExt;
+    ui.grouped_wrapped_list(queries.graphs.iter().map(Some), |ui, i, x| {
+        let b = ui.button(format!(
+            "lattice {} q:{} e:{}",
+            i,
+            x.queries_pretty.len(),
+            x.ex_pretty.len()
+        ));
+        if b.clicked() {
+            *pg_id = Some(i as u16);
+        }
+    });
+}
 pub(super) fn show_central_panel(
     ui: &mut egui::Ui,
     api_addr: &str,
@@ -513,18 +597,20 @@ pub(super) fn show_central_panel(
     smells_result: &mut Option<RemoteResult>,
     smells_diffs_result: &mut Option<RemoteResultDiffs>,
     fetched_files: &mut FetchedFiles,
-) {
+) -> Actions {
+    let mut actions = Actions::default();
     if let Some(_x) = &mut smells.stats {
         todo!();
     }
     if let Some(_examples) = &mut smells.queries {
         todo!();
     }
-    let mut show_action_menu = true;
+    // let mut show_action_menu = true;
     match (smells_result.as_mut()).map(|prom| prep_smells_results(ui, smells, prom)) {
         Some(Ok(result)) => {
             if let Some(queries) = access_smells_results(ui, result) {
-                if let Err(value) = show_smells_result(ui, api_addr, smells, fetched_files, queries)
+                if let Err(value) =
+                    show_smells_result(ui, api_addr, smells, fetched_files, queries, &mut actions)
                 {
                     #[cfg(feature = "force_layout")]
                     for gid in 0..queries.graphs.len() {
@@ -533,27 +619,26 @@ pub(super) fn show_central_panel(
                     }
                     smells.prepared_graphs.clear();
                     *smells_result = Some(value)
-                } else {
-                    show_action_menu = false;
                 }
-            } else {
-                show_action_menu = false;
             }
         }
-        Some(Err(resp)) => {
+        Some(Err(Some(resp))) => {
             let conf = smells.commits.as_mut().unwrap();
             let examples = smells.diffs.as_mut().unwrap();
             show_examples(ui, api_addr, examples, fetched_files);
-            if resp.map_or(false, |r| r.clicked()) {
+            if resp.clicked() {
                 *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
             }
+        }
+        Some(Err(None)) => {
+            actions |= Action::Waiting;
         }
         _ => (),
     }
     if let Some(promise) = smells_diffs_result {
         let Some(result) = promise.ready() else {
             ui.spinner();
-            return;
+            return actions;
         };
         match result {
             Ok(resource) => match &resource.content {
@@ -590,32 +675,31 @@ pub(super) fn show_central_panel(
         let len = examples.examples.len();
         if len == 0 {
             ui.colored_label(ui.visuals().error_fg_color, "No changes found");
-            if show_action_menu {
-                egui::Window::new("Diff Error").show(ui.ctx(), |ui| {
-                    if ui.button("retry").clicked() {
-                        *smells_diffs_result = None;
-                    }
-                });
+            egui::Window::new("Diff Error").show(ui.ctx(), |ui| {
                 if ui.button("retry").clicked() {
                     *smells_diffs_result = None;
                 }
+            });
+            if ui.button("retry").clicked() {
+                *smells_diffs_result = None;
             }
-            return;
+            return actions;
         }
-        let conf = smells.commits.as_mut().unwrap();
-        let center = ui.available_rect_before_wrap().center();
+        // let conf = smells.commits.as_mut().unwrap();
+        // let center = ui.available_rect_before_wrap().center();
         show_examples(ui, api_addr, examples, fetched_files);
-        if show_action_menu {
-            egui::Window::new("Actions")
-                .default_pos(center)
-                .pivot(egui::Align2::CENTER_CENTER)
-                .show(ui.ctx(), |ui| {
-                    if ui.button("Compute Queries").clicked() {
-                        *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
-                    }
-                });
-        }
-        return;
+        // if show_action_menu {
+        //     egui::Window::new("Actions")
+        //         .default_pos(center)
+        //         .pivot(egui::Align2::CENTER_CENTER)
+        //         .show(ui.ctx(), |ui| {
+        //             if ui.button("Compute Queries").clicked() {
+        //                 *smells_result = Some(fetch_results(ui.ctx(), api_addr, conf, &examples));
+        //             }
+        //         });
+        // }
+        actions |= Action::Compute;
+        return actions;
     }
     if let Some(conf) = &mut smells.commits {
         if smells_diffs_result.is_none() {
@@ -629,8 +713,9 @@ pub(super) fn show_central_panel(
         //         *trigger_compute = true;
         //     }
         // });
-        return;
+        return actions;
     }
+    actions
 }
 
 #[cfg(not(feature = "force_layout"))]
@@ -651,8 +736,6 @@ pub(crate) fn show_smells_graph_config(
     ui: &mut egui::Ui,
     smells: &mut Config,
     smells_result: Option<&mut RemoteResult>,
-    // result: &Result<Resource<Result<SearchResults, SmellsError>>, String>,
-    // queries: &SearchResults,
     gid: u16,
 ) {
     use re_ui::UiExt;
@@ -674,11 +757,22 @@ pub(crate) fn show_smells_graph_config(
         ui.selectable_value(view_mode, ViewMode::FullGraph, "Full");
     });
     ui.label("node limit:");
-    ui.add(
-        egui::Slider::new(&mut graph_view_settings.limit, 0..=4000)
-            .integer()
-            .clamping(egui::SliderClamping::Never),
-    );
+    if ui
+        .add(
+            egui::Slider::new(&mut graph_view_settings.limit, 0..=4000)
+                .integer()
+                .update_while_editing(false)
+                .clamping(egui::SliderClamping::Never),
+        )
+        .changed()
+    {
+        #[cfg(feature = "force_layout")]
+        let id = force_graph_id(gid, &graph_view_settings.view_mode);
+        #[cfg(feature = "force_layout")]
+        egui_addon::force_layout::reset(ui, Some(id));
+        #[cfg(feature = "force_layout")]
+        smells.prepared_graphs.clear();
+    };
     ui.label("pretty nodes:");
     ui.add(
         egui::Slider::new(&mut graph_view_settings.pretty_nodes, 0..=1000)
@@ -686,14 +780,13 @@ pub(crate) fn show_smells_graph_config(
             .clamping(egui::SliderClamping::Never),
     );
 
-    let _id = format!("force_graph_patterns{}", gid);
+    let _id = force_graph_id(gid, &graph_view_settings.view_mode);
 
     let mut s = egui_addon::force_layout::get_anime_state(ui, Some(_id.to_string()));
 
     egui_addon::force_layout::show_center_gravity_params(ui, &mut s.extras.0.params);
     egui_addon::force_layout::show_fruchterman_reingold_params(ui, &mut s.base);
     egui_addon::force_layout::show_pinning_params(ui, &mut s.extras.1.0.params);
-    // egui_addon::force_layout::pin_node(&mut s.extras.1.0.params, 0);
 
     egui_addon::force_layout::set_layout_state(ui, s, Some(_id.to_string()));
 
@@ -706,7 +799,7 @@ pub(crate) fn show_smells_graph_config(
     ui.label("too general:");
     ui.group(|ui| {
         let g = g.and_then(|g| g.graphs.get(gid));
-        for (i, id) in graph_view_settings.too_general.iter().enumerate() {
+        for (_i, id) in graph_view_settings.too_general.iter().enumerate() {
             if ui
                 .button(format!("{}", id))
                 .on_hover_ui(|ui| {
@@ -743,7 +836,7 @@ pub(crate) fn show_smells_graph_config(
             let x = graph_view_settings.pretty_queued.remove(i);
             let content = g.unwrap();
             if let Some(_pg) = &mut smells.prepared_graphs[gid] {
-                let pg = _pg.downcast_mut::<GraphTy>().unwrap();
+                let (_mode, pg) = _pg.downcast_mut::<(ViewMode, GraphTy)>().unwrap();
                 handle_new_tops(content, pg, vec![x.into()], 4);
             }
         }
@@ -753,7 +846,7 @@ pub(crate) fn show_smells_graph_config(
         // TODO could move expensive computations to selection detection
         let mut to_deselect = vec![];
         let mut s = egui_addon::force_layout::get_anime_state(ui, Some(_id.to_string()));
-        let mut node_pinning = &mut s.extras.1.0.params;
+        let node_pinning = &mut s.extras.1.0.params;
         // let mut node_pinning_iter = s.extras.1.0.params.iter_pinning();
         let mut has_toggled_pin = false;
         // egui_addon::force_layout::pin_node(node_pinning, 0);
@@ -796,6 +889,17 @@ pub(crate) fn show_smells_graph_config(
 }
 
 #[cfg(feature = "force_layout")]
+fn force_graph_id(gid: usize, view_mode: &ViewMode) -> String {
+    let view_mode = match view_mode {
+        ViewMode::StatisticsOnly => "stats",
+        ViewMode::FullGraph => "full",
+        ViewMode::ExampleTopsBiGraph => "bi",
+    };
+    let id = format!("force_graph_patterns_{}_{}", gid, view_mode);
+    id
+}
+
+#[cfg(feature = "force_layout")]
 fn show_pattern_details(
     prepared_graph: Option<&mut Box<dyn std::any::Any + Send + Sync>>,
     raw_graph: Option<&G>,
@@ -808,7 +912,7 @@ fn show_pattern_details(
     pinned: &mut bool,
 ) {
     if let Some(_pg) = prepared_graph {
-        let pg = _pg.downcast_ref::<GraphTy>().unwrap();
+        let (mode, pg) = _pg.downcast_ref::<(ViewMode, GraphTy)>().unwrap();
         let Some(nn) = pg.node(n.into()).map(|x| x.id()) else {
             return;
         };
@@ -839,7 +943,7 @@ fn show_pattern_details(
             .horizontal_wrapped(|ui| ["too general", "ignore", pin_label].map(|txt| ui.button(txt)))
             .inner;
         if general.clicked() {
-            let pg = _pg.downcast_mut::<GraphTy>().unwrap();
+            let (mode, pg) = _pg.downcast_mut::<(ViewMode, GraphTy)>().unwrap();
             log::info!("pattern {n} deemed too general");
             if let Some(rg) = raw_graph {
                 to_deselect.push(i);
@@ -943,13 +1047,13 @@ pub(crate) fn show_smells_graph(
         }
         ViewMode::ExampleTopsBiGraph => {
             // let _id = format!("force_bigraph_ex_tops{}", gid);
-            let _id = format!("force_graph_patterns{}", gid);
+            let _id = force_graph_id(gid, &graph_view_setting.view_mode);
             let prepared_graph = &mut smells.prepared_graphs[gid];
             let content = &queries.graphs[gid];
             show_bigraph(ui, _id, prepared_graph, content, graph_view_setting);
         }
         ViewMode::FullGraph => {
-            let _id = format!("force_graph_patterns{}", gid);
+            let _id = force_graph_id(gid, &graph_view_setting.view_mode);
             let prepared_graph = &mut smells.prepared_graphs[gid];
             let content = &queries.graphs[gid];
             show_full_graph(ui, _id, prepared_graph, content, graph_view_setting);
@@ -964,8 +1068,11 @@ fn show_bigraph(
     content: &G,
     graph_view_setting: &mut GVSetting,
 ) {
-    let g: &mut GraphTy = if let Some(g) = prepared_graph.as_mut() {
-        g.downcast_mut::<GraphTy>().unwrap()
+    let g: &mut GraphTy = if let Some((ViewMode::ExampleTopsBiGraph, g)) = prepared_graph
+        .as_mut()
+        .and_then(|g| g.downcast_mut::<(ViewMode, GraphTy)>())
+    {
+        g
     } else {
         let _g = build_bigraph(
             content,
@@ -977,10 +1084,11 @@ fn show_bigraph(
         // let g: GraphTy = to_graph(&_g.into());
         let mut g: GraphTy = GraphTy::new(Default::default());
         *g.g_mut() = _g;
-        *prepared_graph = Some(Box::new(g));
-        (prepared_graph.as_mut().unwrap())
-            .downcast_mut::<GraphTy>()
+        *prepared_graph = Some(Box::new((ViewMode::ExampleTopsBiGraph, g)));
+        &mut (prepared_graph.as_mut().unwrap())
+            .downcast_mut::<(ViewMode, GraphTy)>()
             .unwrap()
+            .1
     };
 
     let mut _s = egui_addon::force_layout::GVSettings::default();
@@ -1087,7 +1195,9 @@ fn build_bigraph(
     let mut new_top_candidates = vec![];
 
     for (x, succ) in succs {
-        let inits = ex_it.next_exset().unwrap();
+        let Some(inits) = ex_it.next_exset() else {
+            continue;
+        };
         let mut i = x as u32;
         let mut all_too_general = true;
         for &succ in succ {
@@ -1109,8 +1219,16 @@ fn build_bigraph(
             break;
         }
 
-        assert!(!(inits.len() > 0 && succ.is_empty()), "need to factor");
-        // NOTE probably only happens in trivial cases that are not very interesting
+        if inits.len() > 0 && succ.is_empty() {
+            continue;
+        }
+        // assert!(
+        //     !(inits.len() > 0 && succ.is_empty()),
+        //     "need to factor {}, {}",
+        //     inits.len(),
+        //     succ.len()
+        // );
+        // // NOTE probably only happens in trivial cases that are not very interesting
 
         if inits.len() > 0 {
             let s = "".to_string();
@@ -1273,6 +1391,9 @@ fn build_bigraph(
             if let Some(old_n) = old_g.node_weight(j) {
                 g.node_weight_mut(j).unwrap().set_location(old_n.location());
             }
+            if ex >= ex2init.len() {
+                continue;
+            }
             let i = ex2init[ex];
             // let i = i as u32;
             let id = g.add_edge(i.into(), j, egui_graphs::Edge::new(()));
@@ -1323,16 +1444,20 @@ fn show_full_graph(
     let settings_navigation = &_s.1;
     let settings_style = &_s.2;
 
-    let g: &mut GraphTy = if let Some(g) = prepared_graph.as_mut() {
-        g.downcast_mut::<GraphTy>().unwrap()
+    let g: &mut GraphTy = if let Some((ViewMode::FullGraph, g)) = prepared_graph
+        .as_mut()
+        .and_then(|g| g.downcast_mut::<(ViewMode, GraphTy)>())
+    {
+        g
     } else {
         let g = build_graph(content, graph_view_setting);
         use egui_addon::force_layout::*;
         let g: GraphTy = to_graph(&g.into());
-        *prepared_graph = Some(Box::new(g));
-        (prepared_graph.as_mut().unwrap())
-            .downcast_mut::<GraphTy>()
+        *prepared_graph = Some(Box::new((ViewMode::FullGraph, g)));
+        &mut (prepared_graph.as_mut().unwrap())
+            .downcast_mut::<(ViewMode, GraphTy)>()
             .unwrap()
+            .1
     };
 
     let events = std::rc::Rc::<std::cell::RefCell<Vec<Event>>>::default();
@@ -1515,6 +1640,7 @@ pub(crate) fn show_smells_result(
     smells: &mut Config,
     fetched_files: &mut FetchedFiles,
     queries: &SearchResults,
+    actions: &mut Actions,
 ) -> Result<(), RemoteResult> {
     let center = ui.available_rect_before_wrap().center();
     let action_widget = egui::Window::new("Actions")
@@ -1600,11 +1726,26 @@ pub(crate) fn show_smells_result(
     );
 
     let mut _smells_result = Ok(());
-    action_widget.show(ui.ctx(), |ui| {
-        if ui.button("Compute Queries").clicked() {
-            _smells_result = Err(fetch_results(ui.ctx(), api_addr, conf, &examples));
-        }
-    });
+    *actions |= Action::Recompute;
+    *actions |= Action::OpenGraph;
+    // action_widget.show(ui.ctx(), |ui| {
+    //     if ui.button("Compute Queries").clicked() {
+    //         _smells_result = Err(fetch_results(ui.ctx(), api_addr, conf, &examples));
+    //     }
+    //     use super::utils_egui::MyUiExt;
+    //     #[cfg(feature = "force_layout")]
+    //     ui.grouped_wrapped_list(queries.graphs.iter().map(Some), |ui, i, x| {
+    //         let b = ui.button(format!(
+    //             "lattice {} q:{} e:{}",
+    //             i,
+    //             x.queries_pretty.len(),
+    //             x.ex_pretty.len()
+    //         ));
+    //         if b.clicked() {
+    //             *pg_id = Some(i as u16);
+    //         }
+    //     });
+    // });
     _smells_result
 }
 
@@ -1651,23 +1792,23 @@ pub(crate) fn prep_smells_results<'a>(
     smells_result: &'a mut RemoteResult,
 ) -> Result<&'a Result<Resource<Result<SearchResults, SmellsError>>, String>, Option<egui::Response>>
 {
-    let mut resp = None;
     let Some(result) = smells_result.ready() else {
-        let center = ui.available_rect_before_wrap().center();
-        egui::Window::new("Actions")
-            .default_pos(center)
-            .pivot(egui::Align2::CENTER_CENTER)
-            .show(ui.ctx(), |ui| {
-                resp = Some(ui.button("Compute Queries"));
-                ui.spinner();
-            });
+        // let center = ui.available_rect_before_wrap().center();
+        // egui::Window::new("Actions")
+        //     .default_pos(center)
+        //     .pivot(egui::Align2::CENTER_CENTER)
+        //     .show(ui.ctx(), |ui| {
+        //         resp = Some(ui.button("Compute Queries"));
+        //         ui.spinner();
+        //     });
         smells.bad_matches_bounds = 0..=0;
-        return Err(resp);
+        return Err(None);
     };
     if let Err(error) = result {
         // This should only happen if the fetch API isn't available or something similar.
+        let mut resp = None;
         let center = ui.available_rect_before_wrap().center();
-        egui::Window::new("Actions")
+        egui::Window::new("Error")
             .default_pos(center)
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ui.ctx(), |ui| {
@@ -1701,7 +1842,6 @@ fn show_list_of_queries_with_examples(
             egui::Sense::hover(),
         );
         let top = rect.top();
-        wasm_rs_dbg::dbg!(rows.start..rows.end);
         for i in rows.start..rows.end {
             let mut rect = {
                 let (t, b) = rect.split_top_bottom_at_y(top + H * (i - rows.start + 1) as f32);

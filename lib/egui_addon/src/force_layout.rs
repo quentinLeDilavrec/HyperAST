@@ -399,7 +399,7 @@ mod extra_forces {
             Dn: DisplayNode<N, E, Ty, Ix>,
             De: DisplayEdge<N, E, Ty, Ix, Dn>,
         {
-            wasm_rs_dbg::dbg!(indices, &params.pinned);
+            // wasm_rs_dbg::dbg!(indices, &params.pinned);
             // let mut offset = 0;
             let mut i = 0;
             for &o in &params.pinned {

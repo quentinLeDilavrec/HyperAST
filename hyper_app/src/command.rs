@@ -96,6 +96,8 @@ pub enum UICommand {
     NewQuery,
     OpenLastCreatedQuery,
 
+    OpenLastTab,
+
     // Compute commands:
     RunQuery,
     ComputeTrackingMappingFuture,
@@ -305,6 +307,7 @@ impl UICommand {
                 "Open last created query",
                 "Open the last created tree-sitter query",
             ),
+            UICommand::OpenLastTab => ("Open last inserted tab", "Open the last inserted tab"),
 
             UICommand::RunQuery => ("Run current code query", "TODO desc. RunQuery"),
             UICommand::ComputeTrackingMappingFuture => (
@@ -435,6 +438,7 @@ impl UICommand {
             // TODO
             UICommand::NewQuery => None,
             UICommand::OpenLastCreatedQuery => None,
+            UICommand::OpenLastTab => None,
             UICommand::RunQuery => None,
             UICommand::ComputeTrackingMappingFuture => None,
             UICommand::ComputeTrackingMappingPast => None,

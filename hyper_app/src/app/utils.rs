@@ -281,6 +281,11 @@ macro_rules! typed_vec {
             $vis fn find(&self, mut predicate: impl FnMut(&$item) -> bool) -> Option<($id, &$item)> {
                 self.0.iter().enumerate().find(|(_, v)| predicate(v)).map(|(i, v)| ($id(i as $ty), v))
             }
+
+            #[track_caller]
+            $vis fn last_id(&self) -> Option<$id> {
+                Some($id((self.0.len().checked_sub(1)? as $ty)))
+            }
         }
 
         impl std::ops::Index<$id> for $name {

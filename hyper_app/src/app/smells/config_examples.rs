@@ -57,20 +57,20 @@ pub(super) static BASE_TRY_FAIL_CATCH_EX: Example = Example {
 ) @pred
 (_
     (named_node
-        (identifier) (#EQ "expression_statement")
+        (identifier) (#EQ? "expression_statement")
     ) @rm
     .
 )
 (_
     (named_node
-        (identifier) (#EQ "expression_statement")
+        (identifier) (#EQ? "expression_statement")
     ) @rm
     .
     (named_node)
 )
 (_
     (named_node
-        (identifier) (#EQ "expression_statement")
+        (identifier) (#EQ? "expression_statement")
     ) @rm
     .
     (anonymous_node)
@@ -119,9 +119,6 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX: Example = Example {
     (identifier) (#EQ? "cast_expression")
     .
 ) @rm.all.full
-(predicate
-    (identifier) (#EQ? "eq")
-) @rm
 (named_node
     (identifier) (#EQ? "unary_expression")
     (named_node
@@ -338,6 +335,78 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX: Example = Example {
     ) @pred
 ) @rm.all
 (named_node
+    (identifier) (#EQ? "variable_declarator")
+    (named_node
+        (identifier) (#EQ? "method_invocation")
+        (named_node
+            (identifier) (#EQ? "argument_list")
+        ) @rm.all.full
+    ) .
+)
+(named_node
+    (identifier) (#EQ? "variable_declarator")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred @rm.all
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred @rm.all
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "block") .
+    ) @rm.all.full
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "block")
+        (named_node
+            (identifier) (#EQ? "local_variable_declaration")
+        ) @rm.all.full
+    )
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "formal_parameters")
+        (named_node
+            (identifier) (#EQ? "formal_parameter")
+            (named_node
+                (identifier) (#EQ? "identifier") .
+            ) .
+            (predicate
+                (identifier) (#EQ? "EQ")
+                (parameters
+                    (string) @label
+                )
+            ) @pred @rm.all
+        )
+    )
+)
+(named_node
+    (identifier) (#EQ? "enhanced_for_statement")
+    (named_node
+        (identifier) (#EQ? "block")
+    ) @rm
+)
+(named_node
     (identifier) (#EQ? "method_invocation")
     (named_node
         (identifier) (#EQ? "identifier") .
@@ -357,6 +426,37 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX: Example = Example {
     (identifier) .
     "/" @rm.all.full .
     (identifier) @rm.all.full
+)"#,
+    config: Config::MavenJava,
+    simple_matching: true,
+    prepro_matching: true,
+};
+
+pub(super) static BALANCED_EX: Example = Example {
+    commit: Commit {
+        repo: Repo {
+            forge: Forge::GitHub,
+            user: "Marcono1234",
+            name: "gson",
+        },
+        id: "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde",
+    },
+    // only label identifiers
+    // only do removes
+    name: "balanced synth",
+    meta_gen: r#"[
+    "{" "}" ";" "." "try" "(" ")" "catch" "import"
+    "if" "else"
+    (line_comment) (block_comment)
+] @skip
+;(type_identifier) @label
+(identifier) @label
+(_literal) @abstract"#,
+    meta_simp: r#"(_
+    (named_node
+        (identifier) (#IS? "statement")
+    ) @rm
+    .
 )"#,
     config: Config::MavenJava,
     simple_matching: true,

@@ -10,7 +10,7 @@ use strum::IntoEnumIterator;
 use egui_addon::{code_editor, egui_utils::radio_collapsing};
 
 use crate::app::types::CommitId;
-use crate::command::{CommandReceiver, CommandSender, UICommand};
+use crate::command::{CommandReceiver, CommandSender, UICommand, UICommandSender};
 use crate::command_palette::CommandPalette;
 use crate::utils_poll::{Buffered3, MultiBuffered2};
 use code_aspects::remote_fetch_node;
@@ -722,9 +722,9 @@ impl SelectedConfig {
             SelectedConfig::Tsg => vec![Tab::TSG],
             SelectedConfig::Smells => vec![
                 Tab::Smells,
-                Tab::SmellsPatternGraph(0),
-                Tab::SmellsPatternGraph(1),
-                Tab::SmellsPatternGraph(2),
+                // Tab::SmellsPatternGraph(0),
+                // Tab::SmellsPatternGraph(1),
+                // Tab::SmellsPatternGraph(2),
             ],
             SelectedConfig::Multi => vec![Tab::Commits],
             SelectedConfig::Diff => vec![Tab::Diff(0)],
@@ -1438,7 +1438,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             }
             Tab::Smells => {
                 ui.set_clip_rect(ui.available_rect_before_wrap());
-                smells::show_central_panel(
+                let actions = smells::show_central_panel(
                     ui,
                     &mut self.data.api_addr,
                     &mut self.data.smells,
@@ -1446,6 +1446,24 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     &mut self.data.smells_diffs_result,
                     &mut self.data.fetched_files,
                 );
+                let pg_id = smells::handle_actions(
+                    ui,
+                    &mut self.data.api_addr,
+                    &mut self.data.smells,
+                    &mut self.data.smells_result,
+                    &mut self.data.smells_diffs_result,
+                    &mut self.data.fetched_files,
+                    actions,
+                );
+                if let Some(pg_id) = pg_id {
+                    let tid = self.tabs.push(Tab::SmellsPatternGraph(pg_id));
+                    self.data.command_sender.send_ui(UICommand::OpenLastTab);
+                    // let child = self.tree.tiles.insert_pane(tid);
+                    // match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
+                    //     Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
+                    //     _ => todo!(),
+                    // };
+                }
                 Default::default()
             }
             Tab::SmellsPatternGraph(gid) => {
@@ -2709,6 +2727,15 @@ impl eframe::App for HyperApp {
                         Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
                         _ => todo!(),
                     };
+                }
+                UICommand::OpenLastTab => {
+                    if let Some(tid) = self.tabs.last_id() {
+                        let child = self.tree.tiles.insert_pane(tid);
+                        match self.tree.tiles.get_mut(self.tree.root.unwrap()) {
+                            Some(egui_tiles::Tile::Container(c)) => c.add_child(child),
+                            _ => todo!(),
+                        };
+                    }
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 UICommand::ZoomIn => {

@@ -366,6 +366,26 @@ pub trait MyUiExt: UiExt {
         }
         ui.add(slider)
     }
+    fn grouped_wrapped_list<T, It: IntoIterator<Item = Option<T>>>(
+        &mut self,
+        mut it: It,
+        mut add_content: impl FnMut(&mut egui::Ui, usize, T),
+    ) {
+        let ui = self.ui_mut();
+        egui::Frame::group(ui.style()).show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                let mut rest = false;
+                for (i, x) in it.into_iter().enumerate() {
+                    let Some(x) = x else { continue };
+                    if rest {
+                        ui.separator();
+                    }
+                    rest = true;
+                    add_content(ui, i, x);
+                }
+            })
+        });
+    }
 }
 
 impl MyUiExt for egui::Ui {}

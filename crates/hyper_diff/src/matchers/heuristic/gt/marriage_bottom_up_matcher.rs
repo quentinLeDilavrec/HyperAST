@@ -19,7 +19,6 @@ pub struct MarriageBottomUpMatcher<
 }
 
 impl<
-    'a,
     Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
     Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
     HAST: HyperAST + Copy,

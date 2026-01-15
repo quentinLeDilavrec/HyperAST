@@ -110,7 +110,7 @@ pub fn round_to_significant_digits3(number: f64, significant_digits: usize) -> S
     let magnitude = 10.0_f64.powi(power as i32);
     let shifted = number * magnitude;
     let rounded_number = shifted.round();
-    let unshifted = rounded_number as f64 / magnitude;
+    let unshifted = rounded_number / magnitude;
     dbg!(
         number,
         (number.abs() + 0.000001).log10().ceil(),

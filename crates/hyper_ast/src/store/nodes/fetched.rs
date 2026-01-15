@@ -153,6 +153,7 @@ impl Hash for NodeIdentifier {
     }
 }
 
+#[derive(Default)]
 pub struct FetchedLabels(HashMap<LabelIdentifier, String>);
 
 impl crate::types::LabelStore<str> for FetchedLabels {
@@ -180,13 +181,6 @@ impl FetchedLabels {
     }
     pub fn insert(&mut self, k: LabelIdentifier, v: String) -> Option<String> {
         self.0.insert(k, v)
-    }
-}
-
-#[cfg(feature = "native")]
-impl Default for FetchedLabels {
-    fn default() -> Self {
-        Self(Default::default())
     }
 }
 
@@ -646,6 +640,7 @@ variant_store!(NodeIdentifier, NodeIdentifier;
 );
 
 // #[derive(Default)]
+#[derive(Default)]
 pub struct SimplePackedBuilder {
     // // label_ids: Vec<LabelIdentifier>,
     stockages: HashMap<Arch<&'static str>, RawVariant>,
@@ -659,14 +654,6 @@ impl<S: Hash> Hash for Arch<S> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
         (self.1 as u32).hash(state);
-    }
-}
-
-impl Default for SimplePackedBuilder {
-    fn default() -> Self {
-        Self {
-            stockages: Default::default(),
-        }
     }
 }
 

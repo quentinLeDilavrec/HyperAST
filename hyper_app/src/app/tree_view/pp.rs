@@ -33,13 +33,9 @@ fn subtree_to_string(store: &FetchedHyperAST, nid: NodeIdentifier) -> String {
     s
 }
 
+#[derive(Default)]
 struct PrettyPrinter;
 
-impl Default for PrettyPrinter {
-    fn default() -> Self {
-        Self {}
-    }
-}
 impl cache::ComputerMut<(&FetchedHyperAST, NodeIdentifier), String> for PrettyPrinter {
     fn compute(&mut self, (store, id): (&FetchedHyperAST, NodeIdentifier)) -> String {
         subtree_to_string(store, id)

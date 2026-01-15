@@ -187,6 +187,7 @@ impl Default for ComputeConfigDiff {
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct CodeRange {
     #[serde(flatten)]
     pub(crate) file: FileIdentifier,
@@ -227,29 +228,10 @@ impl Hash for CodeRange {
     }
 }
 
-impl Default for CodeRange {
-    fn default() -> Self {
-        Self {
-            file: Default::default(),
-            range: Default::default(),
-            path: Default::default(),
-            path_ids: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Default)]
 #[serde(default)]
 pub(crate) struct ComputeConfigTracking {
     pub(crate) target: CodeRange,
-}
-
-impl Default for ComputeConfigTracking {
-    fn default() -> Self {
-        Self {
-            target: Default::default(),
-        }
-    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]

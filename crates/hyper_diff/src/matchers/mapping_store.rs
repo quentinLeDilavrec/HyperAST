@@ -12,6 +12,9 @@ pub trait MappingStore {
     type Dst;
     fn topit(&mut self, left: usize, right: usize);
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     fn capacity(&self) -> (usize, usize);
     fn has(&self, src: &Self::Src, dst: &Self::Dst) -> bool;
     fn link(&mut self, src: Self::Src, dst: Self::Dst);

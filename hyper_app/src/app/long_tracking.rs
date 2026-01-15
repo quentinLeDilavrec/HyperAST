@@ -1523,7 +1523,7 @@ pub(super) fn track(
     let flags = serde_qs::to_string(flags).unwrap(); //.replace("=true", "1").replace("=false", "0");
     let url = if let Some(range) = range {
         let flags = if flags.is_empty() {
-            format!("")
+            Default::default()
         } else {
             format!("&{}", flags)
         };
@@ -1540,7 +1540,7 @@ pub(super) fn track(
         )
     } else {
         let flags = if flags.is_empty() {
-            format!("")
+            Default::default()
         } else {
             format!("?{}", flags)
         };

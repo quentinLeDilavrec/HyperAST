@@ -541,7 +541,7 @@ impl<'a> FetchedViewImpl<'a> {
                 } else {
                     show_node_menu(ui, interact, kind).unwrap_or_default()
                 };
-                let rect2 = ui.label(format!("{}", label)).rect;
+                let rect2 = ui.label(label.to_string()).rect;
                 rect1.union(rect2)
             } else {
                 let mut label = egui::RichText::new(label).monospace();

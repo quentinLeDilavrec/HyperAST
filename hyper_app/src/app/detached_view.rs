@@ -362,13 +362,13 @@ fn show_element(
     let cui = &mut prepared.content_ui;
     cui.disable();
     if options.commit {
-        cui.label(format!("{}", &x.file.commit.id.prefix(6)));
+        cui.label(x.file.commit.id.prefix(6).to_string());
     }
     if options.file {
         if let Some(range) = &x.range {
             cui.label(format!("{}:{:?}", x.file.file_path, range));
         } else {
-            cui.label(format!("{}", x.file.file_path));
+            cui.label(x.file.file_path.to_string());
         }
     }
     if options.path {

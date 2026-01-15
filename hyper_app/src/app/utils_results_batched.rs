@@ -23,11 +23,11 @@ pub(super) fn show_short_result(
         return;
     };
     let Ok(resource) = result else {
-        ui.label(format!("compute time: N/A"));
+        ui.label("compute time: N/A".to_string());
         return;
     };
     let Some(Ok(content)) = &resource.content else {
-        ui.label(format!("compute time: N/A"));
+        ui.label("compute time: N/A".to_string());
         return;
     };
     if ui.add(egui::Button::new("Export")).clicked() {

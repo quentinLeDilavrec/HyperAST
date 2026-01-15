@@ -124,7 +124,7 @@ where
             let format = self.frmt(TokenType::Punctuation);
             out.push(LayoutSection {
                 leading_space: 0.0,
-                byte_range: *offset..end.clone(),
+                byte_range: *offset..end,
                 format: format.with(self.theme),
             });
             *offset = end;
@@ -142,7 +142,7 @@ where
                 let format = self.frmt(TokenType::Keyword);
                 out.push(LayoutSection {
                     leading_space: 0.0,
-                    byte_range: *offset..end.clone(),
+                    byte_range: *offset..end,
                     format: format.with(self.theme),
                 });
                 *offset = end;
@@ -171,7 +171,7 @@ where
                 let format = self.frmt(TokenType::Punctuation);
                 out.push(LayoutSection {
                     leading_space: 0.0,
-                    byte_range: *offset..end.clone(),
+                    byte_range: *offset..end,
                     format: format.with(self.theme),
                 });
                 *offset = end;

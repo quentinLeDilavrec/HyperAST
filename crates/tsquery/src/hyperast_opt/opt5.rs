@@ -266,7 +266,7 @@ where
             if !k.is_supertype() {
                 role = n.role_at_and_has_later::<<HAST::TS as RoleStore>::Role>(o);
                 if let Some((role, later)) = role {
-                    field_id = HAST::TS::intern_role(lang.clone(), role);
+                    field_id = HAST::TS::intern_role(lang, role);
                     can_have_later_siblings_with_this_field = later;
                 }
             }

@@ -136,8 +136,7 @@ impl crate::HyperApp {
 
         show_lang_selector(ui, qid, &mut query.lang);
 
-        let precomp_sel =
-            show_precomp_selector(ui, qid, query.precomp.clone(), &mut self.data.queries);
+        let precomp_sel = show_precomp_selector(ui, qid, query.precomp, &mut self.data.queries);
         let precomp_sel = precomp_sel.inner.as_ref();
 
         if let Some(precomp) = precomp_sel.and_then(|x| x.0) {
@@ -194,7 +193,7 @@ impl crate::HyperApp {
                 c.next().map(|c| {
                     let commit = types::Commit {
                         repo: r.clone(),
-                        id: c.clone(),
+                        id: *c,
                     };
                     (i, commit)
                 })
@@ -423,7 +422,7 @@ impl crate::HyperApp {
                 };
                 let max_matches = query_data.max_matches;
                 let timeout = query_data.timeout;
-                let precomp = query_data.precomp.clone().map(|id| &self.data.queries[id]);
+                let precomp = query_data.precomp.map(|id| &self.data.queries[id]);
                 let precomp = precomp.map(|p| p.query.as_ref().to_string());
                 let prom = querying::remote_compute_query_aux(
                     ui.ctx(),

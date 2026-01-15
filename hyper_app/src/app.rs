@@ -1152,7 +1152,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             let m: &mut (Option<(ProjectId, CommitId)>, usize) =
                                 w.get_temp_mut_or_default(id);
                             if m.0.as_ref() != Some(selected) {
-                                m.0 = Some(selected.clone());
+                                m.0 = Some(*selected);
                                 m.1 = (res.rows.lock().unwrap().1)
                                     .iter()
                                     .position(|x| {
@@ -1160,7 +1160,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                                     })
                                     .unwrap_or(usize::MAX);
                                 log::debug!("{:?}", m);
-                                Some(m.1.clone())
+                                Some(m.1)
                             } else {
                                 None
                             }
@@ -1351,7 +1351,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
                     );
 
-                    let bl = &(selected_commit.0, selected_baseline.clone());
+                    let bl = &(selected_commit.0, *selected_baseline);
                     ui2.push_id((commit, bl), |ui| {
                         show_tree_view(
                             ui,
@@ -1824,7 +1824,7 @@ fn show_tree_view(
 
     let curr_commit = Commit {
         repo: repo.clone(),
-        id: commit.1.clone(),
+        id: commit.1,
     };
     let tree_viewer = long_tacking.tree_viewer.entry(curr_commit.clone());
     let tree_viewer = tree_viewer.or_default();
@@ -1969,7 +1969,7 @@ fn update_queries_differential_results(
     } else if let Some(Err(_)) = differential.2.get() {
         false
     } else {
-        hash((queries[qid].query.as_ref(), selected_baseline.clone())) != differential.4
+        hash((queries[qid].query.as_ref(), selected_baseline)) != differential.4
     };
     (absent, new)
 }
@@ -2003,19 +2003,19 @@ fn compute_queries_differential_results(
     let commits = 2;
     let baseline = Commit {
         repo: repo.clone(),
-        id: selected_baseline.clone(),
+        id: *selected_baseline,
     };
     let commit = Commit {
         repo: repo.clone(),
-        id: selected_commit.1.clone(),
+        id: selected_commit.1,
     };
     let max_matches = data.queries[qid].max_matches;
     let timeout = data.queries[qid].timeout;
-    let precomp = data.queries[qid].precomp.clone();
+    let precomp = data.queries[qid].precomp;
     wasm_rs_dbg::dbg!(qid, &data.queries, precomp);
     let precomp = precomp.map(|qid| &data.queries[qid]);
     let precomp = precomp.map(|p| p.query.as_ref().to_string());
-    let hash = hash((&query, selected_baseline.clone()));
+    let hash = hash((&query, *selected_baseline));
     let prom = querying::remote_compute_query_differential(
         ui.ctx(),
         &data.api_addr,
@@ -2404,11 +2404,11 @@ fn poll_md_with_pr(
     if let Some((head_commit, i)) = head_commit {
         if !md.parents.contains(&head_commit.id) {
             if rid == i {
-                c.push(head_commit.id.clone())
+                c.push(head_commit.id)
             } else {
                 log::error!("{:?} {:?}", rid, i)
             }
-            md.parents.push(head_commit.id.clone());
+            md.parents.push(head_commit.id);
         }
     }
     md

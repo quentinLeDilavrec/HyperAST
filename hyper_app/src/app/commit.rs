@@ -665,7 +665,7 @@ pub(crate) fn compute_commit_layout_timed(
                     end = r.times.len();
                     break;
                 }
-                index.insert(current.clone(), (r.times.len(), r.subs.len()));
+                index.insert(current, (r.times.len(), r.subs.len()));
                 if let Some(commit) = commits(&current) {
                     // universal time then ?
                     let time = commit.time; // + commit.timezone as i64 * 60;
@@ -674,7 +674,7 @@ pub(crate) fn compute_commit_layout_timed(
                     r.commits.push(current);
                     r.times.push(time);
                     if let Some(p) = commit.parents.get(0) {
-                        current = p.clone();
+                        current = *p;
                     } else {
                         end = r.times.len();
                         break;
@@ -1334,7 +1334,7 @@ mod commits_layouting {
     }
     impl Commit {
         fn id(&self) -> Oid {
-            self.oid.clone()
+            self.oid
         }
 
         fn parent_count(&self) -> usize {
@@ -1342,7 +1342,7 @@ mod commits_layouting {
         }
 
         fn parent_id(&self, i: usize) -> Result<Oid, ()> {
-            Ok(self.parents[i].clone())
+            Ok(self.parents[i])
         }
     }
 

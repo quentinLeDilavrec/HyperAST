@@ -39,7 +39,7 @@ impl crate::HyperApp {
             let Some(branch) = c.iter_mut().next() else {
                 continue;
             };
-            let branch = (format!("{}/{}", r.user, r.name), branch.clone());
+            let branch = (format!("{}/{}", r.user, r.name), *branch);
 
             if let Some(r) = (self.data.queries_results)
                 .iter()
@@ -79,7 +79,7 @@ impl crate::HyperApp {
         let Some(branch) = commit_slice.iter_mut().next() else {
             return;
         };
-        let branch = (format!("{}/{}", r.user, r.name), branch.clone());
+        let branch = (format!("{}/{}", r.user, r.name), *branch);
         let r = r.clone();
 
         let results_per_commit = qrid
@@ -167,7 +167,7 @@ impl crate::HyperApp {
         if let InteractionEffect::ClickCommitPlusCmdMod(i) = effect {
             if let Some((_, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) {
                 let mut it = commit_slice.iter_mut();
-                *it.next().unwrap() = cached.commits[i].clone();
+                *it.next().unwrap() = cached.commits[i];
                 for _ in 0..it.count() {
                     commit_slice.pop();
                 }
@@ -555,7 +555,7 @@ fn plot_graph_aux<'a>(
                 if t > cached.times[i - 1] {
                     p[1] += 100;
                 }
-                let a = line.last().unwrap().clone();
+                let a = *line.last().unwrap();
                 let b = p.map(|x| x as f64);
                 let position = with_egui_plot::center(a, b);
                 if let Some(text) = DIFF_VALS.then_some(()).and(diff) {

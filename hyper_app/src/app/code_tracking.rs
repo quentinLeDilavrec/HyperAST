@@ -282,7 +282,7 @@ pub(crate) fn show_config(
     tracking_result: &mut Buffered<Result<Resource<TrackingResult>, String>>,
 ) {
     let repo_changed = show_repo_menu(ui, &mut tracking.target.file.commit.repo);
-    let old = tracking.target.file.commit.id.clone();
+    let old = tracking.target.file.commit.id;
     let commit_te = egui::TextEdit::singleline(&mut tracking.target.file.commit.id.tb())
         .clip_text(true)
         .desired_width(150.0)

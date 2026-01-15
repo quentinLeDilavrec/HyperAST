@@ -670,7 +670,7 @@ impl SimplePackedBuilder {
             return;
         };
         let ty = store.resolve_type(id);
-        let id = id.clone().into();
+        let id = (*id).into();
         let lang = ty.get_lang();
         use crate::types::LangRef;
         let lang_name = lang.name();

@@ -184,7 +184,7 @@ fn ui_detached_node(
     for m in &mut r.matched {
         let id = ui.id().with(&m);
         let m_rect = if let Some(m_pos) = result.element.get(&m) {
-            m_pos.clone()
+            *m_pos
         } else {
             let default_pos = (default_x, i as f32 * 50.0);
             let resp = show_detached_element_aux(ui, store, options, &m, id, default_pos);

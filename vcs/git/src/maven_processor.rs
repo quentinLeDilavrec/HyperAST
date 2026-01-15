@@ -450,7 +450,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
         ana,
         status,
     };
-    (node_id.clone(), md)
+    (node_id, md)
 }
 
 use hyperast_gen_ts_xml::legion::XmlTreeGen;

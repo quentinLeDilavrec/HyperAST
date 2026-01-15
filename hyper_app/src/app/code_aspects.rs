@@ -55,7 +55,7 @@ pub(crate) fn show_config(
     for x in &*aspects.ser_opt_java {
         let button = &ui.button(x.to_str());
         if button.clicked() {
-            rm = Some(x.clone());
+            rm = Some(*x);
         }
     }
     if let Some(rm) = rm {
@@ -66,7 +66,7 @@ pub(crate) fn show_config(
     for x in &*aspects.ser_opt_cpp {
         let button = &ui.button(x.to_str());
         if button.clicked() {
-            rm = Some(x.clone());
+            rm = Some(*x);
         }
     }
     if let Some(rm) = rm {
@@ -77,7 +77,7 @@ pub(crate) fn show_config(
     for x in &*aspects.hide_opt_java {
         let button = &ui.button(x.to_str());
         if button.clicked() {
-            rm = Some(x.clone());
+            rm = Some(*x);
         }
     }
     if let Some(rm) = rm {
@@ -88,7 +88,7 @@ pub(crate) fn show_config(
     for x in &*aspects.hide_opt_cpp {
         let button = &ui.button(x.to_str());
         if button.clicked() {
-            rm = Some(x.clone());
+            rm = Some(*x);
         }
     }
     if let Some(rm) = rm {

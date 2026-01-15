@@ -115,7 +115,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation(&self) -> & Spaces {
+    fn indentation(&self) -> &Spaces {
         &self.indentation
     }
 }
@@ -534,7 +534,7 @@ where
             let vacant = insertion.vacant();
             let node_store: &_ = vacant.1.1;
             let stores = SimpleStores {
-                type_store: self.stores.type_store.clone(),
+                type_store: self.stores.type_store,
                 label_store: &self.stores.label_store,
                 node_store,
             };
@@ -568,8 +568,8 @@ where
             self.md_cache.insert(
                 compressed_node,
                 MD {
-                    metrics: metrics.clone(),
-                    precomp_queries: acc.precomp_queries.clone(),
+                    metrics: metrics,
+                    precomp_queries: acc.precomp_queries,
                 },
             );
             Local {

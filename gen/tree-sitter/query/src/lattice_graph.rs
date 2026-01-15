@@ -616,9 +616,7 @@ impl<'a, P> Prep<'a, P> {
             .iter()
             .flat_map(move |g| {
                 let mut dedup = hashbrown::HashSet::new();
-                tops(g)
-                    .map(|x| g[x])
-                    .filter(move |x| dedup.insert(x.clone()))
+                tops(g).map(|x| g[x]).filter(move |x| dedup.insert(*x))
             })
             .map(|top| (self.lattice.pretty(&top), self.lattice.extract2(top).1))
     }
@@ -636,7 +634,7 @@ impl<'a, P> Prep<'a, P> {
                 let mut dedup = hashbrown::HashSet::new();
                 tops_plus_one(g)
                     .map(|x| g[x])
-                    .filter(move |x| dedup.insert(x.clone()))
+                    .filter(move |x| dedup.insert(*x))
             })
             .map(|top| (self.lattice.pretty(&top), self.lattice.extract2(top).1))
     }
@@ -650,7 +648,7 @@ impl<'a, P> Prep<'a, P> {
                 tops(g)
                     .flat_map(|x| [x].into_iter().chain(g.neighbors_directed(x, Down)))
                     .map(|x| g[x])
-                    .filter(move |x| dedup.insert(x.clone()))
+                    .filter(move |x| dedup.insert(*x))
             })
             .map(|maj| (self.lattice.pretty(&maj), self.lattice.extract2(maj).1))
     }

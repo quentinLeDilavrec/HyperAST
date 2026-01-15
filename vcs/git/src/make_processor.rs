@@ -285,7 +285,7 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdenti
         dyn_builder.build(),
     );
 
-    let full_node = (node_id.clone(), MD { metrics });
+    let full_node = (node_id, MD { metrics });
     full_node
 }
 

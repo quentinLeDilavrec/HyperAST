@@ -330,9 +330,7 @@ impl TypeSys {
                     vac.insert(ent);
                     self.list.push(ent);
                 }
-                std::collections::btree_map::Entry::Occupied(occ) => {
-                    self.list.push(occ.get().clone())
-                }
+                std::collections::btree_map::Entry::Occupied(occ) => self.list.push(*occ.get()),
             }
             // let name = camel_case(name);
             // use std::collections::hash_map::Entry;

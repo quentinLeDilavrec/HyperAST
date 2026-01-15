@@ -485,7 +485,7 @@ impl<'stores, 'cache, TS: TsEnabledTypeStore> TreeGen for TsTreeGen<'stores, 'ca
 
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(interned_kind);
-            dyn_builder.add(hashs.clone());
+            dyn_builder.add(hashs);
             dyn_builder.add(compo::BytesLen(
                 (acc.end_byte - acc.start_byte).try_into().unwrap(),
             ));

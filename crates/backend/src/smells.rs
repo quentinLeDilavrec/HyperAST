@@ -311,9 +311,7 @@ pub(crate) fn smells(
         .tops()
         .filter(|(q, _)| {
             let lang = hyperast_gen_ts_java::language();
-            !q.is_empty()
-                && q.lines().count() < 50
-                && hyperast_tsquery::Query::new(q, lang).is_ok()
+            !q.is_empty() && q.lines().count() < 50 && hyperast_tsquery::Query::new(q, lang).is_ok()
         })
         .map(|(s, x)| (s, std::borrow::Cow::Owned(x)))
         .collect();
@@ -964,7 +962,7 @@ mod graph_compression {
                 csr.edges(u).map(|e| {
                     (
                         (e.source().to_usize().unwrap(), e.target() as usize),
-                        e.weight().clone() as i8,
+                        *e.weight() as i8,
                     )
                 })
             }));
@@ -994,7 +992,7 @@ mod graph_compression {
                         use petgraph::adj::IndexType;
                         use petgraph::visit::IntoNeighbors;
                         csr.edges(u)
-                            .map(|e| (e.target(), e.weight().clone() as i8))
+                            .map(|e| (e.target(), *e.weight() as i8))
                             .collect::<Vec<_>>()
                     })
                     .collect::<Vec<_>>()
@@ -1009,9 +1007,7 @@ mod graph_compression {
                     .map(|u| {
                         use petgraph::adj::IndexType;
                         use petgraph::visit::IntoNeighbors;
-                        csr.edges(u)
-                            .map(|e| e.weight().clone() as i8)
-                            .collect::<Vec<_>>()
+                        csr.edges(u).map(|e| *e.weight() as i8).collect::<Vec<_>>()
                     })
                     .collect::<Vec<_>>()
             )

@@ -259,8 +259,8 @@ impl PreProcessedRepository {
                     dir_path,
                     oid,
                 );
-                processing_ordered_commits.push(oid.clone());
-                self.commits.insert(oid.clone(), c);
+                processing_ordered_commits.push(oid);
+                self.commits.insert(oid, c);
             });
         processing_ordered_commits
     }
@@ -368,8 +368,8 @@ impl PreProcessedRepository {
                 dir_path,
                 oid,
             );
-            processing_ordered_commits.push(oid.clone());
-            self.commits.insert(oid.clone(), c);
+            processing_ordered_commits.push(oid);
+            self.commits.insert(oid, c);
         });
         processing_ordered_commits
     }
@@ -398,8 +398,8 @@ impl PreProcessedRepository {
                 dir_path,
                 oid,
             );
-            processing_ordered_commits.push(oid.clone());
-            self.commits.insert(oid.clone(), c);
+            processing_ordered_commits.push(oid);
+            self.commits.insert(oid, c);
         });
         processing_ordered_commits
     }
@@ -417,7 +417,7 @@ impl PreProcessedRepository {
             dir_path,
             oid,
         );
-        self.commits.insert(oid.clone(), c);
+        self.commits.insert(oid, c);
         oid
     }
 }
@@ -461,8 +461,8 @@ impl PreProcessedRepository {
                     dir_path,
                     oid,
                 );
-                processing_ordered_commits.push(oid.clone());
-                self.commits.insert(oid.clone(), c);
+                processing_ordered_commits.push(oid);
+                self.commits.insert(oid, c);
             });
         processing_ordered_commits
     }
@@ -508,8 +508,8 @@ impl PreProcessedRepository {
                     dir_path,
                     oid,
                 );
-                processing_ordered_commits.push(oid.clone());
-                self.commits.insert(oid.clone(), c);
+                processing_ordered_commits.push(oid);
+                self.commits.insert(oid, c);
             });
         processing_ordered_commits
     }
@@ -529,7 +529,7 @@ impl PreProcessedRepository {
             dir_path,
             oid,
         );
-        self.commits.insert(oid.clone(), c);
+        self.commits.insert(oid, c);
         oid
     }
 }
@@ -659,7 +659,7 @@ impl<H: IdHolder, T> IdHolder for (H, T) {
 impl IdHolder for NodeIdentifier {
     type Id = NodeIdentifier;
     fn id(&self) -> Self::Id {
-        self.clone()
+        *self
     }
 }
 

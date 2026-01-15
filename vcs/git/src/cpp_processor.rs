@@ -480,7 +480,7 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
     );
 
     let full_node = cpp_gen::Local {
-        compressed_node: node_id.clone(),
+        compressed_node: node_id,
         metrics,
         ana,
         role: None,

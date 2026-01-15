@@ -197,89 +197,93 @@ struct Alternate {}
 impl Alternate {
     // precond: path are ordered by position
     fn alternate(&mut self, pattern: Patt, path: Vec<usize>) -> Vec<(Vec<usize>, Patt)> {
-        match pattern {
-            Patt::FieldDefinition { field, patt } => {
-                let patt = self.alternate(*patt, path);
-                patt.into_iter()
-                    .map(|(name, patt)| {
-                        (
-                            name,
-                            Patt::FieldDefinition {
-                                field: field.clone(),
-                                patt: Box::new(patt),
-                            },
-                        )
-                    })
-                    .collect()
-            }
-            Patt::Node {
-                kind,
-                patt,
-                captures,
-            } => {
-                let mut r = vec![];
+        alternate(pattern, path)
+    }
+}
 
-                for _ in captures.iter().filter(|c| *c == "name") {
-                    r.push((
-                        path.clone(),
-                        Patt::Node {
-                            kind: kind.clone(),
-                            patt: patt.clone(),
-                            captures: captures.clone(),
+fn alternate(pattern: Patt, path: Vec<usize>) -> Vec<(Vec<usize>, Patt)> {
+    match pattern {
+        Patt::FieldDefinition { field, patt } => {
+            let patt = alternate(*patt, path);
+            patt.into_iter()
+                .map(|(name, patt)| {
+                    (
+                        name,
+                        Patt::FieldDefinition {
+                            field: field.clone(),
+                            patt: Box::new(patt),
                         },
-                    ));
-                }
+                    )
+                })
+                .collect()
+        }
+        Patt::Node {
+            kind,
+            patt,
+            captures,
+        } => {
+            let mut r = vec![];
 
-                for i in 0..patt.len() {
-                    let mut path = path.clone();
-                    path.push(i);
-                    self.alternate(patt[i].clone(), path.clone())
-                        .into_iter()
-                        .for_each(|(n, p)| {
-                            let mut pa = patt.clone();
-                            pa[i] = p;
-                            r.push((
-                                n,
-                                Patt::Node {
-                                    kind: kind.clone(),
-                                    patt: pa,
-                                    captures: captures.clone(),
-                                },
-                            ));
-                        });
-                }
+            for _ in captures.iter().filter(|c| *c == "name") {
+                r.push((
+                    path.clone(),
+                    Patt::Node {
+                        kind: kind.clone(),
+                        patt: patt.clone(),
+                        captures: captures.clone(),
+                    },
+                ));
+            }
 
-                r
-                // if let Some(offset) = self.path.next() {
-                //     match patt.get_mut(index).unwrap() {
-                //         Patt::FieldDefinition { field, patt } => {}
-                //         patt => {
-                //             let p = self.alternate(patt);
-                //             p
-                //         }
-                //     }
-                // } else {
-                //     pattern.clone()
-                // }
+            for i in 0..patt.len() {
+                let mut path = path.clone();
+                path.push(i);
+                alternate(patt[i].clone(), path.clone())
+                    .into_iter()
+                    .for_each(|(n, p)| {
+                        let mut pa = patt.clone();
+                        pa[i] = p;
+                        r.push((
+                            n,
+                            Patt::Node {
+                                kind: kind.clone(),
+                                patt: pa,
+                                captures: captures.clone(),
+                            },
+                        ));
+                    });
             }
-            Patt::Predicated {
-                kind: _,
-                patt: _,
-                captures_with_predicates: _,
-            } => {
-                unimplemented!()
+
+            r
+            // if let Some(offset) = path.next() {
+            //     match patt.get_mut(index).unwrap() {
+            //         Patt::FieldDefinition { field, patt } => {}
+            //         patt => {
+            //             let p = alternate(patt);
+            //             p
+            //         }
+            //     }
+            // } else {
+            //     pattern.clone()
+            // }
+        }
+        Patt::Predicated {
+            kind: _,
+            patt: _,
+            captures_with_predicates: _,
+        } => {
+            unimplemented!()
+        }
+        Patt::Alternation { patt } => {
+            let mut r = vec![];
+            for patt in patt {
+                alternate(patt, path.clone())
+                    .into_iter()
+                    .for_each(|(n, p)| {
+                        r.push((n, p));
+                    });
             }
-            Patt::Alternation { patt } => {
-                let mut r = vec![];
-                for patt in patt {
-                    self.alternate(patt, path.clone())
-                        .into_iter()
-                        .for_each(|(n, p)| {
-                            r.push((n, p));
-                        });
-                }
-                r
-            }
+            r
         }
     }
 }

@@ -8,20 +8,20 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 use hyperast::PrimInt;
-use num_traits::{cast, ToPrimitive};
+use num_traits::{ToPrimitive, cast};
 
 use hyperast::types::{HyperAST, HyperASTShared, HyperType, Labeled};
 
-use super::action_vec::ActionsVec;
 use super::Actions;
+use super::action_vec::ActionsVec;
 
 use crate::actions::script_generator2::{Act, ApplicablePath, SimpleAction};
 use crate::decompressed_tree_store::{
     BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
     PostOrderIterable,
 };
-use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::Mapping;
+use crate::matchers::mapping_store::MonoMappingStore;
 use crate::tree::tree_path::TreePath;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
@@ -71,19 +71,19 @@ where
 }
 
 impl<
-        IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-        SS: DecompressedTreeStore<HAST, IdD>
-            + DecompressedWithParent<HAST, IdD>
-            + PostOrder<HAST, IdD>
-            + PostOrderIterable<HAST, IdD>
-            + Debug,
-        SD: DecompressedTreeStore<HAST, IdD>
-            + DecompressedWithParent<HAST, IdD>
-            + BreadthFirstIterable<HAST, IdD>,
-        HAST: HyperAST + Copy,
-        M: MonoMappingStore<Src = IdD, Dst = IdD> + Default + Clone,
-        P: TreePath<Item = HAST::Idx>,
-    > ScriptGenerator<'_, '_, IdD, SS, SD, HAST, M, P>
+    IdD: PrimInt + Debug + Hash + PartialEq + Eq,
+    SS: DecompressedTreeStore<HAST, IdD>
+        + DecompressedWithParent<HAST, IdD>
+        + PostOrder<HAST, IdD>
+        + PostOrderIterable<HAST, IdD>
+        + Debug,
+    SD: DecompressedTreeStore<HAST, IdD>
+        + DecompressedWithParent<HAST, IdD>
+        + BreadthFirstIterable<HAST, IdD>,
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore<Src = IdD, Dst = IdD> + Default + Clone,
+    P: TreePath<Item = HAST::Idx>,
+> ScriptGenerator<'_, '_, IdD, SS, SD, HAST, M, P>
 where
     HAST::Label: Debug + Eq + Copy,
     HAST::IdN: Debug + Clone,
@@ -127,20 +127,19 @@ where
     }
 }
 impl<
-        'm,
-        IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-        SS: DecompressedTreeStore<HAST, IdD>
-            + DecompressedWithParent<HAST, IdD>
-            + PostOrder<HAST, IdD>
-            + PostOrderIterable<HAST, IdD>
-            + Debug,
-        SD: DecompressedTreeStore<HAST, IdD>
-            + DecompressedWithParent<HAST, IdD>
-            + BreadthFirstIterable<HAST, IdD>,
-        HAST: HyperAST + Copy,
-        M: MonoMappingStore<Src = IdD, Dst = IdD> + Default + Clone,
-        P: TreePath<Item = HAST::Idx>,
-    > ScriptGenerator<'_, '_, IdD, SS, SD, HAST, M, P>
+    IdD: PrimInt + Debug + Hash + PartialEq + Eq,
+    SS: DecompressedTreeStore<HAST, IdD>
+        + DecompressedWithParent<HAST, IdD>
+        + PostOrder<HAST, IdD>
+        + PostOrderIterable<HAST, IdD>
+        + Debug,
+    SD: DecompressedTreeStore<HAST, IdD>
+        + DecompressedWithParent<HAST, IdD>
+        + BreadthFirstIterable<HAST, IdD>,
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore<Src = IdD, Dst = IdD> + Default + Clone,
+    P: TreePath<Item = HAST::Idx>,
+> ScriptGenerator<'_, '_, IdD, SS, SD, HAST, M, P>
 where
     HAST::Label: Debug + Eq + Copy,
     HAST::IdN: Debug,
@@ -171,19 +170,19 @@ where
 }
 
 impl<
-        IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-        SS: DecompressedTreeStore<HAST, IdD>
-            + DecompressedWithParent<HAST, IdD>
-            + PostOrder<HAST, IdD>
-            + PostOrderIterable<HAST, IdD>
-            + Debug,
-        SD: DecompressedTreeStore<HAST, IdD>
-            + DecompressedWithParent<HAST, IdD>
-            + BreadthFirstIterable<HAST, IdD>,
-        HAST: HyperAST + Copy,
-        M: MonoMappingStore<Src = IdD, Dst = IdD> + Default + Clone,
-        P: TreePath<Item = HAST::Idx>,
-    > ScriptGenerator<'_, '_, IdD, SS, SD, HAST, M, P>
+    IdD: PrimInt + Debug + Hash + PartialEq + Eq,
+    SS: DecompressedTreeStore<HAST, IdD>
+        + DecompressedWithParent<HAST, IdD>
+        + PostOrder<HAST, IdD>
+        + PostOrderIterable<HAST, IdD>
+        + Debug,
+    SD: DecompressedTreeStore<HAST, IdD>
+        + DecompressedWithParent<HAST, IdD>
+        + BreadthFirstIterable<HAST, IdD>,
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore<Src = IdD, Dst = IdD> + Default + Clone,
+    P: TreePath<Item = HAST::Idx>,
+> ScriptGenerator<'_, '_, IdD, SS, SD, HAST, M, P>
 where
     HAST::Label: Debug + Eq + Copy,
     HAST::IdN: Debug,

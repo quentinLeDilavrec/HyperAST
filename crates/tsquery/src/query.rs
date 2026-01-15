@@ -715,7 +715,6 @@ impl QueryStep {
     // }
 }
 
-#[repr(packed)]
 pub(crate) struct StepFlags {
     // is_named: bool,
     // is_immediate: bool,

@@ -1,4 +1,4 @@
-///! fully compress all subtrees from a typescript CST
+//! fully compress all subtrees from a typescript CST
 use std::{collections::HashMap, fmt::Debug};
 
 use crate::TNode;

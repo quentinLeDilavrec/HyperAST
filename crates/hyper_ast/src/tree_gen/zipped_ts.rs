@@ -1,35 +1,28 @@
 #![allow(unused)]
-use super::utils_ts::*;
+//! fully compress all subtrees from a cpp CST
 
-use crate::store::nodes::compo;
-use crate::store::nodes::legion::{RawHAST, dyn_builder, subtree_builder};
-use crate::tree_gen::{self, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries};
-use crate::types::{self, HyperType};
-use crate::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    store::{
-        SimpleStores,
-        nodes::{
-            DefaultNodeStore as NodeStore,
-            legion::{NodeIdentifier, eq_node},
-        },
-    },
-    tree_gen::{
-        AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
-        PreResult, SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen,
-        WithByteRange, ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-        parser::{Node as _, TreeCursor},
-    },
-    types::{LabelStore as _, Role},
-};
 use legion::world::EntryRef;
 use num::ToPrimitive as _;
+use std::{collections::HashMap, fmt::Debug};
 
-///! fully compress all subtrees from a cpp CST
-use std::{collections::HashMap, fmt::Debug, vec};
+use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use crate::store::SimpleStores;
+use crate::store::nodes::DefaultNodeStore as NodeStore;
+use crate::store::nodes::compo;
+use crate::store::nodes::legion::{NodeIdentifier, eq_node};
+use crate::store::nodes::legion::{RawHAST, dyn_builder, subtree_builder};
+use crate::tree_gen::parser::{Node as _, TreeCursor};
+use crate::tree_gen::{self, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries};
+use crate::tree_gen::{
+    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
+    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
+    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
+};
+use crate::types::{self, HyperType};
+use crate::types::{LabelStore as _, Role};
+use crate::{filter::BloomSize, full::FullNode, nodes::Space};
+
+use super::utils_ts::*;
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 

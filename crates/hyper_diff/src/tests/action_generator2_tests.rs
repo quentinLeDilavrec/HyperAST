@@ -1,24 +1,20 @@
-use crate::actions::action_vec::{apply_action, apply_actions};
-use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::matchers::Decompressible;
-use crate::tree::simple_tree::Tree;
-use crate::tree::tree_path::CompressedTreePath;
-use crate::tree::tree_path::TreePath;
-use crate::{
-    actions::{
-        Actions,
-        action_vec::{ActionsVec, TestActions},
-        script_generator2::{Act, ApplicablePath, ScriptGenerator, SimpleAction},
-    },
-    decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore},
-    matchers::mapping_store::{DefaultMappingStore, MappingStore},
-    tests::examples::{example_action, example_action2, example_gt_java_code},
-    tree::simple_tree::{DisplayTree, NS, vpair_to_stores},
-};
+use std::fmt;
+
 use hyperast::types::{
     DecompressedFrom, LabelStore, Labeled, NodeStore, NodeStoreExt, Stored, Typed, WithChildren,
 };
-use std::fmt;
+
+use crate::actions::Actions;
+use crate::actions::action_vec::{ActionsVec, TestActions};
+use crate::actions::action_vec::{apply_action, apply_actions};
+use crate::actions::script_generator2::{Act, ApplicablePath, ScriptGenerator, SimpleAction};
+use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
+use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
+use crate::matchers::Decompressible;
+use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::tests::examples::{example_action, example_action2, example_gt_java_code};
+use crate::tree::simple_tree::{DisplayTree, NS, Tree, vpair_to_stores};
+use crate::tree::tree_path::{CompressedTreePath, TreePath};
 
 type IdD = u16;
 

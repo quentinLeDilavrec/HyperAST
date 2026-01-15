@@ -19,7 +19,7 @@ pub trait RefContainer {
     fn check<U: MySerialize + Keyed<usize>>(&self, rf: U) -> Self::Result;
 }
 
-/// identifying data for a node in an HyperAST
+// /// identifying data for a node in an HyperAST
 // pub struct SimpleNode1<Child, Label> {
 //     pub(crate) kind: TypeIdentifier,
 //     pub(crate) label: Option<Label>,

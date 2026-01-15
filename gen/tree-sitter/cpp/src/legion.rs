@@ -1,36 +1,30 @@
-use crate::TNode;
-use crate::types::{CppEnabledTypeStore, Type};
-use hyperast::store::nodes::compo;
-use hyperast::store::nodes::legion::subtree_builder;
-use hyperast::tree_gen::utils_ts::TTreeCursor;
-use hyperast::tree_gen::{
-    self, NoOpMore, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries, try_get_spacing,
-};
-use hyperast::tree_gen::{
-    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
-    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-    parser::{Node as _, TreeCursor},
-};
-use hyperast::types;
-use hyperast::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    store::{
-        SimpleStores,
-        nodes::{
-            DefaultNodeStore as NodeStore, EntityBuilder,
-            legion::{NodeIdentifier, eq_node},
-        },
-    },
-    types::{LabelStore as _, Role},
-};
+//! fully compress all subtrees from a cpp CST
+
 use legion::world::EntryRef;
 use num::ToPrimitive as _;
-///! fully compress all subtrees from a cpp CST
 use std::{collections::HashMap, fmt::Debug, vec};
+
+use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::store::SimpleStores;
+use hyperast::store::nodes::compo;
+use hyperast::store::nodes::legion::subtree_builder;
+use hyperast::store::nodes::legion::{NodeIdentifier, eq_node};
+use hyperast::store::nodes::{DefaultNodeStore as NodeStore, EntityBuilder};
+use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+use hyperast::tree_gen::utils_ts::TTreeCursor;
+use hyperast::tree_gen::{self, NoOpMore, TotalBytesGlobalData as _, add_md_precomp_queries};
+use hyperast::tree_gen::{AccIndentation, Accumulator, BasicAccumulator, RoleAcc};
+use hyperast::tree_gen::{
+    BasicGlobalData, GlobalData, Parents, PreResult, SubTreeMetrics, TextedGlobalData, TreeGen,
+    WithByteRange, ZippedTreeGen, compute_indentation,
+};
+use hyperast::tree_gen::{SpacedGlobalData, Spaces, get_spacing, has_final_space, try_get_spacing};
+use hyperast::types;
+use hyperast::types::{LabelStore as _, Role};
+use hyperast::{filter::BloomSize, full::FullNode, nodes::Space};
+
+use crate::TNode;
+use crate::types::{CppEnabledTypeStore, Type};
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

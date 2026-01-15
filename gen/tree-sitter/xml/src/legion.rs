@@ -1,35 +1,26 @@
-///! fully compress all subtrees from an Xml CST
+//! fully compress all subtrees from an Xml CST
 use std::{fmt::Debug, vec};
 
 use legion::world::EntryRef;
 use tuples::CombinConcat;
 
+use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo::{self, CS, NoSpacesCS};
-use hyperast::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    store::{
-        SimpleStores,
-        nodes::{
-            DefaultNodeStore as NodeStore,
-            legion::{NodeIdentifier, PendingInsert, eq_node},
-        },
-    },
-    tree_gen::{
-        AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
-        PreResult, SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen,
-        WithByteRange, ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-        parser::{Node as _, TreeCursor},
-    },
-    types::LabelStore as _,
+use hyperast::store::nodes::{
+    DefaultNodeStore as NodeStore,
+    legion::{NodeIdentifier, PendingInsert, eq_node},
 };
+use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+use hyperast::tree_gen::{
+    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
+    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
+    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
+};
+use hyperast::{filter::BloomSize, full::FullNode, nodes::Space, types::LabelStore as _};
 
-use crate::{
-    TNode,
-    types::{TStore, Type, XmlEnabledTypeStore},
-};
+use crate::TNode;
+use crate::types::{TStore, Type, XmlEnabledTypeStore};
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

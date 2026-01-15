@@ -1,4 +1,4 @@
-///! fully compress all subtrees from a tree-sitter query CST
+//! fully compress all subtrees from a tree-sitter query CST
 use std::{collections::HashMap, fmt::Debug};
 
 use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};

@@ -1,4 +1,4 @@
-///! fully compress all subtrees from a Java CST
+//! fully compress all subtrees from a Java CST
 use crate::TNode;
 use crate::types::JavaEnabledTypeStore;
 use crate::types::{TStore, Type};
@@ -525,9 +525,7 @@ impl<'stores, 'cache, TS: JavaEnabledTypeStore, X>
     }
 }
 
-impl<'stores, 'cache, TS, More>
-    JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, true>
-{
+impl<'stores, 'cache, TS, More> JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, true> {
     pub fn without_hidden_nodes(
         self,
     ) -> JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, false> {

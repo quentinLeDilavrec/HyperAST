@@ -1,31 +1,24 @@
+//! fully compress all subtrees from a cpp CST
+
+use legion::world::EntryRef;
+use num::ToPrimitive as _;
+use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
+
 use super::{P, parser::Visibility, utils_ts::*, zipped::Has};
+use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use crate::store::SimpleStores;
+use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
-use crate::store::{
-    SimpleStores,
-    nodes::{
-        DefaultNodeStore as NodeStore,
-        legion::{NodeIdentifier, dyn_builder, eq_node},
-    },
-};
+use crate::store::nodes::legion::{NodeIdentifier, dyn_builder, eq_node};
+use crate::tree_gen::parser::{Node as _, TreeCursor};
 use crate::tree_gen::{
     self, AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
     PreResult, SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData,
     TotalBytesGlobalData as _, TreeGen, WithByteRange, ZippedTreeGen, compute_indentation,
     get_spacing, has_final_space,
-    parser::{Node as _, TreeCursor},
 };
-use crate::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    types::{HyperType, LabelStore as _},
-};
-use legion::world::EntryRef;
-use num::ToPrimitive as _;
-
-///! fully compress all subtrees from a cpp CST
-use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
+use crate::types::{HyperType, LabelStore as _};
+use crate::{filter::BloomSize, full::FullNode, nodes::Space};
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 

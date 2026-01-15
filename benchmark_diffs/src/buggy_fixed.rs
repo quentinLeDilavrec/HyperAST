@@ -1265,7 +1265,6 @@ mod test {
         let mut src_arena = DS::decompress(&stores, &src);
         let mut dst_arena = DS::decompress(&stores, &dst);
         let mapper = {
-            let mappings = mappings;
             let src_arena = src_arena.as_mut();
             let dst_arena = dst_arena.as_mut();
             // src_arena.decompress_descendants(node_store, &src_arena.root());

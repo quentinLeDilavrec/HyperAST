@@ -1697,7 +1697,6 @@ impl Query {
             }
         }
         // dbg!(limit_step_id);
-        let step_offsets = step_offsets;
         assert_eq!(glob_caps_count, immediate_matches_calls.len(), "{}", i);
         // dbg!(&step_offsets[stp_id..]);
         // dbg!(

@@ -29,14 +29,7 @@ use std::{
 };
 
 /// Wrap or just map a decommpressed tree in breadth-first eg. post-order,
-pub struct SimpleHiddingMapper<
-    'a,
-    IdD,
-    DTS,
-    M: Borrow<Vec<IdD>>,
-    R: Borrow<BTreeMap<IdD, IdD>>,
-    D: BorrowMut<DTS> = DTS,
-> {
+pub struct SimpleHiddingMapper<'a, IdD, DTS, M, R, D = DTS> {
     map: M,
     rev: R,
     pub back: D,
@@ -60,26 +53,6 @@ impl<
             .finish()
     }
 }
-
-// impl<'a, T: 'a + WithChildren, IdD: PrimInt, D: BorrowMut<LazyPostOrder<HAST::IdN, IdD>>>
-//     SimpleHiddingMapper<'a, IdD, LazyPostOrder<HAST::IdN, IdD>, D>
-// where
-//     T::TreeId: Clone + std::fmt::Debug,
-// {
-//     pub fn from_subtree_mapping<S, M: Index<usize>>(store: &'a S, back: D, side: &M) -> Self
-//     where
-//         S: NodeStore<T::TreeId, R<'a> = T>,
-//         M::Output: PrimInt,
-//     {
-//         let map = hiding_map(&back, side);
-//         Self {
-//             map,
-//             // fc,
-//             back,
-//             phantom: PhantomData,
-//         }
-//     }
-// }
 
 pub fn hiding_map<IdN, IdD: PrimInt, D: BorrowMut<LazyPostOrder<IdN, IdD>>, M: Index<usize>>(
     back: &D,
@@ -121,6 +94,26 @@ pub struct MonoMappingWrap<'map, 'back, Src, Dst, M> {
     pub map_dst: &'map Vec<Dst>,
     pub rev_dst: &'map BTreeMap<Dst, Dst>,
     back: &'back mut M,
+}
+
+impl<'map, 'back, Src, Dst, M> MonoMappingWrap<'map, 'back, Src, Dst, M>
+where
+    Src: PrimInt,
+    Dst: PrimInt,
+{
+    pub fn new<DTS, D>(
+        src: &'map SimpleHiddingMapper<'_, Src, DTS, Vec<Src>, BTreeMap<Src, Src>, D>,
+        dst: &'map SimpleHiddingMapper<'_, Dst, DTS, Vec<Dst>, BTreeMap<Dst, Dst>, D>,
+        mappings: &'back mut M,
+    ) -> Self {
+        MonoMappingWrap {
+            map_src: &src.map,
+            rev_src: &src.rev,
+            map_dst: &dst.map,
+            rev_dst: &dst.rev,
+            back: mappings,
+        }
+    }
 }
 
 impl<M: MappingStore> MappingStore for MonoMappingWrap<'_, '_, M::Src, M::Dst, M>
@@ -276,6 +269,16 @@ impl<T: PrimInt, U: PrimInt> Iterator for MonoIter<'_, T, U> {
     }
 }
 
+type HM<'a, 'map, Src, _Src, MSrc> =
+    SimpleHiddingMapper<'a, MSrc, _Src, &'map Vec<MSrc>, &'map BTreeMap<MSrc, MSrc>, Src>;
+
+#[allow(type_alias_bounds)]
+type HideMapping<'a, 'map, 'back, Src, _Src, Dst, _Dst, M: MappingStore> = crate::matchers::Mapping<
+    HM<'a, 'map, Src, _Src, M::Src>,
+    HM<'a, 'map, Dst, _Dst, M::Dst>,
+    MonoMappingWrap<'map, 'back, M::Src, M::Dst, M>,
+>;
+
 pub fn hide<
     'a,
     'map,
@@ -293,56 +296,33 @@ pub fn hide<
     map_dst: &'map Vec<M::Dst>,
     rev_dst: &'map BTreeMap<M::Dst, M::Dst>,
     mappings: &'back mut M,
-) -> (
-    SimpleHiddingMapper<'a, M::Src, _Src, &'map Vec<M::Src>, &'map BTreeMap<M::Src, M::Src>, Src>,
-    SimpleHiddingMapper<'a, M::Dst, _Dst, &'map Vec<M::Dst>, &'map BTreeMap<M::Dst, M::Dst>, Dst>,
-    MonoMappingWrap<'map, 'back, M::Src, M::Dst, M>,
-)
+) -> HideMapping<'a, 'map, 'back, Src, _Src, Dst, _Dst, M>
 where
     M::Src: PrimInt,
     M::Dst: PrimInt,
 {
-    (
-        SimpleHiddingMapper {
+    crate::matchers::Mapping {
+        src_arena: SimpleHiddingMapper {
             rev: rev_src,
             map: map_src,
             back: src,
             phantom: PhantomData,
         },
-        SimpleHiddingMapper {
+        dst_arena: SimpleHiddingMapper {
             rev: rev_dst,
             map: map_dst,
             back: dst,
             phantom: PhantomData,
         },
-        MonoMappingWrap {
+        mappings: MonoMappingWrap {
             map_src,
             rev_src,
             map_dst,
             rev_dst,
             back: mappings,
         },
-    )
+    }
 }
-
-// impl<
-//         'd,
-//         'a,
-//         'b,
-//         HAST: HyperAST + Copy,
-//         IdD: PrimInt + Debug,
-//         DTS, //: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD> + PostOrder<HAST, IdD>,
-//         M: Borrow<Vec<IdD>>,
-//         R: Borrow<BTreeMap<IdD, IdD>>,
-//         D: BorrowMut<DTS>,
-//     > types::NLending<'b, T::TreeId> for SimpleHiddingMapper<'d, IdD, DTS, M, R, D>
-// where
-//     // T: for<'t> types::NLending<'t, T::TreeId>,
-//     // DTS: for<'t> types::NLending<'t, T::TreeId>,
-//     // for<'t> <DTS as types::NLending<'t, T::TreeId>>::N: hyperast::types::WithChildren,
-// {
-//     type N = <T as types::NLending<'b, T::TreeId>>::N;
-// }
 
 impl<
     HAST: HyperAST + Copy,

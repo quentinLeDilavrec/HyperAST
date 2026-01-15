@@ -66,8 +66,7 @@ impl Helper for hecs::EntityRef<'_> {
             .deref()
             .as_ref()
             .iter()
-            .map(f)
-            .flatten()
+            .flat_map(f)
             .collect()
     }
 

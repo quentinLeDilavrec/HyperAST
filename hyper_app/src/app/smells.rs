@@ -986,11 +986,10 @@ fn handle_new_tops(
     ids.sort_by_key(|id| g.node_mut(*id).unwrap().payload_mut().inits.len());
     let mut _new_tops = ids.into_iter().rev();
     let new_tops: Vec<_> = ((0..max).filter_map(|_| _new_tops.next()))
-        .map(|id| {
+        .inspect(|&id| {
             let payload = g.node_mut(id).unwrap().payload_mut();
             let pretty = content.pretty_or_id(id.index());
             payload.pretty = pretty;
-            id
         })
         .collect();
     use egui_addon::force_layout::petgraph;

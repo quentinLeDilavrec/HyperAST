@@ -348,7 +348,7 @@ pub fn try_pattern_captures(
             let mut actions: Vec<_> = values
                 .into_iter()
                 // .filter(|l| l.len() == 2)
-                .filter_map(|x| {
+                .map(|x| {
                     let new = if x.0.is_empty() {
                         unimplemented!()
                     } else {
@@ -358,7 +358,7 @@ pub fn try_pattern_captures(
                     path.pop();
                     path.reverse();
                     // dbg!(&path);
-                    Some((path, new))
+                    (path, new)
                 })
                 .collect();
             if !actions.is_empty() {

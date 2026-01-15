@@ -24,12 +24,12 @@ trait Helper {
     fn is_leaf(&self) -> bool;
     fn is_concrete(&self) -> bool;
     fn is_abstract(&self) -> bool;
-    fn get_flat<T: hecs::Component, U>(&self, f: impl Fn(&NodeIdentifier) -> Vec<U>) -> Vec<U>
+    fn get_flat<T, U>(&self, f: impl Fn(&NodeIdentifier) -> Vec<U>) -> Vec<U>
     where
-        T: AsRef<Vec<NodeIdentifier>>;
-    fn get_map<T: hecs::Component, U>(&self, f: impl Fn(&NodeIdentifier) -> U) -> Vec<U>
+        T: hecs::Component + AsRef<Vec<NodeIdentifier>>;
+    fn get_map<T, U>(&self, f: impl Fn(&NodeIdentifier) -> U) -> Vec<U>
     where
-        T: AsRef<Vec<NodeIdentifier>>;
+        T: hecs::Component + AsRef<Vec<NodeIdentifier>>;
 }
 
 impl Helper for hecs::EntityRef<'_> {
@@ -57,9 +57,9 @@ impl Helper for hecs::EntityRef<'_> {
             && !self.has::<DChildren>()
     }
 
-    fn get_flat<'a, T: hecs::Component, U>(&self, f: impl Fn(&NodeIdentifier) -> Vec<U>) -> Vec<U>
+    fn get_flat<'a, T, U>(&self, f: impl Fn(&NodeIdentifier) -> Vec<U>) -> Vec<U>
     where
-        T: AsRef<Vec<NodeIdentifier>>,
+        T: hecs::Component + AsRef<Vec<NodeIdentifier>>,
     {
         self.get::<&T>()
             .unwrap()
@@ -70,9 +70,9 @@ impl Helper for hecs::EntityRef<'_> {
             .collect()
     }
 
-    fn get_map<'a, T: hecs::Component, U>(&self, f: impl Fn(&NodeIdentifier) -> U) -> Vec<U>
+    fn get_map<'a, T, U>(&self, f: impl Fn(&NodeIdentifier) -> U) -> Vec<U>
     where
-        T: AsRef<Vec<NodeIdentifier>>,
+        T: hecs::Component + AsRef<Vec<NodeIdentifier>>,
     {
         self.get::<&T>()
             .unwrap()

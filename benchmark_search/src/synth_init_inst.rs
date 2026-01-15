@@ -141,7 +141,7 @@ where
     }
 }
 
-pub fn per_blob<TS: 'static>(
+pub fn per_blob<TS>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
@@ -150,7 +150,7 @@ pub fn per_blob<TS: 'static>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     hyperast_vcs_git::TStore: TyDown<TS>,
     <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
@@ -284,7 +284,7 @@ where
     }
 }
 
-pub fn find_uniques<TS: 'static>(
+pub fn find_uniques<TS>(
     repositories: &mut PreProcessedRepositories,
     repository: ConfiguredRepo2,
     sub: &[&str],
@@ -295,7 +295,7 @@ pub fn find_uniques<TS: 'static>(
     timeout: Timeout,
 ) -> UniqInst
 where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     hyperast_vcs_git::TStore: TyDown<TS>,
     <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {

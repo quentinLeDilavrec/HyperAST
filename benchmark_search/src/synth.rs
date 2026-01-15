@@ -9,7 +9,7 @@ pub struct SynthConfig {
     pub shrink_threshold_factor: usize,
 }
 
-pub fn synth<P: SolvedPosition<NodeIdentifier>>(
+pub fn synth<P>(
     timeout: &crate::Timeout,
     inst: &[P],
     stores: &hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>,
@@ -18,7 +18,7 @@ pub fn synth<P: SolvedPosition<NodeIdentifier>>(
     config: &SynthConfig,
 ) -> QueryLattice<P>
 where
-    P: Sync + Send + Eq + Copy,
+    P: SolvedPosition<NodeIdentifier> + Sync + Send + Eq + Copy,
 {
     assert!(!inst.is_empty(), "No instances provided");
     assert!(!meta_gen.is_empty());

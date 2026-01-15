@@ -124,9 +124,7 @@ pub trait Constraining {
 impl Constraining for () {
     type Tr = ();
     fn generalize(&mut self, other: Self::Tr) {}
-    fn merge_generalization_paths(self, other: Self) -> Self {
-        
-    }
+    fn merge_generalization_paths(self, other: Self) -> Self {}
 }
 
 impl Constraining for ConstrainedStatus {
@@ -183,7 +181,9 @@ impl _G {
             .map(|(i, succ)| (i as u32, succ))
     }
     pub fn tops(&self) -> impl Iterator<Item = IdNQ> {
-        self.succs().filter(|&(x, succ)| succ.is_empty()).map(|(x, succ)| u64_to_idn(self.queries[x as usize] as u64))
+        self.succs()
+            .filter(|&(x, succ)| succ.is_empty())
+            .map(|(x, succ)| u64_to_idn(self.queries[x as usize] as u64))
     }
 }
 
@@ -946,11 +946,11 @@ pub fn make_lattice_graph<N, E: 'static, P: PartialEq>(
     graph
 }
 
-pub fn group_lattices<N: Clone, E: Clone + 'static>(
+pub fn group_lattices<N: Clone, E>(
     graph: petgraph::Graph<N, E>,
 ) -> Vec<petgraph::Graph<N, E, petgraph::Directed, petgraph::csr::DefaultIx>>
 where
-    E: Constraining,
+    E: Clone + 'static + Constraining,
 {
     use petgraph::prelude::*;
 

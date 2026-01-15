@@ -18,7 +18,7 @@ pub trait MySerializePar {
     type Error: Error;
 
     /// Serialize a sequence element.
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: MySerialize + Keyed<usize>;
 
@@ -33,9 +33,9 @@ pub trait MySerializeSco {
     type Error: Error;
 
     /// Serialize a sequence element.
-    fn serialize_object<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_object<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: MySerialize + Keyed<usize>;
+        T: ?Sized + MySerialize + Keyed<usize>;
 
     /// Finish serializing a sequence.
     fn end(self, s: &str) -> Result<Self::Ok, Self::Error>;
@@ -72,9 +72,9 @@ pub trait MySerializer: Sized {
     type SerializePar: MySerializePar<Ok = Self::Ok, Error = Self::Error>;
     type SerializeSco: MySerializeSco<Ok = Self::Ok, Error = Self::Error>;
 
-    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn collect_str<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: Display;
+        T: ?Sized + Display;
 
     fn serialize_par(self, len: Option<usize>) -> Result<Self::SerializePar, Self::Error>;
 
@@ -244,9 +244,9 @@ impl<'a, H: 'a + VaryHasher<u8>> MySerializer for CachedHasher<'a, usize, u8, H>
         })
     }
 
-    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn collect_str<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: Display,
+        T: ?Sized + Display,
     {
         let mut h = H::new(0);
         h.write(value.to_string().as_bytes());
@@ -281,9 +281,9 @@ impl<'a, H: 'a + VaryHasher<u16>> MySerializer for CachedHasher<'a, usize, u16, 
         })
     }
 
-    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn collect_str<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: Display,
+        T: ?Sized + Display,
     {
         let mut h = H::new(0);
         h.write(value.to_string().as_bytes());
@@ -304,9 +304,9 @@ impl<H: VaryHasher<u8>> MySerializePar for CachedHasherAux<'_, usize, u8, H> {
 
     type Error = CachedHasherError;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: MySerialize + Keyed<usize>,
+        T: ?Sized + MySerialize + Keyed<usize>,
     {
         let x = value.serialize(CachedHasher::<_, _, H> {
             index: value.key(),
@@ -334,9 +334,9 @@ impl<H: VaryHasher<u16>> MySerializePar for CachedHasherAux<'_, usize, u16, H> {
 
     type Error = CachedHasherError;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: MySerialize + Keyed<usize>,
+        T: ?Sized + MySerialize + Keyed<usize>,
     {
         let x = value.serialize(CachedHasher::<_, _, H> {
             index: value.key(),
@@ -363,9 +363,9 @@ impl<H: VaryHasher<u8>> MySerializeSco for CachedHasherAux<'_, usize, u8, H> {
 
     type Error = CachedHasherError;
 
-    fn serialize_object<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_object<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: MySerialize + Keyed<usize>,
+        T: ?Sized + MySerialize + Keyed<usize>,
     {
         let x = value.serialize(CachedHasher::<_, _, H> {
             index: value.key(),
@@ -391,9 +391,9 @@ impl<H: VaryHasher<u16>> MySerializeSco for CachedHasherAux<'_, usize, u16, H> {
 
     type Error = CachedHasherError;
 
-    fn serialize_object<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_object<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: MySerialize + Keyed<usize>,
+        T: ?Sized + MySerialize + Keyed<usize>,
     {
         let x = value.serialize(CachedHasher::<_, _, H> {
             index: value.key(),

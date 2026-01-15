@@ -371,10 +371,10 @@ impl<K: Eq + Hash, V2: Send + 'static, V> Default for MultiBuffered2<K, V2, V> {
 }
 
 impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
-    pub fn try_poll_with<Q: ?Sized>(&mut self, key: &Q, mut f: impl FnMut(V2) -> V) -> bool
+    pub fn try_poll_with<Q>(&mut self, key: &Q, mut f: impl FnMut(V2) -> V) -> bool
     where
         K: std::borrow::Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Eq + Hash,
     {
         if let Some((key, prom)) = self.waiting.remove_entry(key) {
             match prom.try_take() {
@@ -412,26 +412,26 @@ impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
 }
 
 impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
-    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+    pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + Hash,
+        Q: ?Sized + Eq + Hash,
     {
         self.content.get_mut(key)
     }
 
-    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+    pub fn get<Q>(&self, key: &Q) -> Option<&V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + Hash,
+        Q: ?Sized + Eq + Hash,
     {
         self.content.get(key)
     }
 
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: Eq + Hash,
+        Q: ?Sized + Eq + Hash,
     {
         self.content.remove(key)
     }
@@ -439,10 +439,10 @@ impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
 
 impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
     #[allow(unused)]
-    pub fn is_waiting<Q: ?Sized>(&self, k: &Q) -> bool
+    pub fn is_waiting<Q>(&self, k: &Q) -> bool
     where
         K: std::borrow::Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Eq + Hash,
     {
         self.waiting.contains_key(k)
     }
@@ -459,10 +459,10 @@ impl<K: Eq + Hash, V2: Send + 'static, V> MultiBuffered2<K, V2, V> {
         self.content.len()
     }
 
-    pub(crate) fn is_absent<Q: ?Sized>(&self, k: &Q) -> bool
+    pub(crate) fn is_absent<Q>(&self, k: &Q) -> bool
     where
         K: std::borrow::Borrow<Q>,
-        Q: Hash + Eq,
+        Q: ?Sized + Eq + Hash,
     {
         !self.content.contains_key(k) && !self.waiting.contains_key(k)
     }

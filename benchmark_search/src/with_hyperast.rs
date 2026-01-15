@@ -182,7 +182,7 @@ where
     }
 }
 
-pub fn per_blob<TS: 'static>(
+pub fn per_blob<TS>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
@@ -191,7 +191,7 @@ pub fn per_blob<TS: 'static>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
     <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
@@ -238,7 +238,7 @@ pub fn per_blob<TS: 'static>(
     cumulative.finish();
 }
 
-pub fn per_blob_nospaces<TS: 'static>(
+pub fn per_blob_nospaces<TS>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
@@ -247,7 +247,7 @@ pub fn per_blob_nospaces<TS: 'static>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
     <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
@@ -295,7 +295,7 @@ pub fn per_blob_nospaces<TS: 'static>(
     cumulative.finish();
 }
 
-pub fn per_blob_cached<TS: 'static>(
+pub fn per_blob_cached<TS>(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
@@ -304,7 +304,7 @@ pub fn per_blob_cached<TS: 'static>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
     <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
@@ -410,7 +410,7 @@ pub fn polyglot(
     cumulative.write_to(std::io::stdout());
 }
 
-pub(crate) fn execute_on_commits_per_blob<P, TS: 'static, R: Default>(
+pub(crate) fn execute_on_commits_per_blob<P, TS, R: Default>(
     config: crate::Config,
     repositories: &mut PreProcessedRepositories,
     repository: &ConfiguredRepo2,
@@ -426,7 +426,7 @@ pub(crate) fn execute_on_commits_per_blob<P, TS: 'static, R: Default>(
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     P: CursorHead<NodeIdentifier, Idx>,
     P: CursorHeadMove<NodeIdentifier, Idx>,
 {
@@ -503,7 +503,7 @@ where
     Ok(())
 }
 
-pub(crate) fn execute_on_commits_per_blob_nospaces<P, TS: 'static, R: Default + Display>(
+pub(crate) fn execute_on_commits_per_blob_nospaces<P, TS, R: Default + Display>(
     config: crate::Config,
     repositories: &mut PreProcessedRepositories,
     repository: &ConfiguredRepo2,
@@ -519,7 +519,7 @@ pub(crate) fn execute_on_commits_per_blob_nospaces<P, TS: 'static, R: Default + 
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     P: CursorHead<NodeIdentifier, Idx>,
     P: CursorHeadMove<NodeIdentifier, Idx>,
 {
@@ -592,7 +592,7 @@ where
 
 pub(crate) fn execute_on_commits_per_blob_cached<
     P,
-    TS: 'static,
+    TS,
     R: Default + AddAssign + for<'a> AddAssign<&'a R> + Clone + Debug,
 >(
     config: crate::Config,
@@ -610,7 +610,7 @@ pub(crate) fn execute_on_commits_per_blob_cached<
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
     P: CursorHead<NodeIdentifier, Idx>,
     P: CursorHeadMove<NodeIdentifier, Idx>,
 {

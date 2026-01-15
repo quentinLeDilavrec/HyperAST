@@ -298,6 +298,7 @@ where
         Ok(w)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn mov_aux(
         &mut self,
         x: IdD,

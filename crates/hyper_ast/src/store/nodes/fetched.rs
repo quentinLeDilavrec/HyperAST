@@ -843,6 +843,7 @@ impl NodeStore {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     fn _extend_from_raw(
         &mut self,
         arch: Arch<String>,

@@ -1523,6 +1523,7 @@ impl Query {
         let i = self.enabled_pattern_map[pid.to_usize()];
         (i != u16::MAX).then_some(i)
     }
+    #[allow(clippy::result_large_err)]
     pub fn with_one_pattern_enabled(mut self, i: u16) -> Result<Self, Self> {
         if i == u16::MAX
             || self.enabled_pattern_count() == 0

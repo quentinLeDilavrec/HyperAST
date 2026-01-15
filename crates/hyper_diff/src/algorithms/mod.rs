@@ -471,6 +471,7 @@ type DS<HAST: types::HyperASTShared> = matchers::Decompressible<
 >;
 
 #[allow(type_alias_bounds)]
+#[allow(clippy::upper_case_acronyms)]
 type CDS<HAST: types::HyperASTShared> =
     matchers::Decompressible<HAST, decompressed_tree_store::CompletePostOrder<HAST::IdN, u32>>;
 

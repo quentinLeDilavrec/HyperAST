@@ -1630,6 +1630,7 @@ fn handle_top_too_general<N: Clone + egui_addon::force_layout::FlexPayload>(
     g.remove_node(idx);
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn show_smells_result(
     ui: &mut egui::Ui,
     api_addr: &str,

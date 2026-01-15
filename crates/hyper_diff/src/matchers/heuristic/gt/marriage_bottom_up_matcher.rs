@@ -57,23 +57,22 @@ where
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert!(mapper.src_arena.len() > 0);
         for a in mapper.src_arena.iter_df_post::<false>() {
-            if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {
-                if let Some(best_dst) = Self::best_dst_candidate(mapper, &a) {
-                    if Self::best_src_candidate(mapper, &best_dst) == Some(a) {
-                        Self::last_chance_match_zs(mapper, a, best_dst);
-                        mapper.mappings.link(a, best_dst);
-                    }
+            if !mapper.mappings.is_src(&a) && Self::src_has_children(mapper, a) {
+                if let Some(best_dst) = Self::best_dst_candidate(mapper, &a)
+                    && Self::best_src_candidate(mapper, &best_dst) == Some(a)
+                {
+                    Self::last_chance_match_zs(mapper, a, best_dst);
+                    mapper.mappings.link(a, best_dst);
                 }
-            } else if mapper.mappings.is_src(&a)
+            } else if let Some(dst) = mapper.mappings.get_dst(&a)
+                && mapper.mappings.is_src(&a)
                 && Self::has_unmapped_src_children(mapper, &a)
                 && Self::has_unmapped_dst_children(
                     mapper,
                     &mapper.mappings.get_dst(&a).expect("No dst found for src"),
                 )
             {
-                if let Some(dst) = mapper.mappings.get_dst(&a) {
-                    Self::last_chance_match_zs(mapper, a, dst);
-                }
+                Self::last_chance_match_zs(mapper, a, dst);
             }
         }
         // for root

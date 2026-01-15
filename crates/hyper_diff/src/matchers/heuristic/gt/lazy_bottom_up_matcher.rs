@@ -434,12 +434,12 @@ where
                 };
                 recovery(self, a_, best);
                 self.mappings.link(*a_.shallow(), *best.shallow());
-            } else if self.has_unmapped_src_descendants_lazy(&a_) {
-                if let Some(dst) = self.mappings.get_dst(&a) {
-                    let dst = self.dst_arena.decompress_to(&dst);
-                    if self.has_unmapped_dst_descendants_lazy(&dst) {
-                        recovery(self, a_, dst);
-                    }
+            } else if self.has_unmapped_src_descendants_lazy(&a_)
+                && let Some(dst) = self.mappings.get_dst(&a)
+            {
+                let dst = self.dst_arena.decompress_to(&dst);
+                if self.has_unmapped_dst_descendants_lazy(&dst) {
+                    recovery(self, a_, dst);
                 }
             }
         }
@@ -667,7 +667,7 @@ where
         let mut seeds = vec![];
         for c in self.mapping.src_arena.descendants(src) {
             for m in self.mapping.mappings.get_dsts(&c) {
-                let m = self.mapping.dst_arena.decompress_to(&m);
+                let m = self.mapping.dst_arena.decompress_to(m);
                 seeds.push(m);
             }
         }
@@ -692,7 +692,7 @@ where
         let mut seeds = vec![];
         for c in self.mapping.dst_arena.descendants(dst) {
             for m in self.mapping.mappings.get_srcs(&c) {
-                let m = self.mapping.src_arena.decompress_to(&m);
+                let m = self.mapping.src_arena.decompress_to(m);
                 seeds.push(m);
             }
         }
@@ -776,16 +776,16 @@ where
         let Some(parent) = arena.parent(&curr) else {
             break;
         };
-        if let Some(next_seed) = seeds.get(i + 1) {
-            if next_seed < &parent {
-                // the post order traversal guarantees that `parent` must be an ancestor of `next_seed`,
-                // so we can handle the `next_seed` first.
-                // NOTE reciprocally next_seed is a descendant of parent.
-                // NOTE also guarantees ascending order and uniqueness of candidates.
-                i += 1;
-                curr = *next_seed;
-                continue;
-            }
+        if let Some(next_seed) = seeds.get(i + 1)
+            && next_seed < &parent
+        {
+            // the post order traversal guarantees that `parent` must be an ancestor of `next_seed`,
+            // so we can handle the `next_seed` first.
+            // NOTE reciprocally next_seed is a descendant of parent.
+            // NOTE also guarantees ascending order and uniqueness of candidates.
+            i += 1;
+            curr = *next_seed;
+            continue;
         }
         let p = &arena.original(&parent);
         let p_type = hyperast.resolve_type(p);

@@ -264,9 +264,7 @@ where
                 self.idd = idd;
                 self.to_traverse.extend(cs);
             } else {
-                let Some(sib) = self.to_traverse.pop() else {
-                    return None;
-                };
+                let sib = self.to_traverse.pop()?;
                 self.idd = sib;
                 self.down = true;
             }

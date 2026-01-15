@@ -168,8 +168,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
     fn insert_text(&mut self, text: &str, char_index: usize) -> usize {
         // Get the byte index from the character index
         let byte_idx = self.byte_index_from_char_index(char_index);
-        if text.starts_with("https://") {
-            let text = &text["https://".len()..];
+        if let Some(text) = text.strip_prefix("https://") {
             let split: Vec<_> = text.split("/").collect();
             if split[0] != "github.com" {
                 // TODO launch an alert
@@ -220,8 +219,7 @@ impl<'a, 'b, 'c> super::code_editor::generic_text_buffer::TextBuffer
     fn replace_range(&mut self, text: &str, char_range: Range<usize>) -> usize {
         // Get the byte index from the character index
         let byte_idx = self.byte_index_from_char_index(char_range.start);
-        if text.starts_with("https://") {
-            let text = &text["https://".len()..];
+        if let Some(text) = text.strip_prefix("https://") {
             let split: Vec<_> = text.split("/").collect();
             if split[0] != "github.com" {
                 // TODO launch an alert

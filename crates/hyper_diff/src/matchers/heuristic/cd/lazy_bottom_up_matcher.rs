@@ -260,9 +260,7 @@ where
                 self.idd = idd;
                 self.to_traverse.extend(cs);
             } else {
-                let Some(sib) = self.to_traverse.pop() else {
-                    return None;
-                };
+                let sib = self.to_traverse.pop()?;
                 let sibs = self.sibs.last_mut().unwrap();
                 if sibs == &0 {
                     self.sibs.pop();

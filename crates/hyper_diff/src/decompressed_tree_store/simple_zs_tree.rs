@@ -197,10 +197,10 @@ where
                 } else {
                     lld
                 };
-                if let Some(tmp) = stack.last_mut() {
-                    if tmp.idx == one() {
-                        tmp.lld = value;
-                    }
+                if let Some(tmp) = stack.last_mut()
+                    && tmp.idx == one()
+                {
+                    tmp.lld = value;
                 }
                 id_compressed.push(curr.clone());
                 llds.push(value);

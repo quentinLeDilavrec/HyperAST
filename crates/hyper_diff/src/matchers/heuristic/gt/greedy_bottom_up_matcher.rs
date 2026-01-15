@@ -86,27 +86,28 @@ where
                 // TODO remove and flip const param of iter_df_post
                 break;
             }
-            if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {
-                let candidates = mapper.get_dst_candidates(&a);
-                let mut best = None;
-                let mut max: f64 = -1.;
-                for cand in candidates {
-                    let sim = similarity_metrics::SimilarityMeasure::range(
-                        &mapper.src_arena.descendants_range(&a),
-                        &mapper.dst_arena.descendants_range(&cand),
-                        &mapper.mappings,
-                    )
-                    .dice();
-                    if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
-                        max = sim;
-                        best = Some(cand);
-                    }
+            if mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a) {
+                continue;
+            }
+            let candidates = mapper.get_dst_candidates(&a);
+            let mut best = None;
+            let mut max: f64 = -1.;
+            for cand in candidates {
+                let sim = similarity_metrics::SimilarityMeasure::range(
+                    &mapper.src_arena.descendants_range(&a),
+                    &mapper.dst_arena.descendants_range(&cand),
+                    &mapper.mappings,
+                )
+                .dice();
+                if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
+                    max = sim;
+                    best = Some(cand);
                 }
+            }
 
-                if let Some(best) = best {
-                    recovery(mapper, a, best);
-                    mapper.mappings.link(a, best);
-                }
+            if let Some(best) = best {
+                recovery(mapper, a, best);
+                mapper.mappings.link(a, best);
             }
         }
         // for root

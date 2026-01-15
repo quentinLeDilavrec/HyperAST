@@ -78,7 +78,8 @@ where
                     mapper.mapping.dst_arena.root(),
                 );
                 break;
-            } else if !(mapper.mappings.is_src(&t) || !Self::src_has_children(mapper, t)) {
+            }
+            if !mapper.mappings.is_src(&t) && Self::src_has_children(mapper, t) {
                 let candidates = mapper.get_dst_candidates(&t);
                 let mut best = None;
                 let mut max_sim = -1f64;
@@ -100,12 +101,12 @@ where
                     recovery(mapper, t, best);
                     mapper.mappings.link(t, best);
                 }
-            } else if mapper.mappings.is_src(&t) && mapper.has_unmapped_src_children(&t) {
-                if let Some(dst) = mapper.mappings.get_dst(&t) {
-                    if mapper.has_unmapped_dst_children(&dst) {
-                        recovery(mapper, t, dst);
-                    }
-                }
+            } else if mapper.mappings.is_src(&t)
+                && mapper.has_unmapped_src_children(&t)
+                && let Some(dst) = mapper.mappings.get_dst(&t)
+                && mapper.has_unmapped_dst_children(&dst)
+            {
+                recovery(mapper, t, dst);
             }
         }
     }

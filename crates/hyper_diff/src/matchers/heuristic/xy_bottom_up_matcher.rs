@@ -45,27 +45,28 @@ where
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         for a in mapper.src_arena.iter_df_post::<false>() {
-            if !(mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a)) {
-                let candidates = mapper.get_dst_candidates(&a);
-                let mut best = None;
-                let mut max: f64 = -1.;
-                for cand in candidates {
-                    let sim = similarity_metrics::SimilarityMeasure::range(
-                        &mapper.src_arena.descendants_range(&a),
-                        &mapper.dst_arena.descendants_range(&cand),
-                        &mapper.mappings,
-                    )
-                    .jaccard();
-                    if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
-                        max = sim;
-                        best = Some(cand);
-                    }
+            if mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a) {
+                continue;
+            }
+            let candidates = mapper.get_dst_candidates(&a);
+            let mut best = None;
+            let mut max: f64 = -1.;
+            for cand in candidates {
+                let sim = similarity_metrics::SimilarityMeasure::range(
+                    &mapper.src_arena.descendants_range(&a),
+                    &mapper.dst_arena.descendants_range(&cand),
+                    &mapper.mappings,
+                )
+                .jaccard();
+                if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
+                    max = sim;
+                    best = Some(cand);
                 }
+            }
 
-                if let Some(best) = best {
-                    Self::last_chance_match(mapper, a, best);
-                    mapper.mappings.link(a, best);
-                }
+            if let Some(best) = best {
+                Self::last_chance_match(mapper, a, best);
+                mapper.mappings.link(a, best);
             }
         }
         // for root
@@ -110,15 +111,17 @@ where
 
         for (src_type, src_list) in src_types.iter() {
             // TODO same thing use an Option instead of a Vec
-            if src_list.len() == 1 {
-                if let Some(dst_list) = dst_types.get(src_type) {
-                    if dst_list.len() == 1
-                        && !mapper.mappings.is_src(&src_list[0])
-                        && !mapper.mappings.is_dst(&dst_list[0])
-                    {
-                        mapper.mappings.link(src_list[0], dst_list[0]);
-                    }
-                }
+            if src_list.len() != 1 {
+                continue;
+            }
+            let Some(dst_list) = dst_types.get(src_type) else {
+                continue;
+            };
+            if dst_list.len() != 1 {
+                continue;
+            }
+            if !mapper.mappings.is_src(&src_list[0]) && !mapper.mappings.is_dst(&dst_list[0]) {
+                mapper.mappings.link(src_list[0], dst_list[0]);
             }
         }
     }

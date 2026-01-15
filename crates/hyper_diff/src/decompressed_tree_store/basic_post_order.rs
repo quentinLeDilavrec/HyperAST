@@ -222,10 +222,10 @@ impl<IdN, IdD: PrimInt> BasicPostOrder<IdN, IdD> {
             } else {
                 let curr_idx = cast(id_compressed.len()).unwrap();
                 let value = if l.is_none() { curr_idx } else { lld };
-                if let Some(tmp) = stack.last_mut() {
-                    if tmp.idx == one() {
-                        tmp.lld = value;
-                    }
+                if let Some(tmp) = stack.last_mut()
+                    && tmp.idx == one()
+                {
+                    tmp.lld = value;
                 }
                 llds.push(value);
                 id_compressed.push(curr);

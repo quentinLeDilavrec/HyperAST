@@ -79,12 +79,12 @@ where
                     mapper.last_chance_match_histogram(&node, &best_candidate);
                     mapper.mappings.link(node, best_candidate);
                 }
-            } else if mapper.mappings.is_src(&node) && mapper.has_unmapped_src_children(&node) {
-                if let Some(dst) = mapper.mappings.get_dst(&node) {
-                    if mapper.has_unmapped_dst_children(&dst) {
-                        mapper.last_chance_match_histogram(&node, &dst);
-                    }
-                }
+            } else if mapper.mappings.is_src(&node)
+                && mapper.has_unmapped_src_children(&node)
+                && let Some(dst) = mapper.mappings.get_dst(&node)
+                && mapper.has_unmapped_dst_children(&dst)
+            {
+                mapper.last_chance_match_histogram(&node, &dst);
             }
         }
 

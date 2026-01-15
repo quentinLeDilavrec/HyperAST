@@ -16,7 +16,6 @@ pub struct LazySimpleBottomUpMatcher<
 }
 
 impl<
-    'a,
     Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
     Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,

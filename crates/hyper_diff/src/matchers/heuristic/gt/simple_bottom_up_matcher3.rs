@@ -15,7 +15,6 @@ pub struct SimpleBottomUpMatcher<
 }
 
 impl<
-    'a,
     Dsrc: DecompTreeBounds<HAST, M::Src>,
     Ddst: DecompTreeBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,

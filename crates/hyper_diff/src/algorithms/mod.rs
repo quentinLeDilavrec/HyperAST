@@ -419,7 +419,7 @@ impl<A, MD: Clone, HAST, DS, DD> DiffResult<A, Mapper<HAST, DS, DD, VecStore<u32
     }
 }
 
-impl<'a, MD> ResultsSummary<MD> {
+impl<MD> ResultsSummary<MD> {
     pub fn compare_results(&self, other: &Self) -> bool {
         self.mappings == other.mappings && self.actions == other.actions
     }

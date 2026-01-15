@@ -482,7 +482,7 @@ impl SelectedProjects {
         (0..self.repositories.len()).map(ProjectId)
     }
 
-    pub fn get<'a>(&'a mut self, ProjectId(i): ProjectId) -> Option<&'a Repo> {
+    pub fn get(&mut self, ProjectId(i): ProjectId) -> Option<&Repo> {
         self.repositories.get(i)
     }
 

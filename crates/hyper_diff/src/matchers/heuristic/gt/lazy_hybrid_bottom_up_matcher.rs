@@ -23,7 +23,6 @@ pub struct LazyHybridBottomUpMatcher<
 }
 
 impl<
-    'a,
     Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
     Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,

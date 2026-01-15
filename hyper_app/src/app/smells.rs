@@ -368,7 +368,7 @@ impl G {
         pretty_payload.map_or_else(|| self.queries[id].to_string(), |x| x.to_string())
     }
 
-    fn iter_successors<'a>(&'a self) -> impl Iterator<Item = &'a [u32]> {
+    fn iter_successors(&self) -> impl Iterator<Item = &[u32]> {
         self.succ.split(|x| *x == 0)
     }
 }

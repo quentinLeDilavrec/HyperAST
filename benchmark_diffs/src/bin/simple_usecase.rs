@@ -209,10 +209,12 @@ fn whole(
         .unwrap();
         buf.flush().unwrap();
     }
-    let mut i = 0;
     let c_len = processing_ordered_commits.len();
     use hyperast_gen_ts_java::utils::memusage_linux;
-    for c in (0..c_len - 1).map(|c| &processing_ordered_commits[c..(c + window_size).min(c_len)]) {
+    for (i, c) in (0..c_len - 1)
+        .map(|c| &processing_ordered_commits[c..(c + window_size).min(c_len)])
+        .enumerate()
+    {
         let oid_src = c[0];
         for oid_dst in &c[1..] {
             log::warn!("diff of {oid_src} and {oid_dst}");
@@ -259,7 +261,6 @@ fn whole(
             }
         }
         log::warn!("done computing diff {i}");
-        i += 1;
     }
     let mu = memusage_linux();
     drop(preprocessed);

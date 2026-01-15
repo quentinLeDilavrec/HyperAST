@@ -642,14 +642,12 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithRoles
     fn role_at<Role: 'static + Copy + Sync + Send>(&self, at: Self::ChildIdx) -> Option<Role> {
         let r = &self.0.get_component::<compo::Roles<Role>>().ok()?.0;
         let ro = self.0.get_component::<compo::RoleOffsets>().ok()?;
-        let mut i = 0;
-        for &ro in ro.0.as_ref() {
+        for (i, &ro) in ro.0.as_ref().iter().enumerate() {
             if ro as u16 > at {
                 return None;
             } else if ro as u16 == at {
                 return Some(r[i]);
             }
-            i += 1;
         }
         None
     }

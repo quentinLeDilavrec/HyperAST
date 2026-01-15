@@ -65,7 +65,6 @@ pub fn windowed_commits_compare(
     //     preprocessed.commits.len(),
     //     processing_ordered_commits
     // );
-    let mut loop_count = 0;
 
     use std::fs::File;
     use std::io::BufWriter;
@@ -94,12 +93,15 @@ pub fn windowed_commits_compare(
         .min()
         .unwrap();
     dbg!(&min_len, 0..=min_len - window_size);
-    for c in (0..min_len - window_size).map(|c| {
-        processing_ordered_commits
-            .iter()
-            .map(|x| (&x.0[c..(c + window_size)], &x.1))
-            .collect::<Vec<_>>()
-    }) {
+    for (loop_count, c) in (0..min_len - window_size)
+        .map(|c| {
+            processing_ordered_commits
+                .iter()
+                .map(|x| (&x.0[c..(c + window_size)], &x.1))
+                .collect::<Vec<_>>()
+        })
+        .enumerate()
+    {
         // dbg!(&c, 1..min_len - window_size);
         let oid_src: Vec<_> = c.iter().map(|x| (x.0[0], x.1)).collect();
         for oid_dst in (1..window_size).map(|i| c.iter().map(|c| (c.0[i], c.1)).collect::<Vec<_>>())
@@ -383,7 +385,6 @@ pub fn windowed_commits_compare(
             }
         }
         log::warn!("done computing diff {loop_count}");
-        loop_count += 1;
     }
     let mu = memusage_linux();
     drop(preprocessed);

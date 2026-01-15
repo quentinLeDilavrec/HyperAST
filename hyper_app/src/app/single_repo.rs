@@ -322,8 +322,7 @@ fn show_examples(
     scripting_context: &mut ScriptingContext,
 ) {
     ui.horizontal_wrapped(|ui| {
-        let mut j = 0;
-        for ex in EXAMPLES {
+        for (j, ex) in EXAMPLES.iter().enumerate() {
             let mut text = egui::RichText::new(ex.name);
             if let EditStatus::Example { i, .. } = &scripting_context.current {
                 if &j == i {
@@ -352,7 +351,6 @@ fn show_examples(
                     egui_demo_lib::easy_mark::easy_mark(ui, desc);
                 });
             }
-            j += 1;
         }
     });
 }

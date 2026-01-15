@@ -74,7 +74,10 @@ pub fn windowed_commits_compare(
         )
         .unwrap();
     }
-    for c in (0..c_len - 1).map(|c| &processing_ordered_commits[c..(c + window_size).min(c_len)]) {
+    for (i, c) in (0..c_len - 1)
+        .map(|c| &processing_ordered_commits[c..(c + window_size).min(c_len)])
+        .enumerate()
+    {
         let oid_src = c[0];
         for oid_dst in &c[1..] {
             log::warn!("diff of {oid_src} and {oid_dst}");
@@ -300,7 +303,6 @@ pub fn windowed_commits_compare(
             }
         }
         log::warn!("done computing diff {i}");
-        i += 1;
     }
     let mu = memusage_linux();
     drop(preprocessed);

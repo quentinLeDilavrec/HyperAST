@@ -1393,7 +1393,7 @@ fn build_bigraph(
             }
             let i = ex2init[ex];
             // let i = i as u32;
-            let id = g.add_edge(i.into(), j, egui_graphs::Edge::new(()));
+            let id = g.add_edge(i, j, egui_graphs::Edge::new(()));
             g.edge_weight_mut(id).unwrap().set_id(id);
         }
     }
@@ -1406,7 +1406,7 @@ fn build_bigraph(
         //     continue;
         // }
         // prev_i = i.index();
-        let id = g.add_edge(top, init.into(), egui_graphs::Edge::new(()));
+        let id = g.add_edge(top, init, egui_graphs::Edge::new(()));
         g.edge_weight_mut(id).unwrap().set_id(id);
     }
     let mut to_remove = to_remove.into_iter().peekable();
@@ -1449,7 +1449,7 @@ fn show_full_graph(
     } else {
         let g = build_graph(content, graph_view_setting);
         use egui_addon::force_layout::*;
-        let g: GraphTy = to_graph(&g.into());
+        let g: GraphTy = to_graph(&g);
         *prepared_graph = Some(Box::new((ViewMode::FullGraph, g)));
         &mut (prepared_graph.as_mut().unwrap())
             .downcast_mut::<(ViewMode, GraphTy)>()
@@ -2184,7 +2184,7 @@ fn show_either_side<MH: MakeHighlights>(
 
             ui.fonts(|f| {
                 let galley = f.layout_job(layout_job);
-                galley.into()
+                galley
             })
         };
         let noop = ui.painter().add(egui::Shape::Noop);
@@ -2309,7 +2309,7 @@ fn show_either_side<MH: MakeHighlights>(
                     color[2] = color[2] + 0.2;
                     color[3] = color[3] * 2.0;
                 } else {
-                    color = (egui::Rgba::from(color) * 10.0).into();
+                    color = color * 10.0;
                 };
                 egui::Stroke::new(3., color)
             };

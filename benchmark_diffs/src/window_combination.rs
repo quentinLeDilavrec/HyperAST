@@ -437,7 +437,7 @@ mod test {
             src_arena,
             dst_arena,
             mappings,
-        } = mapper.mapping.into();
+        } = mapper.mapping;
         print_mappings(&dst_arena, &src_arena, stores, &mappings);
     }
 
@@ -525,7 +525,7 @@ mod test {
             dst_arena,
             mappings,
             ..
-        } = mapper.mapping.into();
+        } = mapper.mapping;
         print_mappings(&dst_arena, &src_arena, stores, &mappings);
 
         let gt_out_format = "JSON";

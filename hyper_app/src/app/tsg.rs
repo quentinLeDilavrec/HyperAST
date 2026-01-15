@@ -394,7 +394,7 @@ pub(crate) fn show_result_graph(
                 simple_add_edge(&mut g, *n1, *n2);
             }
         }
-        let graph: Ty = to_graph(&g.into());
+        let graph: Ty = to_graph(&g);
         content.graph = Some(Box::new(graph));
         (content.graph.as_mut().unwrap())
             .downcast_mut::<Ty>()

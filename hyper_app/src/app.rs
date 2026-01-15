@@ -1593,7 +1593,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 
     fn tab_title_for_pane(&mut self, pane: &TabId) -> egui::WidgetText {
-        self.tabs[*pane].title(&self.data).into()
+        self.tabs[*pane].title(&self.data)
     }
 
     fn top_bar_right_ui(

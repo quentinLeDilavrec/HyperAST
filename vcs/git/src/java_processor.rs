@@ -526,7 +526,7 @@ impl Query {
             precomputeds.as_slice(),
         )
         .unwrap();
-        Self(precomp.into(), precomputeds.join("\n").into())
+        Self(precomp, precomputeds.join("\n").into())
     }
 }
 

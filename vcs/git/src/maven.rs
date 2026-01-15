@@ -148,32 +148,26 @@ impl<'a> IterMavenModules2<'a> {
                 .extend(b.children().unwrap().iter_children().rev().map(|x| Some(x)));
         }
 
-        let contains_pom = b
-            .children()
-            .unwrap_or_default()
-            .iter_children()
-            .find(|x| {
-                if let Some(n) = self.stores.node_store.try_resolve_typed::<XmlIdN>(x) {
-                    let n = n.0;
-                    log::debug!("f {:?}", n.get_type());
-                    n.get_type().eq(&Type::Document)
-                        && if n.has_label() {
-                            log::debug!(
-                                "f name: {:?}",
-                                self.stores.label_store.resolve(n.get_label_unchecked())
-                            );
-                            self.stores
-                                .label_store
-                                .resolve(n.get_label_unchecked())
-                                .eq("pom.xml")
-                        } else {
-                            false
-                        }
+        let contains_pom = b.children().unwrap_or_default().iter_children().any(|x| {
+            let Some(n) = self.stores.node_store.try_resolve_typed::<XmlIdN>(&x) else {
+                return false;
+            };
+            let n = n.0;
+            log::debug!("f {:?}", n.get_type());
+            n.get_type().eq(&Type::Document)
+                && if n.has_label() {
+                    log::debug!(
+                        "f name: {:?}",
+                        self.stores.label_store.resolve(n.get_label_unchecked())
+                    );
+                    self.stores
+                        .label_store
+                        .resolve(n.get_label_unchecked())
+                        .eq("pom.xml")
                 } else {
                     false
                 }
-            })
-            .is_some();
+        });
 
         if contains_pom {
             Some(x)
@@ -469,32 +463,27 @@ impl<'a, T: TreePath<NodeIdentifier>> IterMavenModules<'a, T> {
         is_src || t != Type::MavenDirectory
     }
     fn is_matching(&self, b: &XmlNode<'a>) -> bool {
-        let contains_pom = b
-            .children()
-            .unwrap()
-            .iter_children()
-            .find(|x| {
-                if let Some(n) = self.stores.node_store.try_resolve_typed::<XmlIdN>(x) {
-                    let n = n.0;
-                    log::debug!("f {:?}", n.get_type());
-                    n.get_type().eq(&Type::Document)
-                        && if n.has_label() {
-                            log::debug!(
-                                "f name: {:?}",
-                                self.stores.label_store.resolve(n.get_label_unchecked())
-                            );
-                            self.stores
-                                .label_store
-                                .resolve(n.get_label_unchecked())
-                                .eq("pom.xml")
-                        } else {
-                            false
-                        }
-                } else {
-                    false
-                }
-            })
-            .is_some();
+        let contains_pom = b.children().unwrap().iter_children().any(|x| {
+            if let Some(n) = self.stores.node_store.try_resolve_typed::<XmlIdN>(&x) {
+                let n = n.0;
+                log::debug!("f {:?}", n.get_type());
+                n.get_type().eq(&Type::Document)
+                    && if n.has_label() {
+                        log::debug!(
+                            "f name: {:?}",
+                            self.stores.label_store.resolve(n.get_label_unchecked())
+                        );
+                        self.stores
+                            .label_store
+                            .resolve(n.get_label_unchecked())
+                            .eq("pom.xml")
+                    } else {
+                        false
+                    }
+            } else {
+                false
+            }
+        });
         contains_pom
     }
 }

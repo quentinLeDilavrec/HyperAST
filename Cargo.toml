@@ -82,7 +82,3 @@ too_many_arguments = "allow"
 
 # We often have large enum variants yet we rarely actually bother with splitting them up.
 large_enum_variant = "allow"
-
-unnecessary_mut_passed = "allow" # temporary
-needless_borrow = "allow" # temporary
-unused = "allow" # temporary

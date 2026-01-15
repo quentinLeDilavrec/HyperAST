@@ -22,7 +22,7 @@ use example_queries::EXAMPLES;
 const INFO_QUERY: EditorInfo<&'static str> = EditorInfo {
     title: "Graph Extractor",
     short: "the extractor",
-    long: concat!("follows the tree-sitter-graph DSL"),
+    long: "follows the tree-sitter-graph DSL",
 };
 
 const INFO_DESCRIPTION: EditorInfo<&'static str> = EditorInfo {

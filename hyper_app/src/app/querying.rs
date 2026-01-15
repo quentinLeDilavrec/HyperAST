@@ -24,7 +24,7 @@ use self::example_queries::EXAMPLES;
 const INFO_QUERY: EditorInfo<&'static str> = EditorInfo {
     title: "Query",
     short: "the query",
-    long: concat!("follows the tree sitter query syntax"),
+    long: "follows the tree sitter query syntax",
 };
 
 const INFO_DESCRIPTION: EditorInfo<&'static str> = EditorInfo {

@@ -23,7 +23,7 @@ use example_scripts::EXAMPLES;
 const INFO_INIT: EditorInfo<&'static str> = EditorInfo {
     title: "Init",
     short: "initializes the accumulator on the root node",
-    long: concat!("It will recieve the finally results of the entire computation."),
+    long: "It will recieve the finally results of the entire computation.",
 };
 const INFO_FILTER: EditorInfo<&'static str> = EditorInfo {
     title: "Filter",

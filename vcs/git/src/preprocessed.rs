@@ -592,7 +592,7 @@ impl CommitBuilder {
         let commit = repository.find_commit(commit_oid).unwrap();
         let tree_oid = commit.tree().unwrap().id();
 
-        let parents = commit.parents().into_iter().map(|x| x.id()).collect();
+        let parents = commit.parents().map(|x| x.id()).collect();
 
         info!("handle commit: {}", commit_oid);
 

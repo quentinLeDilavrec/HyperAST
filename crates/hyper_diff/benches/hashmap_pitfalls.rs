@@ -46,7 +46,7 @@ struct SortedVec<K, V>(Vec<(K, V)>);
 
 impl<K: Clone + Ord, V: Clone> SortedVec<K, V> {
     fn new(collec: &[(K, V)]) -> Self {
-        let mut collec: Vec<(K, V)> = collec.iter().cloned().collect();
+        let mut collec: Vec<(K, V)> = collec.to_vec();
         collec.sort_by_key(|x| x.0.clone());
         Self(collec)
     }
@@ -63,7 +63,7 @@ struct SortedVecSoA<K, V>(Vec<K>, Vec<V>);
 
 impl<K: Clone + Ord, V: Clone> SortedVecSoA<K, V> {
     fn new(collec: &[(K, V)]) -> Self {
-        let mut collec: Vec<(K, V)> = collec.iter().cloned().collect();
+        let mut collec: Vec<(K, V)> = collec.to_vec();
         collec.sort_by_key(|x| x.0.clone());
         let (ks, vs) = collec.into_iter().unzip();
         Self(ks, vs)

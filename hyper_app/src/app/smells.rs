@@ -212,7 +212,7 @@ impl<'a> ExIt<'a> {
         Self {
             ex_curr: 0,
             ex_offset: 0,
-            it: (0..content.queries.len()).into_iter(),
+            it: (0..content.queries.len()),
             content,
             i: None,
         }
@@ -1968,7 +1968,6 @@ fn show_query_with_example(
                         .into_iter()
                         .chain(
                             (0..bad_ex_cont.len() - 3)
-                                .into_iter()
                                 .map(|_| 0.6 / (bad_ex_cont.len() - 2) as f32),
                         )
                         .collect()

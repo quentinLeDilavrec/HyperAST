@@ -261,9 +261,9 @@ impl<Init> QueryLattice<Init> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (IdNQ, &[IdQ])> {
-        self.sort_cache.iter().filter_map(|i| {
+        self.sort_cache.iter().map(|i| {
             let (q, e) = &self.queries[*i as usize];
-            Some((*q, &e[..]))
+            (*q, &e[..])
         })
     }
 
@@ -1098,7 +1098,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
             let refs: HashSet<_> = refs
                 .into_iter(|x| x.node())
-                .chain([root_cap].into_iter())
+                .chain([root_cap])
                 .collect();
 
             // let unused_decls =

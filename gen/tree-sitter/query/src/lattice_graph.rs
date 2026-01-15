@@ -274,9 +274,9 @@ pub fn lattice_stats<Q: hyperast::position::position_accessors::SolvedPosition<I
                 .map(|x| x.source())
                 .peekable();
             if uniqs.peek().is_none() {
-                uniqs.chain(vec![x].into_iter())
+                uniqs.chain(vec![x])
             } else {
-                uniqs.chain(vec![].into_iter())
+                uniqs.chain(vec![])
             }
         })
         .collect();

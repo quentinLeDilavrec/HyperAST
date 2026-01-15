@@ -30,10 +30,10 @@ impl<K: Ord, V> Searchable<K, V> for std::collections::BTreeMap<K, V> {
 struct SortedVecSoA<K, V>(Vec<K>, Vec<V>);
 
 impl<K: Clone + Ord, V: Clone> SortedVecSoA<K, V> {
-    fn new(collec: &[(K, V)]) -> Self {
-        let mut collec: Vec<(K, V)> = collec.iter().cloned().collect();
-        collec.sort_by_key(|x| x.0.clone());
-        let (ks, vs) = collec.into_iter().unzip();
+    fn new(v: &[(K, V)]) -> Self {
+        let mut v: Vec<(K, V)> = v.to_vec();
+        v.sort_by_key(|x| x.0.clone());
+        let (ks, vs) = v.into_iter().unzip();
         Self(ks, vs)
     }
 }

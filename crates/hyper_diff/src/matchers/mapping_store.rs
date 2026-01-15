@@ -500,7 +500,7 @@ where
     {
         self.mappings
             .get_srcs(dst)
-            .into_iter()
+            .iter()
             .map(|x| self.src_arena.range(x))
     }
     fn get_dst_ranges(&self, src: &Self::Src) -> impl Iterator<Item = Range<Dst>>
@@ -510,7 +510,7 @@ where
     {
         self.mappings
             .get_dsts(src)
-            .into_iter()
+            .iter()
             .map(|x| self.dst_arena.range(x))
     }
 }
@@ -795,7 +795,7 @@ impl<T: PrimInt + Debug + Hash> MappingStore for MultiHashStore<T> {
     }
 
     fn cut(&mut self, src: T, dst: T) {
-        fn aux<T: PrimInt + Hash>(vec: &mut Vec<HashMap<T, T>>, target: T, other: T) {
+        fn aux<T: PrimInt + Hash>(vec: &mut [HashMap<T, T>], target: T, other: T) {
             let mut i = 0;
             let len = vec.len();
             let _j = loop {

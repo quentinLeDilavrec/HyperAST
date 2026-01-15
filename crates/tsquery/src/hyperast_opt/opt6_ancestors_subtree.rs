@@ -141,7 +141,7 @@ where
         }
         let mut s = self.pos.pos.ref_node();
         let n = self.pos.stack.last().unwrap();
-        let Some(stack) = goto_parent_virt(self.stores, &*self.pos.stack, &mut s) else {
+        let Some(stack) = goto_parent_virt(self.stores, &self.pos.stack, &mut s) else {
             return false;
         };
         let n = stack.last().unwrap();

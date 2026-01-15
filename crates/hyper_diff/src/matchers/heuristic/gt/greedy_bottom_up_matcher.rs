@@ -167,7 +167,6 @@ where
         //     return;
         // }
         let stores = self.hyperast;
-        let src_offset;
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
         let o_src = self.mapping.src_arena.original(&src);
         let o_dst = self.mapping.dst_arena.original(&dst);
@@ -176,7 +175,7 @@ where
             hyperast: stores,
             decomp: src_arena,
         };
-        src_offset = src - src_arena.root();
+        let src_offset = src - src_arena.root();
         let dst_arena = ZsTree::<HAST::IdN, M::Dst>::decompress(stores, &o_dst);
         let dst_arena = Decompressible {
             hyperast: stores,
@@ -198,10 +197,9 @@ where
         Dsrc: crate::decompressed_tree_store::POBorrowSlice<HAST, M::Src>,
         Ddst: crate::decompressed_tree_store::POBorrowSlice<HAST, M::Dst>,
     {
-        let src_offset;
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
         let src_arena = self.mapping.src_arena.slice_po(&src);
-        src_offset = src - src_arena.root();
+        let src_offset = src - src_arena.root();
         let dst_arena = self.mapping.dst_arena.slice_po(&dst);
         let mappings: MZs = ZsMatcher::match_with(self.hyperast, src_arena, dst_arena);
         let dst_offset = self.dst_arena.first_descendant(&dst);

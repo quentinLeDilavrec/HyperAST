@@ -163,7 +163,7 @@ where
 
     fn sort(
         mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-        ambiguous_mappings: &mut Vec<(Dsrc::IdD, Ddst::IdD)>,
+        ambiguous_mappings: &mut [(Dsrc::IdD, Ddst::IdD)],
     ) {
         let mut sib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
         let mut psib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();

@@ -345,13 +345,13 @@ mod tests {
                 src
             )
         );
-        let mut src_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &src);
-        let mut dst_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &dst);
+        let src_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &src);
+        let dst_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &dst);
 
-        let src_iter = LeafIter::new(&stores, &mut src_arena, is_leaf);
+        let src_iter = LeafIter::new(&stores, &src_arena, is_leaf);
         assert_eq!(4, src_iter.count());
 
-        let dst_iter = LeafIter::new(&stores, &mut dst_arena, is_leaf);
+        let dst_iter = LeafIter::new(&stores, &dst_arena, is_leaf);
         assert_eq!(4, dst_iter.count());
     }
 
@@ -366,13 +366,13 @@ mod tests {
                 src
             )
         );
-        let mut src_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &src);
-        let mut dst_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &dst);
+        let src_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &src);
+        let dst_arena = <DS<_> as DecompressedFrom<_>>::decompress(&stores, &dst);
 
-        let src_iter = LeafIter::new(&stores, &mut src_arena, is_leaf_stmt);
+        let src_iter = LeafIter::new(&stores, &src_arena, is_leaf_stmt);
         assert_eq!(2, src_iter.count());
 
-        let dst_iter = LeafIter::new(&stores, &mut dst_arena, is_leaf_stmt);
+        let dst_iter = LeafIter::new(&stores, &dst_arena, is_leaf_stmt);
         assert_eq!(2, dst_iter.count());
     }
 

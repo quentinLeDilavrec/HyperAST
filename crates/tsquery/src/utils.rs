@@ -18,8 +18,6 @@ impl<T> Array<T> {
     ) -> Option<usize> {
         unsafe { std::slice::from_raw_parts(self.contents, self.size as usize) }
             .binary_search_by_key(&needle, f)
-            .ok()?
-            .try_into()
             .ok()
     }
 }

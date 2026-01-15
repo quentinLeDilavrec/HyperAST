@@ -285,7 +285,7 @@ where
 
         let w_t = &self.mid_arena[w.index()].compressed;
         let x_t = &self.dst_arena.original(&x);
-        f(&w_t, &x_t);
+        f(w_t, x_t);
         let w_l = self.store.resolve(w_t).try_get_label().cloned();
         let x_l = self.store.resolve(x_t).try_get_label().cloned();
 
@@ -483,7 +483,7 @@ where
 
     fn _del(
         &mut self,
-        parent: &mut Vec<Ele<IdD, usize, SimpleAction<HAST::Label, P, HAST::IdN>>>,
+        parent: &mut [Ele<IdD, usize, SimpleAction<HAST::Label, P, HAST::IdN>>],
         w: IdD,
     ) -> Result<SimpleAction<HAST::Label, P, HAST::IdN>, EditScriptError> {
         // TODO mutate mid arena ?

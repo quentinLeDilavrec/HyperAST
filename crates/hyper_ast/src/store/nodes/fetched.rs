@@ -851,7 +851,7 @@ impl NodeStore {
         use hashbrown::hash_map::Entry::{Occupied, Vacant};
         match self.vindex.entry(arch) {
             Occupied(occ) => {
-                let vid = *occ.get() as u32;
+                let vid = *occ.get();
                 let var = &mut self.variants[*occ.get() as usize];
                 let mut offset = var.rev().len() as u32;
                 let revs = entities.rev();

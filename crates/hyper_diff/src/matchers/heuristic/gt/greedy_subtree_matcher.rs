@@ -342,7 +342,7 @@ where
                         //         .map_or(0, |x| x.len())
                         // );
                         // println!("id={:?},{:?}", src, dst);
-                        multi_mappings.link(src, dst);
+                        multi_mappings.link(*src, *dst);
                         marks_for_src_trees.set(i, true);
                         marks_for_dst_trees.set(j, true);
                     }

@@ -1,9 +1,9 @@
-///! WIP this action collection aims to better express all possible order (of application) of actions from edit scripts,
-///! as action_vec only allow one order to apply actions.
-///! Maybe it can be integrated in the existing script generator or it needs major changes.
-///! Maybe an other algorithm similar to the Chawathe that better fits my needs exists in the literature.
+//! WIP this action collection aims to better express all possible order (of application) of actions from edit scripts,
+//! as action_vec only allow one order to apply actions.
+//! Maybe it can be integrated in the existing script generator or it needs major changes.
+//! Maybe an other algorithm similar to the Chawathe that better fits my needs exists in the literature.
+
 use std::fmt::{Debug, Display};
-use std::u32;
 
 use hyperast::PrimInt;
 use num_traits::ToPrimitive;
@@ -306,6 +306,7 @@ impl<L: Clone, Idx: PrimInt, I: Clone> ActionsTree<SimpleAction<L, CompressedTre
     //     Self::push_aux(node, &mut self.atomics);
     // }
 
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             atomics: Default::default(),

@@ -137,7 +137,7 @@ impl FromStr for Oid {
             };
             bytes[i] = c1 << 4 | c2;
         }
-        if !s.next().is_none() {
+        if s.next().is_some() {
             return Err((Self(bytes), "too many char in oid"));
         }
         Ok(Self(bytes))

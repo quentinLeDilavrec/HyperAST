@@ -85,7 +85,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
             }
             BasicGitObject::Blob(oid, name)
                 if !FFWD
-                    && !self.dir_path.peek().is_some()
+                    && self.dir_path.peek().is_none()
                     && crate::processing::file_sys::Pom::matches(&name) =>
             {
                 let parent_acc = &mut self.stack.last_mut().unwrap().acc;

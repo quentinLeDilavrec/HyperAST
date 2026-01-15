@@ -1968,10 +1968,8 @@ fn update_queries_differential_results(
         true
     } else if let Some(Err(_)) = differential.2.get() {
         false
-    } else if hash((queries[qid].query.as_ref(), selected_baseline.clone())) != differential.4 {
-        true
     } else {
-        false
+        hash((queries[qid].query.as_ref(), selected_baseline.clone())) != differential.4
     };
     (absent, new)
 }

@@ -116,6 +116,10 @@ struct MidNode<IdC, IdD> {
     children: Option<Vec<IdD>>,
 }
 
+#[allow(type_alias_bounds)]
+type EditScript<HAST: HyperAST, IdD, Idx> =
+    ActionsVec<SimpleAction<IdD, IdD, HAST::IdN, HAST::Label, Idx>>;
+
 pub struct ScriptGenerator<
     'a,
     'b,
@@ -137,7 +141,7 @@ pub struct ScriptGenerator<
     moved: bitvec::vec::BitVec,
 
     // pub actions: ActionsVec<SimpleAction<IdD, IdD, S::>>,
-    pub actions: ActionsVec<SimpleAction<IdD, IdD, HAST::IdN, HAST::Label, Idx>>,
+    pub actions: EditScript<HAST, IdD, Idx>,
 
     src_in_order: InOrderNodes<IdD>,
     dst_in_order: InOrderNodes<IdD>,
@@ -179,7 +183,7 @@ where
         src_arena: &'a SS,
         dst_arena: &'b SD,
         ms: &'c DefaultMappingStore<IdD>,
-    ) -> ActionsVec<SimpleAction<IdD, IdD, HAST::IdN, HAST::Label, HAST::Idx>> {
+    ) -> EditScript<HAST, IdD, HAST::Idx> {
         ScriptGenerator::<'a, 'b, 'c, IdD, SS, SD, HAST>::new(store, src_arena, dst_arena)
             .init_cpy(ms)
             .generate()

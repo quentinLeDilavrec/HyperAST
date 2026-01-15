@@ -90,13 +90,15 @@ impl<D: RuntimeMetric, P> Phased<Prepared<D::M, D>, P> {
             },
         }
     }
-    fn stop_then_prepare(self) -> Phased<Prepared<D, ()>, Phased<Prepared<D::M>, P>> {
+    fn stop_then_prepare(self) -> Phased2<Prepared<D, ()>, D::M, P> {
         self.next_p(|| Prepared::<D>::prepare())
     }
-    fn stop_then_skip_prepare(self) -> Phased<Prepared<D::M, D>, Phased<Prepared<D::M>, P>> {
+    fn stop_then_skip_prepare(self) -> Phased2<Prepared<D::M, D>, D::M, P> {
         self.next_p(|| Prepared::<D>::nothing())
     }
 }
+
+type Phased2<I, M, P> = Phased<I, Phased<Prepared<M>, P>>;
 
 impl<P1: RuntimeMeasurement, P2: RuntimeMeasurement> Phased<P1, P2> {
     pub fn sum<T: 'static + Clone + std::ops::Add<Output = T>>(&self) -> Option<T> {

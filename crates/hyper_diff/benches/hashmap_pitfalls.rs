@@ -111,7 +111,7 @@ fn compare_hashmaps(c: &mut Criterion) {
     simple.sort_by_key(|x| x.0);
     simple.dedup_by_key(|x| x.0);
     #[allow(non_snake_case)]
-    let INPUTS: &[(&[(K, V)], &[K])] = &[
+    let INPUTS = &[
         (&simple[0..10], k),
         (&simple[0..100], k),
         (&simple[0..500], k),

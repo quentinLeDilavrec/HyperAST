@@ -233,6 +233,10 @@ where
     dst_in_order: InOrderNodes<IdD>,
 }
 
+#[allow(type_alias_bounds)]
+type EditScriptResult<HAST: HyperAST, P: TreePath<Item = HAST::Idx>> =
+    Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String>;
+
 static MERGE_SIM_ACTIONS: bool = false;
 
 // TODO split IdD in 2 to help typecheck ids
@@ -261,7 +265,7 @@ where
     pub fn compute_actions<'a: 'a1 + 'a2>(
         hast: HAST,
         mapping: &'a Mapping<SS, SD, M>,
-    ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
+    ) -> EditScriptResult<HAST, P> {
         ScriptGenerator::new(hast, &mapping.src_arena, &mapping.dst_arena)
             .init_cpy(&mapping.mappings)
             .generate()
@@ -367,6 +371,7 @@ where
         self
     }
 }
+
 // TODO split IdD in 2 to help typecheck ids
 impl<
     'a1: 'm,
@@ -395,7 +400,7 @@ where
         src_arena: &'a1 SS,
         dst_arena: &'a2 SD,
         ms: &'m M,
-    ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
+    ) -> EditScriptResult<HAST, P> {
         Self::new(store, src_arena, dst_arena)
             .init_cpy(ms)
             .generate()

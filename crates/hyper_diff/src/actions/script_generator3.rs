@@ -70,6 +70,10 @@ where
     dst_in_order: InOrderNodes<M::Dst>,
 }
 
+#[allow(type_alias_bounds)]
+type EditScriptResult<HAST: HyperAST, P: TreePath<Item = HAST::Idx>> =
+    Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String>;
+
 impl<
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
     SS: DecompressedTreeStore<HAST, IdD>
@@ -89,10 +93,7 @@ where
     HAST::IdN: Debug + Clone,
     P: From<Vec<HAST::Idx>> + Debug,
 {
-    pub fn compute_actions(
-        hast: HAST,
-        mapping: &Mapping<SS, SD, M>,
-    ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
+    pub fn compute_actions(hast: HAST, mapping: &Mapping<SS, SD, M>) -> EditScriptResult<HAST, P> {
         ScriptGenerator::new(hast, &mapping.src_arena, &mapping.dst_arena)
             .init_cpy(&mapping.mappings)
             .generate()
@@ -193,7 +194,7 @@ where
         src_arena: &SS,
         dst_arena: &SD,
         ms: &M,
-    ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
+    ) -> EditScriptResult<HAST, P> {
         ScriptGenerator::new(store, src_arena, dst_arena)
             .init_cpy(ms)
             .generate()
@@ -480,9 +481,9 @@ where
         Ok(())
     }
 
-    fn _del(
+    fn _del<A>(
         &mut self,
-        parent: &mut [Ele<IdD, usize, SimpleAction<HAST::Label, P, HAST::IdN>>],
+        parent: &mut [Ele<IdD, usize, A>],
         w: IdD,
     ) -> Result<SimpleAction<HAST::Label, P, HAST::IdN>, EditScriptError> {
         // TODO mutate mid arena ?

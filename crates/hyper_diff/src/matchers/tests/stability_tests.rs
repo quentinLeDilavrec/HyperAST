@@ -87,28 +87,6 @@ fn is_stable(
     result1 == result2
 }
 
-fn _calculate_mappings(example: ((SimpleTree<u8>, SimpleTree<u8>), Vec<Vec<u8>>, Vec<Vec<u8>>)) {
-    let (vpair, map_src, map_dst) = example;
-    let (stores, src, dst) = vpair_to_stores(vpair);
-
-    let src_arena = Decompressible::<_, CompletePostOrder<u16, u16>>::decompress(&stores, &src);
-    let dst_arena = Decompressible::<_, CompletePostOrder<u16, u16>>::decompress(&stores, &dst);
-
-    let mut m: DefaultMappingStore<u16> = DefaultMappingStore::default();
-    m.topit(src_arena.len(), dst_arena.len());
-
-    let src = src_arena.root();
-    let dst = dst_arena.root();
-
-    for (map_src, map_dst) in map_src.iter().zip(map_dst) {
-        m.link(
-            src_arena.child(&src, map_src),
-            dst_arena.child(&dst, &map_dst),
-        );
-    }
-    println!("{:?}", m);
-}
-
 fn test_with_mappings(
     stores: &SimpleStores<TStore, NS<Tree>, LS<u16>>,
     src: u16,

@@ -386,8 +386,12 @@ where
     // field_id = if let Some(role) = role {
     //     HAST::TS::intern_role(lang.clone(), role);
     // } else { None };
-    let supertypes: &[Symbol] = if first_st != usize::MAX {
-        unsafe { std::mem::transmute(&types[stack.len() - 1..first_st]) }
+    let supertypes = if first_st != usize::MAX {
+        unsafe {
+            std::mem::transmute::<&[<HAST::TS as hyperast::types::TypeStore>::Ty], &[Symbol]>(
+                &types[stack.len() - 1..first_st],
+            )
+        }
     } else {
         &[]
     };

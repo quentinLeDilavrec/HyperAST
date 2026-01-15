@@ -143,7 +143,7 @@ struct StorePtr(*const (), std::any::TypeId);
 impl StorePtr {
     fn new<HAST: crate::types::StoreRefAssoc + 'static>(store: &HAST::S<'_>) -> Self {
         let store = store as *const HAST::S<'_>;
-        let store = unsafe { std::mem::transmute(store) };
+        let store = unsafe { std::mem::transmute::<*const _, *const ()>(store) };
         let hid = std::any::TypeId::of::<HAST>();
         Self(store, hid)
     }

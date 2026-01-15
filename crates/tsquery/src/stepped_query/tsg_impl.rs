@@ -114,10 +114,14 @@ where
         // let matchs = self.query.matches_immediate(node.clone());
         // TODO find a way to avoid transmuting
         let node = node.clone();
-        let node = unsafe { std::mem::transmute(node) };
-        let matchs = unsafe { std::mem::transmute(matchs) };
-        let q = unsafe { std::mem::transmute(self) };
-        let cursor = unsafe { std::mem::transmute(cursor) };
+        let matchs = unsafe {
+            std::mem::transmute::<crate::QueryCursor<'_, _, _>, crate::QueryCursor<'_, _, _>>(
+                matchs,
+            )
+        };
+        let q = self;
+        let q = unsafe { std::mem::transmute::<&_, &_>(self) };
+        let cursor = unsafe { std::mem::transmute::<&mut _, &mut _>(cursor) };
         MyQMatches {
             q,
             cursor,

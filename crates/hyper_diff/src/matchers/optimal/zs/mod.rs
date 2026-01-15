@@ -187,8 +187,6 @@ impl ZsMatcherDist {
 }
 
 impl<
-    'store,
-    's,
     SD: DecompressedTreeStore<HAST, M::Src> + PostOrderKeyRoots<HAST, M::Src>,
     DD: DecompressedTreeStore<HAST, M::Dst> + PostOrderKeyRoots<HAST, M::Dst>,
     HAST: HyperAST + Copy,

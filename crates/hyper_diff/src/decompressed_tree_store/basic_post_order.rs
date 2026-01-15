@@ -362,8 +362,7 @@ where
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
-    Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 where
     HAST::IdN: types::NodeId<IdN = HAST::IdN>,
 {

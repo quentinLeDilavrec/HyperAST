@@ -25,7 +25,7 @@ pub struct State {
 }
 
 impl State {
-    pub(crate) const SEEKING_IMMEDIATE_MATCH: u16 = 1 << (12 + 0);
+    pub(crate) const SEEKING_IMMEDIATE_MATCH: u16 = 1 << 12;
     pub(crate) const IN_PROGRESS_ALTERNATIVES: u16 = 1 << (12 + 1);
     pub(crate) const DEAD: u16 = 1 << (12 + 2);
     pub(crate) const NEEDS_PARENT: u16 = 1 << (12 + 3);
@@ -238,7 +238,6 @@ where
                             state.step_index
                         );
                         (self.exec_state.capture_list_pool).release(state.capture_list_id);
-                        drop(state);
                         None
                     } else {
                         Some(state)

@@ -130,7 +130,7 @@ use egui_addon::code_editor::default_info;
 
 impl<C: From<String>> Default for CodeEditor<C> {
     fn default() -> Self {
-        let languages = Languages::default();
+        let languages = Languages;
         let lang = languages.get("JavaScript");
         let code = &r#"function  f() { return 0; }
 function f() { return 1; }

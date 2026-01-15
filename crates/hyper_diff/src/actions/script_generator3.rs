@@ -473,10 +473,8 @@ where
                     log::trace!("{:?}", action);
                     self.actions.push(action);
                 }
-            } else {
-                if SUBTREE_DEL {
-                    self.actions.extend(waiting);
-                }
+            } else if SUBTREE_DEL {
+                self.actions.extend(waiting);
             }
         }
         Ok(())

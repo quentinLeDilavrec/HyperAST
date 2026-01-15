@@ -1195,7 +1195,6 @@ where
                         precomp_queries: acc.precomp_queries,
                     },
                 );
-                acc.prepro;
                 Local {
                     compressed_node,
                     metrics,

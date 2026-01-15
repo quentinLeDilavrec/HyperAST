@@ -109,7 +109,7 @@ impl LinkBuilder<Config, Rect, Rect> {
 
 fn fancy_link(painter: &Painter, options: &Config, src_rect: Rect, m_rect: Rect) {
     use epaint::*;
-    if options.0.contains(CABLE) {}
+    // if options.0.contains(CABLE) {}
     let m_pos = m_rect.center();
     let src_pos = src_rect.center();
     let b_d = m_rect.right() - src_rect.left();

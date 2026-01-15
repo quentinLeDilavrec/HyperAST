@@ -24,7 +24,7 @@ impl Oid {
     // if x > 20 just return the full oid, equivalent to as_str
     pub fn prefix(&self, x: usize) -> String {
         // std::str::from_utf8(&self.0[..x.min(20)]).unwrap()
-        assert!(x % 2 == 0);
+        assert!(x.is_multiple_of(2));
         self.0
             .into_iter()
             .take(x / 2)

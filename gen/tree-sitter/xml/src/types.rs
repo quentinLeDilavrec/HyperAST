@@ -279,9 +279,7 @@ impl HyperType for Type {
         if self.is_error() {
             return Shared::Error;
         }
-        match self {
-            _ => Shared::Other,
-        }
+        Shared::Other
     }
 
     fn is_error(&self) -> bool {

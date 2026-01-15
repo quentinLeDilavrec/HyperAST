@@ -16,6 +16,7 @@ use super::{
 /// made for the zs diff algo
 /// - post order
 /// - key roots
+///
 /// Compared to simple and complete post order it does not have parents
 pub struct SimpleZsTree<IdN, IdD> {
     basic: BasicPostOrder<IdN, IdD>,

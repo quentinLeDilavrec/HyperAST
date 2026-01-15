@@ -1222,128 +1222,129 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         let decl_cid = norm_query.capture_index_for_name("decl").unwrap();
         let root_cap = s.root_cap;
 
-        let rms = ParallelIterator::map(rms.into_par_iter(), |x| {
-            use hyperast::nodes::TextSerializer;
-            use hyperast::position::structural_pos::CursorHead;
-            let mut candidates = vec![];
-            let query = x.0;
-            let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
-            let mut to_rm = pos.build_empty_set();
-            let mut decl_nodes = pos.build_empty_set();
-            let mut refs = pos.build_empty_set();
-            let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&s.query_store, pos);
-            let mut matches = norm_query.matches(cursor);
-            loop {
-                let Some(m) = matches.next() else {
-                    break;
-                };
-                if let Some(decl) = m.nodes_for_capture_index(decl_cid).next() {
-                    let cap = TextSerializer::new(&s.query_store, decl.pos.node()).to_string();
-                    if cap.matches("^[@]p[0-9]+$").next().is_some() {
-                        decl_nodes.register(&decl.pos);
+        let rms =
+            ParallelIterator::map(rms.into_par_iter(), |x| {
+                use hyperast::nodes::TextSerializer;
+                use hyperast::position::structural_pos::CursorHead;
+                let mut candidates = vec![];
+                let query = x.0;
+                let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
+                let mut to_rm = pos.build_empty_set();
+                let mut decl_nodes = pos.build_empty_set();
+                let mut refs = pos.build_empty_set();
+                let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&s.query_store, pos);
+                let mut matches = norm_query.matches(cursor);
+                loop {
+                    let Some(m) = matches.next() else {
+                        break;
+                    };
+                    if let Some(decl) = m.nodes_for_capture_index(decl_cid).next() {
+                        let cap = TextSerializer::new(&s.query_store, decl.pos.node()).to_string();
+                        if cap.matches("^[@]p[0-9]+$").next().is_some() {
+                            decl_nodes.register(&decl.pos);
+                        }
+                    } else if let Some(pred) = m.nodes_for_capture_index(pred_cid).next() {
+                        let id1 = m.nodes_for_capture_index(id1_cid).next().unwrap();
+                        let id2 = m.nodes_for_capture_index(id2_cid).next().unwrap();
+                        candidates.push((id1.pos.clone(), id2.pos.clone(), pred.pos.clone()));
                     }
-                } else if let Some(pred) = m.nodes_for_capture_index(pred_cid).next() {
-                    let id1 = m.nodes_for_capture_index(id1_cid).next().unwrap();
-                    let id2 = m.nodes_for_capture_index(id2_cid).next().unwrap();
-                    candidates.push((id1.pos.clone(), id2.pos.clone(), pred.pos.clone()));
                 }
-            }
-            if candidates.is_empty() && decl_nodes.is_empty() {
-                return Ok((query, x.1));
-            }
-
-            // @p3 @p2 @p0 @p1                // decl_nodes
-            // (#eq? @p1 @p2) (#eq? @p0 @p3)  // candidates
-            // p3 -> p0 ; p2 -> p1 ; p0 -> p2 ; p1 -> p3
-
-            let mut map: Vec<IdNQ> = vec![];
-            let mut repl_decls: Vec<(Vec<u16>, IdNQ)> = vec![];
-            for c in decl_nodes.iter() {
-                if let Some(i) = map.iter().position(|p| p.node() == c.node()) {
-                    repl_decls.push((c.offsets(), s.auto_caps[i]));
-                } else {
-                    let i = map.len();
-                    map.push(c.node());
-                    repl_decls.push((c.offsets(), s.auto_caps[i]));
+                if candidates.is_empty() && decl_nodes.is_empty() {
+                    return Ok((query, x.1));
                 }
-            }
-            // @p0 @p1 @p2 @p3
-            // p1 == p2 ; p0 == p3
-            // p0 <- p3 == p0 -> p2 ; p1 <- p2 == p1 -> p3
-            // p0 => p2 ; p1 => p3
 
-            // ( p p) ( p p) ( p p)
-            let mut eq_id_rels = candidates
-                .iter()
-                .map(|(id1, id2, _)| {
-                    let p1 = map
-                        .iter()
-                        .position(|x| *x == id1.node())
-                        .unwrap_or(usize::MAX - 1); // to preserve order of non auto preds
-                    let p2 = map
-                        .iter()
-                        .position(|x| *x == id1.node())
-                        .unwrap_or(usize::MAX);
-                    if p1 < p2 { (p1, p2) } else { (p2, p1) }
-                })
-                .collect::<Vec<_>>();
-            eq_id_rels.sort();
+                // @p3 @p2 @p0 @p1                // decl_nodes
+                // (#eq? @p1 @p2) (#eq? @p0 @p3)  // candidates
+                // p3 -> p0 ; p2 -> p1 ; p0 -> p2 ; p1 -> p3
 
-            let repl_refs = candidates.into_iter().zip(eq_id_rels.into_iter()).flat_map(
-                |((id1, id2, pred), (i1, i2))| {
-                    let i1 = s.auto_caps.get(i1).copied();
-                    let i2 = s.auto_caps.get(i2).copied();
-                    if Some(id1.node()) == i1 && Some(id2.node()) == i2 {
-                        return Default::default();
+                let mut map: Vec<IdNQ> = vec![];
+                let mut repl_decls: Vec<(Vec<u16>, IdNQ)> = vec![];
+                for c in decl_nodes.iter() {
+                    if let Some(i) = map.iter().position(|p| p.node() == c.node()) {
+                        repl_decls.push((c.offsets(), s.auto_caps[i]));
+                    } else {
+                        let i = map.len();
+                        map.push(c.node());
+                        repl_decls.push((c.offsets(), s.auto_caps[i]));
                     }
-                    let i1 = i1.unwrap_or(id1.node());
-                    let i2 = i2.unwrap_or(id2.node());
-                    vec![(id1.offsets(), i1), (id2.offsets(), i2)]
-                },
-            );
-            let mut repl = repl_decls;
-            repl.extend(repl_refs);
-            repl.iter_mut().for_each(|(path, _)| {
-                path.pop();
-                path.reverse();
+                }
+                // @p0 @p1 @p2 @p3
+                // p1 == p2 ; p0 == p3
+                // p0 <- p3 == p0 -> p2 ; p1 <- p2 == p1 -> p3
+                // p0 => p2 ; p1 => p3
+
+                // ( p p) ( p p) ( p p)
+                let mut eq_id_rels = candidates
+                    .iter()
+                    .map(|(id1, id2, _)| {
+                        let p1 = map
+                            .iter()
+                            .position(|x| *x == id1.node())
+                            .unwrap_or(usize::MAX - 1); // to preserve order of non auto preds
+                        let p2 = map
+                            .iter()
+                            .position(|x| *x == id1.node())
+                            .unwrap_or(usize::MAX);
+                        if p1 < p2 { (p1, p2) } else { (p2, p1) }
+                    })
+                    .collect::<Vec<_>>();
+                eq_id_rels.sort();
+
+                let repl_refs = candidates.into_iter().zip(eq_id_rels).flat_map(
+                    |((id1, id2, pred), (i1, i2))| {
+                        let i1 = s.auto_caps.get(i1).copied();
+                        let i2 = s.auto_caps.get(i2).copied();
+                        if Some(id1.node()) == i1 && Some(id2.node()) == i2 {
+                            return Default::default();
+                        }
+                        let i1 = i1.unwrap_or(id1.node());
+                        let i2 = i2.unwrap_or(id2.node());
+                        vec![(id1.offsets(), i1), (id2.offsets(), i2)]
+                    },
+                );
+                let mut repl = repl_decls;
+                repl.extend(repl_refs);
+                repl.iter_mut().for_each(|(path, _)| {
+                    path.pop();
+                    path.reverse();
+                });
+                repl.sort_by(|a, b| b.0.cmp(&a.0));
+                let mut curr = query;
+                log::info!("repl: {} {:?}", repl.len(), repl);
+                for rm in 0..repl.len() {
+                    let (path, new) = repl[rm].clone();
+                    // path.pop();
+                    // path.reverse();
+                    let actions = vec![tsq_transform::Action::Replace { path, new }];
+                    match tsq_transform::try_regen_query(&s.query_store, curr, actions.clone()) {
+                        Some(query) => curr = query,
+                        None => {
+                            return Err((
+                                query,
+                                curr,
+                                x.1.clone(),
+                                repl[rm..].iter().map(|x| x.clone()).collect(),
+                            ));
+                        }
+                    }
+                }
+                // eprintln!(
+                //     "{}",
+                //     hyperast::nodes::SyntaxSerializer::new(&s.query_store, curr)
+                // );
+
+                Ok((curr, x.1))
+
+                // let mut to_rm: Vec<_> = to_rm
+                //     .into_iter()
+                //     .map(|path| tsq_transform::Action::Delete { path })
+                //     .collect();
+                // to_rm.sort_by(|a, b| b.path().cmp(a.path()));
+                // match tsq_transform::try_regen_query(&s.query_store, query, to_rm.clone()) {
+                //     Some(query) => Some(Ok((query, x.1))),
+                //     None => return Some(Err((query, x.1.clone(), to_rm))),
+                // }
             });
-            repl.sort_by(|a, b| b.0.cmp(&a.0));
-            let mut curr = query;
-            log::info!("repl: {} {:?}", repl.len(), repl);
-            for rm in 0..repl.len() {
-                let (path, new) = repl[rm].clone();
-                // path.pop();
-                // path.reverse();
-                let actions = vec![tsq_transform::Action::Replace { path, new }];
-                match tsq_transform::try_regen_query(&s.query_store, curr, actions.clone()) {
-                    Some(query) => curr = query,
-                    None => {
-                        return Err((
-                            query,
-                            curr,
-                            x.1.clone(),
-                            repl[rm..].iter().map(|x| x.clone()).collect(),
-                        ));
-                    }
-                }
-            }
-            // eprintln!(
-            //     "{}",
-            //     hyperast::nodes::SyntaxSerializer::new(&s.query_store, curr)
-            // );
-
-            Ok((curr, x.1))
-
-            // let mut to_rm: Vec<_> = to_rm
-            //     .into_iter()
-            //     .map(|path| tsq_transform::Action::Delete { path })
-            //     .collect();
-            // to_rm.sort_by(|a, b| b.path().cmp(a.path()));
-            // match tsq_transform::try_regen_query(&s.query_store, query, to_rm.clone()) {
-            //     Some(query) => Some(Ok((query, x.1))),
-            //     None => return Some(Err((query, x.1.clone(), to_rm))),
-            // }
-        });
         let (remains, mut rms): (
             Vec<(IdNQ, IdNQ, TR<Init>, Vec<(Vec<u16>, IdNQ)>)>,
             Vec<(IdNQ, TR<Init>)>,

@@ -17,7 +17,7 @@ fn main() -> eframe::Result<()> {
         .map_or(ADDR, |x| x)
         .to_string();
 
-    let languages = hyper_app::Languages::default();
+    let languages = hyper_app::Languages;
     static ICON: &[u8] = include_bytes!("coevolution.png");
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

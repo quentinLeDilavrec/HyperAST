@@ -786,7 +786,6 @@ impl<N: Clone + FlexPayload, E: Clone, Dn: egui_graphs::DisplayNode<N, E, Direct
                         rm = Some(idx)
                     }
                 });
-                drop(nodes);
 
                 if let Some(idx) = rm {
                     log::info!("Removing node {:?}", idx);

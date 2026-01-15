@@ -405,7 +405,7 @@ pub mod str_distance_patched {
 
             eq_map(iter_a, iter_b)
                 .into_iter()
-                .map(|(n1, n2)| if n1 > n2 { n1 - n2 } else { n2 - n1 })
+                .map(|(n1, n2)| n1.abs_diff(n2))
                 .sum()
         }
 

@@ -806,7 +806,9 @@ pub(crate) fn show_smells_graph_config(
                     }
                 })
                 .clicked()
-            {}
+            {
+                log::info!("TODO");
+            }
             ui.separator();
         }
     });
@@ -1209,7 +1211,7 @@ fn build_bigraph(
             // simple_add_edge(&mut g, i, x);
             waiting_inits[x] |= inits;
             let curr = waiting_inits[x];
-            waiting_inits[i as usize] |= curr;
+            waiting_inits[i] |= curr;
         }
         if x >= limit {
             break;

@@ -403,11 +403,10 @@ where
         let hyperast = self.hyperast;
         let decomp = &self.simple;
         let simple = Decompressible { hyperast, decomp };
-        let decomp = CompletePOSlice {
+        CompletePOSlice {
             simple: simple._slice(x),
             kr: &self.kr[range],
-        };
-        decomp
+        }
     }
 }
 

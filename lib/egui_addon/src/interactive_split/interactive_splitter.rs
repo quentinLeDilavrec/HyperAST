@@ -209,8 +209,8 @@ impl InteractiveSplitter {
         //     ui.set_min_width(*width_range.start());
         //     add_contents(ui)
         // });
-        let frame = None;
-        let frame = frame.unwrap_or_else(|| Frame::side_top_panel(ui.style()));
+        // let frame = frame.unwrap_or_else(|| Frame::side_top_panel(ui.style()));
+        let frame = Frame::side_top_panel(ui.style());
         let inner_response = frame.show(&mut first_ui, |first_ui| {
             // ui1.set_widthmin_height(ui1.max_rect().height()); // Make sure the frame fills the full height
             // ui1.set_min_width(*width_range.start());

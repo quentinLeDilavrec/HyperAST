@@ -988,7 +988,6 @@ impl CompressedCompo for D {
         let d = if let Some(d) = ptr.unerase_ref::<Dynamic>(tid) {
             d.clone()
         } else if let Some(x) = ptr.unerase_ref::<DynHolder<()>>(tid) {
-            x.0;
             ().into()
         } else if let Some(x) = ptr.unerase_ref::<DynHolder<u16>>(tid) {
             x.to_dyn()

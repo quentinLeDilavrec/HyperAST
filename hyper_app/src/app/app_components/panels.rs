@@ -527,7 +527,7 @@ impl crate::HyperApp {
         ui.add_space(20.0);
 
         const MAX: i64 = 60 * 60 * 24 * 365;
-        const MIN: i64 = 60 * 60 * 24 * 1;
+        const MIN: i64 = 60 * 60 * 24;
         let resp = &egui::widgets::Slider::new(&mut self.data.offset_fetch, 0..=MAX).ui(ui);
         if resp.drag_stopped() {
             self.save_interval = std::time::Duration::ZERO;

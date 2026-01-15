@@ -339,12 +339,13 @@ mod exp {
 
     fn f(w: &mut W, p: I) -> I {
         let pat = w.entry(p).unwrap();
-        match pat {
-            // Plus { pat } => match pat.as_ref() {
-            //     pat => Plus { pat }
-            // },
-            x => p,
-        }
+        p
+        // match pat {
+        //     // Plus { pat } => match pat.as_ref() {
+        //     //     pat => Plus { pat }
+        //     // },
+        //     x => p,
+        // }
     }
     enum P<T, I> {
         Named { ty: T, pat: Vec<I> },

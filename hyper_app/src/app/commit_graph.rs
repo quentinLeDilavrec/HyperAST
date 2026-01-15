@@ -824,7 +824,7 @@ fn label_formatter(
     value: &egui_plot::PlotPoint,
 ) -> String {
     fn msg(x: Option<&Result<commit::CommitMetadata, String>>) -> Option<&str> {
-        x?.as_ref().ok()?.message.as_ref().map(|s| s.as_str())
+        x?.as_ref().ok()?.message.as_deref()
     }
     if name == CUSTOM_LABEL_FORMAT_MARK_WITH_DATA {
         let i = value.x.to_bits() as usize;

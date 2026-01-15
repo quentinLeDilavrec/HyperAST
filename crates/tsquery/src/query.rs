@@ -1704,6 +1704,7 @@ impl Query {
         //     step_offsets[stp_id].step_index,
         //     immediate_matches_calls.len()
         // );
+        let re = regex::Regex::new("^[(]#(EQ|NOT-EQ|MATCH|ANY)[?]").unwrap();
         let mut aaa = 0;
         while stp_id < step_offsets.len()
             && (step_offsets[stp_id].step_index as usize) < limit_step_id
@@ -1714,7 +1715,6 @@ impl Query {
             let so = &step_offsets[stpid];
             // dbg!(so.step_index as usize, stpid);
             // assert_eq!(so.step_index as usize, step_id);
-            let re = regex::Regex::new("^[(]#(EQ|NOT-EQ|MATCH|ANY)[?]").unwrap();
             let haystack = &comment_line_removed[so.byte_offset as usize..];
             // if pattern_count > 10 {
             //     dbg!(stpid, so.step_index, &haystack[..10]);
@@ -2300,7 +2300,7 @@ mod exp {
         // },
     }
 
-    #[repr(packed)]
+    #[repr(C, packed)]
     struct F {
         is_named: bool,
         is_immediate: bool,

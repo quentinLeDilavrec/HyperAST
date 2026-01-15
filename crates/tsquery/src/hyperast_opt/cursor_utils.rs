@@ -197,7 +197,7 @@ where
 
 pub fn has_child_with_field_id<'hast, HAST: HyperAST>(
     stores: &'hast HAST,
-    pos: impl CursorHeadMove<HAST::IdN, HAST::Idx> + Clone + CursorHead<HAST::IdN, HAST::Idx>,
+    pos: impl CursorHeadMove<HAST::IdN, HAST::Idx> + Clone,
     field_id: <HAST::TS as RoleStore>::IdF,
 ) -> bool
 where

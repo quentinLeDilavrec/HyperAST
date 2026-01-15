@@ -816,11 +816,7 @@ impl<'a> FetchedViewImpl<'a> {
         let mut action = Action::Keep;
         let additions = self.additions.as_ref().map(|x| &x[..]);
         let deletions = self.deletions.as_ref().map(|x| &x[..]);
-        let mut prefill_old = if let Some(prefill_cache) = self.prefill_cache.take() {
-            prefill_cache
-        } else {
-            PrefillCache::default()
-        };
+        let mut prefill_old = self.prefill_cache.take().unwrap_or_default();
 
         let mut prefill = PrefillCache {
             head: prefill_old.head,

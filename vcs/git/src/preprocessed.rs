@@ -894,13 +894,13 @@ mod experiments {
             name: &[u8],
             oid: git2::Oid,
         ) -> <crate::maven::MavenModuleAcc as Accumulator>::Unlabeled {
-            processor_factory::ffwd::Maven {
-                sources: &middle::MiddleWare { repository },
-                maven: &mut self.maven,
-                pom: &mut self.pom,
-                java: &mut self.java,
-                dir_path,
-            };
+            // processor_factory::ffwd::Maven {
+            //     sources: &middle::MiddleWare { repository },
+            //     maven: &mut self.maven,
+            //     pom: &mut self.pom,
+            //     java: &mut self.java,
+            //     dir_path,
+            // };
             // MavenProcessor::<RMS, FFWD, MavenModuleAcc>::new(repository, self, dir_path, name, oid)
             //     .process()
             todo!()

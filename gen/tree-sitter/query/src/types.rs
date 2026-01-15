@@ -717,9 +717,7 @@ impl Type {
         }
     }
     pub fn is_supertype(&self) -> bool {
-        match self {
-            _ => false,
-        }
+        false
     }
     pub fn is_named(&self) -> bool {
         match self {

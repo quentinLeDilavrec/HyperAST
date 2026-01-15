@@ -289,11 +289,15 @@ fn main() {
                 //         ))
                 //         .collect::<String>()
                 // );
-                let mut file = match std::fs::OpenOptions::new().write(true).create(true).open({
-                    let mut output = output.clone();
-                    output.set_extension("md");
-                    output
-                }) {
+                let mut file = match std::fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open({
+                        let mut output = output.clone();
+                        output.set_extension("md");
+                        output
+                    }) {
                     Ok(file) => file,
                     Err(e) => {
                         println!("Error opening file: {}", e);
@@ -331,11 +335,15 @@ fn main() {
                 ) {
                     eprintln!("{}", e);
                 }
-                let mut file = match std::fs::OpenOptions::new().write(true).create(true).open({
-                    let mut output = output.clone();
-                    output.set_extension("csv");
-                    output
-                }) {
+                let mut file = match std::fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open({
+                        let mut output = output.clone();
+                        output.set_extension("csv");
+                        output
+                    }) {
                     Ok(file) => file,
                     Err(e) => {
                         println!("Error opening file: {}", e);

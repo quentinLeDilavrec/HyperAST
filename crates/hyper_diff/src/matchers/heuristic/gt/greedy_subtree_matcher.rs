@@ -326,11 +326,9 @@ where
             //     marks_for_dst_trees.len()
             // );
 
-            for i in 0..current_height_src_trees.len() {
-                for j in 0..current_height_dst_trees.len() {
-                    let src = current_height_src_trees[i];
-                    let dst = current_height_dst_trees[j];
-                    if Self::isomorphic(mapper, &src, &dst) {
+            for (i, src) in current_height_src_trees.iter().enumerate() {
+                for (j, dst) in current_height_dst_trees.iter().enumerate() {
+                    if Self::isomorphic(mapper, src, dst) {
                         // println!("isomorphic={},{}", i, j);
                         // println!(
                         //     "children={},{}",

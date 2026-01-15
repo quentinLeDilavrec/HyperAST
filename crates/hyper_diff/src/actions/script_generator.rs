@@ -473,8 +473,8 @@ where
         }
         let xpos = self.dst_arena.position_in_parent(x).unwrap();
         let mut v: Option<IdD> = None;
-        for i in 0..xpos {
-            let c: &IdD = &siblings[i];
+
+        for c in siblings.iter().take(xpos) {
             if self.dst_in_order.contains(c) {
                 v = Some(*c);
             };

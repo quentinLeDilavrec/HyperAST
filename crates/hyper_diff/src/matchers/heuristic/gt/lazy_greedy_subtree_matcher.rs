@@ -363,10 +363,9 @@ where
             let mut marks_for_src_trees = bitvec::bitbox![0;current_height_src_trees.len()];
             let mut marks_for_dst_trees = bitvec::bitbox![0;current_height_dst_trees.len()];
 
-            for i in 0..current_height_src_trees.len() {
-                for j in 0..current_height_dst_trees.len() {
-                    let src = current_height_src_trees[i].clone();
-                    let dst = current_height_dst_trees[j].clone();
+            for (i, src) in current_height_src_trees.iter().enumerate() {
+                for (j, dst) in current_height_dst_trees.iter().cloned().enumerate() {
+                    let src = src.clone();
                     let is_iso = {
                         let src = src_trees.arena.original(&src);
                         let dst = dst_trees.arena.original(&dst);

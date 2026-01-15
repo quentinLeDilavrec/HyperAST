@@ -63,6 +63,7 @@ impl InteractiveSplitter {
         self.show_dyn(ui, Box::new(add_contents))
     }
 
+    #[expect(clippy::type_complexity)]
     pub fn show_dyn<'c, R>(
         self,
         ui: &mut Ui,

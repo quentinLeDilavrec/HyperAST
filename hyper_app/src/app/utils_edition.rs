@@ -218,13 +218,13 @@ pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
         }
     }
 }
-
+type SparseVecSharedDoc = Vec<Option<crdt_over_ws::SharedDocView>>;
 pub(super) async fn db_update_handler(
     mut sender: futures::channel::mpsc::Sender<tokio_tungstenite_wasm::Message>,
     mut receiver: futures_util::stream::SplitStream<tokio_tungstenite_wasm::WebSocketStream>,
     owner: String,
     ctx: egui::Context,
-    data: Arc<RwLock<(Option<usize>, Vec<Option<crdt_over_ws::SharedDocView>>)>>,
+    data: Arc<RwLock<(Option<usize>, SparseVecSharedDoc)>>,
 ) {
     use futures_util::StreamExt;
     type User = String;

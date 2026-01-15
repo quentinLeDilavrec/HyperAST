@@ -118,9 +118,6 @@ pub(crate) fn diff(
     );
     let mapper = diff.mapper;
     let actions = diff.actions.unwrap();
-    // let actions = _diff(&state, src_tr, dst_tr, with_spaces_stores, stores)?
-    //     .actions
-    //     .unwrap();
     dbg!(&actions.len());
 
     enum Choice {
@@ -163,127 +160,6 @@ pub(crate) fn diff(
         deletes,
         inserts,
         moves,
-    })
-}
-
-fn _diff(
-    state: &crate::AppState,
-    src_tr: NodeIdentifier,
-    dst_tr: NodeIdentifier,
-    with_spaces_stores: &hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
-    stores: &hyperast::store::SimpleStores<
-        hyperast_vcs_git::TStore,
-        hyperast_vcs_git::no_space::NoSpaceNodeStoreWrapper<'_>,
-        &LabelStore,
-    >,
-) -> Result<
-    DiffResult<SimpleAction<LabelIdentifier, CompressedTreePath<u16>, NodeIdentifier>, (), ()>,
-    // ActionsVec<SimpleAction<LabelIdentifier, CompressedTreePath<u16>, NodeIdentifier>>,
-    String,
-> {
-    let binding = crate::utils::bind_tree_pair(&state.partial_decomps, &src_tr, &dst_tr);
-    use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
-    use hyperast::types::WithStats;
-    let mapped = {
-        let mappings_cache = &state.mappings_alone;
-        use hyper_diff::matchers::mapping_store;
-        use mapping_store::MappingStore;
-        use mapping_store::VecStore;
-
-        let hyperast = stores;
-        use hyper_diff::matchers::Mapping;
-
-        dbg!();
-        match mappings_cache.entry((src_tr, dst_tr)) {
-            dashmap::mapref::entry::Entry::Occupied(entry) => entry.into_ref().downgrade(),
-            dashmap::mapref::entry::Entry::Vacant(entry) => {
-                // std::collections::hash_map::Entry::Vacant(entry) => {
-                let mappings = VecStore::default();
-                let mut locked = binding.lock();
-                let (src_arena, dst_arena) = locked.as_mut(stores);
-                dbg!(src_arena.len());
-                dbg!(dst_arena.len());
-                let src_size = stores.node_store.resolve(src_tr).size();
-                let dst_size = stores.node_store.resolve(dst_tr).size();
-                dbg!(src_size);
-                dbg!(dst_size);
-                let mut mapper = hyper_diff::matchers::Mapper {
-                    hyperast,
-                    mapping: Mapping {
-                        src_arena: Decompressible {
-                            hyperast,
-                            decomp: src_arena,
-                        },
-                        dst_arena: Decompressible {
-                            hyperast,
-                            decomp: dst_arena,
-                        },
-                        mappings,
-                    },
-                };
-                dbg!();
-                dbg!(mapper.mapping.src_arena.len());
-                dbg!(mapper.mapping.dst_arena.len());
-                mapper.mapping.mappings.topit(
-                    mapper.mapping.src_arena.len(),
-                    mapper.mapping.dst_arena.len(),
-                );
-                crate::matching::full2(&mut mapper);
-
-                // TODO match decls by sig/path
-
-                let vec_store = mapper.mappings.clone();
-
-                dbg!();
-                entry
-                    .insert((crate::MappingStage::Bottomup, vec_store))
-                    .downgrade()
-            }
-        }
-    };
-    let mut locked = binding.lock();
-    let (src_arena, dst_arena) = locked.as_mut(stores);
-    dbg!();
-    let mut src_arena = Decompressible {
-        hyperast: stores,
-        decomp: src_arena,
-    };
-    let mut dst_arena = Decompressible {
-        hyperast: stores,
-        decomp: dst_arena,
-    };
-    src_arena.complete_subtree(&src_arena.root());
-    let src_arena = complete_post_order_ref::CompletePostOrder::from(&*src_arena.decomp);
-    dbg!();
-    dst_arena.complete_subtree(&dst_arena.root());
-    let dst_arena = complete_post_order_ref::CompletePostOrder::from(&*dst_arena.decomp);
-    dbg!();
-    let dst_arena = Decompressible {
-        hyperast: stores,
-        decomp: dst_arena,
-    };
-    let dst_arena = SimpleBfsMapper::with_store(stores, dst_arena);
-    dbg!();
-    let ms = &mapped.1;
-    let src_arena = Decompressible {
-        hyperast: stores,
-        decomp: src_arena,
-    };
-    let mapping = hyper_diff::matchers::Mapping {
-        src_arena,
-        dst_arena,
-        mappings: ms.clone(),
-    };
-
-    let mut this = ScriptGenerator::new(stores, &mapping.src_arena, &mapping.dst_arena)
-        .init_cpy(&mapping.mappings);
-    this.auxilary_ins_mov_upd(&|w, x| assert_eq!(stores.resolve_type(w), stores.resolve_type(x)))?;
-    this.del();
-
-    Ok(DiffResult {
-        mapper: (),
-        actions: Some(this.actions),
-        exec_data: (),
     })
 }
 

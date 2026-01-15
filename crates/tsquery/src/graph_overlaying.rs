@@ -63,11 +63,11 @@ where
         let pos = Pos::empty();
         let cursor = crate::cursor_on_unbuild::TreeCursor::new(stores, acc, label, pos);
         use crate::cursor_on_unbuild::Node as N;
-        let mut qcursor: crate::QueryCursor<
-            '_,
-            _,
-            N<HAST::S<'_>, &Acc, HAST::Idx, Pos<HAST::IdN, HAST::Idx>, &str>,
-        > = query.matches_immediate(cursor); // TODO filter on height (and visibility?)
+        #[allow(type_alias_bounds)]
+        type NNN<'a, HAST: StoreRefAssoc, Acc> =
+            N<HAST::S<'a>, &'a Acc, HAST::Idx, Pos<HAST::IdN, HAST::Idx>, &'a str>;
+        let mut qcursor: crate::QueryCursor<'_, _, NNN<'_, HAST, Acc>> =
+            query.matches_immediate(cursor); // TODO filter on height (and visibility?)
         let mut r = Default::default();
         loop {
             let Some(m) = qcursor._next_match() else {
@@ -216,15 +216,12 @@ where
             // ORI: ... matches.next() ...
             let mat: stepped_query_imm::MyQMatch<_, &Acc> = {
                 let Some(mat) = matches.next() else { break };
-                let qm: crate::QueryMatch<
-                    stepped_query_imm::Node<
-                        <HAST as StoreRefAssoc>::S<'_>,
-                        &Acc,
-                        HAST::Idx,
-                        Pos<HAST::IdN, HAST::Idx>,
-                        &str,
-                    >,
-                > = unsafe { std::mem::transmute(mat.qm) };
+                use stepped_query_imm::Node as N;
+                #[allow(type_alias_bounds)]
+                type NNN<'a, HAST: StoreRefAssoc, Acc> =
+                    N<HAST::S<'a>, &'a Acc, HAST::Idx, Pos<HAST::IdN, HAST::Idx>, &'a str>;
+                let qm: crate::QueryMatch<NNN<'_, HAST, Acc>> =
+                    unsafe { std::mem::transmute(mat.qm) };
                 stepped_query_imm::MyQMatch {
                     stores: tree.0.stores,
                     b: mat.b,

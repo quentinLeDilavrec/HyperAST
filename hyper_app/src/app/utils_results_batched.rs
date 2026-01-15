@@ -274,12 +274,14 @@ impl<T> PartialError<T> for String {
     }
 }
 
+type ComputeResultRows<E> = [Result<ComputeResultIdentified, E>];
+
 pub(crate) fn show_long_result_table(
     ui: &mut egui::Ui,
     content: (
         &[String],
         Option<&[String]>,
-        &[Result<ComputeResultIdentified, impl PartialError<ComputeResultIdentified>>],
+        &ComputeResultRows<impl PartialError<ComputeResultIdentified>>,
     ),
     selected_commit: &mut Option<usize>,
     commit_info: impl Fn(&str) -> Option<String>,

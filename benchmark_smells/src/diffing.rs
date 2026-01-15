@@ -6,14 +6,18 @@ use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
 use hyperast::types::{self, HyperAST, NodeId};
 use std::fmt::Debug;
 
-fn _top_down<HAST: HyperAST + Copy>(
-    mapper: &mut Mapper<
-        HAST,
-        Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, u32>>,
-        Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, u32>>,
-        VecStore<u32>,
-    >,
-) where
+type IdD = u32;
+
+#[allow(type_alias_bounds)]
+type LazyVecMapper<'a, HAST: HyperAST, IdD> = Mapper<
+    HAST,
+    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>>,
+    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>>,
+    VecStore<IdD>,
+>;
+
+fn _top_down<HAST: HyperAST + Copy>(mapper: &mut LazyVecMapper<'_, HAST, IdD>)
+where
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
@@ -27,14 +31,9 @@ fn _top_down<HAST: HyperAST + Copy>(
 
 pub fn top_down<'a, HAST: HyperAST + Copy>(
     hyperast: HAST,
-    src_arena: &'a mut LazyPostOrder<HAST::IdN, u32>,
-    dst_arena: &'a mut LazyPostOrder<HAST::IdN, u32>,
-) -> Mapper<
-    HAST,
-    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, u32>>,
-    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, u32>>,
-    VecStore<u32>,
->
+    src_arena: &'a mut LazyPostOrder<HAST::IdN, IdD>,
+    dst_arena: &'a mut LazyPostOrder<HAST::IdN, IdD>,
+) -> LazyVecMapper<'a, HAST, IdD>
 where
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,

@@ -34,6 +34,15 @@ mod view;
 mod ws;
 pub use ws::ws_handler;
 
+type DocState = (
+    RwLock<automerge::AutoCommitWithObs<automerge::transaction::UnObserved>>,
+    (
+        tokio::sync::broadcast::Sender<(SocketAddr, Vec<automerge::Change>)>,
+        tokio::sync::broadcast::Receiver<(SocketAddr, Vec<automerge::Change>)>,
+    ),
+    RwLock<Vec<tokio::sync::mpsc::Sender<Option<Vec<u8>>>>>,
+);
+
 // #[derive(Default)]
 pub struct AppState {
     pub db: DashMap<String, Bytes>,
@@ -43,14 +52,7 @@ pub struct AppState {
     mappings_alone: MappingAloneCache,
     partial_decomps: PartialDecompCache,
     // Single shared doc
-    doc: Arc<(
-        RwLock<automerge::AutoCommit>,
-        (
-            tokio::sync::broadcast::Sender<(SocketAddr, Vec<automerge::Change>)>,
-            tokio::sync::broadcast::Receiver<(SocketAddr, Vec<automerge::Change>)>,
-        ),
-        RwLock<Vec<tokio::sync::mpsc::Sender<Option<Vec<u8>>>>>,
-    )>,
+    doc: Arc<DocState>,
     // Multiple shared docs
     doc2: ws::SharedDocs,
     pr_cache: RwLock<std::collections::HashMap<commit::Param, pull_requests::RawPrData>>,

@@ -326,6 +326,7 @@ impl Default for Config {
 }
 
 pub(crate) type RemoteResult = Remote<Result<SearchResults, SmellsError>>;
+pub(crate) type ResourceResult = Resource<Result<SearchResults, SmellsError>>;
 pub(crate) type RemoteResultDiffs = Remote<Result<ExamplesValues, DiffsError>>;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -719,7 +720,7 @@ pub(super) fn show_central_panel(
 pub(crate) fn show_smells_graph_config(
     ui: &mut egui::Ui,
     smells: &mut Config,
-    result: &Result<Resource<Result<SearchResults, SmellsError>>, String>,
+    result: &Result<ResourceResult, String>,
     gid: u16,
 ) {
     ui.label("enable force_layout feature")
@@ -1767,7 +1768,7 @@ fn init_slider(smells: &mut Config, queries: &SearchResults) -> bool {
 
 pub(crate) fn access_smells_results<'a>(
     ui: &mut egui::Ui,
-    result: &'a Result<Resource<Result<SearchResults, SmellsError>>, String>,
+    result: &'a Result<ResourceResult, String>,
 ) -> Option<&'a SearchResults> {
     let Ok(resource) = result else {
         return None;
@@ -1784,13 +1785,11 @@ pub(crate) fn access_smells_results<'a>(
     };
     content.as_ref().ok()
 }
-
 pub(crate) fn prep_smells_results<'a>(
     ui: &mut egui::Ui,
     smells: &mut Config,
     smells_result: &'a mut RemoteResult,
-) -> Result<&'a Result<Resource<Result<SearchResults, SmellsError>>, String>, Option<egui::Response>>
-{
+) -> Result<&'a Result<ResourceResult, String>, Option<egui::Response>> {
     let Some(result) = smells_result.ready() else {
         // let center = ui.available_rect_before_wrap().center();
         // egui::Window::new("Actions")
@@ -2378,15 +2377,13 @@ pub(super) fn fetch_results(
 
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // will wake up UI thread
-        let resource = response.and_then(|response| {
-            Resource::<Result<SearchResults, SmellsError>>::from_response(&ctx, response)
-        });
+        let resource = response.and_then(|response| ResourceResult::from_response(&ctx, response));
         sender.send(resource);
     });
     promise
 }
 
-impl Resource<Result<SearchResults, SmellsError>> {
+impl ResourceResult {
     pub(super) fn from_response(
         _ctx: &egui::Context,
         response: ehttp::Response,

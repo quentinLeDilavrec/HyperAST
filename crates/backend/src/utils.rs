@@ -28,15 +28,16 @@ pub type NoS<'a> = SimpleStores<
     &'a hyperast::store::labels::LabelStore,
 >;
 
+type Binding =
+    clashmap::RwLock<hashbrown::HashTable<(IdN, lazy_post_order::LazyPostOrder<IdN, u32>)>>;
+
 /// CAUTION a cache should be used on a single HyperAST
 /// btw a given HyperAST can be used by multiple caches
 pub(crate) fn bind_tree_pair<'a>(
     partial_comp_cache: &'a crate::PartialDecompCache,
     src: &IdN,
     dst: &IdN,
-) -> PairLock<
-    &'a clashmap::RwLock<hashbrown::HashTable<(IdN, lazy_post_order::LazyPostOrder<IdN, u32>)>>,
-> {
+) -> PairLock<&'a Binding> {
     let hasher = partial_comp_cache.hasher().clone();
     let hash1 = partial_comp_cache.hash_usize(src);
     let hash2 = partial_comp_cache.hash_usize(dst);

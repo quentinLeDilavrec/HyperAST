@@ -66,17 +66,7 @@ where
         let pos = P::empty();
 
         let cursor = crate::cursor_on_unbuild::TreeCursor::new(stores, acc, label, pos);
-        let mut qcursor: crate::QueryCursor<
-            '_,
-            _,
-            <crate::cursor_on_unbuild::Node<
-                HAST::S<'_>,
-                &Acc,
-                _,
-                P<_, _>,
-                &str,
-            > as crate::Cursor>::Node,
-        > = self.0.matches_immediate(cursor); // TODO filter on height (and visibility?)
+        let mut qcursor: crate::QueryCursor<'_, _, _> = self.0.matches_immediate(cursor); // TODO filter on height (and visibility?)
         let mut r = Default::default();
         for m in qcursor {
             assert!(m.pattern_index.to_usize() < 16);

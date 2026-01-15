@@ -1730,17 +1730,15 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         }
     }
 }
-
+type ComputeRes = Result<utils_results_batched::ComputeResultIdentified, querying::MatchingError>;
+type StreamedComputeTable = querying::StreamedDataTable<Vec<String>, ComputeRes>;
 fn extract_qres<'a>(
     ui: &mut egui::Ui,
     qres: Option<&'a mut QueryResults>,
 ) -> Option<(
     &'a mut ProjectId,
     &'a mut QueryId,
-    &'a mut querying::StreamedDataTable<
-        Vec<String>,
-        Result<utils_results_batched::ComputeResultIdentified, querying::MatchingError>,
-    >,
+    &'a mut StreamedComputeTable,
 )> {
     let Some(QueryResults {
         project: pid,

@@ -7,6 +7,12 @@ use egui_addon::{
 use re_ui::UiExt;
 use std::collections::hash_map;
 
+type ShowRes<T> = (
+    egui::Response,
+    egui::InnerResponse<()>,
+    std::option::Option<egui::InnerResponse<Option<T>>>,
+);
+
 #[allow(unused)] // TODO move to egui_addon
 pub trait MyUiExt: UiExt {
     fn radio_collapsing<R, S: PartialEq + Clone>(
@@ -30,15 +36,7 @@ pub trait MyUiExt: UiExt {
         commit: &types::Commit,
         file_path: &mut String,
         file_result: hash_map::Entry<'_, types::FileIdentifier, code_tracking::RemoteFile>,
-    ) -> (
-        egui::Response,
-        egui::InnerResponse<()>,
-        std::option::Option<
-            egui::InnerResponse<
-                Option<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>>,
-            >,
-        >,
-    ) {
+    ) -> ShowRes<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>> {
         egui::ScrollArea::horizontal()
             .show(self.ui_mut(), |ui| {
                 ui.show_remote_code1(
@@ -61,15 +59,7 @@ pub trait MyUiExt: UiExt {
         file_result: hash_map::Entry<'_, types::FileIdentifier, code_tracking::RemoteFile>,
         desired_width: f32,
         wrap: bool,
-    ) -> (
-        egui::Response,
-        egui::InnerResponse<()>,
-        std::option::Option<
-            egui::InnerResponse<
-                Option<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>>,
-            >,
-        >,
-    ) {
+    ) -> ShowRes<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>> {
         let mut upd_src = false;
         egui::collapsing_header::CollapsingState::load_with_default_open(
             self.ui().ctx(),
@@ -154,20 +144,8 @@ pub trait MyUiExt: UiExt {
         file_result: hash_map::Entry<'_, types::FileIdentifier, code_tracking::RemoteFile>,
         desired_width: f32,
         wrap: bool,
-    ) -> (
-        egui::Response,
-        egui::InnerResponse<()>,
-        std::option::Option<
-            egui::InnerResponse<
-                Option<
-                    egui::scroll_area::ScrollAreaOutput<(
-                        SkipedBytes,
-                        egui::text_edit::TextEditOutput,
-                    )>,
-                >,
-            >,
-        >,
-    ) {
+    ) -> ShowRes<egui::scroll_area::ScrollAreaOutput<(SkipedBytes, egui::text_edit::TextEditOutput)>>
+    {
         let mut upd_src = false;
         egui::collapsing_header::CollapsingState::load_with_default_open(
             self.ui().ctx(),

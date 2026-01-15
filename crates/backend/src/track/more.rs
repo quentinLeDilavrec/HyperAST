@@ -17,17 +17,17 @@ use hyperast::types::{Childrn, HyperAST, NodeStore, WithChildren};
 use mapping_store::MappingStore;
 
 type IdD = u32;
+type LazyVecMapping =
+    Mapping<LazyPostOrder<IdN, IdD>, LazyPostOrder<IdN, IdD>, mapping_store::VecStore<IdD>>;
+type LazyRefMut<'a> = clashmap::mapref::one::RefMut<'a, IdN, LazyPostOrder<IdN, IdD>>;
+
 // WARN lazy subtrees are not complete
 fn lazy_mapping<'a>(
     repositories: &'a PreProcessedRepositories,
     mappings: &'a crate::MappingCache,
     src_tr: IdN,
     dst_tr: IdN,
-) -> dashmap::mapref::one::RefMut<
-    'a,
-    (IdN, IdN),
-    Mapping<LazyPostOrder<IdN, IdD>, LazyPostOrder<IdN, IdD>, mapping_store::VecStore<IdD>>,
-> {
+) -> dashmap::mapref::one::RefMut<'a, (IdN, IdN), LazyVecMapping> {
     use mapping_store::DefaultMappingStore as M;
     use mapping_store::DefaultMultiMappingStore as MM;
 
@@ -92,11 +92,7 @@ fn lazy_subtree_mapping<'a>(
     partial_comp_cache: &'a crate::PartialDecompCache,
     src_tr: IdN,
     dst_tr: IdN,
-) -> Mapping<
-    clashmap::mapref::one::RefMut<'a, IdN, LazyPostOrder<IdN, IdD>>,
-    clashmap::mapref::one::RefMut<'a, IdN, LazyPostOrder<IdN, IdD>>,
-    mapping_store::MultiVecStore<IdD>,
-> {
+) -> Mapping<LazyRefMut<'a>, LazyRefMut<'a>, mapping_store::MultiVecStore<IdD>> {
     use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher as SubtreeMatcher;
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
     use hyper_diff::matchers::heuristic::gt;

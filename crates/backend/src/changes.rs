@@ -299,14 +299,17 @@ use hyperast::PrimInt;
 use hyperast::types;
 use types::WithHashs;
 
+#[allow(type_alias_bounds)]
+type Mpr<'tree, HAST: HyperAST, M: MonoMappingStore> = hyper_diff::matchers::Mapper<
+    HAST,
+    Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Src>>,
+    Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Dst>>,
+    M,
+>;
+
 pub fn continue_compute_mappings_full<'alone, 'tree, HAST: HyperAST + Copy, M, MM>(
     mappings_alone: &'alone crate::MappingAloneCache<HAST::IdN, M>,
-    mapper: &mut hyper_diff::matchers::Mapper<
-        HAST,
-        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Src>>,
-        Decompressible<HAST, &'tree mut LazyPostOrder<HAST::IdN, M::Dst>>,
-        M,
-    >,
+    mapper: &mut Mpr<'tree, HAST, M>,
     partial: Option<MM>,
 ) -> MappingAloneCacheRef<'alone, HAST::IdN, M>
 where

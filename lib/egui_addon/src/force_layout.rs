@@ -510,6 +510,7 @@ pub mod settings;
 
 const EVENTS_LIMIT: usize = 100;
 
+type SparseGraphVec<T> = Vec<Option<(T, GraphId)>>;
 type GraphId = String;
 pub struct ForceBasedGraphExplorationApp<
     N: Clone = (),
@@ -519,7 +520,7 @@ pub struct ForceBasedGraphExplorationApp<
     g: Graph<N, E, Directed, DefaultIx, Dn>,
 
     id: GraphId,
-    others: Vec<Option<(Graph<N, E, Directed, DefaultIx, Dn>, GraphId)>>,
+    others: SparseGraphVec<Graph<N, E, Directed, DefaultIx, Dn>>,
     /// the active graph in the `others` vec
     active: usize,
 

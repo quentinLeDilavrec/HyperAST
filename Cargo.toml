@@ -74,8 +74,6 @@ unexpected_cfgs = { level = "allow" }
 # Lets see
 style = { level = "allow", priority = -1 } # TODO
 
-type_complexity = "allow"
-
 # in Rust it can be very tedious to reduce argument count without
 # running afoul of the borrow checker.
 too_many_arguments = "allow"

@@ -348,6 +348,8 @@ impl<Init> QueryLattice<Init> {
     }
 }
 
+type VecDedup<Init, T> = Vec<(Init, (IdNQ, T))>;
+
 impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
     pub fn get_query(&self, index: usize) -> Option<(String, &[IdQ])> {
         self.queries
@@ -385,7 +387,7 @@ impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
         meta_gen: &'q hyperast_tsquery::Query,
         meta_simp: &'q hyperast_tsquery::Query,
         f: &impl Fn(qgen::FNode) -> T,
-    ) -> Builder<'q, Init, Vec<(Init, (IdNQ, T))>>
+    ) -> Builder<'q, Init, VecDedup<Init, T>>
     where
         TS: TypeStore + RoleStore,
         TIdN: TypedNodeId<IdN = IdN>,
@@ -525,7 +527,7 @@ impl<TR> Ded for DedupBySize2<TR> {
 
 #[cfg(feature = "synth_par")]
 pub fn group_by_size<Init: Clone + SolvedPosition<IdN> + Eq + Sync + Send>(
-    from: Vec<(Init, (IdNQ, (u32, u32)))>,
+    from: VecDedup<Init, (u32, u32)>,
 ) -> DedupBySize2<TR<Init>> {
     use rayon::iter::IntoParallelIterator as _;
     use rayon::iter::ParallelIterator;
@@ -712,7 +714,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
     /// Must use dedup_removes_par on output to properly progress
     #[must_use]
-    fn removes_par(&mut self, active_size: usize, active: &mut Vec<IdNQ>) -> Vec<(IdNQ, TR<Init>)> {
+    fn removes_par(&mut self, active_size: usize, active: &mut Vec<IdNQ>) -> Vec<Simplified<Init>> {
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
         let meta_simp = self.meta_simp;
@@ -843,12 +845,10 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         Init: Eq,
     {
         let mut active_size = self.dedup.len() - 1;
-        // eprintln!("{active_size}: {}", pp_dedup(&self.dedup, active_size));
         let mut active: Vec<_> = self.actives(active_size);
         loop {
             dbg!(active_size);
             dbg!(active.len());
-            // eprintln!("{}", pp_dedup(&self.dedup, active_size));
             let (uniqs, already) = self.uniques_par_par(active_size, &mut active);
             dbg!(uniqs.len());
             self.dedup_uniques_par(active_size, uniqs);
@@ -916,7 +916,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         &mut self,
         _active_size: usize,
         active: &mut Vec<IdNQ>,
-    ) -> Vec<(IdNQ, TR<Init>)> {
+    ) -> Vec<Simplified<Init>> {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -935,7 +935,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 })
                 .collect::<Vec<_>>()
         });
-        let (remains, mut rms): (Vec<(IdN, Vec<u16>)>, Vec<(IdN, TR<Init>)>) =
+        let (remains, mut rms): (Vec<SimpRmsRemains>, Vec<(IdN, TR<Init>)>) =
             ParallelIterator::partition_map(rms, |x| x.into());
         log::info!("remains: {}", remains.len());
         log::info!("rms: {}", rms.len());
@@ -966,7 +966,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         active_size: usize,
         active: &mut Vec<IdNQ>,
         cid: hyperast_tsquery::CaptureId,
-    ) -> Vec<(IdNQ, TR<Init>)> {
+    ) -> Vec<Simplified<Init>> {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -980,7 +980,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 Err(e) => Err(e),
             })
         });
-        let (remains, mut rms): (Vec<(IdNQ, IdNQ, Vec<Vec<u16>>)>, Vec<(IdNQ, TR<Init>)>) =
+        let (remains, mut rms): (Vec<RmAllAlt>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
         log::info!("remains: {}", remains.len());
         log::info!("rms: {}", rms.len());
@@ -1015,7 +1015,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
     #[must_use]
     // remove incomplete predicates and unused predicates from a pattern so they compile
-    pub fn repair_par(&mut self, rms: Vec<(IdNQ, TR<Init>)>) -> Vec<(IdNQ, TR<Init>)> {
+    pub fn repair_par(&mut self, rms: Vec<(IdNQ, TR<Init>)>) -> Vec<Simplified<Init>> {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -1096,10 +1096,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 // .collect::<Vec<_>>();
                 .for_each(|x| to_rm.register(&x.2));
 
-            let refs: HashSet<_> = refs
-                .into_iter(|x| x.node())
-                .chain([root_cap])
-                .collect();
+            let refs: HashSet<_> = refs.into_iter(|x| x.node()).chain([root_cap]).collect();
 
             // let unused_decls =
             decl_nodes
@@ -1158,10 +1155,9 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
             //     None => return Some(Err((query, x.1.clone(), to_rm))),
             // }
         });
-        let (remains, mut rms): (
-            Vec<(IdNQ, IdNQ, TR<Init>, Vec<Vec<u16>>)>,
-            Vec<(IdNQ, TR<Init>)>,
-        ) = ParallelIterator::partition_map(rms, |x| x.into());
+        type RepairRemains<Init> = (IdNQ, IdNQ, TR<Init>, Vec<PendingRmPath>);
+        let (remains, mut rms): (Vec<RepairRemains<Init>>, Vec<Simplified<Init>>) =
+            ParallelIterator::partition_map(rms, |x| x.into());
         log::info!("remains: {}", remains.len());
         log::info!("rms: {}", rms.len());
 
@@ -1194,7 +1190,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
     #[must_use]
     /// normalize captures to avoid duplicates due to what are actually free variable
-    fn norm_caps(&mut self, rms: Vec<(IdNQ, TR<Init>)>) -> Vec<(IdNQ, TR<Init>)> {
+    fn norm_caps(&mut self, rms: Vec<(IdNQ, TR<Init>)>) -> Vec<Simplified<Init>> {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -1345,10 +1341,9 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 //     None => return Some(Err((query, x.1.clone(), to_rm))),
                 // }
             });
-        let (remains, mut rms): (
-            Vec<(IdNQ, IdNQ, TR<Init>, Vec<(Vec<u16>, IdNQ)>)>,
-            Vec<(IdNQ, TR<Init>)>,
-        ) = ParallelIterator::partition_map(rms, |x| x.into());
+        type NormRemains<Init> = (IdNQ, IdNQ, TR<Init>, Vec<(PendingRmPath, IdNQ)>);
+        let (remains, mut rms): (Vec<NormRemains<Init>>, Vec<Simplified<Init>>) =
+            ParallelIterator::partition_map(rms, |x| x.into());
         log::info!("remains: {}", remains.len());
         log::info!("rms: {}", rms.len());
 
@@ -1385,7 +1380,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         &mut self,
         active_size: usize,
         active: &mut Vec<IdNQ>,
-    ) -> (Vec<(IdNQ, TR<Init>)>, Vec<IdNQ>) {
+    ) -> (Vec<Simplified<Init>>, Vec<IdNQ>) {
         use rayon::iter::IntoParallelIterator as _;
         use rayon::iter::ParallelIterator;
 
@@ -1408,12 +1403,11 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 .collect::<Vec<_>>()
         });
 
-        let ((remains, already), mut rms): (
-            (Vec<(IdNQ, IdNQ, Vec<Vec<u16>>)>, Vec<IdNQ>),
-            Vec<(IdNQ, TR<Init>)>,
-        ) = ParallelIterator::partition_map(rms, |x| x);
-        log::info!("remains: {}", remains.len());
+        let (alt, mut rms): (_, Vec<Simplified<Init>>) =
+            ParallelIterator::partition_map(rms, |x| x);
         log::info!("uniqs: {}", rms.len());
+        let (remains, already): (Vec<RmAllAlt>, Vec<IdNQ>) = alt;
+        log::info!("remains: {}", remains.len());
         log::info!("already: {}", already.len());
 
         // now handling the remaining patterns that require mut access to query_store,
@@ -1708,35 +1702,6 @@ fn cmp_lat_entry<TS: TypeStore + RoleStore, T: PartialOrd>(
     }
 }
 
-pub fn pp_dedup<E, E2>(
-    dedup: &Vec<std::collections::HashMap<u32, Vec<(E, TR<E2>)>>>,
-    active_size: usize,
-) -> String {
-    dedup[..active_size + 1]
-        .iter()
-        .fold(Vec::<Result<usize, usize>>::new(), |mut acc, x| {
-            if x.is_empty() {
-                if acc.last().is_some_and(|x| x.is_err()) {
-                    if let Err(x) = acc.last_mut().unwrap() {
-                        *x += 1;
-                    }
-                } else {
-                    acc.push(Err(1));
-                }
-            } else {
-                acc.push(Ok(x.len()));
-            }
-            acc
-        })
-        .into_iter()
-        .map(|x| match x {
-            Ok(x) => format!("{x}"),
-            Err(x) => format!("{x}x0"),
-        })
-        .collect::<Vec<_>>()
-        .join(",")
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct QueryId(
     // even if I use just a NodeIdentifier, queries are dedup early
@@ -1990,30 +1955,10 @@ fn simp_rms<'a>(
     })
 }
 
-/// remove all matched thing from query
-fn simp_rmalls<'a>(
-    query_store: &'a mut QStore,
-    query: NodeIdentifier,
-    meta_simp: &'a hyperast_tsquery::Query,
-    cid: hyperast_tsquery::CaptureId,
-) -> impl Iterator<Item = (NodeIdentifier, LabelH)> + 'a {
-    let mut rms = find_matches(query_store, query, meta_simp, cid);
-    let mut curr = query;
-    for path in rms {
-        curr = apply_rms_aux(query_store, curr, &path).unwrap();
-    }
-    if !simp_search_need(query_store, query, meta_simp) {
-        return vec![].into_iter();
-    }
-    if curr == query {
-        return vec![].into_iter();
-    }
-    vec![(query, query_store.resolve(&query).hash(&HashKind::label()))].into_iter()
-}
-
 type SimpRmsRemoves = IdNQ;
 type SimpRmsRemains = (IdNQ, PendingRmPath);
 type PendingRmPath = Vec<u16>;
+type Simplified<Init> = (IdNQ, TR<Init>);
 
 fn try_simp_rms<'a>(
     query_store: &'a QStore,
@@ -2034,12 +1979,14 @@ fn try_simp_rms<'a>(
     })
 }
 
+type RmAllAlt = (IdNQ, IdNQ, Vec<PendingRmPath>);
+
 fn try_simp_rmalls<'a>(
     query_store: &'a QStore,
     query: IdNQ,
     meta_simp: &'a hyperast_tsquery::Query,
     cid: hyperast_tsquery::CaptureId,
-) -> Option<Result<SimpRmsRemoves, (IdNQ, IdNQ, Vec<PendingRmPath>)>> {
+) -> Option<Result<SimpRmsRemoves, RmAllAlt>> {
     let mut rms = find_matches(query_store, query, meta_simp, cid);
     for rm in &mut rms {
         rm.pop();

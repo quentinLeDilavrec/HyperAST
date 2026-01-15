@@ -148,7 +148,7 @@ pub fn number_of_common_descendants<
     for t in src {
         if mappings.is_src(t) {
             let m = mappings.get_dst_unchecked(t).to_usize().unwrap();
-            if dst_descendants.len() != 0
+            if !dst_descendants.is_empty()
                 && min <= m
                 && m - min < dst_descendants.len()
                 && dst_descendants[m - min]

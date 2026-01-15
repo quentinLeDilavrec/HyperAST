@@ -122,7 +122,7 @@ where
     //     + NodeStore<T::TreeId>,
         {
             debug_assert!(
-                self.id_parent.len() == 0 || self.id_parent[x.to_usize().unwrap()] != zero(),
+                self.id_parent.is_empty() || self.id_parent[x.to_usize().unwrap()] != zero(),
                 "x has not been initialized"
             );
             let a = self.original(x);
@@ -427,6 +427,9 @@ impl<IdN, IdD: PrimInt> LazyPostOrder<IdN, IdD> {
     pub fn len(&self) -> usize {
         self._len()
     }
+    pub fn is_empty(&self) -> bool {
+        self._len() == 0
+    }
 
     pub fn root(&self) -> IdD {
         cast(self._len() - 1).unwrap()
@@ -703,7 +706,7 @@ where
 
     fn children(&self, x: &IdD) -> Vec<IdD> {
         debug_assert!(
-            self.id_parent.len() == 0 || self.id_parent[x.to_usize().unwrap()] != zero(),
+            self.id_parent.is_empty() || self.id_parent[x.to_usize().unwrap()] != zero(),
             "x has not been initialized"
         );
         let a = self.original(x);
@@ -811,7 +814,7 @@ where
     fn decompress_children(&mut self, x: &Self::IdD) -> Vec<Self::IdD> {
         let store = self.hyperast;
         debug_assert!(
-            self.id_parent.len() == 0 || self.id_parent[x.to_usize().unwrap()] != zero(),
+            self.id_parent.is_empty() || self.id_parent[x.to_usize().unwrap()] != zero(),
             "x has not been initialized"
         );
         let node = store.resolve(&self.original(x));
@@ -889,7 +892,7 @@ where
 
 impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
     fn is_decompressed(&self, x: &IdD) -> bool {
-        self.id_parent.len() == 0 || self.id_parent[x.to_usize().unwrap()] != zero()
+        self.id_parent.is_empty() || self.id_parent[x.to_usize().unwrap()] != zero()
     }
 }
 

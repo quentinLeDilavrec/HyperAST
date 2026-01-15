@@ -63,6 +63,9 @@ pub trait FullyDecompressedTreeStore<HAST: HyperAST + Copy, IdD>:
 
 pub trait ShallowDecompressedTreeStore<HAST: HyperAST + Copy, IdD, IdS = IdD> {
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     fn original(&self, id: &IdD) -> HAST::IdN;
     fn root(&self) -> IdD;
     fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdS;

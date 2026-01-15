@@ -1,6 +1,11 @@
 use std::fmt::Debug;
 
-use hyperast::types::{HyperAST, HyperType, LabelStore, Labeled, NodeId, NodeStore, NodeStoreExt};
+use hyperast::types::HyperAST;
+use hyperast::types::NodeId;
+use hyperast::types::NodeStoreExt;
+use hyperast::types::{HyperType, Labeled, LendT};
+use hyperast::types::{LabelStore, NodeStore};
+use hyperast::types::{WithSerialization, WithStats};
 
 use crate::tree::tree_path::TreePath;
 
@@ -22,7 +27,7 @@ impl<A> Default for ActionsVec<A> {
 }
 
 /// [`crate::actions::action_vec::print_action`]
-pub fn actions_vec_f<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
+pub fn actions_vec_f<P: TreePath<Item = HAST::Idx>, HAST>(
     f: &mut std::fmt::Formatter<'_>,
     v: &ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>,
     stores: HAST,
@@ -30,9 +35,9 @@ pub fn actions_vec_f<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
     dst: HAST::IdN,
 ) -> std::fmt::Result
 where
-    HAST: HyperAST,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
+    HAST: Copy + HyperAST,
+    for<'t> LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithStats,
     HAST::IdN: Copy + NodeId<IdN = HAST::IdN> + Debug,
 {
     for a in v.iter() {
@@ -48,8 +53,7 @@ fn format_action_pos<'store, P: TreePath<Item = HAST::Idx>, HAST>(
 ) -> String
 where
     HAST: HyperAST,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
-        hyperast::types::WithSerialization + hyperast::types::WithStats,
+    for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
     HAST::IdN: Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN> + Debug,
 {
@@ -113,7 +117,7 @@ where
     )
 }
 
-pub(crate) fn print_action<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
+pub(crate) fn print_action<P: TreePath<Item = HAST::Idx>, HAST>(
     f: &mut std::fmt::Formatter<'_>,
     src: HAST::IdN,
     dst: HAST::IdN,
@@ -121,9 +125,9 @@ pub(crate) fn print_action<P: TreePath<Item = HAST::Idx>, HAST: Copy>(
     a: &SimpleAction<HAST::Label, P, HAST::IdN>,
 ) -> std::fmt::Result
 where
-    HAST: HyperAST,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
+    HAST: Copy + HyperAST,
+    for<'t> LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithStats,
     HAST::IdN: Copy + NodeId<IdN = HAST::IdN> + Debug,
 {
     use hyperast::types::WithChildren;
@@ -151,7 +155,7 @@ where
                     break;
                 }
                 fmtd_ty.push_str(t.as_static_str());
-                fmtd_ty.push_str("/");
+                fmtd_ty.push('/');
                 n = stores.resolve(&n).child(&num_traits::zero()).unwrap();
             }
             let r = p.range();
@@ -211,7 +215,7 @@ where
                         break;
                     }
                     fmtd_ty.push_str(t.as_static_str());
-                    fmtd_ty.push_str("/");
+                    fmtd_ty.push('/');
                     e = stores
                         .node_store()
                         .resolve(&e)

@@ -842,10 +842,7 @@ impl<IdN, Idx> Eq for PersistedNode<IdN, Idx> {}
 
 impl<IdN, Idx> PartialOrd for PersistedNode<IdN, Idx> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if !Rc::ptr_eq(&self.s, &other.s) {
-            return None;
-        }
-        self.h.0.partial_cmp(&other.h.0)
+        Some(self.cmp(other))
     }
 }
 
@@ -931,10 +928,7 @@ impl<IdN, Idx> Clone for RefNode<'_, IdN, Idx> {
 
 impl<IdN, Idx> PartialOrd for RefNode<'_, IdN, Idx> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if !std::ptr::eq(&self.s, &other.s) {
-            return None;
-        }
-        self.h.0.partial_cmp(&other.h.0)
+        Some(self.cmp(other))
     }
 }
 

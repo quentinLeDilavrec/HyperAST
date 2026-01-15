@@ -56,10 +56,7 @@ pub struct SimplePOSlice<'a, IdN, IdD> {
 
 impl<IdN, IdD> Clone for SimplePOSlice<'_, IdN, IdD> {
     fn clone(&self) -> Self {
-        Self {
-            basic: self.basic,
-            id_parent: self.id_parent,
-        }
+        *self
     }
 }
 

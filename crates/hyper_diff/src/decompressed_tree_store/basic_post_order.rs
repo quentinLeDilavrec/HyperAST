@@ -407,10 +407,7 @@ pub struct BasicPOSlice<'a, IdN, IdD> {
 
 impl<IdN, IdD> Clone for BasicPOSlice<'_, IdN, IdD> {
     fn clone(&self) -> Self {
-        Self {
-            id_compressed: self.id_compressed,
-            llds: self.llds,
-        }
+        *self
     }
 }
 

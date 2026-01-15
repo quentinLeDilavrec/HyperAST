@@ -72,7 +72,7 @@ impl<T> Niche for Handle<T> {
 
 impl<T> Clone for Handle<T> {
     fn clone(&self) -> Handle<T> {
-        Handle::new(self.index)
+        *self
     }
 }
 
@@ -108,7 +108,7 @@ impl<T> PartialEq for Handle<T> {
 
 impl<T> PartialOrd for Handle<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.index.partial_cmp(&other.index)
+        Some(self.cmp(other))
     }
 }
 

@@ -226,18 +226,16 @@ impl PartialEq for LatticeStats {
 
 impl Ord for LatticeStats {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.complete_tops
+            .cmp(&other.complete_tops)
+            .then(self.leaf_count.cmp(&other.leaf_count))
+            .then(self.node_count.cmp(&other.node_count))
+            .then(self.edge_count.cmp(&other.edge_count))
     }
 }
 impl PartialOrd for LatticeStats {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.complete_tops
-                .cmp(&other.complete_tops)
-                .then(self.leaf_count.cmp(&other.leaf_count))
-                .then(self.node_count.cmp(&other.node_count))
-                .then(self.edge_count.cmp(&other.edge_count)),
-        )
+        Some(self.cmp(other))
     }
 }
 impl std::fmt::Display for LatticeStats {
@@ -331,18 +329,16 @@ impl PartialEq for TopStats {
 
 impl Ord for TopStats {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.paths
+            .cmp(&other.paths)
+            .then(self.incomplete.cmp(&other.incomplete))
+            .then(self.reachable_uniqs.len().cmp(&other.reachable_uniqs.len()))
+            .then(self.patt_stats.cmp(&other.patt_stats))
     }
 }
 impl PartialOrd for TopStats {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.paths
-                .cmp(&other.paths)
-                .then(self.incomplete.cmp(&other.incomplete))
-                .then(self.reachable_uniqs.len().cmp(&other.reachable_uniqs.len()))
-                .then(self.patt_stats.cmp(&other.patt_stats)),
-        )
+        Some(self.cmp(other))
     }
 }
 impl std::fmt::Display for TopStats {
@@ -491,18 +487,16 @@ impl PartialEq for PatternStats {
 
 impl Ord for PatternStats {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.byte_len
+            .cmp(&other.byte_len)
+            .then(self.node_count.cmp(&other.node_count))
+            .then(self.pred_count.cmp(&other.pred_count))
+            .then(self.height.cmp(&other.height))
     }
 }
 impl PartialOrd for PatternStats {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.byte_len
-                .cmp(&other.byte_len)
-                .then(self.node_count.cmp(&other.node_count))
-                .then(self.pred_count.cmp(&other.pred_count))
-                .then(self.height.cmp(&other.height)),
-        )
+        Some(self.cmp(other))
     }
 }
 impl std::fmt::Display for PatternStats {

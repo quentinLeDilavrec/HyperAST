@@ -640,11 +640,7 @@ pub struct LazyPOSlice<'a, IdN, IdD> {
 impl<IdN, IdD> Copy for LazyPOSlice<'_, IdN, IdD> {}
 impl<IdN, IdD> Clone for LazyPOSlice<'_, IdN, IdD> {
     fn clone(&self) -> Self {
-        Self {
-            id_compressed: self.id_compressed,
-            llds: self.llds,
-            id_parent: self.id_parent,
-        }
+        *self
     }
 }
 

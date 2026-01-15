@@ -1073,7 +1073,7 @@ impl<L: LLang<Self, I = u16>> Copy for TypeU16<L> {}
 
 impl<L: LLang<Self, I = u16>> Clone for TypeU16<L> {
     fn clone(&self) -> Self {
-        Self(self.0, self.1)
+        *self
     }
 }
 

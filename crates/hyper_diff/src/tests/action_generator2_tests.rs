@@ -17,6 +17,14 @@ use crate::tree::simple_tree::{DisplayTree, NS, Tree, vpair_to_stores};
 use crate::tree::tree_path::{CompressedTreePath, TreePath};
 
 type IdD = u16;
+type IdN = u16;
+
+type Mpr<'a, HAST> = SimpleBfsMapper<
+    'a,
+    IdD,
+    Decompressible<HAST, CompletePostOrder<IdN, IdD>>,
+    &'a Decompressible<HAST, CompletePostOrder<IdN, IdD>>,
+>;
 
 pub struct Fmt<F>(pub F)
 where
@@ -45,8 +53,8 @@ fn test_with_action_example() {
         DisplayTree::new(label_store, node_store, dst)
     );
     let mut ms = DefaultMappingStore::default();
-    let src_arena = Decompressible::<_, CompletePostOrder<_, u16>>::decompress(&stores, &src);
-    let dst_arena = Decompressible::<_, CompletePostOrder<u16, u16>>::decompress(&stores, &dst);
+    let src_arena = Decompressible::<_, CompletePostOrder<_, IdD>>::decompress(&stores, &src);
+    let dst_arena = Decompressible::<_, CompletePostOrder<_, IdD>>::decompress(&stores, &dst);
     let actions = {
         let src = &(src_arena.root());
         let dst = &(dst_arena.root());
@@ -89,11 +97,7 @@ fn test_with_action_example() {
                 write!(f, "")
             })
         );
-        let dst_arena2: SimpleBfsMapper<
-            _,
-            Decompressible<_, CompletePostOrder<u16, u16>>,
-            &Decompressible<_, CompletePostOrder<u16, u16>>,
-        > = SimpleBfsMapper::with_store(&stores, &dst_arena);
+        let dst_arena2: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
         // let dst_arena2 = Decompressible {
         //     hyperast: &stores,
         //     decomp: dst_arena2,
@@ -156,7 +160,6 @@ fn test_with_action_example() {
         actions
     };
 
-    let stores = stores;
     let mut node_store = stores.node_store;
 
     let mut root = vec![src];
@@ -164,7 +167,6 @@ fn test_with_action_example() {
         let node = node_store.resolve(&root[0]);
         let t = node.get_type();
         let l = node.try_get_label().cloned();
-        drop(node);
         node_store.build_then_insert(root[0], t, l, vec![]);
     }
     apply_actions::<_, NS<Tree>, _>(actions, &mut root, &mut node_store);
@@ -459,8 +461,8 @@ fn test_with_action_example2() {
         DisplayTree::new(label_store, node_store, dst)
     );
     let mut ms = DefaultMappingStore::default();
-    let src_arena = Decompressible::<_, CompletePostOrder<_, u16>>::decompress(&stores, &src);
-    let dst_arena = Decompressible::<_, CompletePostOrder<_, u16>>::decompress(&stores, &dst);
+    let src_arena = Decompressible::<_, CompletePostOrder<_, IdD>>::decompress(&stores, &src);
+    let dst_arena = Decompressible::<_, CompletePostOrder<_, IdD>>::decompress(&stores, &dst);
 
     let actions = {
         let src = &(src_arena.root());
@@ -505,11 +507,7 @@ fn test_with_action_example2() {
             })
         );
 
-        let dst_arena2: SimpleBfsMapper<
-            _,
-            Decompressible<_, CompletePostOrder<u16, u16>>,
-            &Decompressible<_, CompletePostOrder<u16, u16>>,
-        > = SimpleBfsMapper::with_store(&stores, &dst_arena);
+        let dst_arena2: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
         let actions =
             ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena2, &ms).unwrap();
 
@@ -568,7 +566,6 @@ fn test_with_action_example2() {
         actions
     };
 
-    let stores = stores;
     let label_store = stores.label_store;
     let mut node_store = stores.node_store;
 
@@ -753,11 +750,7 @@ fn test_with_zs_custom_example() {
         // ms.addMapping(src.getChild("1.3"), dst.getChild("0.1.3"));
         ms.link(from_src(&[1, 3]), from_dst(&[0, 1, 3]));
 
-        let dst_arena2: SimpleBfsMapper<
-            _,
-            Decompressible<_, CompletePostOrder<u16, u16>>,
-            &Decompressible<_, CompletePostOrder<u16, u16>>,
-        > = SimpleBfsMapper::with_store(&stores, &dst_arena);
+        let dst_arena2: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
         let actions =
             ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena2, &ms).unwrap();
 

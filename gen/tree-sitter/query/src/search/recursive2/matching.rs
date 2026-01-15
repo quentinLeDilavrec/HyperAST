@@ -462,7 +462,7 @@ where
         mut immediate: bool,
         // mut i: HAST::Idx,
         p_t: TIdN::Ty,
-        parent_node: &<HAST as TypedLending<'_, TIdN::Ty>>::TT,
+        _parent_node: &<HAST as TypedLending<'_, TIdN::Ty>>::TT,
     ) -> Vec<MatchingRes<HAST::IdN, HAST::Idx>> {
         // dbg!(i);
         let mut result = vec![];
@@ -672,7 +672,7 @@ where
                             cs.clone_adv(),
                             false,
                             p_t,
-                            parent_node,
+                            _parent_node,
                         ));
                     }
                     MatchingRes {
@@ -693,7 +693,7 @@ where
                             cs.clone_adv(),
                             immediate,
                             p_t,
-                            parent_node,
+                            _parent_node,
                         ));
                     }
                     MatchingRes {
@@ -711,7 +711,7 @@ where
                             cs.clone_adv(),
                             false,
                             p_t,
-                            parent_node,
+                            _parent_node,
                         ));
                     }
                     MatchingRes { matched, .. } => todo!("{:?}", matched),
@@ -732,7 +732,7 @@ where
                                 cs.clone_adv(),
                                 false,
                                 p_t,
-                                parent_node,
+                                _parent_node,
                             ));
                         }
                         immediate = false;
@@ -758,7 +758,7 @@ where
                                 cs.clone_adv(),
                                 false,
                                 p_t,
-                                parent_node,
+                                _parent_node,
                             ));
                         }
                         for v in &mut capt {
@@ -773,7 +773,7 @@ where
                             cs.clone_adv(),
                             true,
                             p_t,
-                            parent_node,
+                            _parent_node,
                         ));
                         immediate = false;
                         i_pat += 1;
@@ -803,7 +803,7 @@ where
                             cs.clone(),
                             false,
                             p_t,
-                            parent_node,
+                            _parent_node,
                         ));
                         immediate = false;
                         matched = Quant::ZeroOrOne;

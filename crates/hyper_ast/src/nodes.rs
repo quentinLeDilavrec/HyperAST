@@ -1375,7 +1375,7 @@ where
     fn serialize(
         &self,
         id: &HAST::IdN,
-        indent: usize,
+        _indent: usize,
         out: &mut std::fmt::Formatter<'_>,
     ) -> Result<(), std::fmt::Error> {
         use crate::types::LabelStore;
@@ -1401,7 +1401,7 @@ where
                 if !children.is_empty() {
                     let it = children;
                     for id in it {
-                        self.serialize(&id, indent + 1, out)?;
+                        self.serialize(&id, _indent + 1, out)?;
                     }
                 }
                 Ok(())

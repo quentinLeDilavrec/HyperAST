@@ -846,7 +846,7 @@ pub(crate) fn got_through<F>(
     mut path: hyperast::position::StructuralPosition,
     mut p: u16,
     mut p_it: impl std::iter::Iterator<Item = u16> + Clone,
-    mut d: usize,
+    mut _d: usize,
     result: &mut F,
 ) where
     F: FnMut(&P, &NoSpaceWrapper<NodeIdentifier>, &N, NodeIdentifier) -> bool,
@@ -863,7 +863,7 @@ pub(crate) fn got_through<F>(
             return; // NOTE should not happen
         };
         path.goto(*node, p);
-        d += 1;
+        _d += 1;
 
         id = *node;
         nn = stores.node_store.resolve(*node);
@@ -880,7 +880,7 @@ pub(crate) fn got_through<F>(
         let mut p_it = n.action.path.ori.iter();
         // always at least one element in an action path
         let p = p_it.next().unwrap();
-        got_through(stores, n, path.clone(), p, p_it, d, result);
+        got_through(stores, n, path.clone(), p, p_it, _d, result);
     }
 }
 

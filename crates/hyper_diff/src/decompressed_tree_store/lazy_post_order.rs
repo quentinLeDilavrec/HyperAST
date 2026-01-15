@@ -1037,16 +1037,22 @@ where
     IdN: types::NodeId<IdN = IdN>,
 {
     fn size2<HAST: HyperAST<IdN = IdN> + Copy>(&self, store: HAST, x: &IdN) -> usize {
-        let tmp = store.resolve(x);
-        let Some(cs) = tmp.children() else {
-            return 1;
-        };
+        fn size<HAST: HyperAST + Copy>(store: HAST, x: &HAST::IdN) -> usize
+        where
+            HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        {
+            let tmp = store.resolve(x);
+            let Some(cs) = tmp.children() else {
+                return 1;
+            };
 
-        let mut z = 0;
-        for x in cs.iter_children() {
-            z += self.size2(store, &x);
+            let mut z = 0;
+            for x in cs.iter_children() {
+                z += size(store, &x);
+            }
+            z + 1
         }
-        z + 1
+        size(store, x)
     }
 }
 

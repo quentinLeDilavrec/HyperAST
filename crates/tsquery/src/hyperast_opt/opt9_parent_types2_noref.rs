@@ -419,8 +419,8 @@ where
     n.role_at::<<HAST::TS as RoleStore>::Role>(at)
 }
 
-fn goto_parent<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn goto_parent<HAST: HyperAST>(
+    stores: &HAST,
     types: &mut Vec<<HAST::TS as TypeStore>::Ty>,
     misc_stacks: &mut MiscStacks,
     pos: &mut impl CursorHead<HAST::IdN, HAST::Idx>,
@@ -440,8 +440,8 @@ where
     }
 }
 
-fn goto_parent_virt<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn goto_parent_virt<HAST: HyperAST>(
+    stores: &HAST,
     mut types: &[<HAST::TS as TypeStore>::Ty],
     misc_stacks: &MiscStacks,
     pos: &mut impl CursorHead<HAST::IdN, HAST::Idx>,
@@ -461,8 +461,8 @@ where
     }
 }
 
-fn goto_next_sibling_internal<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn goto_next_sibling_internal<HAST: HyperAST>(
+    stores: &HAST,
     types: &mut Vec<<HAST::TS as TypeStore>::Ty>,
     misc_stacks: &mut MiscStacks,
     pos: &mut impl CursorHeadMove<HAST::IdN, HAST::Idx>,
@@ -503,8 +503,8 @@ where
     true
 }
 
-fn goto_first_child_internal<'hast, HAST: HyperAST>(
-    stores: &'hast HAST,
+fn goto_first_child_internal<HAST: HyperAST>(
+    stores: &HAST,
     types: &mut Vec<<HAST::TS as TypeStore>::Ty>,
     misc_stacks: &mut MiscStacks,
     pos: &mut impl CursorHeadMove<HAST::IdN, HAST::Idx>,

@@ -16,8 +16,9 @@ use super::DS;
 use crate::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
 use crate::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 
-type M = VecStore<u32>;
-type MM = DefaultMultiMappingStore<u32>;
+type IdD = u32;
+type M = VecStore<IdD>;
+type MM = DefaultMultiMappingStore<IdD>;
 
 pub fn diff<HAST: HyperAST + Copy>(
     hyperast: HAST,
@@ -79,14 +80,17 @@ where
 use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use crate::matchers::Decompressible;
 
+#[allow(type_alias_bounds)]
+type LazyMapper<'a, HAST: HyperAST> = Mapper<
+    HAST,
+    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>>,
+    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>>,
+    VecStore<IdD>,
+>;
+
 pub fn lazy_top_down<'a, HAST: HyperAST + Copy + 'a>(
     mapper_owned: &'a mut (DS<HAST>, DS<HAST>),
-) -> Mapper<
-    HAST,
-    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, u32>>,
-    Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, u32>>,
-    VecStore<u32>,
->
+) -> LazyMapper<'a, HAST>
 where
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,

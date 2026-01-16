@@ -410,6 +410,7 @@ fn bench_baseline(
             let mut count = 0;
             for (q, t, text) in f.iter() {
                 let mut cursor = tree_sitter::QueryCursor::default();
+                use streaming_iterator::StreamingIterator;
                 count += black_box(cursor.matches(q, t.root_node(), text.as_bytes()).count());
             }
             assert_eq!(count as u64, parameter.0.4);

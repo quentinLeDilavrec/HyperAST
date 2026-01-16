@@ -129,12 +129,6 @@ checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 
 [[package]]
 name = "ahash"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0453232ace82dee0dd0b4c87a59bd90f7b53b314f3e0f61fe2ee7c8a16482289"
-
-[[package]]
-name = "ahash"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
@@ -701,12 +695,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175571dd1d178ced59193a6fc02dde1b972eb0bc56c892cde9beeceac5bf0f6b"
 
 [[package]]
-name = "ascii"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1163,7 +1151,7 @@ checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
 name = "backend"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "automerge",
  "autosurgeon",
@@ -1222,7 +1210,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tree-sitter",
- "tree-sitter-cli",
  "tree-sitter-graph",
  "webgraph",
 ]
@@ -1743,12 +1730,6 @@ dependencies = [
  "wasm-bindgen",
  "windows-link 0.1.1",
 ]
-
-[[package]]
-name = "chunked_transfer"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 
 [[package]]
 name = "ciborium"
@@ -2395,26 +2376,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.2.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a2785755761f3ddc1492979ce1e48d2c00d09311c39e4466429188f3dd6501"
-dependencies = [
- "quote",
- "syn 2.0.99",
-]
-
-[[package]]
-name = "ctrlc"
-version = "3.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90eeab0aa92f3f9b4e87f258c72b139c207d251f9cbc1080a0086b86a8870dd3"
-dependencies = [
- "nix 0.29.0",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "cursor-icon"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2805,7 +2766,7 @@ dependencies = [
 
 [[package]]
 name = "egui_addon"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "accesskit",
  "console_error_panic_hook",
@@ -3512,9 +3473,9 @@ dependencies = [
 
 [[package]]
 name = "fs4"
-version = "0.8.4"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7e180ac76c23b45e767bd7ae9579bc0bb458618c4bc71835926e098e61d15f8"
+checksum = "e8c6b3bd49c37d2aa3f3f2220233b29a7cd23f79d1fe70e5337d25fb390793de"
 dependencies = [
  "rustix 0.38.44",
  "windows-sys 0.52.0",
@@ -3929,15 +3890,6 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
-dependencies = [
- "ahash 0.4.8",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
@@ -4104,15 +4056,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589533453244b0995c858700322199b2becb13b627df2851f64a2775d024abcf"
 dependencies = [
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "html-escape"
-version = "0.2.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d1ad449764d627e22bfd7cd5e8868264fc9236e07c752972b4080cd351cb476"
-dependencies = [
- "utf8-width",
 ]
 
 [[package]]
@@ -4285,7 +4228,7 @@ dependencies = [
 
 [[package]]
 name = "hyper_app"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ahash 0.8.11",
  "async_executors",
@@ -4355,7 +4298,7 @@ dependencies = [
 
 [[package]]
 name = "hyper_diff"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bitvec",
  "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4377,7 +4320,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bevy_ecs",
  "bitvec",
@@ -4399,7 +4342,7 @@ dependencies = [
  "ref-cast",
  "rhai",
  "serde",
- "string-interner 0.17.0",
+ "string-interner",
  "strum 0.25.0",
  "strum_macros 0.25.3",
  "tikv-jemalloc-ctl",
@@ -4409,7 +4352,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cfg-if",
  "env_logger 0.9.3",
@@ -4426,7 +4369,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark_diffs"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bitvec",
  "byteorder",
@@ -4458,7 +4401,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark_search"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap 4.5.32",
  "env_logger 0.11.5",
@@ -4472,6 +4415,7 @@ dependencies = [
  "hyperast_vcs_git",
  "log",
  "num-traits",
+ "streaming-iterator",
  "tikv-jemallocator",
  "tracing-appender",
  "tracing-subscriber",
@@ -4481,7 +4425,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark_smells"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base16ct",
  "bitvec",
@@ -4511,7 +4455,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_c"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4534,7 +4478,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_cpp"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4560,7 +4504,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_java"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4583,7 +4527,8 @@ dependencies = [
  "ref-cast",
  "serde",
  "stack-graphs",
- "string-interner 0.17.0",
+ "streaming-iterator",
+ "string-interner",
  "tree-sitter",
  "tree-sitter-graph",
  "tree-sitter-java 0.23.5",
@@ -4592,7 +4537,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_ts"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4615,7 +4560,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_tsquery"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4645,7 +4590,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_xml"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "hashbrown 0.14.5",
  "hyperast",
@@ -4661,7 +4606,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_tsquery"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "hyperast",
  "log",
@@ -4675,7 +4620,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_vcs_git"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enumset",
@@ -4968,8 +4913,6 @@ checksum = "6717a8d2a5a929a1a2eb43a12812498ed141a0bcfb7e8f7844fbdbe4303bba9f"
 dependencies = [
  "equivalent",
  "hashbrown 0.16.0",
- "serde",
- "serde_core",
 ]
 
 [[package]]
@@ -6008,18 +5951,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
-dependencies = [
- "bitflags 2.10.0",
- "cfg-if",
- "cfg_aliases",
- "libc 0.2.171",
-]
-
-[[package]]
-name = "nix"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
@@ -7054,7 +6985,7 @@ dependencies = [
 
 [[package]]
 name = "polyglote"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "derive_deref",
  "heck 0.5.0",
@@ -9566,12 +9497,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smallbitvec"
-version = "2.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d31d263dd118560e1a492922182ab6ca6dc1d03a3bf54e7699993f31a4150e3f"
-
-[[package]]
 name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9734,22 +9659,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
 
 [[package]]
+name = "streaming-iterator"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
+
+[[package]]
 name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 dependencies = [
  "float-cmp",
-]
-
-[[package]]
-name = "string-interner"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "383196d1876517ee6f9f0864d1fc1070331b803335d3c6daaa04bbcccd823c08"
-dependencies = [
- "cfg-if",
- "hashbrown 0.9.1",
 ]
 
 [[package]]
@@ -10361,18 +10282,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tiny_http"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "389915df6413a2e74fb181895f933386023c71110878cd0825588928e64cdc82"
-dependencies = [
- "ascii",
- "chunked_transfer",
- "httpdate",
- "log",
-]
-
-[[package]]
 name = "tinystr"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10819,13 +10728,14 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter"
-version = "0.23.2"
+version = "0.24.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0203df02a3b6dd63575cc1d6e609edc2181c9a11867a271b25cfd2abff3ec5ca"
+checksum = "a5387dffa7ffc7d2dae12b50c6f7aab8ff79d6210147c6613561fc3d474c6f75"
 dependencies = [
  "cc",
  "regex",
  "regex-syntax 0.8.5",
+ "streaming-iterator",
  "tree-sitter-language",
 ]
 
@@ -10837,62 +10747,6 @@ checksum = "afd2b1bf1585dc2ef6d69e87d01db8adb059006649dd5f96f31aa789ee6e9c71"
 dependencies = [
  "cc",
  "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-cli"
-version = "0.23.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e23850129ac291ec55703b35da1ab36b5ca6fc6ed40b2196dbd5f26017a8346"
-dependencies = [
- "anstyle",
- "anyhow",
- "bstr",
- "clap 4.5.32",
- "ctor",
- "ctrlc",
- "dirs",
- "filetime",
- "glob",
- "heck 0.5.0",
- "html-escape",
- "indexmap 2.12.0",
- "indoc",
- "lazy_static",
- "log",
- "memchr",
- "rand 0.8.5",
- "regex",
- "regex-syntax 0.8.5",
- "rustc-hash 1.1.0",
- "semver",
- "serde",
- "serde_derive",
- "serde_json",
- "similar",
- "smallbitvec",
- "tiny_http",
- "tree-sitter",
- "tree-sitter-config",
- "tree-sitter-highlight",
- "tree-sitter-loader",
- "tree-sitter-tags",
- "url",
- "walkdir",
- "wasmparser",
- "webbrowser",
-]
-
-[[package]]
-name = "tree-sitter-config"
-version = "0.23.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25af717df6320cba42c08d3dfc2d950ac839c549ca1787c411212862b55858c1"
-dependencies = [
- "anyhow",
- "dirs",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -10916,27 +10770,28 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-graph"
-version = "0.12.2"
-source = "git+https://github.com/quentinLeDilavrec/tree-sitter-graph?rev=661d3545ad1b114c285c70a876299236e03d6dea#661d3545ad1b114c285c70a876299236e03d6dea"
+version = "0.12.0"
+source = "git+https://github.com/quentinLeDilavrec/tree-sitter-graph?rev=c705168570dbb8c729710f57d415ab788d2388e5#c705168570dbb8c729710f57d415ab788d2388e5"
 dependencies = [
  "log",
  "regex",
  "serde",
  "serde_json",
  "smallvec",
- "string-interner 0.12.2",
+ "streaming-iterator",
  "thiserror 1.0.69",
  "tree-sitter",
 ]
 
 [[package]]
 name = "tree-sitter-highlight"
-version = "0.23.2"
+version = "0.24.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380a7706376fa6c52ba7bf71d1e7a93856ee8ab08a7680631dfa664fdd237d66"
+checksum = "6411813e4a9ebc87d391b98b0f3ce65d5361cd80c54de8651d8b85b555ea5d95"
 dependencies = [
  "lazy_static",
  "regex",
+ "streaming-iterator",
  "thiserror 1.0.69",
  "tree-sitter",
 ]
@@ -10978,25 +10833,28 @@ checksum = "e8ddffe35a0e5eeeadf13ff7350af564c6e73993a24db62caee1822b185c2600"
 
 [[package]]
 name = "tree-sitter-loader"
-version = "0.23.2"
+version = "0.24.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae207d06263c49495fe04e41c801e884dfec53e6a487ec6fc51c15e84042e582"
+checksum = "3a08ab0d4320b697297e70ffc94fdfced32496b3556b88abce4dae226c12c0bd"
 dependencies = [
  "anyhow",
  "cc",
  "dirs",
  "fs4",
  "indoc",
+ "lazy_static",
  "libloading",
  "once_cell",
  "path-slash",
  "regex",
+ "semver",
  "serde",
  "serde_json",
  "tempfile",
  "tree-sitter",
  "tree-sitter-highlight",
  "tree-sitter-tags",
+ "url",
 ]
 
 [[package]]
@@ -11020,12 +10878,13 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-tags"
-version = "0.23.2"
+version = "0.24.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3badf626aa7bbe52972da001303088fddf1fee6903084fd83ee24f5ac7104f01"
+checksum = "5725ac990bb36fccc60363d74a88d0eddbd34284e870c0c893a6f77598825273"
 dependencies = [
  "memchr",
  "regex",
+ "streaming-iterator",
  "thiserror 1.0.69",
  "tree-sitter",
 ]
@@ -11253,12 +11112,6 @@ name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8232dd3cdaed5356e0f716d285e4b40b932ac434100fe9b7e0e8e935b9e6246"
-
-[[package]]
-name = "utf8-width"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86bd8d4e895da8537e5315b8254664e6b769c4ff3db18321b297a1e7004392e3"
 
 [[package]]
 name = "utf8_iter"
@@ -11495,20 +11348,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "wasmparser"
-version = "0.215.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53fbde0881f24199b81cf49b6ff8f9c145ac8eb1b7fc439adb5c099734f7d90e"
-dependencies = [
- "ahash 0.8.11",
- "bitflags 2.10.0",
- "hashbrown 0.14.5",
- "indexmap 2.12.0",
- "semver",
- "serde",
 ]
 
 [[package]]

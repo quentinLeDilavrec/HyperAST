@@ -58,6 +58,7 @@ impl Executor for tree_sitter::Query {
         let content = pos.0;
         let mut query_cursor = tree_sitter::QueryCursor::new();
         let matches = query_cursor.matches(self, tree.root_node(), content);
+        use streaming_iterator::StreamingIterator;
         res.result += matches.count();
     }
 }

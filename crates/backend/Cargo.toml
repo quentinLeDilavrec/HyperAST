@@ -1,6 +1,6 @@
 [package]
 name = "backend"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 
 [lints]
@@ -8,7 +8,7 @@ workspace = true
 
 [dependencies]
 tree-sitter = { workspace = true }
-tree-sitter-cli = "0.23.0"
+# tree-sitter-cli = "0.23.0"
 hyperast = { workspace = true, features = ["serialize", "fetched"] }
 hyperast_gen_ts_cpp = { workspace = true }
 hyperast_gen_ts_java = { workspace = true }

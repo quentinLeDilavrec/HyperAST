@@ -77,6 +77,7 @@ fn compare_querying_group(c: &mut Criterion) {
                         for p in f.iter() {
                             let (q, t, text) = prep_baseline(q.2)(p);
                             let mut cursor = tree_sitter::QueryCursor::default();
+                            use streaming_iterator::StreamingIterator;
                             black_box(cursor.matches(&q, t.root_node(), text.as_bytes()).count());
                         }
                     }

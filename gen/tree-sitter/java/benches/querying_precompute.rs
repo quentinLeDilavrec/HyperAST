@@ -104,6 +104,7 @@ fn compare_querying_group(c: &mut Criterion) {
                         compute_size = false;
                     }
                     let mut cursor = tree_sitter::QueryCursor::default();
+                    use streaming_iterator::StreamingIterator;
                     black_box(cursor.matches(&q, t.root_node(), text.as_bytes()).count());
                 }
             })

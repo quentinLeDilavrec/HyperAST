@@ -153,7 +153,7 @@ impl Hash for NodeIdentifier {
     }
 }
 
-#[derive(Default)]
+#[cfg_attr(feature = "native", derive(Default))]
 pub struct FetchedLabels(HashMap<LabelIdentifier, String>);
 
 impl crate::types::LabelStore<str> for FetchedLabels {

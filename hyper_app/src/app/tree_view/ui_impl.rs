@@ -1090,7 +1090,7 @@ impl<'a> FetchedViewImpl<'a> {
             }
             _ => (),
         };
-        let c_cache = imp.prefill_cache.unwrap();
+        let c_cache = imp.prefill_cache.unwrap_or_default();
         let h = c_cache.height();
 
         self.min_before_count += imp.min_before_count;

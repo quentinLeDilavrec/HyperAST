@@ -117,11 +117,11 @@ where
             let len = s.len();
             let s = Space::format_indentation(s.as_bytes());
             let b: String = s.iter().map(|x| x.to_string()).collect();
-            if !b.contains("\n") {
-                return Ok(last_line(parent_indent));
-            };
+            // if !b.contains("\n") {
+            //     return Ok(last_line(parent_indent));
+            // };
             let end = *offset + len;
-            let format = self.frmt(TokenType::Punctuation);
+            let format = self.frmt(TokenType::Whitespace);
             out.push(LayoutSection {
                 leading_space: 0.0,
                 byte_range: *offset..end,

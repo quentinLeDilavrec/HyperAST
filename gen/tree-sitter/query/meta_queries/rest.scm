@@ -1,8 +1,5 @@
 [
   (named_node
-    (identifier) (#EQ? "expression_statement")
-  )
-  (named_node
     (identifier) (#EQ? "return_statement")
   )
   (named_node
@@ -10,6 +7,9 @@
   )
   (named_node
     (identifier) (#EQ? "method_declaration")
+  )
+  (named_node
+    (identifier) (#EQ? "class_declaration")
   )
 ] @need
 [

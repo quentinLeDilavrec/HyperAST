@@ -13,14 +13,14 @@
 (named_node
     (identifier) (#EQ? "method_invocation")
     (named_node
-        (identifier) (#EQ? "identifier")
-        (predicate
-            (identifier) (#EQ? "EQ")
-            (parameters
-                (string)
-            )
-        )
+        (identifier) (#EQ? "identifier") .
     ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    )
     (named_node
         (identifier) (#EQ? "argument_list")
         (named_node
@@ -28,31 +28,31 @@
             .
         ) .
     )
-) @rm
+) @_rm
 (named_node
     (identifier) (#EQ? "method_invocation")
     (named_node
-        (identifier) (#EQ? "identifier")
-        (predicate
-            (identifier) (#EQ? "EQ")
-            (parameters
-                (string)
-            )
-        )
+        (identifier) (#EQ? "identifier") .
     ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    )
     (named_node
         (identifier) (#EQ? "argument_list")
         .
     )
-) @rm
+) @_rm
 (named_node
     (identifier) (#EQ? "method_invocation") .
     (named_node
         (identifier) (#EQ? "identifier")
-    ) @rm.all.full .
+    ) @_rm.all.full .
     (predicate
         (identifier) (#EQ? "EQ")
-    ) @rm.all.full .
+    ) @_rm.all.full .
     (named_node
         (identifier) (#EQ? "identifier")
     ) .
@@ -63,47 +63,15 @@
 (named_node
     (identifier) (#EQ? "argument_list")
     (named_node
-        (identifier) (#EQ? "method_invocation") .
-        (named_node
-            (identifier) (#EQ? "identifier")
-        ) .
-        (predicate
-            (identifier) (#EQ? "EQ")
-            (parameters
-                (string) @label
-            )
-        ) @pred .
-        (named_node)
-    ) @rm.all
-)
-(named_node
-    (identifier) (#EQ? "argument_list")
-    (named_node
         (identifier) (#EQ? "identifier") .
-        (predicate
-            (identifier) (#EQ? "EQ")
-            (parameters
-                (string) @label
-            )
-        ) @pred
-    )
-) @rm.all
-(named_node
-    (identifier) (#EQ? "method_invocation")
-    (named_node
-        (identifier) (#EQ? "identifier") .
-        (predicate
-            (identifier) (#EQ? "EQ")
-            (parameters
-                (string)
-            )
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
         )
-    )
-    (named_node
-        (identifier) (#EQ? "argument_list")
-        .
-    )
-) @rm.all.full
+    ) @_pred
+) @_rm.all
 
 (named_node
     (identifier) (#EQ? "argument_list")
@@ -124,7 +92,7 @@
         (identifier) (#EQ? "argument_list")
         (named_node
             (identifier) (#EQ? "method_invocation")
-            [(named_node) (predicate)]* @rm.all.full
+            [(named_node) (predicate)]* @_rm.all.full
         ) .
     )
 )
@@ -140,6 +108,27 @@
     (identifier) (#EQ? "argument_list") .
     (named_node
         (identifier) (#EQ? "string_literal")
+    ) @rm .
+)
+
+(named_node
+    (identifier) (#EQ? "argument_list") .
+    (named_node
+        (identifier) (#EQ? "decimal_floating_point_literal")
+    ) @rm .
+)
+
+(named_node
+    (identifier) (#EQ? "argument_list") .
+    (named_node
+        (identifier) (#EQ? "true")
+    ) @rm .
+)
+
+(named_node
+    (identifier) (#EQ? "argument_list") .
+    (named_node
+        (identifier) (#EQ? "false")
     ) @rm .
 )
 
@@ -163,15 +152,31 @@
     (identifier) (#EQ? "method_invocation") .
     (named_node
       (identifier) (#EQ? "identifier")
-    ) @rm .
+    ) @_rm .
     (named_node
         (identifier) (#EQ? "identifier")
     )
 )
 
+
 (named_node
-    (identifier) (#EQ? "method_invocation") .
+    (identifier) (#EQ? "argument_list")
     (named_node
-      (identifier) (#EQ? "parenthesized_expression")
+        (identifier) (#EQ? "method_invocation")
     ) @rm.all.full
+)
+
+(named_node
+    (identifier) (#EQ? "argument_list") .
+    (named_node
+      (identifier) (#EQ? "binary_expression")
+    ) @rm.all.full
+)
+
+
+(named_node
+    (identifier) (#EQ? "argument_list")
+    (named_node
+        (identifier) (#EQ? "method_invocation")
+    ) @rm.final
 )

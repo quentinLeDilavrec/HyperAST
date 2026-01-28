@@ -1,7 +1,4 @@
 (named_node
-    (identifier) (#EQ? "catch_type")
-) @rm.all_full
-(named_node
     (identifier) (#EQ? "generic_type")
 ) @rm.all.full
 (named_node
@@ -18,11 +15,11 @@
     (named_node
         (identifier) .
     )
-) @rm.all_full
+) @rm.all.full
 (named_node
     (identifier) (#EQ? "unary_expression")
     (anonymous_node)
-) @rm.all_full
+) @rm.all.full
 (named_node
     (identifier) (#EQ? "array_creation_expression") .
     (anonymous_node) (#EQ? "\"new\"")
@@ -33,24 +30,24 @@
         (identifier) (#EQ? "string_literal")
     ) .
     (anonymous_node) .
-) @rm.all_full
+) @rm.all.full
 (named_node
     (identifier) (#EQ? "binary_expression")
     (named_node (identifier) (#EQ? "string_literal")) .
     (anonymous_node) .
     (named_node (identifier) (#EQ? "string_literal")) .
-) @rm.all_full
+) @rm.all.full
 (named_node
     (identifier) (#EQ? "binary_expression") .
     (anonymous_node) .
     (named_node
         (identifier) (#EQ? "string_literal")
     )
-) @rm.all_full
+) @rm.all.full
 (named_node
     (identifier) (#EQ? "binary_expression") .
     (anonymous_node) .
-) @rm.all_full
+) @rm.all.full
 (named_node
     (identifier) (#EQ? "binary_expression")
     (named_node
@@ -63,6 +60,39 @@
         )
     ) @pred @rm.all
 )
+
+(named_node
+    (identifier) (#EQ? "binary_expression")
+    (named_node
+        (identifier) (#EQ? "method_invocation") .
+        (named_node
+            (identifier) (#EQ? "identifier")
+        ) .
+        (predicate
+            (identifier) (#EQ? "EQ")
+            (parameters
+                (string) @label
+            )
+        ) @pred .
+        (named_node
+            (identifier) (#EQ? "identifier")
+        )
+    ) @rm.all
+)
+
+(named_node
+    (identifier) (#EQ? "cast_expression") .
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred
+) @rm.all
+
 (named_node
     (identifier) (#EQ? "field_access") .
     (named_node

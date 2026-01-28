@@ -1,6 +1,7 @@
+use clap::Parser as _;
+use std::io::Write;
 use std::time::Instant;
 
-use clap::Parser as _;
 use hyperast_benchmark_search::{Timeout, enable_logging, read_subpatterns_file, synth_init_inst};
 
 use hyperast_gen_ts_tsquery::lattice_graph::GroupedLattices;
@@ -87,6 +88,8 @@ enum Bench {
         input: std::path::PathBuf,
         #[clap(long)]
         output: std::path::PathBuf,
+        #[clap(long)]
+        max_inputs: Option<usize>,
     },
     #[clap(alias = "DETECTION")]
     DETECTION {
@@ -127,7 +130,6 @@ fn main() {
 
     let meta_simp = hyperast_benchmark_search::meta_queries::META_SIMP;
     hyperast_tsquery::Query::new(&meta_simp, hyperast_gen_ts_tsquery::language()).unwrap();
-
     if args.fetch {
         repo.fetch();
         eprintln!("fetched {}/{}", user, name);
@@ -162,6 +164,7 @@ fn main() {
             cached,
             nospace,
             input,
+            max_inputs,
             output,
         } => {
             if cached {
@@ -222,7 +225,10 @@ fn main() {
                 dbg!(inst.len());
                 inst.sort_by_key(|x| unsafe { std::mem::transmute::<_, u64>(x) });
 
-                // let inst = inst.into_iter().take(1000).copied().collect::<Vec<_>>();
+                let inst = inst
+                    .into_iter()
+                    .take(max_inputs.unwrap_or(uniqs.set.len()))
+                    .collect::<Vec<_>>();
 
                 let elapsed_compute_examples_post = start.elapsed();
 
@@ -246,27 +252,8 @@ fn main() {
                     log::info!("wcc 1 := {}", graphs.wcc_description(i));
                 }
 
-                // graphs.describe();
-
-                // let majors: Vec<_> = graphs
-                //     .majors()
-                //     .filter(|(q, _)| {
-                //         let lang = hyperast_gen_ts_java::language();
-                //         !q.is_empty()
-                //             // && q.lines().count() < 50 // ignore patterns not fitting on screen
-                //             && hyperast_tsquery::Query::new(&q, lang).is_ok()
-                //     })
-                //     .collect();
-                // log::warn!(
-                //     "Length of major queries:{:?}",
-                //     majors
-                //         .iter()
-                //         .map(|q| q.0.lines().count())
-                //         .collect::<Vec<_>>()
-                // );
-                let tops: Vec<_> = graphs
-                    .tops()
-                    .filter(|(q, _)| {
+                let tops: Vec<_> = (graphs.tops())
+                    .filter(|q| {
                         let lang = hyperast_gen_ts_java::language();
                         !q.is_empty()
                             // && q.lines().count() < 50 // ignore patterns not fitting on screen
@@ -275,40 +262,12 @@ fn main() {
                     .collect();
                 log::warn!(
                     "Length of top queries:{:?}",
-                    tops.iter().map(|q| q.0.lines().count()).collect::<Vec<_>>()
+                    tops.iter().map(|q| q.lines().count()).collect::<Vec<_>>()
                 );
-                // tops.sort_by_key(|x| x.1.len());
-                // log::warn!(
-                //     "Length of top queries:\n{}",
-                //     tops.iter()
-                //         .map(|q| format!(
-                //             "---tops---{}---{:?}----\n{}\n",
-                //             q.0.lines().count(),
-                //             q.1,
-                //             q.0.lines().collect::<String>()
-                //         ))
-                //         .collect::<String>()
-                // );
-                let mut file = match std::fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open({
-                        let mut output = output.clone();
-                        output.set_extension("md");
-                        output
-                    }) {
-                    Ok(file) => file,
-                    Err(e) => {
-                        println!("Error opening file: {}", e);
-                        panic!();
-                    }
-                };
+                let input = input.to_str().unwrap_or("");
+                let mut file = open_output_file(&output, "md");
                 file.set_len(0).unwrap();
-                // let grouped = GroupedLattices::<&_>::new(&query_poset);
-                let mut graphs: Vec<_> = graphs
-                    .g
-                    .into_iter()
+                let mut graphs: Vec<_> = (graphs.g.into_iter())
                     .map(|graph| {
                         (
                             hyperast_gen_ts_tsquery::lattice_graph::lattice_stats(
@@ -335,32 +294,45 @@ fn main() {
                 ) {
                     eprintln!("{}", e);
                 }
-                let mut file = match std::fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open({
-                        let mut output = output.clone();
-                        output.set_extension("csv");
-                        output
-                    }) {
-                    Ok(file) => file,
-                    Err(e) => {
-                        println!("Error opening file: {}", e);
-                        panic!();
-                    }
-                };
-                use std::io::Write;
+                if let Err(e) = writeln!(file, "# Inputs") {
+                    eprintln!("{}", e);
+                }
+
+                macro_rules! write_md {
+                    ($val:ident) => {
+                        let name = stringify!($val);
+                        let val = $val;
+                        if let Err(e) = writeln!(file, "## {name}\n{val}") {
+                            eprintln!("{}", e);
+                        }
+                    };
+                    ($name:expr, $desc:expr, $val:ident) => {
+                        let name = $name;
+                        let desc = $desc;
+                        let val = $val;
+                        if let Err(e) = writeln!(file, "## {name}\n{desc}\n```scheme\n{val}\n```") {
+                            eprintln!("{}", e);
+                        }
+                    };
+                }
+                write_md!(user);
+                write_md!(name);
+                write_md!(commit);
+                write_md!(depth);
+                write_md!("input query", "query finding examples", query);
+                write_md!("meta gen", "query generating initial patterns", meta_gen);
+                write_md!("meta gen", "query simplifying patterns", meta_simp);
+                let mut file = open_output_file(&output, "csv");
                 file.set_len(0).unwrap();
-                macro_rules! write_data {
-                    ($f:expr, $val:ident) => {
+                macro_rules! write_csv {
+                    ($val:ident) => {
                         let name = stringify!($val);
                         let val = $val;
                         if let Err(e) = writeln!(file, "{name} {val}") {
                             eprintln!("{}", e);
                         }
                     };
-                    ($f:expr, t=$val:ident) => {
+                    (t=$val:ident) => {
                         let name = stringify!($val);
                         let val = $val;
                         let val = val.as_secs_f64();
@@ -369,7 +341,8 @@ fn main() {
                         }
                     };
                 }
-                let input = input.to_str().unwrap_or("");
+                let (tops, full_cover_tops, full_cover_cc, full_cover_cc_non_solo) =
+                    extract_stats(&grouped);
                 let examples = inst.len();
                 let wcc = grouped.graphs.len();
                 let timeout = timeout.to_string();
@@ -379,23 +352,27 @@ fn main() {
                 } = config;
                 let shrink_threshold_factor = shrink_threshold_factor as f32 / 100.0;
                 let kind = "value";
-                write_data!(file, kind); // the header
-                write_data!(file, user);
-                write_data!(file, name);
-                write_data!(file, commit);
-                write_data!(file, depth);
-                write_data!(file, input);
-                write_data!(file, examples);
-                write_data!(file, wcc);
-                write_data!(file, timeout);
-                write_data!(file, size_threshold);
-                write_data!(file, shrink_threshold_factor);
-                write_data!(file, t = elapsed_meta_simp_comp);
-                write_data!(file, t = elapsed_load_repo);
-                write_data!(file, t = elapsed_compute_examples);
-                write_data!(file, t = elapsed_compute_examples_post);
-                write_data!(file, t = elapsed_synth);
-                write_data!(file, t = elapsed_group_reduce);
+                write_csv!(kind); // the header
+                write_csv!(user);
+                write_csv!(name);
+                write_csv!(commit);
+                write_csv!(depth);
+                write_csv!(input);
+                write_csv!(timeout);
+                write_csv!(size_threshold);
+                write_csv!(shrink_threshold_factor);
+                write_csv!(wcc);
+                write_csv!(examples);
+                write_csv!(tops);
+                write_csv!(full_cover_tops);
+                write_csv!(full_cover_cc);
+                write_csv!(full_cover_cc_non_solo);
+                write_csv!(t = elapsed_meta_simp_comp);
+                write_csv!(t = elapsed_load_repo);
+                write_csv!(t = elapsed_compute_examples);
+                write_csv!(t = elapsed_compute_examples_post);
+                write_csv!(t = elapsed_synth);
+                write_csv!(t = elapsed_group_reduce);
             } else if language == "Cpp" {
                 todo!("import cpp gen")
                 // per_blob::<hyperast_gen_ts_cpp::types::TStore>(
@@ -441,6 +418,58 @@ fn main() {
     }
 }
 
+fn extract_stats(
+    grouped: &GroupedLattices<hyperast::store::defaults::NodeIdentifier>,
+) -> (usize, usize, usize, usize) {
+    let tops = (grouped.graphs.iter())
+        .map(|g| g.0.complete_tops.len())
+        .sum::<usize>();
+    let full_cover_tops = (grouped.graphs.iter())
+        .map(|g| {
+            (g.0.complete_tops.iter())
+                .filter(|x| x.1.inits == g.0.leaf_count)
+                .count()
+        })
+        .sum::<usize>();
+    let full_cover_cc = (grouped.graphs.iter())
+        .filter(|g| {
+            (g.0.complete_tops.iter())
+                .filter(|x| x.1.inits == g.0.leaf_count)
+                .count()
+                > 0
+        })
+        .count();
+    let full_cover_cc_non_solo = (grouped.graphs.iter())
+        .filter(|g| {
+            (g.0.complete_tops.iter())
+                .filter(|x| x.1.inits == g.0.leaf_count)
+                .count()
+                > 0
+                && g.0.leaf_count > 1
+        })
+        .count();
+    (tops, full_cover_tops, full_cover_cc, full_cover_cc_non_solo)
+}
+
+fn open_output_file(output: &std::path::PathBuf, ext: &str) -> std::fs::File {
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open({
+            let mut output = output.clone();
+            output.set_extension(ext);
+            output
+        }) {
+        Ok(file) => file,
+        Err(e) => {
+            println!("Error opening file: {}", e);
+            panic!();
+        }
+    }
+}
+
+#[ignore]
 #[test]
 fn debug_malloc_free_issue() {
     let meta_simp = hyperast_benchmark_search::meta_queries::META_SIMP;

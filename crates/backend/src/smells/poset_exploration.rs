@@ -87,11 +87,11 @@ pub fn semi_interactive_poset_build<P>(
             };
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all") {
                 active = act; // first rm on the ones that were simp
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = b.repair_par(rms);
                 b.dedup_uniques_par2(active_size, rms);
                 active = not.clone(); // then the other that were not simp
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = b.repair_par(rms);
                 b.dedup_uniques_par2(active_size, rms);
             }
@@ -101,7 +101,7 @@ pub fn semi_interactive_poset_build<P>(
         } else if phase == Phase::RemovesAll || phase == Phase::RemovesAll2 {
             // do not use naively after simp_eq as it might remove captures
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = if phase == Phase::RemovesAll2 {
                     b.repair_par(rms)
                 } else {

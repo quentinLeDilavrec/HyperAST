@@ -179,6 +179,7 @@ impl QueryStep {
         !self.field > 0 || field == self.field
     }
 
+    // TODO rename to positional_pred
     pub(crate) fn immediate_pred(&self) -> Option<u16> {
         self.has_immediate_pred().then_some(
             if self.capture_ids[1] == super::indexed::CaptureId::NONE {

@@ -1,7 +1,7 @@
 
 (named_node
     (identifier) (#EQ? "catch_type")
-) @rm
+) @_rm
 
 (named_node
     (identifier) (#EQ? "catch_formal_parameter")
@@ -46,9 +46,25 @@
     )? @rm.all.full .
 )
 
+
+
 (named_node
     (identifier) (#EQ? "catch_formal_parameter")
     (named_node
         (identifier) (#EQ? "identifier") .
     ) .
 ) @rm.all.full
+
+(named_node
+    (identifier) (#EQ? "catch_formal_parameter") .
+    (named_node
+        (identifier) .
+    ) .
+) @rm.all.full
+
+(named_node
+    (identifier) (#EQ? "catch_formal_parameter")
+    (named_node
+        (identifier) (#EQ? "modifiers")
+    ) @rm.all.full
+)

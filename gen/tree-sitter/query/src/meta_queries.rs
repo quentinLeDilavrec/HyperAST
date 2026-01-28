@@ -1,7 +1,7 @@
 /// queries used to generate the initial patterns from examples
 pub static META_GEN: &str = r#"[
 "{" "}" ";" "." "," "=" "(" ")" "[" "]" "!"
-"try" "catch" "import" "finally" "return" "throw" "if" "else"
+"try" "catch" "import" "finally" "return" "throw" "if" "else" "while" "for" "throws"
 (line_comment) (block_comment)
 ] @skip
 (type_identifier) @label

@@ -1,6 +1,8 @@
 #![allow(unused)]
 use num::ToPrimitive;
 use std::cmp::Ordering;
+#[cfg(feature = "synth_par")]
+use std::collections::BTreeSet;
 use std::collections::{BTreeMap, HashSet};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -36,6 +38,7 @@ pub enum TrMarker {
     Uniqs,
     RMs,
     RMall,
+    RMfinal,
     SimpEQ,
     Focus,
 }
@@ -53,6 +56,7 @@ impl TrMarker {
             TrMarker::Uniqs => "Uniqs",
             TrMarker::RMs => "RMs",
             TrMarker::RMall => "RMall",
+            TrMarker::RMfinal => "RMfinal",
             TrMarker::SimpEQ => "SimpEQ",
             TrMarker::Focus => "Focus",
         }
@@ -68,6 +72,7 @@ pub enum TR<E = IdInit, I = IdNQ> {
     Uniqs(I),
     RMs(I),
     RMall(I),
+    RMfinal(I),
     SimpEQ(I),
     Focus(I),
 }
@@ -85,6 +90,8 @@ impl<E: PartialEq, I: PartialEq> PartialOrd for TR<E, I> {
             (TR::RMs(_), _) => Some(Ordering::Less),
             (TR::SimpEQ(_), TR::SimpEQ(_)) => Some(Ordering::Equal),
             (TR::SimpEQ(_), _) => Some(Ordering::Less),
+            (TR::RMfinal(_), TR::RMfinal(_)) => Some(Ordering::Equal),
+            (TR::RMfinal(_), _) => Some(Ordering::Less),
             (TR::Focus(_), TR::Focus(_)) => Some(Ordering::Equal),
             (TR::Focus(_), _) => Some(Ordering::Less),
             // _ => self.eq(other).then(|| Ordering::Equal),
@@ -115,6 +122,7 @@ impl<E, I> TR<E, I> {
             TR::Uniqs(t) => f(TrMarker::Uniqs, Err(t)),
             TR::RMall(t) => f(TrMarker::RMall, Err(t)),
             TR::RMs(t) => f(TrMarker::RMs, Err(t)),
+            TR::RMfinal(t) => f(TrMarker::RMfinal, Err(t)),
             TR::SimpEQ(t) => f(TrMarker::SimpEQ, Err(t)),
             TR::Focus(t) => f(TrMarker::Focus, Err(t)),
         }
@@ -133,6 +141,7 @@ impl<E, I> TR<E, I> {
             Self::RMall(c) => Some(c),
             Self::SimpEQ(c) => Some(c),
             Self::Focus(c) => Some(c),
+            Self::RMfinal(c) => Some(c),
             Self::Init(_) => None,
         }
     }
@@ -919,16 +928,29 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         active: &mut Vec<IdNQ>,
     ) -> Vec<Simplified<Init>> {
         use rayon::iter::IntoParallelIterator as _;
-        use rayon::iter::ParallelIterator;
 
+        let rms = std::mem::take(active).into_par_iter();
+
+        let meta_simp = self.meta_simp;
+        let Some(cid) = meta_simp.capture_index_for_name("rm") else {
+            return vec![];
+        };
+
+        self.removes_par_aux(rms, cid)
+    }
+
+    #[cfg(feature = "synth_par")]
+    pub fn removes_par_aux(
+        &mut self,
+        rms: rayon::vec::IntoIter<IdNQ>,
+        cid: hyperast_tsquery::CaptureId,
+    ) -> Vec<(IdNQ, TR<Init>)> {
+        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::ParallelIterator;
         let s = &mut self.lattice;
         let meta_simp = self.meta_simp;
-        let rms = std::mem::take(active).into_par_iter();
         let rms = ParallelIterator::flat_map(rms, |x| {
             let query = x;
-            let Some(cid) = meta_simp.capture_index_for_name("rm") else {
-                return vec![];
-            };
             try_simp_rms(&s.query_store, query, meta_simp, cid)
                 .map(|x| match x {
                     Ok(new_q) => Ok((new_q, TR::RMs(query))),
@@ -947,13 +969,11 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
             log::info!("remains removes {i:4}/{rem_count}");
             rms.extend(x.iter().filter_map(|(query, path)| {
                 let query = *query;
-                let label_h;
                 let new_q = {
                     let query = apply_rms_aux(&mut s.query_store, query, path)?;
                     if !simp_search_need(&s.query_store, query, meta_simp) {
                         return None;
                     }
-                    label_h = s.query_store.resolve(&query).hash(&HashKind::label());
                     query
                 };
                 Some((new_q, TR::RMs(query)))
@@ -965,27 +985,42 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
     #[cfg(feature = "synth_par")]
     pub fn removesall_par_par(
         &mut self,
-        active_size: usize,
         active: &mut Vec<IdNQ>,
         cid: hyperast_tsquery::CaptureId,
     ) -> Vec<Simplified<Init>> {
-        use rayon::iter::IntoParallelIterator as _;
+        use rayon::iter::{IntoParallelIterator as _, ParallelIterator};
+        let rms = std::mem::take(active).into_par_iter();
+        self.removesall_par_par_aux(rms, |query_store, query, meta_simp| {
+            find_matches(query_store, query, meta_simp, cid)
+        })
+    }
+    #[must_use]
+    #[cfg(feature = "synth_par")]
+    pub fn removesall_par_par_aux<T>(
+        &mut self,
+        rms: impl rayon::iter::ParallelIterator<Item = T>,
+        find: impl Fn(&QStore, T, &hyperast_tsquery::Query) -> Vec<PendingRmPath> + Sync,
+    ) -> Vec<Simplified<Init>>
+    where
+        T: Send + std::borrow::Borrow<IdNQ>,
+    {
         use rayon::iter::ParallelIterator;
 
         let s = &mut self.lattice;
         let meta_simp = self.meta_simp;
-        let rms = std::mem::take(active).into_par_iter();
         let rms = ParallelIterator::filter_map(rms, |x| {
-            let query = x;
-            try_simp_rmalls(&s.query_store, query, meta_simp, cid).map(|x| match x {
+            let query = *x.borrow();
+            // let mut rms = find_matches(&s.query_store, query, meta_simp, cid);
+            let mut rms = find(&s.query_store, x, meta_simp);
+            try_simp_rmalls_aux(&s.query_store, query, meta_simp, rms).map(|x| match x {
                 Ok(new_q) => Ok((new_q, TR::RMall(query))),
                 Err(e) => Err(e),
             })
         });
         let (remains, mut rms): (Vec<RmAllAlt>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
-        log::info!("remains: {}", remains.len());
-        log::info!("rms: {}", rms.len());
+        log::info!("all remains: {}", remains.len());
+        log::info!("all rms: {}", rms.len());
 
         let rem_count = remains.len();
         const CHUNK_SIZE: usize = 1000;
@@ -1010,6 +1045,89 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 }
                 assert_ne!(new_q, query);
                 Some((new_q, TR::RMall(query)))
+            }))
+        });
+        rms
+    }
+    #[must_use]
+    #[cfg(feature = "synth_par")]
+    pub fn remove_par_aux<T>(
+        &mut self,
+        rms: impl rayon::iter::ParallelIterator<Item = T>,
+        find: impl Fn(&QStore, T, &hyperast_tsquery::Query) -> Vec<PendingRmPath> + Sync,
+    ) -> Vec<Simplified<Init>>
+    where
+        T: Send + std::borrow::Borrow<IdNQ>,
+    {
+        use rayon::iter::ParallelIterator;
+
+        let s = &mut self.lattice;
+        let meta_simp = self.meta_simp;
+        let rms = ParallelIterator::flat_map(rms, |x| {
+            use rayon::iter::IntoParallelIterator;
+            let qs = &s.query_store;
+            let query = *x.borrow();
+            // let mut rms = find_matches(&s.query_store, query, meta_simp, cid);
+            let mut rms = find(&s.query_store, x, meta_simp);
+            // try_simp_rms(&s.query_store, query, meta_simp, rms).map(|x| match x {
+            //     Ok(new_q) => Ok((new_q, TR::RMall(query))),
+            //     Err(e) => Err(e),
+            // })
+            rms.into_par_iter()
+                .flat_map(move |path| {
+                    // log::info!("to remove: {:?}", path);
+                    let Some(query) = try_apply_rms_aux(qs, query, &path) else {
+                        return vec![Err((query, path))];
+                    };
+                    if !simp_search_need(qs, query, meta_simp) {
+                        return vec![];
+                    }
+                    vec![Ok(query)]
+                })
+                .map(move |x| match x {
+                    Ok(new_q) => Ok((new_q, TR::RMs(query))),
+                    Err(e) => Err(e),
+                })
+        });
+        struct OnlySome<T>(Vec<T>);
+
+        impl<T: Send> rayon::iter::ParallelExtend<Option<T>> for OnlySome<T> {
+            fn par_extend<I>(&mut self, par_iter: I)
+            where
+                I: rayon::iter::IntoParallelIterator<Item = Option<T>>,
+            {
+                let some = par_iter.into_par_iter().filter_map(std::convert::identity);
+                self.0.par_extend(some);
+            }
+        }
+
+        // let rms = OnlySome(rms.collect::<Vec<_>>());
+        let (remains, mut rms): (Vec<(IdNQ, PendingRmPath)>, Vec<Simplified<Init>>) =
+            ParallelIterator::partition_map(rms, |x| x.into());
+        log::info!("all remains: {}", remains.len());
+        log::info!("all rms: {}", rms.len());
+
+        let rem_count = remains.len();
+        const CHUNK_SIZE: usize = 1000;
+        remains.chunks(CHUNK_SIZE).enumerate().for_each(|(i, x)| {
+            let i = i * CHUNK_SIZE;
+            log::info!("remains removesall {i:4}/{rem_count}");
+
+            rms.extend(x.iter().filter_map(|(query, path)| {
+                let query = *query;
+                let mut curr = query;
+                // dbg!(&paths);
+                curr = apply_rms_aux(&mut s.query_store, curr, path)?;
+                if !simp_search_need(&s.query_store, curr, meta_simp) {
+                    return None;
+                }
+                let new_q = curr;
+                if new_q == query {
+                    todo!()
+                    // return None;
+                }
+                assert_ne!(new_q, query);
+                Some((new_q, TR::RMs(query)))
             }))
         });
         rms
@@ -1126,7 +1244,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 .collect();
             to_rm.sort_by(|a, b| b.cmp(a));
             let mut curr = query;
-            log::info!("to_rm: {:?}", to_rm);
+            log::trace!("to_rm: {:?}", to_rm);
             for rm in 0..to_rm.len() {
                 let mut path = to_rm[rm].clone();
                 // path.pop();
@@ -1160,8 +1278,8 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         type RepairRemains<Init> = (IdNQ, IdNQ, TR<Init>, Vec<PendingRmPath>);
         let (remains, mut rms): (Vec<RepairRemains<Init>>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
-        log::info!("remains: {}", remains.len());
-        log::info!("rms: {}", rms.len());
+        log::info!("repair remains: {}", remains.len());
+        log::info!("repair rms: {}", rms.len());
 
         let rem_count = remains.len();
         const CHUNK_SIZE: usize = 1000;
@@ -1171,7 +1289,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                     log::info!("remains repairs {i:4}/{rem_count}");
                 }
 
-                log::info!("to_rm mut: {:?}", paths);
+                log::trace!("to_rm mut: {:?}", paths);
                 // dbg!(&paths);
                 // eprintln!(
                 //     "{}",
@@ -1308,7 +1426,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 });
                 repl.sort_by(|a, b| b.0.cmp(&a.0));
                 let mut curr = query;
-                log::info!("repl: {} {:?}", repl.len(), repl);
+                log::trace!("repl: {} {:?}", repl.len(), repl);
                 for rm in 0..repl.len() {
                     let (path, new) = repl[rm].clone();
                     // path.pop();
@@ -1346,8 +1464,8 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         type NormRemains<Init> = (IdNQ, IdNQ, TR<Init>, Vec<(PendingRmPath, IdNQ)>);
         let (remains, mut rms): (Vec<NormRemains<Init>>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
-        log::info!("remains: {}", remains.len());
-        log::info!("rms: {}", rms.len());
+        log::info!("norm remains: {}", remains.len());
+        log::info!("norm rms: {}", rms.len());
 
         let rem_count = remains.len();
         const CHUNK_SIZE: usize = 1000;
@@ -1435,7 +1553,6 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         (rms, already)
     }
 }
-
 /// dedup using any usize representable metric,
 /// `by_metric` is indexed by the metric as its key
 /// `dedup` is also indexed by the metric as its offset
@@ -1482,7 +1599,7 @@ where
     use rayon::iter::IntoParallelIterator as _;
     use rayon::iter::ParallelIterator;
     let by_metric = ParallelIterator::fold(
-        uniques.into_par_iter(),
+        instances.into_par_iter(),
         BTreeMap::<M, Vec<_>>::default,
         |mut acc, x: (IdNQ, TR)| {
             let size = metric(&x.0);
@@ -1502,6 +1619,57 @@ where
     );
     by_metric
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IdNQOrd(IdNQ);
+
+impl PartialOrd for IdNQOrd {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for IdNQOrd {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let s: u64 = unsafe { std::mem::transmute::<_, _>(self.0) };
+        let o: u64 = unsafe { std::mem::transmute::<_, _>(other.0) };
+        s.cmp(&o)
+    }
+}
+
+impl From<IdNQ> for IdNQOrd {
+    fn from(id: IdNQ) -> Self {
+        IdNQOrd(id)
+    }
+}
+
+impl Into<IdNQ> for IdNQOrd {
+    fn into(self) -> IdNQ {
+        self.0
+    }
+}
+
+// #[cfg(feature = "synth_par")]
+// /// the rayon parallelization enabling fold-reduce
+// fn par_set_collect(instances: impl Iterator<Item = IdNQOrd>) -> BTreeSet<IdNQOrd> {
+//     use rayon::iter::IntoParallelIterator as _;
+//     use rayon::iter::ParallelIterator;
+//     let by_metric = ParallelIterator::fold(
+//         instances.collect::<Vec<_>>().into_par_iter(),
+//         BTreeSet::<_>::default,
+//         |mut acc, x: _| {
+//             acc.insert(x);
+//             acc
+//         },
+//     );
+//     let by_metric = ParallelIterator::reduce(by_metric, BTreeSet::<_>::default, |mut acc, b| {
+//         for v in b {
+//             acc.insert(v);
+//         }
+//         acc
+//     });
+//     by_metric
+// }
+
 #[cfg(feature = "synth_par")]
 pub fn filter_by_key_par<TR: Clone + PartialEq + Send + Sync>(
     by_metric: &mut BTreeMap<usize, Vec<(legion::Entity, TR)>>,
@@ -1970,7 +2138,7 @@ fn try_simp_rms<'a>(
 ) -> impl Iterator<Item = Result<SimpRmsRemoves, SimpRmsRemains>> + 'a {
     let rms = find_matches(query_store, query, meta_simp, cid);
     rms.into_iter().filter_map(move |path| {
-        log::info!("to remove: {:?}", path);
+        // log::info!("to remove: {:?}", path);
         let Some(query) = try_apply_rms_aux(query_store, query, &path) else {
             return Some(Err((query, path)));
         };
@@ -1990,6 +2158,15 @@ fn try_simp_rmalls<'a>(
     cid: hyperast_tsquery::CaptureId,
 ) -> Option<Result<SimpRmsRemoves, RmAllAlt>> {
     let mut rms = find_matches(query_store, query, meta_simp, cid);
+    try_simp_rmalls_aux(query_store, query, meta_simp, rms)
+}
+
+fn try_simp_rmalls_aux<'a>(
+    query_store: &'a QStore,
+    query: IdNQ,
+    meta_simp: &'a hyperast_tsquery::Query,
+    mut rms: Vec<PendingRmPath>,
+) -> Option<Result<SimpRmsRemoves, RmAllAlt>> {
     for rm in &mut rms {
         rm.pop();
         rm.reverse();
@@ -2314,7 +2491,6 @@ pub fn find_matches_aux(
         };
         log::trace!("found match {}", m.pattern_index.to_usize());
         for p in m.nodes_for_capture_index(cid) {
-            log::trace!("found capture for match");
             set.register(&p.pos);
         }
     }
@@ -2484,6 +2660,34 @@ impl<P: Ord> std::fmt::Display for PerLabel<P> {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+enum Phase {
+    /// Isolate matching subpatterns
+    Uniq,
+    /// Remove each matched subpattern individually (i.e., a,b,c match then it produces [b,c], [a,c], [a,b]),
+    /// done iteratively it is combinatorial.
+    /// Do not use once SimpEq has been applied, otherwise generated patterns might be invalid
+    ///
+    /// use AdvRemovesEach is SimpEq has been applied
+    RemovesEach,
+    /// Remove all matched subpattern, at once.
+    /// Do not use once SimpEq has been applied, otherwise generated patterns might be invalid
+    ///
+    /// use AdvRemovesAll is SimpEq has been applied
+    RemovesAll,
+    /// try to regroup positional predicates (captured as @pred) with same @label, otherwise remove subpatterns captured by @rm.all
+    ///
+    /// like RemovesAll, does not explore combinations
+    SimpEq,
+    /// same RemovesAll, but with additional steps to repair patterns
+    AdvRemovesAll,
+    /// same as RemovesEach, but with additional steps to repair patterns
+    AdvRemovesEach,
+    /// Same as AdvRemoves, but applied to patterns not yet simplified (the tops in the poset),
+    /// to avoid producing too many intermediate patterns
+    AdvRemovesFinal,
+}
+
 #[cfg(feature = "synth_par")]
 pub fn semi_interactive_poset_build<P>(
     b: &mut Builder<'_, P>,
@@ -2493,16 +2697,6 @@ pub fn semi_interactive_poset_build<P>(
 ) where
     P: Eq + Clone + SolvedPosition<IdN> + Sync + Send,
 {
-    #[derive(PartialEq, Eq, Debug)]
-    enum Phase {
-        Uniq,
-        Removes,
-        RemovesAll,
-        SimpEq,
-        RemovesAll2,
-        Removes2,
-    }
-
     type BySize<T> = Vec<T>;
     type SimpEqResult = IdN;
     type SimpEqSource = IdN;
@@ -2565,12 +2759,12 @@ pub fn semi_interactive_poset_build<P>(
             };
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all") {
                 active = act; // first rm on the ones that were simp
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = b.repair_par(rms);
                 let rms = b.norm_caps(rms);
                 b.dedup_uniques_par2(active_size, rms);
                 active = not.clone(); // then the other that were not simp
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = b.repair_par(rms);
                 let rms = b.norm_caps(rms);
                 b.dedup_uniques_par2(active_size, rms);
@@ -2578,11 +2772,11 @@ pub fn semi_interactive_poset_build<P>(
             // TODO link all found simpeq (then rm.all) to previous respective simpeq action,
             // ie. follow one back then re-apply same simpeq action and link to result
             // let call this a reduction and model it as TR::SimpEqReduction(TR)
-        } else if phase == Phase::RemovesAll || phase == Phase::RemovesAll2 {
+        } else if phase == Phase::RemovesAll || phase == Phase::AdvRemovesAll {
             // do not use naively after simp_eq as it might remove captures
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
-                let rms = if phase == Phase::RemovesAll2 {
+                let rms = b.removesall_par_par(&mut active, cid);
+                let rms = if phase == Phase::AdvRemovesAll {
                     let rms = b.repair_par(rms);
                     let rms = b.norm_caps(rms);
                     rms
@@ -2593,34 +2787,35 @@ pub fn semi_interactive_poset_build<P>(
 
                 // avoid hanging, by ignoring the patterns not shrinking enough
                 let mut by_size = b.by_pattern_size(rms);
-                let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
+                // let mut largest_by_size = by_size.split_off(&size_threshold(active_size));
                 let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
                 active.extend(act);
                 log::info!("actives after remove all: {}", active.len());
 
-                filter_by_key_par(&mut largest_by_size, &b.dedup);
-                let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
-                log::info!("too_slow added: {}", act.len());
+                // filter_by_key_par(&mut largest_by_size, &b.dedup);
+                // let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
+                // log::info!("too_slow added: {}", act.len());
             }
-        } else if phase == Phase::Removes || phase == Phase::Removes2 {
+        } else if phase == Phase::RemovesEach || phase == Phase::AdvRemovesEach {
             // do not use naively after simp_eq as it might remove captures
             for a in &active {
                 log::trace!("try remove: {:?}", b.lattice.pretty(&a));
             }
             let rms = b.removes_par_par(active_size, &mut active);
-            for (a, _) in &rms {
-                log::info!("to remove: {:?}", b.lattice.pretty(&a));
-            }
-            let rms = if phase == Phase::Removes2 {
+            // for (a, _) in &rms {
+            //     log::info!("to remove: {:?}", b.lattice.pretty(&a));
+            // }
+            let rms = if phase == Phase::AdvRemovesEach {
                 let rms = b.repair_par(rms);
                 let rms = b.norm_caps(rms);
                 rms
             } else {
                 rms
             };
-            for (a, _) in &rms {
-                log::info!("repaired: {:?}", b.lattice.pretty(&a));
-            }
+            log::info!("repaired and normalized: {}", rms.len());
+            // for (a, _) in &rms {
+            //     log::info!("repaired: {:?}", b.lattice.pretty(&a));
+            // }
             // TODO add post-removal to make invalid patterns valid again
             // not that difficult, just need to remove predicate using absent capture
             // and then also remove the unused captures to help with deduplication
@@ -2639,10 +2834,319 @@ pub fn semi_interactive_poset_build<P>(
             filter_by_key_par(&mut largest_by_size, &b.dedup);
             let act = dedup_patterns_by_metric(largest_by_size, &mut too_slow);
             log::info!("too_slow added: {}", act.len());
+        } else if phase == Phase::AdvRemovesFinal {
+            use std::hash::Hash;
+
+            use rayon::iter::IntoParallelRefIterator;
+
+            let Some(cid) = meta_simp.capture_index_for_name("rm.final") else {
+                break;
+            };
+
+            // the above is needed because we do not keep active patterns in between phases
+
+            let mut active_tops = {
+                let patts: Vec<_> = b.dedup.0.iter().flat_map(|x| x.keys().copied()).collect();
+                let already: std::collections::HashSet<_> = (b.dedup.0.iter())
+                    .flat_map(|x| x.values())
+                    .flat_map(|x| x.iter().filter_map(|x| x.no_init().copied()))
+                    .collect();
+                patts
+                    .into_iter()
+                    .filter(|x| !already.contains(x))
+                    .collect::<Vec<_>>()
+            };
+            // eprintln!("thetops:");
+            // for t in &active_tops {
+            //     eprintln!("{}", b.lattice.pretty(t));
+            // }
+            let mut active_tops_hash = 0;
+            loop {
+                if active_tops.is_empty() || active_tops.len() >= 50_000 {
+                    dbg!(active_tops.len());
+                    let patts: Vec<_> = b.dedup.0.iter().flat_map(|x| x.keys().copied()).collect();
+                    let already: std::collections::HashSet<_> = (b.dedup.0.iter())
+                        .flat_map(|x| x.values())
+                        .flat_map(|x| x.iter().filter_map(|x| x.no_init().copied()))
+                        .collect();
+                    dbg!(patts.len(), already.len());
+                    active_tops = patts
+                        .into_iter()
+                        .filter(|x| !already.contains(x))
+                        .collect::<Vec<_>>();
+                    dbg!(active_tops.len());
+                    if active_tops.is_empty() {
+                        break;
+                    }
+                }
+                if active_tops_hash == hyperast::utils::hash(&active_tops) {
+                    log::info!("reached fixed point at {} tops", active_tops.len());
+                    break;
+                } else {
+                    active_tops_hash = hyperast::utils::hash(&active_tops);
+                }
+                log::info!("refining {} tops fast", active_tops.len());
+
+                let active_tops_count = active_tops.len();
+
+                use std::borrow::Borrow;
+
+                use rayon::iter::{IntoParallelIterator as _, ParallelIterator};
+                let mut to_be_rm =
+                    rayon::iter::ParallelIterator::flat_map(active_tops.into_par_iter(), |query| {
+                        use hyperast::position::structural_pos::CursorHead;
+                        let set = find_matches_aux(&b.lattice.query_store, query, meta_simp, cid);
+                        // TODO only keep leafs
+                        set.collect_vec(|x| (x.node(), (query, x.offsets())))
+                    });
+
+                type SubToBeRm = IdNQOrd;
+
+                let mut sub_to_be_rm = rayon::iter::ParallelIterator::fold(
+                    to_be_rm,
+                    BTreeMap::<SubToBeRm, Vec<_>>::default,
+                    |mut acc, (n, rest)| {
+                        acc.entry(IdNQOrd(n)).or_default().push(rest);
+                        acc
+                    },
+                );
+
+                let sub_to_be_rm = rayon::iter::ParallelIterator::reduce(
+                    sub_to_be_rm,
+                    BTreeMap::<SubToBeRm, Vec<_>>::default,
+                    |mut acc, b| {
+                        for (n, rest) in b {
+                            acc.entry(n).or_default().extend(rest);
+                        }
+                        acc
+                    },
+                );
+
+                dbg!(sub_to_be_rm.len());
+                eprintln!(
+                    "{:?}",
+                    sub_to_be_rm.iter().map(|x| x.1.len()).collect::<Vec<_>>()
+                );
+                dbg!(sub_to_be_rm.iter().map(|x| x.1.len()).sum::<usize>());
+
+                if sub_to_be_rm.is_empty() {
+                    dbg!();
+                    break;
+                }
+                if active_tops_count < 100 {
+                    // let patts: Vec<_> = b.dedup.0.iter().flat_map(|x| x.keys().copied()).collect();
+                    // let already: std::collections::HashSet<_> = (b.dedup.0.iter())
+                    //     .flat_map(|x| x.values())
+                    //     .flat_map(|x| x.iter().filter_map(|x| x.no_init().copied()))
+                    //     .collect();
+                    // dbg!(active_tops_count);
+
+                    // active_tops = patts
+                    //     .into_iter()
+                    //     .filter(|x| !already.contains(x))
+                    //     .collect::<Vec<_>>();
+
+                    // if active_tops.is_empty()
+                    //     || active_tops.len() >= 50_000
+                    //     || active_tops.len() < 100
+                    // {
+                    //     dbg!(active_tops.len());
+                    //     break;
+                    // }
+                    if sub_to_be_rm.iter().map(|x| x.1.len()).sum::<usize>() < 200 {
+                        let mut patt_to_be_simp = rayon::iter::ParallelIterator::fold(
+                            sub_to_be_rm.into_par_iter(),
+                            BTreeMap::<PattToBeSimp, Vec<_>>::default,
+                            |mut acc, (n, rest)| {
+                                for (n, p) in rest {
+                                    acc.entry(IdNQOrd(n)).or_default().push(p);
+                                }
+                                acc
+                            },
+                        );
+
+                        let patt_to_be_simp = rayon::iter::ParallelIterator::reduce(
+                            patt_to_be_simp,
+                            BTreeMap::<PattToBeSimp, Vec<_>>::default,
+                            |mut acc, b| {
+                                for (n, rest) in b {
+                                    acc.entry(n).or_default().extend(rest);
+                                }
+                                acc
+                            },
+                        );
+                        let rms = b.remove_par_aux(
+                            patt_to_be_simp
+                                .into_par_iter()
+                                .map(|x| TopRmMinShared(x.0, x.1)),
+                            |query_store, query, meta_simp| query.1,
+                        );
+                        // active_tops = sub_to_be_rm.values().flatten().map(|x| x.0).collect();
+                        // active_tops.sort_by_key(|x| unsafe { std::mem::transmute::<_, u64>(*x) });
+                        // active_tops.dedup();
+
+                        // use rayon::iter::IntoParallelIterator;
+                        // let rms = b.removes_par_aux(active_tops.into_par_iter(), cid);
+                        let rms = rms
+                            .into_iter()
+                            .map(|(x, y)| {
+                                (
+                                    x,
+                                    match y {
+                                        TR::RMs(y) => TR::RMfinal(y),
+                                        _ => unreachable!(),
+                                    },
+                                )
+                            })
+                            .collect();
+                        let rms = b.repair_par(rms);
+                        let rms = b.norm_caps(rms);
+
+                        let mut by_size = b.by_pattern_size(rms);
+                        let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+                        // assert!(!act.iter().any(|x| already.contains(x)));
+                        // actives of tops are also tops
+                        active_tops = act;
+                        continue;
+                    }
+                    dbg!(active_tops_count);
+                }
+
+                type PattToBeSimp = IdNQOrd;
+                let min_common = sub_to_be_rm.iter().map(|x| x.1.len()).min().unwrap_or(0);
+                let mut patt_to_be_simp = rayon::iter::ParallelIterator::fold(
+                    sub_to_be_rm.into_par_iter(),
+                    BTreeMap::<PattToBeSimp, Vec<_>>::default,
+                    |mut acc, (n, rest)| {
+                        if rest.len() > min_common {
+                            log::info!("waiting: sharing {}", rest.len());
+                            return acc;
+                        }
+                        for (n, p) in rest {
+                            acc.entry(IdNQOrd(n)).or_default().push(p);
+                        }
+                        acc
+                    },
+                );
+
+                let patt_to_be_simp = rayon::iter::ParallelIterator::reduce(
+                    patt_to_be_simp,
+                    BTreeMap::<PattToBeSimp, Vec<_>>::default,
+                    |mut acc, b| {
+                        for (n, rest) in b {
+                            acc.entry(n).or_default().extend(rest);
+                        }
+                        acc
+                    },
+                );
+                log::info!(
+                    "processing {} patterns with {min_common} commons",
+                    patt_to_be_simp.len()
+                );
+                struct TopRmMinShared(IdNQOrd, Vec<PendingRmPath>);
+                impl Borrow<IdNQ> for TopRmMinShared {
+                    fn borrow(&self) -> &IdNQ {
+                        &self.0.0
+                    }
+                }
+
+                let rms = b.removesall_par_par_aux::<TopRmMinShared>(
+                    patt_to_be_simp
+                        .into_par_iter()
+                        .map(|x| TopRmMinShared(x.0, x.1)),
+                    |query_store, query, meta_simp| query.1,
+                );
+                let rms = rms
+                    .into_iter()
+                    .map(|(x, y)| {
+                        (
+                            x,
+                            match y {
+                                TR::RMall(y) => TR::RMfinal(y),
+                                _ => unreachable!(),
+                            },
+                        )
+                    })
+                    .collect();
+                let rms = b.repair_par(rms);
+                let rms = b.norm_caps(rms);
+                let mut by_size = b.by_pattern_size(rms);
+                let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+                // assert!(!act.iter().any(|x| already.contains(x)));
+                dbg!(act.len());
+                // actives of tops are also tops
+                active_tops = act;
+            }
+
+            // let patts: Vec<_> = b.dedup.0.iter().flat_map(|x| x.keys().copied()).collect();
+            // let already: std::collections::HashSet<_> = (b.dedup.0.iter())
+            //     .flat_map(|x| x.values())
+            //     .flat_map(|x| x.iter().filter_map(|x| x.no_init().copied()))
+            //     .collect();
+            // the above is needed again to be thorough
+
+            // let Some(cid) = meta_simp.capture_index_for_name("rm.final") else {
+            //     break;
+            // };
+            // // active_tops = patts
+            // //     .into_iter()
+            // //     .filter(|x| !already.contains(x))
+            // //     .collect::<Vec<_>>();
+            // while !active_tops.is_empty() && active_tops.len() < 5_000 {
+            //     log::info!("refining {} tops", active_tops.len());
+            //     let mut to_be_rm = active_tops
+            //         .iter()
+            //         .flat_map(|query| {
+            //             use hyperast::position::structural_pos::CursorHead;
+            //             let set = find_matches_aux(&b.lattice.query_store, *query, meta_simp, cid);
+            //             set.collect_vec(|x| x.node())
+            //         })
+            //         .collect::<Vec<_>>();
+            //     to_be_rm.sort_by_key(|x| unsafe { std::mem::transmute::<_, u64>(*x) });
+            //     if !to_be_rm.is_empty() {
+            //         let mut duplicates = vec![0];
+            //         let mut prev = to_be_rm[0];
+            //         for x in to_be_rm.into_iter().skip(1) {
+            //             if x == prev {
+            //                 *duplicates.last_mut().unwrap() += 1;
+            //             } else {
+            //                 duplicates.push(1);
+            //                 prev = x;
+            //             }
+            //         }
+            //         eprintln!("duplicates: {:?}", duplicates);
+            //     }
+
+            //     use rayon::iter::IntoParallelIterator;
+            //     let rms = b.removes_par_aux(active_tops.into_par_iter(), cid);
+            //     let rms = rms
+            //         .into_iter()
+            //         .map(|(x, y)| {
+            //             (
+            //                 x,
+            //                 match y {
+            //                     TR::RMs(y) => TR::RMfinal(y),
+            //                     _ => unreachable!(),
+            //                 },
+            //             )
+            //         })
+            //         .collect();
+            //     let rms = b.repair_par(rms);
+            //     let rms = b.norm_caps(rms);
+
+            //     let mut by_size = b.by_pattern_size(rms);
+            //     let act = dedup_patterns_by_metric(by_size, &mut b.dedup);
+            //     // assert!(!act.iter().any(|x| already.contains(x)));
+            //     // actives of tops are also tops
+            //     active_tops = act;
+            // }
+            break;
+
+            // find tops
+            // tops = set of patterns / set of already simplified patterns
+            // then process the tops, iteratively when not in the simplified set
         }
-        log::error!("{phase:?} size: {} actives: {}", &active_size, active.len());
-        log::warn!("");
-        log::info!("");
+        log::info!("{phase:?} size: {} actives: {}", &active_size, active.len());
         if b.between(&mut active_size, &mut active) {
             log::error!("finish phase: {phase:?}");
             if phase == Phase::Uniq {
@@ -2660,8 +3164,8 @@ pub fn semi_interactive_poset_build<P>(
                 assert!(!b.dedup.is_empty());
                 active_size = b.dedup.len() - 1;
                 active = b.actives(active_size);
-                phase = Phase::Removes;
-            } else if phase == Phase::Removes {
+                phase = Phase::RemovesEach;
+            } else if phase == Phase::RemovesEach {
                 assert!(!b.dedup.is_empty());
                 active_size = b.dedup.len() - 1;
                 // this phase produce many variants so only reasonably sized patterns are considered
@@ -2673,18 +3177,24 @@ pub fn semi_interactive_poset_build<P>(
                 active_size = active_size.min(size_threshold(0));
                 active = b.actives(active_size);
             } else if phase == Phase::SimpEq {
-                phase = Phase::Removes2;
+                phase = Phase::AdvRemovesEach;
                 assert!(!b.dedup.is_empty());
                 active_size = b.dedup.len() - 1;
                 // active_size = active_size.min(size_threshold(0));
                 active = b.actives(active_size);
-            } else if phase == Phase::Removes2 {
-                phase = Phase::RemovesAll2;
+            } else if phase == Phase::AdvRemovesEach {
+                phase = Phase::AdvRemovesAll;
                 assert!(!b.dedup.is_empty());
                 active_size = b.dedup.len() - 1;
                 // active_size = active_size.min(size_threshold(0));
                 active = b.actives(active_size);
-            } else if phase == Phase::RemovesAll2 {
+            } else if phase == Phase::AdvRemovesAll {
+                phase = Phase::AdvRemovesFinal;
+                assert!(!b.dedup.is_empty());
+                active_size = b.dedup.len() - 1;
+                // active_size = active_size.min(size_threshold(0));
+                active = b.actives(active_size);
+            } else if phase == Phase::AdvRemovesFinal {
                 break;
             } else {
                 unreachable!();
@@ -2692,3 +3202,23 @@ pub fn semi_interactive_poset_build<P>(
         }
     }
 }
+
+/// default sequence, with a good balance between speed and number of patterns
+const PHASES_1: &[Phase] = &[
+    Phase::Uniq,
+    Phase::SimpEq,
+    Phase::AdvRemovesEach,
+    Phase::AdvRemovesAll,
+    Phase::AdvRemovesFinal,
+];
+
+/// thorough sequence, with more patterns and slower
+const PHASES_2: &[Phase] = &[
+    Phase::Uniq,
+    Phase::RemovesEach,
+    Phase::RemovesAll,
+    Phase::SimpEq,
+    Phase::AdvRemovesEach,
+    Phase::AdvRemovesAll,
+    Phase::AdvRemovesFinal,
+];

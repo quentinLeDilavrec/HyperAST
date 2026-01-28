@@ -443,19 +443,16 @@ impl ResultLogger<HashInstAccumulator> for UniqInst {
         &mut self,
         entry: crate::LogEntry<HashInstAccumulator>,
     ) -> Result<(), crate::TimeoutError> {
-        match entry {
-            crate::LogEntry::ExecuteQueryOnCommit(r, _) => {
-                dbg!(r.vec.inst.len());
-                assert_eq!(r.vec.inst.len(), r.vec.struc.len());
-                assert_eq!(r.vec.inst.len(), r.vec.label.len());
-                // if self.prev_struc != r.accu.struc && self.prev_label != r.accu.label {
-                for (k, v) in r.vec.into_iter() {
-                    self.set.insert(k, v);
-                }
-                dbg!(self.set.len());
-                // }
+        if let crate::LogEntry::ExecuteQueryOnCommit(r, _) = entry {
+            dbg!(r.vec.inst.len());
+            assert_eq!(r.vec.inst.len(), r.vec.struc.len());
+            assert_eq!(r.vec.inst.len(), r.vec.label.len());
+            // if self.prev_struc != r.accu.struc && self.prev_label != r.accu.label {
+            for (k, v) in r.vec.into_iter() {
+                self.set.insert(k, v);
             }
-            _ => (),
+            dbg!(self.set.len());
+            // }
         }
 
         let duration = self.start_time.elapsed();

@@ -138,14 +138,14 @@ impl<E, I> TR<E, I> {
     }
 }
 
-pub struct QueryLattice<E> {
+pub struct QueryLattice<E, Q = IdNQ> {
     pub query_store: QStore,
-    leaf_queries: Vec<IdNQ>,
-    pub raw_rels: std::collections::HashMap<IdNQ, Vec<TR<E>>>,
-    pub queries: Vec<(IdNQ, Vec<IdQ>)>,
+    leaf_queries: Vec<Q>,
+    pub raw_rels: std::collections::HashMap<Q, Vec<TR<E>>>,
+    pub queries: Vec<(Q, Vec<IdQ>)>,
     sort_cache: Vec<u32>,
-    pub(crate) root_cap: IdNQ,
-    pub(crate) auto_caps: Vec<IdNQ>,
+    pub(crate) root_cap: Q,
+    pub(crate) auto_caps: Vec<Q>,
 }
 
 /// make the deduplication through raw entries, probably slower, is it marginal ?
@@ -1357,7 +1357,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                     log::info!("remains repairs {i:4}/{rem_count}");
                 }
 
-                log::info!("repl mut: {:?}", paths);
+                log::trace!("repl mut: {:?}", paths);
                 // dbg!(&paths);
                 // eprintln!(
                 //     "{}",
@@ -1471,9 +1471,9 @@ pub fn dedup_patterns_by_metric<TR: Clone + PartialEq + Send + Sync>(
 #[cfg(feature = "synth_par")]
 /// the rayon parallelization enabling fold-reduce
 fn by_metric<TR, M>(
-    uniques: Vec<(IdN, TR)>,
-    metric: impl Fn(&IdN) -> M + Sync,
-) -> BTreeMap<M, Vec<(IdN, TR)>>
+    instances: Vec<(IdNQ, TR)>,
+    metric: impl Fn(&IdNQ) -> M + Sync,
+) -> BTreeMap<M, Vec<(IdNQ, TR)>>
 where
     M: Ord,
     TR: Send + Sync,

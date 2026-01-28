@@ -352,8 +352,11 @@ pub(crate) fn smells(
     log::info!("final bad len: {}", bad.len());
 
     bad.sort_by(|a, b| {
-        let cmp = b.examples.len().cmp(&a.examples.len());
-        cmp.then_with(|| b.query.len().cmp(&a.query.len()))
+        // let cmp = b.examples.len().cmp(&a.examples.len());
+        // cmp.then_with(|| a.matches.cmp(&b.matches))
+        // .then_with(|| b.query.len().cmp(&a.query.len()))
+        b.examples.len().cmp(&a.examples.len())
+        // b.matches.cmp(&a.matches)
     });
 
     let good = vec![]; // TODO generate the smell fixes

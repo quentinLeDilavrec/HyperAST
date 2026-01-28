@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use num::ToPrimitive;
 use petgraph::csr::Csr;
 use petgraph::{Directed, Graph};
@@ -117,6 +119,9 @@ pub fn group_lattices<N: Clone, E: Clone + 'static + EdgeUnion>(
                     assert_ne!(b.target(), uninit);
                     if let Some(edge) = g.find_edge(map[a.index()], map[b.target().index()]) {
                         g[edge].union(b.weight().clone());
+                    } else if let Some(edge) = g.find_edge(map[b.target().index()], map[a.index()])
+                    {
+                        g[edge].union(b.weight().clone());
                     } else {
                         g.add_edge(map[b.target().index()], map[a.index()], b.weight().clone());
                     }
@@ -150,21 +155,13 @@ pub fn group_lattices<N: Clone, E: Clone + 'static + EdgeUnion>(
                 g.add_node(graph[*n].clone());
             }
             for e in reduction.edge_indices() {
-                if let Some((u, v)) = reduction.edge_endpoints(e) {
-                    g.add_edge(
-                        v,
-                        u,
-                        graph
-                            .edge_weight(
-                                graph
-                                    .find_edge_undirected(toposort[v.index()], toposort[u.index()])
-                                    .unwrap()
-                                    .0,
-                            )
-                            .unwrap()
-                            .clone(),
-                    );
-                }
+                let Some((u, v)) = reduction.edge_endpoints(e) else {
+                    continue;
+                };
+                let e = graph.find_edge_undirected(toposort[v.index()], toposort[u.index()]);
+                let e = e.unwrap().0;
+                let weight = graph.edge_weight(e).unwrap().clone();
+                g.add_edge(v, u, weight);
             }
             log::trace!("q count {}", g.node_count());
             Some(g)
@@ -179,8 +176,10 @@ pub struct GroupedLattices<Q, E = crate::code2query::TrMarkers> {
     pub graphs: Vec<(LatticeStats, Graph<Q, E>)>,
 }
 
-impl<Q: hyperast::position::position_accessors::SolvedPosition<IdN> + Clone + From<IdN>>
-    GroupedLattices<Q>
+impl<Q> GroupedLattices<Q>
+where
+    Q: hyperast::position::position_accessors::SolvedPosition<IdN> + From<IdN>,
+    Q: Clone + Borrow<IdNQ>,
 {
     pub fn new<P: PartialEq>(lattice: Latt<'_, P>) -> Self {
         // preps
@@ -207,12 +206,13 @@ impl<Q: hyperast::position::position_accessors::SolvedPosition<IdN> + Clone + Fr
 }
 
 pub struct LatticeStats {
-    leaf_count: usize,
-    node_count: usize,
-    edge_count: usize,
+    pub leaf_count: usize,
+    pub node_count: usize,
+    pub edge_count: usize,
     pub complete_tops: Vec<(NodeIndex, TopStats)>,
     pub incompletes_tops: Vec<(NodeIndex, TopStats)>,
     pub uniqs: hashbrown::HashSet<NodeIndex>,
+    pub topo: crate::lattice_graph::TopoNumbers<num::BigUint>,
 }
 
 impl Eq for LatticeStats {}
@@ -226,9 +226,9 @@ impl PartialEq for LatticeStats {
 
 impl Ord for LatticeStats {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.complete_tops
-            .cmp(&other.complete_tops)
-            .then(self.leaf_count.cmp(&other.leaf_count))
+        self.leaf_count
+            .cmp(&other.leaf_count)
+            .then(self.complete_tops.cmp(&other.complete_tops))
             .then(self.node_count.cmp(&other.node_count))
             .then(self.edge_count.cmp(&other.edge_count))
     }
@@ -258,11 +258,17 @@ impl LatticeStats {
     }
 }
 
-pub fn lattice_stats<Q: hyperast::position::position_accessors::SolvedPosition<IdN>, E, P>(
+pub fn lattice_stats<Q, E, P>(
     lattice: &QueryLattice<P>,
     graph: &Graph<Q, E>,
     is_uniq: fn(&E) -> bool,
-) -> LatticeStats {
+) -> LatticeStats
+where
+    Q: hyperast::position::position_accessors::SolvedPosition<IdN>,
+    Q: Clone + Borrow<IdNQ>,
+    E: Clone + std::fmt::Debug,
+    P: Clone + PartialEq,
+{
     let uniqs: hashbrown::HashSet<_> = graph
         .externals(petgraph::Direction::Outgoing)
         .flat_map(|x| {
@@ -281,33 +287,36 @@ pub fn lattice_stats<Q: hyperast::position::position_accessors::SolvedPosition<I
 
     let tops = graph.externals(petgraph::Direction::Incoming);
 
+    let Ok(topo) = crate::lattice_graph::TopoNumbers::<num::BigUint>::compute(graph, lattice, 1024)
+        .map_err(|x| x.dense_inits_counts.len())
+    else {
+        panic!()
+    };
+
     let (mut incompletes, mut tops_ranked): (Vec<_>, Vec<_>) = tops
         .map(|node_id| {
             (
                 node_id,
-                top_stats(graph, &lattice.query_store, &uniqs, node_id),
+                top_stats(graph, &lattice.query_store, &uniqs, &topo, node_id),
             )
         })
         .partition(|x| x.1.incomplete);
-    incompletes.sort_by(|a, b| a.1.cmp(&b.1).reverse());
-    tops_ranked.sort_by(|a, b| a.1.cmp(&b.1).reverse());
+    incompletes.sort_by(|a, b| a.1.cmp(&b.1));
+    tops_ranked.sort_by(|a, b| a.1.cmp(&b.1));
 
+    let leaf_count = graph
+        .node_references()
+        .flat_map(|(_, n)| lattice.raw_rels.get(&n.node()).unwrap())
+        .filter_map(|x| x.as_init().cloned())
+        .count();
     LatticeStats {
-        leaf_count: graph
-            .node_references()
-            .flat_map(|(_, n)| lattice.raw_rels.get(&n.node()).unwrap())
-            .filter_map(|x| {
-                let crate::code2query::TR::Init(x) = x else {
-                    return None;
-                };
-                Some(x)
-            })
-            .count(),
+        leaf_count,
         node_count: graph.node_count(),
         edge_count: graph.edge_count(),
         complete_tops: tops_ranked,
         incompletes_tops: incompletes,
         uniqs,
+        topo,
     }
 }
 
@@ -316,11 +325,13 @@ pub struct TopStats {
     pub reachable_uniqs: hashbrown::HashSet<NodeIndex>,
     pub patt_stats: PatternStats,
     pub incomplete: bool,
+    pub inits: usize,
 }
 impl Eq for TopStats {}
 impl PartialEq for TopStats {
     fn eq(&self, other: &Self) -> bool {
-        self.paths.eq(&other.paths)
+        self.inits.eq(&other.inits)
+            && self.paths.eq(&other.paths)
             && self.incomplete.eq(&other.incomplete)
             && self.reachable_uniqs.len().eq(&other.reachable_uniqs.len())
             && self.patt_stats.eq(&other.patt_stats)
@@ -329,10 +340,12 @@ impl PartialEq for TopStats {
 
 impl Ord for TopStats {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.paths
-            .cmp(&other.paths)
+        std::cmp::Ordering::Equal
+            .then(self.inits.cmp(&other.inits).reverse())
+            .then((self.reachable_uniqs.len().cmp(&other.reachable_uniqs.len())).reverse())
+            .then(self.patt_stats.node_count.cmp(&other.patt_stats.node_count))
+            .then(self.paths.cmp(&other.paths))
             .then(self.incomplete.cmp(&other.incomplete))
-            .then(self.reachable_uniqs.len().cmp(&other.reachable_uniqs.len()))
             .then(self.patt_stats.cmp(&other.patt_stats))
     }
 }
@@ -399,6 +412,7 @@ fn top_stats<Q: hyperast::position::position_accessors::SolvedPosition<IdN>, E>(
     lattice: &Graph<Q, E>,
     stores: &hyperast::store::SimpleStores<crate::types::TStore>,
     uniqs: &HashSet<NodeIndex>,
+    topo_numbers: &crate::lattice_graph::TopoNumbers<num::BigUint>,
     node_id: NodeIndex,
 ) -> TopStats {
     let patt_id = lattice.node_weight(node_id).unwrap().node();
@@ -416,6 +430,8 @@ fn top_stats<Q: hyperast::position::position_accessors::SolvedPosition<IdN>, E>(
             visit.push(e.target());
         }
     }
+
+    let inits = topo_numbers.inits(node_id.index());
 
     let meta_simp = hyperast_tsquery::Query::new(
         r#"
@@ -466,6 +482,7 @@ fn top_stats<Q: hyperast::position::position_accessors::SolvedPosition<IdN>, E>(
         patt_stats,
         reachable_uniqs,
         incomplete: !m.is_empty(),
+        inits,
     }
 }
 
@@ -487,11 +504,10 @@ impl PartialEq for PatternStats {
 
 impl Ord for PatternStats {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.byte_len
-            .cmp(&other.byte_len)
-            .then(self.node_count.cmp(&other.node_count))
-            .then(self.pred_count.cmp(&other.pred_count))
-            .then(self.height.cmp(&other.height))
+        (self.pred_count.cmp(&other.pred_count))
+            .then(self.height.cmp(&other.height).reverse())
+            .then(self.node_count.cmp(&other.node_count).reverse())
+            .then(self.byte_len.cmp(&other.byte_len).reverse())
     }
 }
 impl PartialOrd for PatternStats {
@@ -523,14 +539,31 @@ impl PatternStats {
 
 pub fn pattern_stats(
     stores: &hyperast::store::SimpleStores<crate::types::TStore>,
-    id: IdN,
+    id: IdNQ,
 ) -> PatternStats {
     use hyperast::types::{WithSerialization, WithStats};
     let n = stores.node_store.resolve(id);
+
+    let meta_query = hyperast_tsquery::Query::new(
+        r#"
+    (predicate
+        (identifier) (#EQ? "EQ")
+    ) @positional
+    (predicate) @capture
+            "#,
+        crate::language(),
+    )
+    .unwrap();
+    let cid_pos = meta_query.capture_index_for_name("positional").unwrap();
+    let cid_cap = meta_query.capture_index_for_name("capture").unwrap();
+    let m_pos = crate::code2query::find_matches(&stores, id, &meta_query, cid_pos);
+    let m_cap = crate::code2query::find_matches(&stores, id, &meta_query, cid_cap);
+    let pos = m_pos.len();
+    let cap = m_cap.len() - pos;
     PatternStats {
         byte_len: n.try_bytes_len().unwrap(),
         node_count: n.size(),
-        pred_count: 0,
+        pred_count: cap,
         height: n.height(),
     }
 }
@@ -596,14 +629,13 @@ impl<'a, P> Prep<'a, P> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(
                     f,
-                    "q count {} init count {}",
+                    "q count {} top count {} init count {}",
                     self.0.g[self.1].node_count(),
                     self.0.g[self.1]
-                        .node_indices()
-                        .filter(|x| self.0.g[self.1]
-                            .neighbors_directed(*x, petgraph::Direction::Outgoing)
-                            .count()
-                            > 0)
+                        .externals(petgraph::Direction::Incoming)
+                        .count(),
+                    self.0.g[self.1]
+                        .externals(petgraph::Direction::Outgoing)
                         .count()
                 )
             }
@@ -611,7 +643,7 @@ impl<'a, P> Prep<'a, P> {
         PP(self, i)
     }
 
-    pub fn tops(&self) -> impl Iterator<Item = (String, Vec<u32>)> {
+    pub fn tops_with_inits(&self) -> impl Iterator<Item = (String, Vec<u32>)> {
         self.g
             .iter()
             .flat_map(move |g| {
@@ -619,6 +651,16 @@ impl<'a, P> Prep<'a, P> {
                 tops(g).map(|x| g[x]).filter(move |x| dedup.insert(*x))
             })
             .map(|top| (self.lattice.pretty(&top), self.lattice.extract2(top).1))
+    }
+
+    pub fn tops(&self) -> impl Iterator<Item = String> {
+        self.g
+            .iter()
+            .flat_map(move |g| {
+                let mut dedup = hashbrown::HashSet::new();
+                tops(g).map(|x| g[x]).filter(move |x| dedup.insert(*x))
+            })
+            .map(|top| self.lattice.pretty(&top))
     }
 
     pub fn tops_plus_one(&self) -> impl Iterator<Item = (String, Vec<u32>)> {
@@ -659,7 +701,7 @@ fn tops<E>(g: &Graph<IdNQ, E>) -> impl Iterator<Item = petgraph::prelude::NodeIn
         .filter(|x| g.neighbors_directed(*x, Up).count() == 0)
 }
 
-fn describe_lattice<P: PartialEq + Clone, E: Clone>(
+fn describe_lattice<P: PartialEq + Clone, E: Clone + std::fmt::Debug>(
     lattice: &Graph<IdN, E>,
     poset: &QueryLattice<P>,
     i: usize,
@@ -695,7 +737,7 @@ fn print_lattice_shape<P, E>(lattice: &Graph<legion::Entity, E>, poset: &QueryLa
     }
 }
 
-fn print_lattice_extra<P: PartialEq + Clone, E: Clone>(
+fn print_lattice_extra<P: PartialEq + Clone, E: Clone + std::fmt::Debug>(
     lattice: &Graph<legion::Entity, E>,
     poset: &QueryLattice<P>,
 ) {
@@ -727,7 +769,7 @@ fn print_lattice_extra<P: PartialEq + Clone, E: Clone>(
     }
 }
 
-fn compute_topo_numbers<P, Bitset, E: Clone>(
+pub(crate) fn compute_topo_numbers<P, Bitset, E: Clone + std::fmt::Debug>(
     g: &Graph<IdN, E>,
     lattice: &QueryLattice<P>,
     max: u32,
@@ -838,7 +880,7 @@ fn idn_to_u64(x: IdN) -> u64 {
     unsafe { std::mem::transmute::<_, _>(x) }
 }
 
-struct TopoNumbers<Bitset> {
+pub struct TopoNumbers<Bitset> {
     // NOTE always sequential iteration (for now at least)
     // TODO try to use some compression, like EF ?
     /// indices over dense_inits_counts
@@ -853,26 +895,39 @@ type Imap = u8;
 
 impl<Bitset> TopoNumbers<Bitset>
 where
+    Bitset: Eq + Clone,
+    Bitset: num::One + num::Zero,
+    Bitset: std::ops::Shl<usize, Output = Bitset>,
+    Bitset: std::ops::BitAnd<Bitset, Output = Bitset>,
+{
+    pub(crate) fn inits(&self, n: usize) -> usize {
+        total_inits(&self.dense_inits_counts, &self.reachable_inits[n])
+    }
+}
+impl<Bitset> TopoNumbers<Bitset>
+where
     Bitset: num::One + Clone,
     Bitset: std::ops::Shl<usize, Output = Bitset>,
     Bitset: std::ops::BitOrAssign + std::ops::BitOrAssign,
 {
-    fn compute<P, E: Clone>(
-        g: &Graph<IdN, E>,
+    pub(crate) fn compute<P, E, N>(
+        g: &Graph<N, E>,
         lattice: &QueryLattice<P>,
         max: u32,
     ) -> Result<TopoNumbers<Bitset>, PreparedInits>
     where
         P: PartialEq + Clone,
+        N: Clone + std::borrow::Borrow<IdNQ>,
+        E: Clone + std::fmt::Debug,
     {
-        for i in 0..g.node_count() {
-            let n = petgraph::prelude::NodeIndex::new(i);
-            eprint!("|{:>3} {} ", i, idn_to_u64(*g.node_weight(n).unwrap()));
-            for j in g.neighbors_directed(n, petgraph::Direction::Outgoing) {
-                eprint!("{}:{},", j.index(), idn_to_u64(*g.node_weight(j).unwrap()));
-            }
-            eprintln!();
-        }
+        // for i in 0..g.node_count() {
+        //     let n = petgraph::prelude::NodeIndex::new(i);
+        //     eprint!("|{:>3} {} ", i, idn_to_u64(*g.node_weight(n).unwrap()));
+        //     for j in g.neighbors_directed(n, petgraph::Direction::Outgoing) {
+        //         eprint!("{}:{},", j.index(), idn_to_u64(*g.node_weight(j).unwrap()));
+        //     }
+        //     eprintln!();
+        // }
         let csr = graph_to_csr(&g);
         assert_eq!(g.node_count(), csr.node_count());
         assert_eq!(g.edge_count(), csr.edge_count());
@@ -898,21 +953,21 @@ where
         let mut max_dist_inits = MaxDistInits::<u8>::new(csr.node_count());
         // indexes into dense_inits_counts
         for (i, _e) in iter_topo(&csr) {
-            eprint!("{} {}", i, idn_to_u64(_e));
+            // eprint!("{} {}", i, idn_to_u64(_e));
             // retrieve
             let curr = reachable_inits.retrieve(&preped, i);
             let curr_min = min_dist_inits.retrieve(&preped, i);
             let curr_max = max_dist_inits.retrieve(&preped, i);
-            eprint!("({}) ", curr_min);
+            // eprint!("({}) ", curr_min);
             // then diffuse
             for j in iter_succ(&csr, i) {
-                eprint!("{},", j);
+                // eprint!("{},", j);
 
                 reachable_inits.diffuse(j, &curr);
                 min_dist_inits.diffuse(j, &curr_min);
                 max_dist_inits.diffuse(j, &curr_max);
             }
-            eprintln!();
+            // eprintln!();
         }
         println!("min dist to an initial pattern:");
         for i in min_dist_inits.iter() {
@@ -937,7 +992,9 @@ where
     }
 }
 
-pub fn graph_to_csr<N: Clone, E: Clone>(g: &Graph<N, E, Directed>) -> Csr<N, E, Directed> {
+pub fn graph_to_csr<N: Clone, E: Clone + std::fmt::Debug>(
+    g: &Graph<N, E, Directed>,
+) -> Csr<N, E, Directed> {
     // let mut csr: Csr<(), _, Directed> = Csr::with_nodes(g.node_count());
     let mut csr: Csr<_, _, Directed> = Csr::new();
     g.node_weights().for_each(|n| {
@@ -953,9 +1010,12 @@ pub fn graph_to_csr<N: Clone, E: Clone>(g: &Graph<N, E, Directed>) -> Csr<N, E, 
         );
         assert!(
             added,
-            "{} {}",
+            "{} {} {:?}",
             edge.target().index() as u32,
             edge.source().index() as u32,
+            g.edge_references()
+                .map(|x| (x.target().index(), edge.source().index(), edge.weight()))
+                .collect::<Vec<_>>()
         );
     }
     csr
@@ -979,17 +1039,17 @@ where
     c
 }
 
-struct PreparedInits {
+pub(crate) struct PreparedInits {
     dense_inits_map: Vec<Imap>,
-    dense_inits_counts: Vec<usize>,
+    pub(crate) dense_inits_counts: Vec<usize>,
 }
 impl PreparedInits {
-    fn compute<E>(csr: &Csr<IdN, E>, inits: impl Fn(IdN) -> usize) -> Self {
+    fn compute<N: Borrow<IdNQ>, E>(csr: &Csr<N, E>, inits: impl Fn(IdNQ) -> usize) -> Self {
         let mut dense_inits_map = Vec::<Imap>::new();
         let mut dense_inits_counts = vec![0];
         // first is for no inits
         for (_, query) in iter_topo(csr) {
-            let inits = inits(query);
+            let inits = inits(*query.borrow());
             if inits > 0 {
                 let len = dense_inits_counts.len();
                 dense_inits_map.push(len as Imap);
@@ -1081,11 +1141,11 @@ impl<D: hyperast::PrimInt> MaxDistInits<D> {
 /// index in graph
 type IdG = usize;
 
-fn iter_topo<E>(csr: &Csr<IdN, E>) -> impl Iterator<Item = (IdG, IdN)> {
-    (0..csr.node_count().to_u32().expect("use a larger Ix")).map(|i| (i as usize, csr[i]))
+fn iter_topo<N: Borrow<IdNQ>, E>(csr: &Csr<N, E>) -> impl Iterator<Item = (IdG, IdNQ)> {
+    (0..csr.node_count().to_u32().expect("use a larger Ix")).map(|i| (i as usize, *csr[i].borrow()))
 }
 
-fn iter_succ<E>(csr: &Csr<IdN, E>, i: IdG) -> impl Iterator<Item = IdG> {
+fn iter_succ<N, E>(csr: &Csr<N, E>, i: IdG) -> impl Iterator<Item = IdG> {
     use petgraph::visit::IntoNeighbors;
     csr.neighbors(i as u32).map(|i| i as usize)
 }

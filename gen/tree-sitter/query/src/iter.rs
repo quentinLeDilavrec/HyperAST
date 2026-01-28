@@ -73,8 +73,8 @@ impl<
                         let b = self.stores.node_store().resolve(node.id());
                         if b.has_children() {
                             assert!(offset < b.child_count());
-                            let cs = b.children();
-                            assert_eq!(child, cs.unwrap()[num::cast(offset).unwrap()]);
+                            let cs = b.children().unwrap();
+                            assert_eq!(child, cs[num::cast(offset).unwrap()]);
                         } else {
                             panic!()
                         }
@@ -122,23 +122,19 @@ impl<
                     Id::Other(node) => {
                         let b = self.stores.node_store().resolve(node);
                         if b.has_children() {
-                            let children = b.children();
-                            let children = children.unwrap();
-                            self.stack.push((
-                                Id::Other(*node),
-                                0,
-                                Some(children.iter_children().collect()),
-                            ));
+                            let children = b.children().unwrap().iter_children().collect();
+                            self.stack.push((Id::Other(*node), 0, Some(children)));
                         }
                         continue;
                     }
                 };
 
                 if b.has_children() {
-                    let children = b.children();
-                    let children = children.unwrap();
-                    self.stack
-                        .push((node, 0, Some(children.iter_children().collect())));
+                    self.stack.push((
+                        node,
+                        0,
+                        Some(b.children().unwrap().iter_children().collect()),
+                    ));
                 }
                 return Some(self.path.clone());
             }

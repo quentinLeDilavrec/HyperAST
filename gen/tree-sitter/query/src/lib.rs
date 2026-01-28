@@ -15,29 +15,38 @@ mod tnode {
     pub use hyperast::tree_gen::utils_ts::TNode;
 }
 
+#[cfg(feature = "impl")]
 use auto::tsq_ser_meta::Conv;
 use hyperast::types::{HyperType, TypeTrait};
+#[cfg(feature = "impl")]
 use search::Captured;
 #[cfg(feature = "legion")]
 pub use tnode::TNode;
 
+#[cfg(feature = "impl")]
 pub mod search;
 
 #[cfg(feature = "legion")]
 pub mod iter;
 
+#[cfg(feature = "impl")]
 pub mod auto;
 
+#[cfg(feature = "impl")]
 pub mod code2query;
 
+#[cfg(feature = "impl")]
 pub mod refinements;
 
 #[cfg(feature = "lattice")]
 pub mod lattice_graph;
 
 pub mod meta_queries;
+
+#[cfg(feature = "impl")]
 pub mod synth_display;
 
+#[cfg(feature = "impl")]
 pub fn prepare_matcher<Ty>(query: &str) -> crate::search::PreparedMatcher<Ty, Conv<Ty>>
 where
     Ty: std::fmt::Debug,
@@ -56,6 +65,7 @@ pub struct IterMatched<M, HAST, It, TIdN> {
     _phantom: std::marker::PhantomData<TIdN>,
 }
 
+#[cfg(feature = "impl")]
 impl<HAST, It: Iterator, TIdN> Iterator
     for IterMatched<&crate::search::PreparedMatcher<TIdN::Ty, Conv<TIdN::Ty>>, &HAST, It, TIdN>
 where
@@ -109,6 +119,7 @@ where
 //     }
 // }
 
+#[cfg(feature = "impl")]
 impl<Ty: HyperType + std::hash::Hash + Copy + Eq + Send + Sync>
     crate::search::PreparedMatcher<Ty, Conv<Ty>>
 {
@@ -157,6 +168,7 @@ pub struct IterMatched2<M, HAST, It: Iterator, TIdN> {
     _phantom: std::marker::PhantomData<TIdN>,
 }
 
+#[cfg(feature = "impl")]
 impl<'a, HAST, It: Iterator, TIdN> Iterator
     for IterMatched2<
         crate::search::recursive2::MatchingIter<

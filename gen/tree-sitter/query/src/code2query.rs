@@ -912,6 +912,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
 
     /// Must use dedup_removes_par on output to properly progress
     #[must_use]
+    #[cfg(feature = "synth_par")]
     pub fn removes_par_par(
         &mut self,
         _active_size: usize,
@@ -961,6 +962,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         rms
     }
     #[must_use]
+    #[cfg(feature = "synth_par")]
     pub fn removesall_par_par(
         &mut self,
         active_size: usize,

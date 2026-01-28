@@ -45,15 +45,15 @@ impl TsType for Type {
     }
 }
 
+impl TypeStore for TStore {
+    type Ty = TypeU16<TsQuery>;
+}
+
 #[cfg(feature = "legion")]
 mod legion_impls {
     use super::*;
 
     use hyperast::{store::nodes::legion::HashedNodeRef, types::LangWrapper};
-
-    impl TypeStore for TStore {
-        type Ty = TypeU16<TsQuery>;
-    }
 
     impl RoleStore for TStore {
         type IdF = u16;

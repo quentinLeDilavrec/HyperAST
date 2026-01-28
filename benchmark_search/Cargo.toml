@@ -8,11 +8,9 @@ autobins = true
 [lints]
 workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-tree-sitter = { workspace = true }
 streaming-iterator = { workspace = true } # used for recent versions of tree-sitter
+tree-sitter = { workspace = true }
 hyperast = { workspace = true }
 hyper_diff = { workspace = true }
 hyperast_vcs_git = { workspace = true }

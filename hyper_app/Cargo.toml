@@ -101,8 +101,8 @@ poll-promise = { version = "0.3", default-features = false }
 tracing-subscriber = "0.3"
 tree-sitter-javascript = "0.23.1"
 # tree-sitter = { version = "0.22.2", package = "tree-sitter-facade-sg" }
-tree-sitter-highlight = "0.24.0"
-tree-sitter = { version = "0.24.0" }
+tree-sitter-highlight = "0.25.0"
+tree-sitter = { version = "0.25.0" }
 # tree-sitter-native = { version = "0.23.2", package = "tree-sitter" }
 tokio = { version = "1.26.0", features = ["rt", "rt-multi-thread"] }
 

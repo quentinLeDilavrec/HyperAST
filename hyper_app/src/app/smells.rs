@@ -69,6 +69,16 @@ pub(super) struct ComputeConfigQuery {
 
     // filterings
     wanted_matches: std::ops::Range<usize>,
+    exhaustivity: std::ops::Range<f32>,
+
+    // sort_examples: bool,
+    // reverse_sort_examples: bool,
+    // sort_matches: bool,
+    // reverse_sort_matches: bool,
+    // sort_query_size: bool,
+    // reverse_sort_query_size: bool,
+    #[serde(skip)]
+    sort_selectors: Vec<Selectors>,
 
     #[serde(skip)]
     // examples
@@ -78,17 +88,52 @@ pub(super) struct ComputeConfigQuery {
     advanced_open: bool,
 }
 
+static SELECTORS: &[Selectors] = &[
+    Selectors {
+        name: "by examples",
+        fct: |x| usize::MAX - x.examples.len(),
+    },
+    Selectors {
+        name: "by matches",
+        fct: |x| x.matches,
+    },
+    Selectors {
+        name: "by query size",
+        fct: |x| x.query.len(),
+    },
+    Selectors {
+        name: "by examples reversed",
+        fct: |x| x.examples.len(),
+    },
+    Selectors {
+        name: "by matches reversed",
+        fct: |x| usize::MAX - x.matches,
+    },
+    Selectors {
+        name: "by query size reversed",
+        fct: |x| usize::MAX - x.query.len(),
+    },
+];
+
 impl Default for ComputeConfigQuery {
     fn default() -> Self {
         Self {
             wanted_matches: usize::MAX..usize::MAX,
+            // sort_examples: true,
+            // reverse_sort_examples: false,
+            // sort_matches: true,
+            // reverse_sort_matches: false,
+            // sort_query_size: true,
+            // reverse_sort_query_size: false,
+            sort_selectors: SELECTORS.to_vec(),
             advanced_open: false,
             examples: vec![
                 config_examples::BASE_TRY_FAIL_CATCH_EX.clone(),
                 config_examples::MORE_TRY_FAIL_CATCH_EX.clone(),
                 config_examples::BALANCED_EX.clone(),
+                config_examples::BENCH_EX.clone(),
             ],
-            ..Into::into(&config_examples::MORE_TRY_FAIL_CATCH_EX)
+            ..Into::into(&config_examples::BENCH_EX)
         }
     }
 }
@@ -478,6 +523,95 @@ pub(crate) fn show_config(
     .response
     .on_disabled_hover_text("no patterns to filter");
 
+    ui.add_enabled_ui(bounds_initialized, |ui| {
+        ui.label("empirical specificity:");
+        let double_ended_slider = ui.double_ended_float_slider(
+            &mut conf.exhaustivity.start,
+            &mut conf.exhaustivity.end,
+            -0.000001..=1.00001,
+        );
+        if double_ended_slider.changed() {
+            smells.bads = None
+        };
+    })
+    .response
+    .on_disabled_hover_text("exhaustivity by ratio of examples over matches");
+
+    // dnd sort fct
+    {
+        type Location = usize;
+        let column = &mut conf.sort_selectors;
+        let mut from: Option<Location> = None;
+        let mut to: Option<Location> = None;
+        let frame = egui::Frame::default().inner_margin(4.0);
+
+        let (_, dropped_payload) = ui.dnd_drop_zone::<Location, ()>(frame, |ui| {
+            ui.set_min_size(egui::vec2(64.0, 100.0));
+            for (row_idx, item) in column.iter().enumerate() {
+                let item_id = egui::Id::new(("my_drag_and_drop_demo", row_idx));
+
+                let item_location = row_idx;
+                let response = ui
+                    .dnd_drag_source(item_id, item_location, |ui| ui.label(item.name))
+                    .response;
+
+                // Detect drops onto this item:
+                if let (Some(pointer), Some(hovered_payload)) = (
+                    ui.input(|i| i.pointer.interact_pos()),
+                    response.dnd_hover_payload::<Location>(),
+                ) {
+                    let rect = response.rect;
+
+                    // Preview insertion:
+                    let stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+                    let insert_row_idx = if *hovered_payload == item_location {
+                        // We are dragged onto ourselves
+                        ui.painter().hline(rect.x_range(), rect.center().y, stroke);
+                        row_idx
+                    } else if pointer.y < rect.center().y {
+                        // Above us
+                        ui.painter().hline(rect.x_range(), rect.top(), stroke);
+                        row_idx
+                    } else {
+                        // Below us
+                        ui.painter().hline(rect.x_range(), rect.bottom(), stroke);
+                        row_idx + 1
+                    };
+
+                    if let Some(dragged_payload) = response.dnd_release_payload::<Location>() {
+                        // The user dropped onto this item.
+                        from = Some(*dragged_payload);
+                        to = Some(insert_row_idx);
+                    }
+                }
+            }
+        });
+        if let Some(dragged_payload) = dropped_payload {
+            // The user dropped onto the column, but not on any one item.
+            from = Some(*dragged_payload);
+            to = Some(usize::MAX);
+        }
+        if let (Some(from), Some(mut to)) = (from, to) {
+            to -= (from < to) as usize;
+
+            let item = column.remove(from);
+
+            to = to.min(column.len());
+            column.insert(to, item);
+            smells.bads = None;
+        }
+    }
+    // if (ui.checkbox(&mut conf.sort_examples, "sort by examples")
+    //     | ui.checkbox(&mut conf.reverse_sort_examples, "reverse")
+    //     | ui.checkbox(&mut conf.sort_matches, "sort by matches")
+    //     | ui.checkbox(&mut conf.reverse_sort_matches, "reverse")
+    //     | ui.checkbox(&mut conf.sort_query_size, "sort by query size")
+    //     | ui.checkbox(&mut conf.reverse_sort_query_size, "reverse"))
+    // .changed()
+    // {
+    //     smells.bads = None
+    // };
+
     // let text = "displays only queries in the given range";
     // double_ended_slider.on_hover_text_at_pointer(text);
 
@@ -510,6 +644,12 @@ pub(crate) fn show_config(
     );
 
     (resp_repo, resp_commit)
+}
+
+#[derive(Debug, Clone)]
+struct Selectors {
+    name: &'static str,
+    fct: fn(&SearchResult) -> usize,
 }
 #[derive(enumset::EnumSetType)]
 pub enum Action {
@@ -1655,11 +1795,69 @@ pub(crate) fn show_smells_result(
     let examples = smells.diffs.as_mut().unwrap();
     let tot_len = queries.bad.len();
     let predicate = |i: &usize| {
-        conf.wanted_matches.contains(&queries.bad[*i].matches)
-            || conf.wanted_matches.end == queries.bad[*i].matches
+        (conf.wanted_matches.contains(&queries.bad[*i].matches)
+            || conf.wanted_matches.end == queries.bad[*i].matches)
+            && (conf.exhaustivity.contains(
+                &(queries.bad[*i].examples.len() as f32 / queries.bad[*i].matches as f32),
+            ))
     };
     if smells.bads.is_none() {
-        smells.bads = Some((0..tot_len).filter(predicate).collect())
+        let mut pre_bads: Vec<_> = (0..tot_len).filter(predicate).collect();
+        pre_bads.sort_by_key(|i| {
+            conf.sort_selectors
+                .iter()
+                .map(|x| (x.fct)(&queries.bad[*i]))
+                .collect::<Vec<_>>()
+
+            // (
+            //     // if !conf.sort_examples {
+            //     //     0
+            //     // } else if conf.reverse_sort_examples {
+            //     //     queries.bad[*i].examples.len()
+            //     // } else {
+            //     //     usize::MAX - queries.bad[*i].examples.len()
+            //     // },
+            //     // if !conf.sort_matches {
+            //     //     0
+            //     // } else if conf.reverse_sort_matches {
+            //     //     usize::MAX - queries.bad[*i].matches
+            //     // } else {
+            //     //     queries.bad[*i].matches
+            //     // },
+            //     // if !conf.sort_query_size {
+            //     //     0
+            //     // } else if conf.reverse_sort_query_size {
+            //     //     usize::MAX - queries.bad[*i].query.len()
+            //     // } else {
+            //     //     queries.bad[*i].query.len()
+            //     // },
+            // )
+        });
+
+        let mut ex: std::collections::HashSet<usize> = (0..examples.examples.len()).collect();
+
+        let mut bads = Vec::with_capacity(pre_bads.len());
+
+        'l: while !pre_bads.is_empty() {
+            if ex.is_empty() {
+                ex = (0..examples.examples.len()).collect();
+            }
+            for i in 0..pre_bads.len() {
+                let set: std::collections::HashSet<usize> =
+                    queries.bad[pre_bads[i]].examples.iter().copied().collect();
+                if ex.intersection(&set).count() > 0 {
+                    bads.push(pre_bads.remove(i));
+                    for x in set {
+                        ex.remove(&x);
+                    }
+                    continue 'l;
+                }
+            }
+            bads.push(pre_bads.remove(0));
+            ex = (0..examples.examples.len()).collect();
+        }
+
+        smells.bads = Some(bads);
         // smells.bads = Some((0..tot_len).collect())
     }
     if !queries.good.is_empty() {
@@ -2019,13 +2217,44 @@ pub(crate) fn show_query(
             .show(ui)
     });
     let mut font_id = egui::TextStyle::Heading.resolve(ui.style());
-    font_id.size *= 3.0;
-    ui.painter().text(
-        ui.available_rect_before_wrap().right_top(),
+    font_id.size *= 1.5;
+    let painter = ui.ctx().layer_painter(egui::LayerId::new(
+        egui::Order::Middle,
+        egui::Id::new("smells"),
+    ));
+    let pos = ui
+        .available_rect_before_wrap()
+        .scale_from_center2(egui::Vec2::new(0.8, 1.0))
+        .right_top();
+    painter.text(
+        pos,
         egui::Align2::RIGHT_BOTTOM,
         bad_query.matches,
-        font_id,
+        font_id.clone(),
         matches_color(ui),
+    );
+    painter.text(
+        pos,
+        egui::Align2::RIGHT_TOP,
+        bad_query.examples.len(),
+        font_id,
+        examples_color(ui),
+    );
+
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    painter.text(
+        pos + egui::Vec2::new(5.0, 0.0),
+        egui::Align2::LEFT_BOTTOM,
+        "matches",
+        font_id.clone(),
+        matches_color(ui),
+    );
+    painter.text(
+        pos + egui::Vec2::new(5.0, 0.0),
+        egui::Align2::LEFT_TOP,
+        "examples",
+        font_id,
+        examples_color(ui),
     );
     scroll_resp
 }
@@ -2035,6 +2264,14 @@ fn matches_color(ui: &egui::Ui) -> egui::Color32 {
         egui::Color32::YELLOW
     } else {
         egui::Color32::from_rgb(255, 127, 0)
+    }
+}
+
+fn examples_color(ui: &egui::Ui) -> egui::Color32 {
+    if ui.visuals().dark_mode {
+        egui::Color32::GREEN
+    } else {
+        egui::Color32::from_rgb(0, 127, 0)
     }
 }
 

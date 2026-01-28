@@ -67,6 +67,7 @@ hyperast = { path = "../crates/hyper_ast", default-features = false, features = 
 hyperast_gen_ts_cpp = { path = "../gen/tree-sitter/cpp", default-features = false }
 hyperast_gen_ts_java = { path = "../gen/tree-sitter/java", default-features = false }
 hyperast_gen_ts_xml = { path = "../gen/tree-sitter/xml", default-features = false }
+hyperast_gen_ts_tsquery = { path = "../gen/tree-sitter/query", default-features = false }
 egui_addon = { path = "../lib/egui_addon" }
 
 nohash-hasher = "0.2.0"

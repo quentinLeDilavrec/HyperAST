@@ -326,6 +326,35 @@ pub trait MyUiExt: UiExt {
             })
             .inner
     }
+    fn double_ended_float_slider(
+        &mut self,
+        low: &mut f32,
+        high: &mut f32,
+        range: std::ops::RangeInclusive<f32>,
+    ) -> egui::Response {
+        self.ui_mut()
+            .horizontal(|ui| {
+                let mut lower_value = *low;
+                let mut upper_value = *high;
+                let range = std::ops::RangeInclusive::new(*range.start(), *range.end());
+                let slider = egui_double_slider::DoubleSlider::new(
+                    &mut lower_value,
+                    &mut upper_value,
+                    range.clone(),
+                )
+                .separation_distance(0.001f32);
+                let mut resp = ui.add(slider);
+                *low = lower_value;
+                *high = upper_value;
+                ui.spacing_mut().button_padding = Default::default();
+                ui.spacing_mut().interact_size = Default::default();
+                resp |= ui.add(egui::DragValue::new(low).range(range.clone()));
+                ui.label("..");
+                resp |= ui.add(egui::DragValue::new(high).range(range.clone()));
+                resp
+            })
+            .inner
+    }
 
     fn aux<R>(&mut self, txt: &str, f: impl FnOnce(&mut egui::Ui) -> R) -> R {
         let (frame, area) = framed_scroll_area_aux();

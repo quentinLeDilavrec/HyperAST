@@ -4258,6 +4258,7 @@ dependencies = [
  "hyperast",
  "hyperast_gen_ts_cpp",
  "hyperast_gen_ts_java",
+ "hyperast_gen_ts_tsquery",
  "hyperast_gen_ts_xml",
  "image",
  "itertools 0.10.5",

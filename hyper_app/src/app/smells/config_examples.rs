@@ -27,6 +27,8 @@ impl Into<super::ComputeConfigQuery> for &Example {
             wanted_matches: usize::MAX..usize::MAX,
             advanced_open: false,
             examples: vec![],
+            exhaustivity: 0.0..1.0000001,
+            sort_selectors: crate::app::smells::SELECTORS.to_vec(),
         }
     }
 }
@@ -458,6 +460,25 @@ pub(super) static BALANCED_EX: Example = Example {
     ) @rm
     .
 )"#,
+    config: Config::MavenJava,
+    simple_matching: true,
+    prepro_matching: true,
+};
+
+pub(super) static BENCH_EX: Example = Example {
+    commit: Commit {
+        repo: Repo {
+            forge: Forge::GitHub,
+            user: "Marcono1234",
+            name: "gson",
+        },
+        id: "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde",
+    },
+    // only label identifiers
+    // only do removes
+    name: "benchmarked synth",
+    meta_gen: hyperast_gen_ts_tsquery::meta_queries::META_GEN,
+    meta_simp: hyperast_gen_ts_tsquery::meta_queries::META_SIMP,
     config: Config::MavenJava,
     simple_matching: true,
     prepro_matching: true,

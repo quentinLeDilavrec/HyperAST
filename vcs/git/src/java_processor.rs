@@ -12,14 +12,13 @@ use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
 use hyperast_gen_ts_java::types::{TStore, Type};
 
-use crate::Processor;
-use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::java::JavaAcc;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::{Processor, StackEle};
 
 pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
     (tree.iter().rev())
@@ -30,12 +29,14 @@ pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>;
 
+type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>;
+
 pub struct JavaProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
     pub dir_path: &'d mut Peekable<Components<'c>>,
-    handle: &'d crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+    handle: &'d Handle,
 }
 
 impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
@@ -45,7 +46,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
         dir_path: &'d mut Peekable<Components<'c>>,
         name: &ObjectName,
         oid: git2::Oid,
-        handle: &'d crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+        handle: &'d Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree);
@@ -203,15 +204,15 @@ fn make(
     stores: &mut SimpleStores,
     java_proc: &mut JavaProc,
 ) -> hyperast_gen_ts_java::legion_with_refs::Local {
-    use hyperast::{
-        cyclomatic::Mcc,
-        store::nodes::legion::{NodeStore, eq_node},
-        types::LabelStore,
-    };
+    use hyperast::cyclomatic::Mcc;
+    use hyperast::store::nodes::legion::NodeStore;
+    use hyperast::store::nodes::legion::eq_node;
+    use hyperast::types::ETypeStore as _;
+    use hyperast::types::LabelStore;
+
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
     let kind = Type::Directory;
-    use hyperast::types::ETypeStore;
     let interned_kind = hyperast_gen_ts_java::types::TStore::intern(kind);
     let label_id = label_store.get_or_insert(acc.primary.name.clone());
 
@@ -434,9 +435,9 @@ impl crate::processing::erased::Parametrized for JavaProcessorHolder {
         &mut self,
         t: Self::T,
     ) -> crate::processing::erased::ParametrizedCommitProcessorHandle {
-        use crate::processing::erased::{
-            ConfigParametersHandle, ParametrizedCommitProc, ParametrizedCommitProcessorHandle,
-        };
+        use crate::processing::erased::ConfigParametersHandle;
+        use crate::processing::erased::ParametrizedCommitProc;
+        use crate::processing::erased::ParametrizedCommitProcessorHandle;
         if let Some(l) = self.0.iter().position(|x| &x.parameter == &t) {
             return ParametrizedCommitProcessorHandle(
                 self.erased_handle(),
@@ -733,7 +734,7 @@ impl RepositoryProcessor {
         dir_path: &'c mut Peekable<Components<'d>>,
         oid: Oid,
         name: &ObjectName,
-        handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+        handle: Handle,
     ) -> <JavaAcc as hyperast::tree_gen::Accumulator>::Node {
         let full_node = self.handle_java_directory(repository, dir_path, name, oid, handle);
         let name = self.intern_object_name(name);
@@ -745,7 +746,7 @@ impl RepositoryProcessor {
         oid: Oid,
         name: &ObjectName,
         repository: &Repository,
-        parameters: crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+        parameters: Handle,
     ) -> Result<(java_tree_gen::Local,), crate::ParseErr> {
         self.processing_systems
             .caching_blob_handler::<crate::processing::file_sys::Java>()
@@ -858,7 +859,7 @@ impl RepositoryProcessor {
         w: &mut JavaAcc,
         name: &ObjectName,
         repository: &Repository,
-        parameters: crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+        parameters: Handle,
     ) -> Result<(), crate::ParseErr> {
         let (full_node,) = self.handle_java_blob(oid, name, repository, parameters)?;
         let name = self.intern_object_name(name);
@@ -887,7 +888,7 @@ impl RepositoryProcessor {
         dir_path: &'b mut Peekable<Components<'d>>,
         name: &ObjectName,
         oid: git2::Oid,
-        handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+        handle: Handle,
     ) -> (java_tree_gen::Local,) {
         JavaProcessor::<JavaAcc>::new(repository, self, dir_path, name, oid, &handle).process()
     }

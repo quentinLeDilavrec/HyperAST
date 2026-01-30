@@ -2,9 +2,9 @@ use hyperast::tree_gen::NoOpMore;
 
 use crate::types::TStore;
 
-type CppTreeGen<'store, 'cache, HAST, Acc> =
-    crate::legion::CppTreeGen<'store, 'cache, TStore, NoOpMore<HAST, Acc>, true>;
 type SimpleStores = hyperast::store::SimpleStores<TStore>;
+type CppTreeGen<'store, 'cache, HAST, Acc> =
+    crate::legion::CppTreeGen<'store, 'cache, TStore, SimpleStores, NoOpMore<HAST, Acc>, true>;
 
 mod prepro;
 mod simple;

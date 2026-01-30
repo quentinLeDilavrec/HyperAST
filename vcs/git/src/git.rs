@@ -1,20 +1,16 @@
-use std::{
-    fmt::{Debug, Display},
-    fs,
-    path::{Path, PathBuf},
-    process,
-};
+use std::fmt::{Debug, Display};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use std::{fs, process};
 
-pub use git2::Error;
-pub use git2::ErrorCode;
-pub use git2::Oid;
-pub use git2::Repository;
+pub use git2::{ErrorCode, Oid, Repository};
 use git2::{RemoteCallbacks, Revwalk, TreeEntry};
+
 use hyperast::{position::Position, utils::Url};
 
 use crate::processing::ObjectName;
 
-pub struct Builder<'a>(git2::Revwalk<'a>, &'a git2::Repository, bool);
+pub struct Builder<'a>(Revwalk<'a>, &'a Repository, bool);
 
 impl<'a> Builder<'a> {
     pub fn new(repository: &'a Repository) -> Result<Self, git2::Error> {
@@ -186,8 +182,12 @@ where
     // let path = &format!("{}{}", "/tmp/hyperastgitresources/repo/", repo_name);
     let mut callbacks = RemoteCallbacks::new();
 
+    let mut time = std::time::Instant::now();
     callbacks.transfer_progress(|x| {
-        log::info!("transfer {}/{}", x.received_objects(), x.total_objects());
+        if time.elapsed() > Duration::from_secs(2) {
+            log::debug!("transfer {}/{}", x.received_objects(), x.total_objects());
+            time = std::time::Instant::now();
+        }
         true
     });
 
@@ -209,7 +209,10 @@ where
         log::error!("tryed to use the git executable, but failed. {}", err);
     }
 
-    nofetch_repository(url, path)
+    log::info!("loading repo at {}", path.display());
+    let repository = up_to_date_repo(&path, None, url);
+    repository.unwrap()
+    // nofetch_repository(url, path)
 }
 
 pub fn nofetch_repository<T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
@@ -220,6 +223,7 @@ where
     let mut path: PathBuf = path.into();
     path.push(url.path.clone());
 
+    log::info!("loading repo at {}", path.display());
     let repository = up_to_date_repo(&path, None, url);
     repository.unwrap()
 }
@@ -360,14 +364,17 @@ pub fn fetch_github_repository(repo_name: &str) -> Repository {
 
 pub fn fetch_remote(mut x: git2::Remote, head: &str) -> Result<(), git2::Error> {
     let name = x.name().unwrap_or("").to_string();
+    let mut time = std::time::Instant::now();
     let mut callbacks = RemoteCallbacks::new();
     callbacks.transfer_progress(move |x| {
-        log::info!(
-            "{}/{head} transfer {}/{}",
-            name,
-            x.received_objects(),
-            x.total_objects()
-        );
+        if time.elapsed() > Duration::from_secs(2) {
+            log::debug!(
+                "{name}/{head} transfer {}/{}",
+                x.received_objects(),
+                x.total_objects()
+            );
+            time = std::time::Instant::now();
+        }
         true
     });
 
@@ -383,84 +390,171 @@ pub fn up_to_date_repo(
     fo: Option<git2::FetchOptions>,
     url: Url,
 ) -> Result<Repository, git2::Error> {
-    if path.join(".git").exists() {
-        let repository = match Repository::open(path) {
-            Ok(repo) => repo,
-            Err(e) if e.code() == git2::ErrorCode::NotFound => {
-                if path.starts_with("/tmp") {
-                    if let Err(e) = fs::remove_dir_all(path.join(".git")) {
-                        panic!("failed to remove currupted clone: {}", e)
-                    } else {
-                        return if let Some(fo) = fo {
-                            clone_helper(url, path, fo)
-                        } else {
-                            Err(e)
-                        };
-                    }
-                } else {
-                    panic!("failed to open: {}", e)
-                }
-            }
-            Err(e) => panic!("failed to open: {}", e),
-        };
+    let Some(fo) = fo else {
+        return Repository::open(path);
+    };
+    best_effort(path, &url, BestEffortState::Init { fo })
+}
 
-        if let Some(mut fo) = fo {
-            log::info!("fetch: {:?}", path);
-            repository
-                .find_remote("origin")
-                .unwrap()
-                .fetch(&["main"], Some(&mut fo), None)
-                .unwrap_or_else(|e| log::error!("{}", e));
+enum BestEffortState<'cb> {
+    Init {
+        fo: git2::FetchOptions<'cb>,
+    },
+    /// trying to fetch
+    Updating {
+        repo: Repository,
+        fo: git2::FetchOptions<'cb>,
+        attempts: u8,
+    },
+    /// Cloning a repository
+    ///
+    /// We could init then fetch, but direct cloning is faster if we want everything. see clone local
+    Cloning {
+        builder: git2::build::RepoBuilder<'cb>,
+        attempts: u8,
+    },
+}
+
+impl<'cb> BestEffortState<'cb> {
+    fn cloning(fo: git2::FetchOptions<'cb>) -> Self {
+        let mut builder = git2::build::RepoBuilder::new();
+        builder.bare(true).fetch_options(fo);
+        BestEffortState::Cloning {
+            builder,
+            attempts: 0,
         }
-
-        Ok(repository)
-    } else if path.exists() && path.read_dir().map_or(true, |mut x| x.next().is_some()) {
-        todo!()
-    } else if let Some(fo) = fo {
-        clone_helper(url, path, fo)
-    } else {
-        panic!("there is no repo there, you can enable the cloning by provinding a fetch callback.")
     }
 }
 
-fn clone_helper(url: Url, path: &Path, fo: git2::FetchOptions) -> Result<Repository, git2::Error> {
-    let mut builder = git2::build::RepoBuilder::new();
-
-    builder.bare(true);
-
-    builder.fetch_options(fo);
-
-    log::info!("clone {} in {:?}", url, path);
-    let repository = match builder.clone(&url.to_string(), path.join(".git").as_path()) {
-        Ok(repo) => repo,
-        Err(e) if e.code() == git2::ErrorCode::Locked => {
-            match builder.clone(&url.to_string(), path.join(".git").as_path()) {
-                Ok(repo) => repo,
-                Err(e) if e.code() == git2::ErrorCode::Locked => return Err(e),
+fn best_effort<'cb>(
+    path: &Path,
+    url: &Url,
+    state: BestEffortState<'cb>,
+) -> Result<Repository, git2::Error> {
+    let state = match state {
+        BestEffortState::Init { fo } if path.join(".git").exists() => {
+            let open = Repository::open(path);
+            match open {
+                Ok(repo) => {
+                    log::info!("opened repo at {}", path.display());
+                    BestEffortState::Updating {
+                        repo,
+                        fo,
+                        attempts: 0,
+                    }
+                }
+                Err(e) if e.code() == git2::ErrorCode::NotFound && path.starts_with("/tmp") => {
+                    log::warn!("removing {:?}", path.join(".git"));
+                    if let Err(e) = fs::remove_dir_all(path.join(".git")) {
+                        log::error!("failed to remove corrupted clone: {}", e);
+                        return Err(git2::Error::from_str("failed to remove corrupted clone"));
+                    }
+                    BestEffortState::cloning(fo)
+                }
                 Err(e) => return Err(e),
             }
         }
-        Err(e) => return Err(e),
+        BestEffortState::Init { fo } => {
+            if let Ok(repo) = Repository::open(path) {
+                BestEffortState::Updating {
+                    repo,
+                    fo,
+                    attempts: 0,
+                }
+            } else {
+                log::warn!("no .git/ in {:?}", path);
+                let mut builder = git2::build::RepoBuilder::new();
+                builder.bare(true).fetch_options(fo);
+                BestEffortState::Cloning {
+                    builder,
+                    attempts: 0,
+                }
+            }
+        }
+        BestEffortState::Updating {
+            repo,
+            mut fo,
+            mut attempts,
+        } => {
+            let mut remote = repo.find_remote("origin")?;
+            let r = try_connect_and_download(path, &mut fo, &mut attempts, &mut remote);
+            if let Err(e) = remote.disconnect() {
+                log::error!("failed to disconnect remote: {}", e);
+            }
+            drop(remote);
+            match r {
+                Ok(_) if attempts == 0 => return Ok(repo),
+                Ok(_) => BestEffortState::Updating { repo, fo, attempts },
+                Err(e) => return Err(e),
+            }
+        }
+        BestEffortState::Cloning {
+            mut builder,
+            attempts,
+        } => {
+            log::debug!("cloning {}", url.path);
+            let repo = builder.clone(&url.to_string(), path.join(".git").as_path());
+            match repo {
+                Ok(repo) => {
+                    log::info!("{} cloned", url.path);
+                    return Ok(repo);
+                }
+                Err(e) => {
+                    let attempts = attempts + 1;
+                    if attempts > 2 {
+                        log::error!("failed to clone after 2 attempts");
+                        return Err(e);
+                    }
+                    log::warn!("failed to clone {}: {}", url.path, e);
+                    BestEffortState::Cloning { builder, attempts }
+                }
+            }
+        }
     };
-    Ok(repository)
+    best_effort(path, url, state)
+}
+
+fn try_connect_and_download(
+    path: &Path,
+    fo: &mut git2::FetchOptions<'_>,
+    attempts: &mut u8,
+    remote: &mut git2::Remote<'_>,
+) -> Result<(), git2::Error> {
+    let connect = remote.connect(git2::Direction::Fetch);
+    if let Err(e) = connect {
+        *attempts += 1;
+        if *attempts > 2 {
+            log::error!("failed to fetch after 2 attempts");
+            return Err(e);
+        }
+        log::warn!("cannot fetch, {}", e);
+        return Ok(());
+    }
+    // let specs = remote
+    //     .default_branch()
+    //     .inspect_err(|e| log::error!("{}", e))
+    //     .ok();
+    // let specs = specs.as_ref().and_then(|s| s.as_str()).unwrap_or("coucou");
+    // dbg!(specs);
+    log::info!("download: {:?}", path);
+    let specs: &[&str] = &[];
+    if let Err(e) = remote.download(specs, Some(fo)) {
+        *attempts += 1;
+        if *attempts > 3 {
+            log::error!("failed to download after 3 attempts");
+            return Err(e);
+        }
+        log::error!("failed to download: {}", e);
+        return Ok(());
+    }
+    *attempts = 0;
+    return Ok(());
 }
 
 pub(crate) enum BasicGitObject {
     Blob(Oid, ObjectName),
     Tree(Oid, ObjectName),
 }
-
-// impl<'a> From<TreeEntry<'a>> for BasicGitObjects {
-//     fn from(x: TreeEntry<'a>) -> Self {
-//         if x.kind().unwrap().eq(&git2::ObjectType::Tree) {
-//             Self::Tree(x.id(), x.name_bytes().to_owned())
-//         } else if x.kind().unwrap().eq(&git2::ObjectType::Blob) {
-//             Self::Blob(x.id(), x.name_bytes().to_owned())
-//         } else {
-//             panic!("{:?} {:?}",x.kind(), x.name_bytes())
-//         }
-//     }
-// }
 
 impl<'a> TryFrom<TreeEntry<'a>> for BasicGitObject {
     type Error = TreeEntry<'a>;

@@ -333,15 +333,20 @@ where
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         let indent = if node.start_byte() < global.sum_byte_length() {
+            eprintln!("kind: {:?}", kind);
+            eprintln!("parent kind: {:?}", stack.parent().unwrap().simple.kind);
             let b = node.start_byte();
-            let a = b.saturating_sub(30);
+            let a = b.saturating_sub(100);
             let c = global.sum_byte_length();
-            let d = c.saturating_add(30);
-            let d = if d < text.len() { d } else { text.len() };
-            eprintln!("{}", std::str::from_utf8(&text[a..b]).unwrap());
-            eprintln!("{}", std::str::from_utf8(&text[b..c]).unwrap());
-            eprintln!("{}", std::str::from_utf8(&text[c..d]).unwrap());
-            panic!("broken monotonicity invariant")
+            let d = c.saturating_add(100).min(text.len());
+            eprintln!("{:?}", std::str::from_utf8(&text[a..b]).unwrap());
+            eprintln!("{:?}", std::str::from_utf8(&text[b..c]).unwrap());
+            eprintln!("{:?}", std::str::from_utf8(&text[c..d]).unwrap());
+            panic!(
+                "broken monotonicity invariant at {} which should not be smaller than {}",
+                node.start_byte(),
+                global.sum_byte_length()
+            )
         } else {
             compute_indentation(
                 &self.line_break,

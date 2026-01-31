@@ -94,7 +94,7 @@ where
         } else if IT_VARIANT == 2 {
             let it = ZippedTreeGenIt::new(&mut state, pre_post);
             // using the iterator
-            for _ in it {}
+            it.for_each(|_| ());
         }
     }
 }
@@ -312,7 +312,7 @@ where
         }
     };
 
-    log::trace!("{}", is_parent_hidden);
+    log::trace!("is parent hidden: {}", is_parent_hidden);
 
     let parent = state.stack.parent_mut().unwrap();
     if let Some(full_node) = full_node {

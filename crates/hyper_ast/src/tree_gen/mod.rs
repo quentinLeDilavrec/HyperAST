@@ -1033,8 +1033,9 @@ pub mod utils_ts {
                 }
             } else if let Some(visibility) = self.cursor.goto_next_sibling_extended() {
                 let node = self.cursor.node();
-                if *self.stack.last().unwrap() <= node.start_byte() {
-                    // dbg!(&self.stack, node.start_byte());
+                if *self.stack.last().unwrap() <= node.start_byte()
+                    && node.start_byte() < node.end_byte()
+                {
                     self.waiting = Some(visibility);
                     self.has = Has::Up;
                     let vis = if *self.vis.last().unwrap() {
@@ -1063,6 +1064,13 @@ pub mod utils_ts {
                 } else {
                     None
                 }
+            } else if let Some(vis) = self.vis.last() {
+                let vis = if *vis {
+                    Visibility::Hidden
+                } else {
+                    Visibility::Visible
+                };
+                Some(vis)
             } else {
                 None
             }

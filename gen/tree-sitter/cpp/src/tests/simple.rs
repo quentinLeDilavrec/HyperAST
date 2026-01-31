@@ -2,6 +2,7 @@ use hyperast::position::structural_pos::CursorHead;
 use tree_sitter::Parser;
 
 use crate::legion::tree_sitter_parse;
+use crate::tests::{EX_ISSUE_MISSING_NODE2, EX_ISSUE_MISSING_NODE3};
 
 use super::EX_ISSUE_MISSING_NODE;
 use super::{CppTreeGen, SimpleStores};
@@ -140,6 +141,44 @@ pub(crate) fn cpp_parsing_error_test() {
     println!("{}", nodes::SyntaxWithFieldsSerializer::new(&stores, id));
 }
 
+#[test_log::test]
+pub(crate) fn cpp_parsing_missing_systemd_dbus_cred_c_test() {
+    let text = EX_ISSUE_MISSING_NODE2.as_bytes();
+    let tree = match tree_sitter_parse(text) {
+        Ok(t) => t,
+        Err(t) => t,
+    };
+    println!("{:#?}", tree.root_node().to_sexp());
+    let mut stores = SimpleStores::default();
+    let mut md_cache = Default::default();
+    let mut tree_gen = CppTreeGen::new(&mut stores, &mut md_cache);
+    let x = tree_gen.generate_file(b"", text, tree.walk()).local;
+    use hyperast::nodes;
+    let id = x.compressed_node;
+    println!("{}", nodes::SyntaxSerializer::new(&stores, id));
+    println!("{}", nodes::TextSerializer::new(&stores, id));
+    println!("{}", nodes::SexpSerializer::new(&stores, id));
+    println!("{}", nodes::SyntaxWithFieldsSerializer::new(&stores, id));
+}
+#[test_log::test]
+pub(crate) fn cpp_parsing_missing_systemd_pam_systemd_c_test() {
+    let text = EX_ISSUE_MISSING_NODE3.as_bytes();
+    let tree = match tree_sitter_parse(text) {
+        Ok(t) => t,
+        Err(t) => t,
+    };
+    println!("{:#?}", tree.root_node().to_sexp());
+    let mut stores = SimpleStores::default();
+    let mut md_cache = Default::default();
+    let mut tree_gen = CppTreeGen::new(&mut stores, &mut md_cache);
+    let x = tree_gen.generate_file(b"", text, tree.walk()).local;
+    use hyperast::nodes;
+    let id = x.compressed_node;
+    println!("{}", nodes::SyntaxSerializer::new(&stores, id));
+    println!("{}", nodes::TextSerializer::new(&stores, id));
+    println!("{}", nodes::SexpSerializer::new(&stores, id));
+    println!("{}", nodes::SyntaxWithFieldsSerializer::new(&stores, id));
+}
 #[allow(unused)]
 static Q2: &str = r#"
 (translation_unit

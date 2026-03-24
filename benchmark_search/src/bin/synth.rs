@@ -25,7 +25,6 @@ struct Cli {
 #[derive(clap::clap_derive::Subcommand, Clone)]
 // #[derive(clap::clap_derive::ValueEnum, Clone)]
 // #[clap(rename_all = "SCREAMING_SNAKE_CASE")]
-#[allow(non_camel_case_types)]
 enum Bench {
     // /// Tree-Sitter baseline
     // /// using git2 to traverse the repository
@@ -65,47 +64,61 @@ enum Bench {
         s: Vec<usize>,
         language: String,
         #[clap(long)]
-        /// cache the result of the search, associated to files in the case of Java, in the case of JavaMaven I still don't know.
-        cached: bool,
-        #[clap(long)]
-        nospace: bool,
-        #[clap(long)]
         input: std::path::PathBuf,
+        #[clap(flatten)]
+        options: SharedOptions,
     },
-    #[clap(alias = "UNIQ")]
-    UNIQ {
+    /// Select code elements by tracking initial elements in past up to given depth (by time or numbers of commits)
+    #[clap(alias = "TRACK")]
+    Track {
         #[clap(long)]
         sub: Option<std::path::PathBuf>,
         #[clap(short = 's')]
         s: Vec<usize>,
         language: String,
         #[clap(long)]
-        /// cache the result of the search, associated to files in the case of Java, in the case of JavaMaven I still don't know.
-        cached: bool,
+        input: std::path::PathBuf,
         #[clap(long)]
-        nospace: bool,
+        depth: usize,
+        #[clap(flatten)]
+        options: SharedOptions,
+    },
+    #[clap(alias = "UNIQ")]
+    Uniq {
+        #[clap(long)]
+        sub: Option<std::path::PathBuf>,
+        #[clap(short = 's')]
+        s: Vec<usize>,
+        language: String,
         #[clap(long)]
         input: std::path::PathBuf,
         #[clap(long)]
         output: std::path::PathBuf,
         #[clap(long)]
         max_inputs: Option<usize>,
+        #[clap(flatten)]
+        options: SharedOptions,
     },
     #[clap(alias = "DETECTION")]
-    DETECTION {
+    Detection {
         #[clap(long)]
         sub: Option<std::path::PathBuf>,
         #[clap(short = 's')]
         s: Vec<usize>,
         language: String,
         #[clap(long)]
-        /// cache the result of the search, associated to files in the case of Java, in the case of JavaMaven I still don't know.
-        cached: bool,
-        #[clap(long)]
-        nospace: bool,
-        #[clap(long)]
         input: std::path::PathBuf,
+        #[clap(flatten)]
+        options: SharedOptions,
     },
+}
+#[derive(clap::clap_derive::Parser, Clone)]
+struct SharedOptions {
+    #[clap(long)]
+    /// cache the result of the search, associated to files in the case of Java, in the case of JavaMaven I still don't know.
+    cached: bool,
+    #[clap(long)]
+    nospace: bool,
 }
 
 // initialize synth:
@@ -150,34 +163,51 @@ fn main() {
             sub,
             s,
             language,
-            cached,
-            nospace,
             input,
+            options,
         } => {
-            dbg!(sub, s, language, cached, nospace, input);
+            dbg!(sub, s, language, options.cached, options.nospace, input);
             todo!()
         }
-        Bench::UNIQ {
+        Bench::Track {
             sub,
             s,
             language,
-            cached,
-            nospace,
+            input,
+            depth,
+            options,
+        } => {
+            dbg!(
+                sub,
+                s,
+                language,
+                depth,
+                options.cached,
+                options.nospace,
+                input
+            );
+            todo!()
+        }
+        Bench::Uniq {
+            sub,
+            s,
+            language,
             input,
             max_inputs,
             output,
+            options,
         } => {
-            if cached {
+            if options.cached {
                 todo!();
             }
-            if nospace {
+            if options.nospace {
                 todo!();
             }
             let query =
                 std::fs::read_to_string(&input).expect("Failed to read provided pattern file");
             let config = hyperast_benchmark_search::Config {
                 config: c,
-                first_chunk: 1,
+                first_chunk: depth,
                 chunk_interval: 1,
                 depth,
             };
@@ -193,7 +223,7 @@ fn main() {
                 use hyperast_gen_ts_java as ts_gen;
                 let meta_simp = hyperast_benchmark_search::meta_queries::META_SIMP.to_string();
                 hyperast_tsquery::Query::new(&meta_simp, hyperast_gen_ts_tsquery::language())
-                    .unwrap();
+                    .expect("valid simplification meta query");
                 let elapsed_meta_simp_comp = start.elapsed();
                 let mut repositories = PreProcessedRepositories::default();
                 if sub.is_empty() {
@@ -216,11 +246,13 @@ fn main() {
                     config,
                     timeout.clone(),
                 );
+                let syntax_nodes_first_commit = uniqs.nodes_first_commit;
+                let total_syntax_nodes = uniqs.total_nodes;
+                let elapsed_initial_prepare = uniqs.initial_prepare_duration.unwrap_or_default();
                 let elapsed_compute_examples = start.elapsed();
                 let stores = &repositories.processor.main_stores;
                 let sss: &hyperast::store::SimpleStores<ts_gen::types::TStore> = stores.with_ts();
                 let meta_gen = hyperast_benchmark_search::meta_queries::META_GEN;
-
                 let mut inst = uniqs.set.values().copied().collect::<Vec<_>>();
                 dbg!(inst.len());
                 inst.sort_by_key(|x| unsafe { std::mem::transmute::<_, u64>(x) });
@@ -360,7 +392,7 @@ fn main() {
                         }
                     };
                 }
-                let (tops, full_cover_tops, full_cover_cc, full_cover_cc_non_solo) =
+                let (nodes, tops, full_cover_tops, full_cover_cc, full_cover_cc_non_solo) =
                     extract_stats(&grouped);
                 let examples = inst.len();
                 let wcc = grouped.graphs.len();
@@ -380,14 +412,18 @@ fn main() {
                 write_csv!(timeout);
                 write_csv!(size_threshold);
                 write_csv!(shrink_threshold_factor);
-                write_csv!(wcc);
                 write_csv!(examples);
+                write_csv!(syntax_nodes_first_commit);
+                write_csv!(total_syntax_nodes);
+                write_csv!(wcc);
+                write_csv!(nodes);
                 write_csv!(tops);
                 write_csv!(full_cover_tops);
                 write_csv!(full_cover_cc);
                 write_csv!(full_cover_cc_non_solo);
                 write_csv!(t = elapsed_meta_simp_comp);
                 write_csv!(t = elapsed_load_repo);
+                write_csv!(t = elapsed_initial_prepare);
                 write_csv!(t = elapsed_compute_examples);
                 write_csv!(t = elapsed_compute_examples_post);
                 write_csv!(t = elapsed_synth);
@@ -399,18 +435,17 @@ fn main() {
                 // );
             }
         }
-        Bench::DETECTION {
+        Bench::Detection {
             sub,
             s,
             language,
-            cached,
-            nospace,
             input,
+            options,
         } => {
-            if cached {
+            if options.cached {
                 todo!();
             }
-            if nospace {
+            if options.nospace {
                 todo!();
             }
             let queries = hyperast_benchmark_search::ReadSearches::new(input);
@@ -439,7 +474,10 @@ fn main() {
 
 fn extract_stats(
     grouped: &GroupedLattices<hyperast::store::defaults::NodeIdentifier>,
-) -> (usize, usize, usize, usize) {
+) -> (usize, usize, usize, usize, usize) {
+    let nodes = (grouped.graphs.iter())
+        .map(|g| g.0.node_count)
+        .sum::<usize>();
     let tops = (grouped.graphs.iter())
         .map(|g| g.0.complete_tops.len())
         .sum::<usize>();
@@ -467,7 +505,13 @@ fn extract_stats(
                 && g.0.leaf_count > 1
         })
         .count();
-    (tops, full_cover_tops, full_cover_cc, full_cover_cc_non_solo)
+    (
+        nodes,
+        tops,
+        full_cover_tops,
+        full_cover_cc,
+        full_cover_cc_non_solo,
+    )
 }
 
 fn open_output_file(output: &std::path::PathBuf, ext: &str) -> std::fs::File {

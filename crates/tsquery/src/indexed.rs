@@ -161,7 +161,11 @@ impl Default for CaptureId {
 
 impl From<u32> for CaptureId {
     fn from(value: u32) -> Self {
-        CaptureId(value.to_u16().expect("an u16 and not an u32"))
+        CaptureId(
+            value
+                .to_u16()
+                .unwrap_or_else(|| panic!("an u16 and not an u32 {value}")),
+        )
     }
 }
 

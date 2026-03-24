@@ -138,14 +138,14 @@ impl<E, I> TR<E, I> {
     }
 }
 
-pub struct QueryLattice<E> {
+pub struct QueryLattice<E, Q = IdNQ> {
     pub query_store: QStore,
-    leaf_queries: Vec<IdNQ>,
-    pub raw_rels: std::collections::HashMap<IdNQ, Vec<TR<E>>>,
-    pub queries: Vec<(IdNQ, Vec<IdQ>)>,
+    leaf_queries: Vec<Q>,
+    pub raw_rels: std::collections::HashMap<Q, Vec<TR<E>>>,
+    pub queries: Vec<(Q, Vec<IdQ>)>,
     sort_cache: Vec<u32>,
-    pub(crate) root_cap: IdNQ,
-    pub(crate) auto_caps: Vec<IdNQ>,
+    pub(crate) root_cap: Q,
+    pub(crate) auto_caps: Vec<Q>,
 }
 
 /// make the deduplication through raw entries, probably slower, is it marginal ?
@@ -965,7 +965,6 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
     #[cfg(feature = "synth_par")]
     pub fn removesall_par_par(
         &mut self,
-        active_size: usize,
         active: &mut Vec<IdNQ>,
         cid: hyperast_tsquery::CaptureId,
     ) -> Vec<Simplified<Init>> {
@@ -984,8 +983,8 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         });
         let (remains, mut rms): (Vec<RmAllAlt>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
-        log::info!("remains: {}", remains.len());
-        log::info!("rms: {}", rms.len());
+        log::info!("all remains: {}", remains.len());
+        log::info!("all rms: {}", rms.len());
 
         let rem_count = remains.len();
         const CHUNK_SIZE: usize = 1000;
@@ -1126,7 +1125,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 .collect();
             to_rm.sort_by(|a, b| b.cmp(a));
             let mut curr = query;
-            log::info!("to_rm: {:?}", to_rm);
+            log::trace!("to_rm: {:?}", to_rm);
             for rm in 0..to_rm.len() {
                 let mut path = to_rm[rm].clone();
                 // path.pop();
@@ -1160,8 +1159,8 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         type RepairRemains<Init> = (IdNQ, IdNQ, TR<Init>, Vec<PendingRmPath>);
         let (remains, mut rms): (Vec<RepairRemains<Init>>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
-        log::info!("remains: {}", remains.len());
-        log::info!("rms: {}", rms.len());
+        log::info!("repair remains: {}", remains.len());
+        log::info!("repair rms: {}", rms.len());
 
         let rem_count = remains.len();
         const CHUNK_SIZE: usize = 1000;
@@ -1171,7 +1170,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                     log::info!("remains repairs {i:4}/{rem_count}");
                 }
 
-                log::info!("to_rm mut: {:?}", paths);
+                log::trace!("to_rm mut: {:?}", paths);
                 // dbg!(&paths);
                 // eprintln!(
                 //     "{}",
@@ -1308,7 +1307,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 });
                 repl.sort_by(|a, b| b.0.cmp(&a.0));
                 let mut curr = query;
-                log::info!("repl: {} {:?}", repl.len(), repl);
+                log::trace!("repl: {} {:?}", repl.len(), repl);
                 for rm in 0..repl.len() {
                     let (path, new) = repl[rm].clone();
                     // path.pop();
@@ -1346,8 +1345,8 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         type NormRemains<Init> = (IdNQ, IdNQ, TR<Init>, Vec<(PendingRmPath, IdNQ)>);
         let (remains, mut rms): (Vec<NormRemains<Init>>, Vec<Simplified<Init>>) =
             ParallelIterator::partition_map(rms, |x| x.into());
-        log::info!("remains: {}", remains.len());
-        log::info!("rms: {}", rms.len());
+        log::info!("norm remains: {}", remains.len());
+        log::info!("norm rms: {}", rms.len());
 
         let rem_count = remains.len();
         const CHUNK_SIZE: usize = 1000;
@@ -1357,7 +1356,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                     log::info!("remains repairs {i:4}/{rem_count}");
                 }
 
-                log::info!("repl mut: {:?}", paths);
+                log::trace!("repl mut: {:?}", paths);
                 // dbg!(&paths);
                 // eprintln!(
                 //     "{}",
@@ -1471,9 +1470,9 @@ pub fn dedup_patterns_by_metric<TR: Clone + PartialEq + Send + Sync>(
 #[cfg(feature = "synth_par")]
 /// the rayon parallelization enabling fold-reduce
 fn by_metric<TR, M>(
-    uniques: Vec<(IdN, TR)>,
-    metric: impl Fn(&IdN) -> M + Sync,
-) -> BTreeMap<M, Vec<(IdN, TR)>>
+    instances: Vec<(IdNQ, TR)>,
+    metric: impl Fn(&IdNQ) -> M + Sync,
+) -> BTreeMap<M, Vec<(IdNQ, TR)>>
 where
     M: Ord,
     TR: Send + Sync,
@@ -1482,7 +1481,7 @@ where
     use rayon::iter::IntoParallelIterator as _;
     use rayon::iter::ParallelIterator;
     let by_metric = ParallelIterator::fold(
-        uniques.into_par_iter(),
+        instances.into_par_iter(),
         BTreeMap::<M, Vec<_>>::default,
         |mut acc, x: (IdNQ, TR)| {
             let size = metric(&x.0);
@@ -1502,6 +1501,35 @@ where
     );
     by_metric
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IdNQOrd(IdNQ);
+
+impl PartialOrd for IdNQOrd {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for IdNQOrd {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let s: u64 = unsafe { std::mem::transmute::<_, _>(self.0) };
+        let o: u64 = unsafe { std::mem::transmute::<_, _>(other.0) };
+        s.cmp(&o)
+    }
+}
+
+impl From<IdNQ> for IdNQOrd {
+    fn from(id: IdNQ) -> Self {
+        IdNQOrd(id)
+    }
+}
+
+impl Into<IdNQ> for IdNQOrd {
+    fn into(self) -> IdNQ {
+        self.0
+    }
+}
+
 #[cfg(feature = "synth_par")]
 pub fn filter_by_key_par<TR: Clone + PartialEq + Send + Sync>(
     by_metric: &mut BTreeMap<usize, Vec<(legion::Entity, TR)>>,
@@ -1970,7 +1998,7 @@ fn try_simp_rms<'a>(
 ) -> impl Iterator<Item = Result<SimpRmsRemoves, SimpRmsRemains>> + 'a {
     let rms = find_matches(query_store, query, meta_simp, cid);
     rms.into_iter().filter_map(move |path| {
-        log::info!("to remove: {:?}", path);
+        // log::info!("to remove: {:?}", path);
         let Some(query) = try_apply_rms_aux(query_store, query, &path) else {
             return Some(Err((query, path)));
         };
@@ -1990,6 +2018,15 @@ fn try_simp_rmalls<'a>(
     cid: hyperast_tsquery::CaptureId,
 ) -> Option<Result<SimpRmsRemoves, RmAllAlt>> {
     let mut rms = find_matches(query_store, query, meta_simp, cid);
+    try_simp_rmalls_aux(query_store, query, meta_simp, rms)
+}
+
+fn try_simp_rmalls_aux<'a>(
+    query_store: &'a QStore,
+    query: IdNQ,
+    meta_simp: &'a hyperast_tsquery::Query,
+    mut rms: Vec<PendingRmPath>,
+) -> Option<Result<SimpRmsRemoves, RmAllAlt>> {
     for rm in &mut rms {
         rm.pop();
         rm.reverse();
@@ -2314,7 +2351,6 @@ pub fn find_matches_aux(
         };
         log::trace!("found match {}", m.pattern_index.to_usize());
         for p in m.nodes_for_capture_index(cid) {
-            log::trace!("found capture for match");
             set.register(&p.pos);
         }
     }
@@ -2565,12 +2601,12 @@ pub fn semi_interactive_poset_build<P>(
             };
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all") {
                 active = act; // first rm on the ones that were simp
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = b.repair_par(rms);
                 let rms = b.norm_caps(rms);
                 b.dedup_uniques_par2(active_size, rms);
                 active = not.clone(); // then the other that were not simp
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = b.repair_par(rms);
                 let rms = b.norm_caps(rms);
                 b.dedup_uniques_par2(active_size, rms);
@@ -2581,7 +2617,7 @@ pub fn semi_interactive_poset_build<P>(
         } else if phase == Phase::RemovesAll || phase == Phase::RemovesAll2 {
             // do not use naively after simp_eq as it might remove captures
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
-                let rms = b.removesall_par_par(active_size, &mut active, cid);
+                let rms = b.removesall_par_par(&mut active, cid);
                 let rms = if phase == Phase::RemovesAll2 {
                     let rms = b.repair_par(rms);
                     let rms = b.norm_caps(rms);

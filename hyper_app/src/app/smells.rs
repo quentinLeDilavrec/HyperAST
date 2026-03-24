@@ -445,6 +445,10 @@ pub(crate) fn show_config(
     let meta_simp = egui::TextEdit::multiline(&mut conf.meta_simp).hint_text(hint_text);
     egui::Window::new("Interactive Finder's Advanced Settings")
         .open(&mut conf.advanced_open)
+        .resizable(true)
+        .collapsible(false)
+        .max_height(ui.ctx().screen_rect().height())
+        .scroll(true)
         .show(ui.ctx(), |ui| {
             ui.label("Query Generation:");
             meta_gen.desired_rows(1).interactive(true).show(ui);
@@ -2019,13 +2023,44 @@ pub(crate) fn show_query(
             .show(ui)
     });
     let mut font_id = egui::TextStyle::Heading.resolve(ui.style());
-    font_id.size *= 3.0;
-    ui.painter().text(
-        ui.available_rect_before_wrap().right_top(),
+    font_id.size *= 1.5;
+    let painter = ui.ctx().layer_painter(egui::LayerId::new(
+        egui::Order::Background,
+        egui::Id::new("smells"),
+    ));
+    let pos = ui
+        .available_rect_before_wrap()
+        .scale_from_center2(egui::Vec2::new(0.8, 1.0))
+        .right_top();
+    painter.text(
+        pos,
         egui::Align2::RIGHT_BOTTOM,
         bad_query.matches,
-        font_id,
+        font_id.clone(),
         matches_color(ui),
+    );
+    painter.text(
+        pos,
+        egui::Align2::RIGHT_TOP,
+        bad_query.examples.len(),
+        font_id,
+        examples_color(ui),
+    );
+
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    painter.text(
+        pos + egui::Vec2::new(5.0, 0.0),
+        egui::Align2::LEFT_BOTTOM,
+        "matches",
+        font_id.clone(),
+        matches_color(ui),
+    );
+    painter.text(
+        pos + egui::Vec2::new(5.0, 0.0),
+        egui::Align2::LEFT_TOP,
+        "examples",
+        font_id,
+        examples_color(ui),
     );
     scroll_resp
 }
@@ -2035,6 +2070,14 @@ fn matches_color(ui: &egui::Ui) -> egui::Color32 {
         egui::Color32::YELLOW
     } else {
         egui::Color32::from_rgb(255, 127, 0)
+    }
+}
+
+fn examples_color(ui: &egui::Ui) -> egui::Color32 {
+    if ui.visuals().dark_mode {
+        egui::Color32::GREEN
+    } else {
+        egui::Color32::from_rgb(0, 127, 0)
     }
 }
 

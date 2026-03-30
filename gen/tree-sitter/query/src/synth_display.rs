@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fmt::Display;
 
 use hyperast::PrimInt;
@@ -47,8 +48,8 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-    Q: Copy + Into<IdNQ> + PQ,
-    P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy,
+    Q: Clone + Borrow<IdNQ> + PQ,
+    P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy + Eq,
     for<'t> (&'t HAST, P): PPP,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -83,15 +84,13 @@ where
                 }
                 writeln!(f, "#### Sublattice {i}")?;
                 for (node_id, stats) in TopStats::iter_covering_all(
-                    stats
-                        .complete_tops
-                        .iter()
+                    (stats.complete_tops.iter())
                         .chain(stats.incompletes_tops.iter())
                         .map(|(node_id, stats)| (*node_id, stats)),
                     &mut stats.uniqs.clone(),
                 ) {
                     let query = graph.node_weight(node_id).unwrap();
-                    let pattern = lattice.pretty(&(*query).into());
+                    let pattern = lattice.pretty(query.borrow());
                     let incompletes = if stats.incomplete {
                         " (incomplete)"
                     } else {
@@ -132,7 +131,7 @@ where
                     &mut stats.uniqs.clone(),
                 ) {
                     let query = graph.node_weight(node_id).unwrap();
-                    let pattern = lattice.pretty(&(*query).into());
+                    let pattern = lattice.pretty(&query.borrow());
                     let incompletes = if stats.incomplete {
                         " (incomplete)"
                     } else {
@@ -166,61 +165,103 @@ where
 
             #[cfg(feature = "lattice")]
             print_mermaid_graph(f, lattice, stores, graph)?;
+            print_patterns(f, lattice, stores, graph, stats)?;
         }
         Ok(())
     }
 }
+const EDGE_LIMIT: usize = 1000;
 
 #[cfg(feature = "lattice")]
 fn print_mermaid_graph<HAST: HyperAST, Q, P>(
     f: &mut std::fmt::Formatter<'_>,
+    _lattice: &QueryLattice<P>,
+    _stores: &HAST,
+    graph: &petgraph::Graph<Q, enumset::EnumSet<crate::code2query::TrMarker>>,
+) -> Result<(), std::fmt::Error>
+where
+    Q: Borrow<IdNQ> + PQ,
+    for<'t> (&'t HAST, P): PPP,
+{
+    if graph.edge_count() > EDGE_LIMIT {
+        writeln!(f, "> too many edges (over 1000)")?;
+    } else {
+        let mermaid = Mermaid::new(&graph);
+        writeln!(f, "```mermaid\n{}\n```", mermaid)?;
+    }
+    Ok(())
+}
+
+fn print_patterns<HAST: HyperAST, Q, P>(
+    f: &mut std::fmt::Formatter<'_>,
     lattice: &QueryLattice<P>,
     stores: &HAST,
     graph: &petgraph::Graph<Q, enumset::EnumSet<crate::code2query::TrMarker>>,
+    stats: &crate::lattice_graph::LatticeStats,
 ) -> Result<(), std::fmt::Error>
 where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-    Q: Copy + Into<IdNQ> + PQ,
-    P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy,
+    Q: Clone + std::borrow::Borrow<IdNQ> + PQ,
+    P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy + Eq,
     for<'t> (&'t HAST, P): PPP,
 {
     use crate::lattice_graph::pattern_stats;
     use petgraph::visit::EdgeRef;
     use petgraph::visit::IntoNodeReferences;
     use std::fmt::Formatter as Fmt;
-    let mermaid = Mermaid::new(&graph);
-    writeln!(f, "```mermaid\n{}\n```", mermaid)?;
-    let mut patt_ranked: Vec<_> = graph
+    let patts: Vec<_> = graph
         .node_references()
-        .map(|(id, query)| (id, pattern_stats(&lattice.query_store, (*query).into())))
+        .map(|(id, query)| (id, pattern_stats(&lattice.query_store, *query.borrow())))
         .collect();
-    patt_ranked.sort_by(|a, b| a.1.cmp(&b.1));
-    for (j, (node_id, s)) in patt_ranked.into_iter().enumerate() {
-        let open = j < 4;
-        let query = graph.node_weight(node_id).unwrap();
-        let id = *query;
+
+    let mut depths = vec![0; patts.len()];
+    (0..patts.len()).rev().for_each(|i| {
+        let mut inc = graph.edges_directed((i as u32).into(), petgraph::Direction::Incoming);
+        if inc.next().is_some() {
+            depths[i] = inc.map(|x| depths[x.target().index()]).min().unwrap_or(0) + 1;
+        }
+    });
+
+    let mut ranked = (0..patts.len()).collect::<Vec<_>>();
+    ranked.reverse();
+    ranked.sort_by(|a, b| {
+        std::cmp::Ordering::Equal
+            .then(depths[*a].cmp(&depths[*b]))
+            .then(stats.topo.inits(*a).cmp(&stats.topo.inits(*b)).reverse())
+            .then(patts[*a].1.cmp(&patts[*b].1).reverse())
+    });
+    let mut opened = 0;
+
+    for j in ranked.into_iter() {
+        let (node_id, s) = &patts[j];
+        if graph.edge_count() > EDGE_LIMIT {
+            let mut inc = graph.edges_directed(*node_id, petgraph::Direction::Incoming);
+            let mut out = graph.edges_directed(*node_id, petgraph::Direction::Outgoing);
+            if !(inc.next().is_none() || out.next().is_none()) {
+                continue;
+            }
+        }
+
+        let open = opened < 4;
+        if open {
+            opened += 1;
+        }
+        let query = graph.node_weight(*node_id).unwrap();
+        let id = query;
         let query = query.pp();
         let summary_head = |f: &mut Fmt<'_>| writeln!(f, "Pattern {query}");
 
-        let query = id.into();
+        let query = *id.borrow();
         let summary_content = |f: &mut Fmt<'_>| {
-            writeln!(f, "{}", s.header())?;
-            writeln!(f, "| {s} |")?;
+            writeln!(f, "| leafs {}-----|", s.header())?;
+            writeln!(f, "| {} | {s}", stats.topo.inits(j))?;
             writeln!(f, "")?;
             writeln!(f, "")?;
-            let init_count = lattice
-                .raw_rels
-                .get(&query)
-                .unwrap()
+            let init_count = (lattice.raw_rels.get(&query).unwrap())
                 .iter()
-                .filter_map(|x| {
-                    let crate::code2query::TR::Init(x) = x else {
-                        return None;
-                    };
-                    Some(x)
-                })
+                .filter_map(|x| x.as_init())
                 .count();
 
             if init_count == 0 {
@@ -246,7 +287,7 @@ where
 
         let pattern = lattice.pretty(&query);
         let details_content = |f: &mut std::fmt::Formatter<'_>| {
-            let inc = graph.edges_directed(node_id, petgraph::Direction::Incoming);
+            let inc = graph.edges_directed(*node_id, petgraph::Direction::Incoming);
             let mut b = false;
             for inc in inc {
                 if !b {
@@ -268,7 +309,7 @@ where
             }
             writeln!(f, "```scheme\n{}\n```", pattern)?;
             let mut b = false;
-            for out in graph.edges(node_id) {
+            for out in graph.edges(*node_id) {
                 if !b {
                     writeln!(f, "specializes to ")?;
                 }

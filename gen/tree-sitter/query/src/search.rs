@@ -87,8 +87,9 @@ impl<Ty, C> PreparedMatcher<Ty, C> {
         impl std::ops::Index<usize> for &A {
             type Output = tree_sitter::CaptureQuantifier;
 
-            fn index(&self, index: usize) -> &Self::Output {
-                self.0.get(&index).unwrap_or(&Quant::Zero)
+            fn index(&self, index: usize) -> &tree_sitter::CaptureQuantifier {
+                let x = self.0.get(&index);
+                x.unwrap_or(&Quant::Zero)
             }
         }
         let s = &self.quantifiers[index];

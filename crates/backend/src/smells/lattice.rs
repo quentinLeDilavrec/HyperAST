@@ -1223,6 +1223,7 @@ pub enum SimpKind {
     Uniqs,
     RMall,
     RMs,
+    RMfinal,
     SimpEQ,
     Focus,
 }
@@ -1238,6 +1239,7 @@ pub fn each<E, I>(
         TR::Uniqs(t) => g(SimpKind::Uniqs, t),
         TR::RMall(t) => g(SimpKind::RMall, t),
         TR::RMs(t) => g(SimpKind::RMs, t),
+        TR::RMfinal(t) => g(SimpKind::RMfinal, t),
         TR::SimpEQ(t) => g(SimpKind::SimpEQ, t),
         TR::Focus(t) => g(SimpKind::Focus, t),
     }

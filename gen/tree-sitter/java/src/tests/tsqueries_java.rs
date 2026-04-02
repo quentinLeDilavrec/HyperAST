@@ -22,9 +22,9 @@ impl log::Log for SimpleLogger {
     fn flush(&self) {}
 }
 
+/// provoke an infinite loop or is very slow
+///
 #[test]
-// provoke an infinite loop or is very slow
-//
 fn test_immediate_pred2() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))

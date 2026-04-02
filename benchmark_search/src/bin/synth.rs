@@ -266,7 +266,7 @@ fn main() {
                 // );
                 let tops: Vec<_> = graphs
                     .tops()
-                    .filter(|(q, _)| {
+                    .filter(|q| {
                         let lang = hyperast_gen_ts_java::language();
                         !q.is_empty()
                             // && q.lines().count() < 50 // ignore patterns not fitting on screen
@@ -275,7 +275,7 @@ fn main() {
                     .collect();
                 log::warn!(
                     "Length of top queries:{:?}",
-                    tops.iter().map(|q| q.0.lines().count()).collect::<Vec<_>>()
+                    tops.iter().map(|q| q.lines().count()).collect::<Vec<_>>()
                 );
                 // tops.sort_by_key(|x| x.1.len());
                 // log::warn!(

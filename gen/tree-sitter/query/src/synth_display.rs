@@ -19,12 +19,14 @@ use mermaid::Mermaid;
 
 type IdNQ = hyperast::store::defaults::NodeIdentifier;
 
+#[cfg(feature = "lattice")]
 pub struct GroupedLatticesFmt<'a, 'b, HAST: HyperASTShared, Q, P> {
     pub(crate) lattice: &'a QueryLattice<P>,
     pub(crate) stores: &'a HAST,
     pub(crate) graphs: &'b GroupedLattices<Q>,
 }
 
+#[cfg(feature = "lattice")]
 pub fn markdown<'a, 'b, HAST: HyperASTShared, Q, P>(
     graphs: &'b GroupedLattices<Q>,
     lattice: &'a QueryLattice<P>,
@@ -43,6 +45,7 @@ details details {
 }
 </style>"###;
 
+#[cfg(feature = "lattice")]
 impl<HAST: HyperAST, Q, P> Display for GroupedLatticesFmt<'_, '_, HAST, Q, P>
 where
     HAST::IdN: std::fmt::Debug + Copy,
@@ -192,6 +195,7 @@ where
     Ok(())
 }
 
+#[cfg(feature = "lattice")]
 fn print_patterns<HAST: HyperAST, Q, P>(
     f: &mut std::fmt::Formatter<'_>,
     lattice: &QueryLattice<P>,

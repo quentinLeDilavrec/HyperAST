@@ -562,6 +562,19 @@ impl ErazedFcts {
     }
 }
 
+#[test]
+fn test_issue_missing_last_child_before_ts_0_26() {
+    let meta_simp: &str = r#"(named_node
+    (identifier) (#EQ? "cast_expression")
+    .
+) @rm.all.full"#;
+
+    let meta_simp = Query::new(&meta_simp, tree_sitter_query::language()).unwrap();
+    println!("{}", meta_simp);
+    let s = meta_simp.steps.iter().nth(1).unwrap();
+    assert!(s.is_last_child());
+}
+
 // mod staged_graph {
 //     use std::collections::VecDeque;
 //     use std::collections::HashMap;

@@ -81,15 +81,27 @@ pub struct Examples {
     /// ```scheme
     /// (identifier) (type_identifier)` same as `(identifier) @label (type_identifier) @label
     /// ```
-    meta_gen: String,
+    pub meta_gen: String,
     /// the query configuring the query simplification/generalization,
     /// such as,
     /// ```scheme
     /// (predicate (identifier) (#EQ? "EQ") (parameters (string) @label )) @pred
     /// ```
-    meta_simp: String,
+    pub meta_simp: String,
     /// the list of examples driving the query generation
-    examples: Vec<ExamplesValue>,
+    pub examples: Vec<ExamplesValue>,
+}
+
+impl Examples {
+    pub fn new(meta_gen: String, meta_simp: String, examples: Vec<ExamplesValue>) -> Self {
+        Self {
+            simple_matching: true,
+            prepro_matching: false,
+            meta_gen,
+            meta_simp,
+            examples,
+        }
+    }
 }
 
 #[derive(Deserialize, Clone)]
@@ -109,10 +121,10 @@ pub enum SmellsError {
 pub struct SearchResults<G = self::lattice::G> {
     pub prepare_time: f64,
     pub search_time: f64,
-    bad: Vec<SearchResult>,
-    good: Vec<SearchResult>,
-    additional: Vec<ExamplesValue>,
-    graphs: G,
+    pub bad: Vec<SearchResult>,
+    pub good: Vec<SearchResult>,
+    pub additional: Vec<ExamplesValue>,
+    pub graphs: G,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
@@ -129,8 +141,8 @@ pub struct SearchResult<Q = String> {
 pub struct ExamplesResults {
     pub prepare_time: f64,
     pub search_time: f64,
-    examples: Vec<ExamplesValue>,
-    moves: Vec<(PieceOfCode, PieceOfCode)>,
+    pub examples: Vec<ExamplesValue>,
+    pub moves: Vec<(PieceOfCode, PieceOfCode)>,
 }
 
 #[derive(Deserialize, Clone, Serialize)]
@@ -147,7 +159,7 @@ pub struct ExamplesValue<Idx = usize> {
 /// For simplicity, here, let's assume that provided changes are fixing the smells.
 /// Changes can be inverted to simulate smell fixes if it is not the case.
 /// meta_gen and meta_simp can also be used to change the behavior of the smell synthesis.
-pub(crate) fn smells(
+pub fn smells(
     examples: Examples,
     state: SharedState,
     path: Path,
@@ -405,10 +417,7 @@ fn examples4idqs(
     hset.into_iter().map(|x| x as usize).collect()
 }
 
-pub(crate) fn smells_ex_from_diffs(
-    state: SharedState,
-    path: Path,
-) -> Result<ExamplesResults, String> {
+pub fn smells_ex_from_diffs(state: SharedState, path: Path) -> Result<ExamplesResults, String> {
     let now = Instant::now();
     let repo_spec = path.repo();
     let Path { commit, len, .. } = path;
@@ -629,211 +638,14 @@ mod tests {
     }
 }
 
-const META_GEN: &str = r#"
-    [
-        "{" ";" "." "try" "(" ")" "}" "catch" "import"
-        (line_comment) (block_comment)
-    ] @skip
-    (type_identifier) @label
-    (identifier) @label
-    (_literal) @abstract
-"#;
-
-const META_SIMP: &str = r#"(named_node
-        (identifier) (#EQ? "try_statement")
-    ) @uniq
-    (named_node
-        (identifier) (#EQ? "method_invocation")
-    ) @need
-    (named_node
-        (identifier) (#EQ? "catch_type")
-    ) @rm.all.full
-    (named_node
-        (identifier) (#EQ? "string_literal")
-    ) @rm.all.full
-    (named_node
-        (identifier) (#EQ? "decimal_integer_literal")
-    ) @rm.all.full
-    (named_node
-        (identifier) (#EQ? "null_literal")
-    ) @rm.all.full
-    (named_node
-        (identifier) (#EQ? "unary_expression")
-        (named_node
-            (identifier) .
-        )
-    ) @rm
-    (named_node
-        (identifier) (#EQ? "field_access")
-        (named_node
-        )
-        (named_node
-        )
-    ) @rm
-    (named_node
-        (identifier) (#EQ? "object_creation_expression")
-        (named_node
-            (identifier) (#EQ? "argument_list")
-            .
-        )
-    ) @rm.all.full
-    (named_node
-        (identifier) (#EQ? "method_invocation")
-        (named_node
-            (identifier) (#EQ? "identifier")
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string)
-                )
-            )
-        ) .
-    ) @rm
-    (named_node
-        (identifier) (#EQ? "method_invocation")
-        (named_node
-            (identifier) (#EQ? "identifier")
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string)
-                )
-            )
-        ) .
-        (named_node
-            (identifier) (#EQ? "argument_list")
-            (named_node
-                (identifier) (#EQ? "identifier")
-                .
-            ) .
-        )
-    ) @rm
-    (named_node
-        (identifier) (#EQ? "method_invocation")
-        (named_node
-            (identifier) (#EQ? "identifier")
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string)
-                )
-            )
-        ) .
-        (named_node
-            (identifier) (#EQ? "argument_list")
-            .
-        )
-    ) @rm
-    (named_node
-        (identifier) (#EQ? "block") .
-        (named_node
-            (identifier) (#EQ? "try_statement")
-        ) @focus .
-        (capture
-            (identifier) (#EQ? "_root")
-        )
-    )
-    (named_node
-        (identifier) (#EQ? "method_invocation") .
-        (named_node
-            (identifier) (#EQ? "identifier")
-        ) @rm.all.full .
-        (predicate
-            (identifier) (#EQ? "EQ")
-        ) @rm.all.full .
-        (named_node
-            (identifier) (#EQ? "identifier")
-        ) .
-        (predicate
-            (identifier) (#EQ? "EQ")
-        )
-    )
-    (named_node
-        (identifier) (#EQ? "catch_formal_parameter")
-        (named_node
-            (identifier) (#EQ? "identifier")
-        ) .
-        (predicate
-            (identifier) (#EQ? "EQ")
-            (parameters
-                (string) @label
-            )
-        ) @pred
-    ) @rm.all
-    (named_node
-        (identifier) (#EQ? "catch_clause")
-        (named_node
-            (identifier) (#EQ? "catch_formal_parameter")
-            (named_node
-                (identifier) (#EQ? "identifier")
-            ) .
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string)
-                )
-            )
-        ) @rm.all.full
-        (named_node
-            (identifier) (#EQ? "block")
-            .
-        )
-    )
-    (named_node
-        (identifier) (#EQ? "catch_clause")
-        .
-        (named_node
-            (identifier) (#EQ? "block")
-        ) @rm.all.full
-    )
-    (named_node
-        (identifier) (#EQ? "argument_list")
-        (named_node
-            (identifier) (#EQ? "method_invocation") .
-            (named_node
-                (identifier) (#EQ? "identifier")
-            ) .
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string) @label
-                )
-            ) @pred
-        )
-    ) @rm.all
-    (named_node
-        (identifier) (#EQ? "argument_list")
-        (named_node
-            (identifier) (#EQ? "identifier") .
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string) @label
-                )
-            ) @pred
-        )
-    ) @rm.all
-    (named_node
-        (identifier) (#EQ? "method_invocation")
-        (named_node
-            (identifier) (#EQ? "identifier") .
-            (predicate
-                (identifier) (#EQ? "EQ")
-                (parameters
-                    (string)
-                )
-            )
-        )
-        (named_node
-            (identifier) (#EQ? "argument_list")
-            .
-        )
-    ) @rm.all.full
-    (named_node .
-        (identifier) .
-        "/" @rm.all.full .
-        (identifier) @rm.all.full
-    )
+pub const META_GEN: &str = r#"[
+"{" "}" ";" "." "," "=" "(" ")" "[" "]" "!"
+"try" "catch" "import" "finally" "return" "throw" "if" "else" "while" "for" "throws"
+(line_comment) (block_comment)
+] @skip
+(type_identifier) @label
+(identifier) @label
+(_literal) @abstract
 "#;
 
 #[cfg(feature = "lattice")]
@@ -1142,3 +954,774 @@ mod graph_compression {
         println!("Csr EF: {}", serde_json::to_string(&webg).unwrap().len());
     }
 }
+
+#[cfg(test)]
+mod test_gen {
+    use std::time::Instant;
+
+    use hyperast::nodes::TextSerializer;
+    use hyperast_gen_ts_tsquery::code2query::QueryLattice;
+
+    use crate::AppState;
+    use crate::smells;
+    use crate::smells::ExMap;
+    use crate::smells::SearchResult;
+    use crate::smells::SearchResults;
+    use crate::smells::examples4idqs;
+    use crate::smells::lattice;
+    use crate::smells::matching;
+    use crate::smells::poset_exploration;
+    use crate::smells::{Examples, More, Path};
+    use crate::utils::IdN;
+
+    #[test]
+    fn test_meta_simp_last_child() -> Result<(), Box<dyn std::error::Error>> {
+        pub const META_SIMP_LAST_CHILD: &str = r#"(named_node
+            (identifier) (#EQ? "cast_expression")
+            .
+        ) @rm.all.full"#;
+        let meta_simp = META_SIMP_LAST_CHILD.to_string();
+
+        let meta_simp =
+            hyperast_tsquery::Query::new(&meta_simp, hyperast_gen_ts_tsquery::language())
+                .map_err(|e| format!("error in meta_simp: {e}"))?;
+
+        let pp_m_simp = meta_simp.to_string();
+        let pp_m_simp = pp_m_simp.lines().collect::<Vec<_>>();
+        assert_eq!(pp_m_simp.len(), 3);
+        assert_eq!(
+            pp_m_simp[1],
+            "   1: { 1 symbol: identifier, last_child, imm:0} bitfield: 1000000100,"
+        );
+        // NOTE: prior to tree-sitter 0.26 last_child flag was missing
+        //     "   1: { 1 symbol: identifier, imm:0} bitfield: 1000000000,"
+        Ok(())
+    }
+
+    #[ignore] // ignore (from normal cargo test) for now, later make a feature
+    #[test_log::test]
+    /// Testing tsq pattern generation (synth + simp)
+    ///
+    /// I had issues upgrading from tree-sitter 0.25 to 0.26.
+    ///
+    ///
+    /// slow test, more of an integration test, at least use release
+    ///
+    fn test_pattern_generation() -> Result<(), Box<dyn std::error::Error>> {
+        let user = "Marcono1234";
+        let name = "gson";
+        let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+        let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+        let commit = "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde";
+
+        let state = AppState::default();
+        (state.repositories.write())
+            .unwrap()
+            .register_config(repo_spec.clone(), config);
+        let state = std::sync::Arc::new(state);
+
+        let path = serde_json::json!({
+            "user": user,
+            "name": name,
+            "commit": commit,
+            "len": 1
+        });
+
+        let path: smells::Path = serde_json::from_value(path).unwrap();
+
+        let result = smells::smells_ex_from_diffs(state.clone(), path.clone())?;
+
+        assert_eq!(result.examples.len(), 38);
+        assert_eq!(result.moves.len(), 146);
+
+        let meta_gen = smells::META_GEN.to_string();
+        let meta_simp = smells::META_SIMP.to_string();
+        let more: More = serde_json::from_value(serde_json::json!({})).unwrap();
+
+        let examples = Examples::new(
+            meta_gen.clone(),
+            meta_simp.clone(),
+            result.examples[..2].to_vec(),
+        );
+
+        dbg!(
+            &result.examples[0].before.file,
+            &result.examples[0].before.start,
+            &result.examples[0].before.end
+        );
+        dbg!(
+            &result.examples[1].before.file,
+            &result.examples[1].before.start,
+            &result.examples[1].before.end
+        );
+
+        aux(examples, state.clone(), path.clone(), more.clone())?;
+
+        // let smells = smells::smells(examples, state.clone(), path.clone(), more.clone())?;
+        // assert_eq!(smells.additional.len(), 0);
+        // assert_eq!(smells.bad.len(), 4);
+        // assert_eq!(smells.good.len(), 0);
+        // assert_eq!(smells.graphs.len(), 3);
+
+        // let examples = smells::Examples::new(
+        //     meta_gen.clone(),
+        //     meta_simp.clone(),
+        //     result.examples[..5].to_vec(),
+        // );
+
+        // let smells = smells::smells(examples, state.clone(), path.clone(), more.clone())?;
+
+        // assert_eq!(smells.additional.len(), 0);
+        // assert_eq!(smells.bad.len(), 15);
+        // assert_eq!(smells.good.len(), 0);
+        // assert_eq!(smells.graphs.len(), 6);
+
+        // let examples = smells::Examples::new(
+        //     meta_gen.clone(),
+        //     meta_simp.clone(),
+        //     result.examples[..10].to_vec(),
+        // );
+
+        // let smells = smells::smells(examples, state.clone(), path.clone(), more.clone())?;
+
+        // assert_eq!(smells.additional.len(), 0);
+        // assert_eq!(smells.bad.len(), 22);
+        // assert_eq!(smells.good.len(), 0);
+        // assert_eq!(smells.graphs.len(), 8);
+
+        // let examples =
+        //     smells::Examples::new(meta_gen.clone(), meta_simp.clone(), result.examples.clone());
+
+        // let smells = smells::smells(examples, state.clone(), path.clone(), more.clone())?;
+
+        // assert_eq!(smells.additional.len(), 0);
+        // assert_eq!(smells.bad.len(), 72);
+        // assert_eq!(smells.good.len(), 0);
+        // assert_eq!(smells.graphs.len(), 20);
+
+        Ok(())
+    }
+
+    pub fn aux(
+        examples: smells::Examples,
+        state: crate::SharedState,
+        path: smells::Path,
+        more: smells::More,
+    ) -> Result<(), String> {
+        let state = state.clone();
+        let path = path.clone();
+        let more = more.clone();
+        let now = Instant::now();
+        let repo_spec = path.repo();
+        let Path { commit, len, .. } = path;
+        log::warn!("use len value={len}");
+        let Examples {
+            meta_gen,
+            meta_simp,
+            examples,
+            simple_matching,
+            prepro_matching,
+        } = examples;
+        let prepro_matching = if simple_matching {
+            prepro_matching
+        } else if prepro_matching {
+            prepro_matching
+        } else {
+            true
+        };
+
+        let More {
+            timeout,
+            size_threshold,
+            shrink_threshold_factor,
+        } = more;
+
+        let repo_handle = (state.repositories.read().unwrap())
+            .get_config(repo_spec)
+            .ok_or_else(|| "missing config for repository".to_string())?;
+        let mut repository = repo_handle.fetch();
+        log::warn!("done cloning {}", repository.spec);
+        let commits = (state.repositories.write().unwrap())
+            .pre_process_with_limit(&mut repository, "", &commit, 4)
+            .map_err(|e| e.to_string())?;
+        log::info!(
+            "done construction of {commits:?} commits in {}",
+            repository.spec.user()
+        );
+        let prepare_time = now.elapsed().as_secs_f64();
+        let now = Instant::now();
+        let src_oid = commits[0];
+        let dst_oid = commits[1];
+        use hyperast_vcs_git::processing::ConfiguredRepoTrait;
+        let repo_handle = &repository;
+        let repositories = state.repositories.read().expect("not poisoned");
+        let commit_src = repositories
+            .get_commit(repo_handle.config(), &src_oid)
+            .ok_or("missing source commit")?;
+        let _src_tr = commit_src.ast_root;
+        let commit_dst = repositories
+            .get_commit(repo_handle.config(), &dst_oid)
+            .ok_or("missing destination commit")?;
+        let dst_tr = commit_dst.ast_root;
+        let with_spaces_stores = &repositories.processor.main_stores;
+
+        // NOTE temporary solution, will be fixed when adding more polyglote facilities
+        use hyperast_gen_ts_java as ts_gen;
+        let sss: &hyperast::store::SimpleStores<ts_gen::types::TStore> =
+            with_spaces_stores.with_ts();
+
+        let meta_gen = hyperast_tsquery::Query::new(&meta_gen, ts_gen::language())
+            .map_err(|e| format!("error in meta_gen: {e}"))?;
+
+        let meta_simp =
+            hyperast_tsquery::Query::new(&meta_simp, hyperast_gen_ts_tsquery::language())
+                .map_err(|e| format!("error in meta_simp: {e}"))?;
+
+        let pp_m_simp = meta_simp.to_string();
+        let pp_m_simp = pp_m_simp.lines().collect::<Vec<_>>();
+        assert_eq!(pp_m_simp.len(), 247);
+
+        let ex_map: ExMap = examples
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                assert_eq!(e.before.commit, dst_oid);
+                assert!(!e.before.path.is_empty());
+                let (_, from) = hyperast::position::compute_position(
+                    dst_tr,
+                    &mut e.before.path.iter().map(|x| *x as u16),
+                    with_spaces_stores,
+                );
+                (from, i as u16)
+            })
+            .fold(Default::default(), |mut acc, x| {
+                acc.entry(x.0).or_default().push(x.1);
+                acc
+            });
+        let query_lattice = {
+            let stores = sss;
+            let b = QueryLattice::builder::<ts_gen::types::TStore, ts_gen::types::TIdN<_>, _>(
+                stores,
+                ex_map.keys(),
+                &meta_gen,
+                &meta_simp,
+                &|x| (x.local.metrics.size, x.local.metrics.hashs.label),
+            );
+            let mut b = b.dedup_leaf_queries(|from: Vec<(_, (_, (u32, u32)))>| {
+                hyperast_gen_ts_tsquery::code2query::group_by_size(from)
+            });
+
+            if let Some(cid) = meta_simp.capture_index_for_name("uniq") {
+                dbg!();
+                let mut active_size = b.dedup.len() - 1;
+                let mut active: Vec<_> = b.actives(active_size);
+                let query_store = &b.lattice.query_store;
+                dbg!(active.len());
+                active.iter().for_each(|query| {
+                    let m = hyperast_gen_ts_tsquery::code2query::find_matches(
+                        query_store,
+                        *query,
+                        &meta_simp,
+                        cid,
+                    );
+
+                    dbg!(m.len());
+                });
+            }
+            if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
+                dbg!();
+                let mut active_size = b.dedup.len() - 1;
+                let mut active: Vec<_> = b.actives(active_size);
+                let query_store = &b.lattice.query_store;
+                dbg!(active.len());
+                let mut res = active
+                    .iter()
+                    .map(|query| {
+                        let mut res = vec![];
+                        let mut pos =
+                            hyperast::position::structural_pos::CursorWithPersistence::new(*query);
+                        let cursor =
+                            hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
+                        let mut matches = meta_simp.matches(cursor);
+                        loop {
+                            let Some(m) = matches.next() else {
+                                break;
+                            };
+                            let c = m.nodes_for_capture_index(cid).count();
+                            if c == 0 {
+                                continue;
+                            }
+                            res.push((c, m.pattern_index.to_usize()));
+                        }
+                        res
+                        // hyperast_gen_ts_tsquery::code2query::find_matches(
+                        //     query_store,
+                        //     *query,
+                        //     &meta_simp,
+                        //     cid,
+                        // )
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    res,
+                    vec![
+                        vec![
+                            (2, 15),
+                            (1, 3),
+                            (1, 31),
+                            (1, 31),
+                            (2, 15),
+                            (1, 31),
+                            (1, 31),
+                            (1, 31),
+                            (1, 17),
+                        ],
+                        vec![
+                            (2, 15),
+                            (1, 3),
+                            (1, 31),
+                            (1, 31),
+                            (2, 15),
+                            (1, 31),
+                            (1, 31),
+                            (1, 31),
+                            (1, 17),
+                        ]
+                    ]
+                );
+            }
+            if let Some(cid) = meta_simp.capture_index_for_name("rm") {
+                dbg!();
+                let mut active_size = b.dedup.len() - 1;
+                let mut active: Vec<_> = b.actives(active_size);
+                let query_store = &b.lattice.query_store;
+                dbg!(active.len());
+                let m = active
+                    .iter()
+                    .map(|query| {
+                        hyperast_gen_ts_tsquery::code2query::find_matches(
+                            query_store,
+                            *query,
+                            &meta_simp,
+                            cid,
+                        )
+                        .len()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(m, vec![8, 8]);
+            }
+            {
+                let mut active_size = b.dedup.len() - 1;
+                let mut active: Vec<_> = b.actives(active_size);
+                let query_store = &b.lattice.query_store;
+                dbg!(active.len());
+                let m = active
+                    .iter()
+                    .map(|query| {
+                        let m = hyperast_gen_ts_tsquery::code2query::simp_search_positional_preds(
+                            query_store,
+                            *query,
+                            &meta_simp,
+                        );
+                        m.iter()
+                            .map(|m| (m.0.to_string(), m.1.len()))
+                            .collect::<std::collections::HashSet<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    m,
+                    vec![
+                        vec![("\"exception\"".to_string(), 1), ("\"e\"".to_string(), 2)]
+                            .into_iter()
+                            .collect(),
+                        vec![("\"e\"".to_string(), 2), ("\"exception\"".to_string(), 1)]
+                            .into_iter()
+                            .collect()
+                    ]
+                );
+            }
+
+            let start = std::time::Instant::now();
+            let timeout = std::time::Duration::from_secs(timeout);
+            let mut timeouted = false;
+            let mut timeout = || {
+                if start.elapsed() > timeout {
+                    log::warn!("Timeout reached");
+                    timeouted = true;
+                    return true;
+                }
+                false
+            };
+
+            let size_threshold: usize = 400;
+            let shrink_threshold_factor: usize = 75; // in percent
+            let mut size_threshold = |s| size_threshold.max(s * shrink_threshold_factor / 100);
+            poset_exploration::semi_interactive_poset_build(
+                &mut b,
+                &meta_simp,
+                &mut timeout,
+                size_threshold,
+            );
+            if timeouted {
+                log::warn!(
+                    "timeouted lattice size: {}",
+                    b.dedup.iter().map(|x| x.len()).sum::<usize>()
+                );
+                // TIP simplify more aggressively
+            } else {
+                log::trace!(
+                    "final lattice size: {}",
+                    b.dedup.iter().map(|x| x.len()).sum::<usize>()
+                );
+            }
+            b.post();
+            b.build()
+        };
+
+        let mut graphs = {
+            let g = lattice::Prep::extract_and_group(&query_lattice);
+            g.describe();
+            let f = |x: &IdN| TextSerializer::new(sss, *x).to_string();
+            g.log(&f);
+            g
+        };
+
+        assert_eq!(graphs.tops().count(), 4);
+
+        assert_eq!(query_lattice.count(), 206);
+
+        Ok(())
+    }
+}
+
+pub const META_SIMP: &str = r#"
+(named_node
+    (identifier) (#EQ? "try_statement")
+) @uniq
+(named_node
+    (identifier) (#EQ? "catch_type")
+) @rm
+(named_node
+    (identifier) (#EQ? "string_literal")
+) @rm.all.full
+(named_node
+    (identifier) (#EQ? "decimal_integer_literal")
+) @rm.all.full
+(named_node
+    (identifier) (#EQ? "null_literal")
+) @rm.all.full
+(named_node
+    (identifier) (#EQ? "generic_type")
+) @rm.all.full
+(named_node
+    (identifier) (#EQ? "cast_expression")
+    .
+) @rm.all.full
+(named_node
+    (identifier) (#EQ? "unary_expression")
+    (named_node
+        (identifier) .
+    )
+) @rm
+(named_node
+    (identifier) (#EQ? "object_creation_expression")
+    (named_node
+        (identifier) (#EQ? "argument_list")
+        .
+    )
+) @rm.all.full
+(named_node
+    (identifier) (#EQ? "method_invocation")
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    ) .
+) @rm
+(named_node
+    (identifier) (#EQ? "method_invocation") .
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    ) .
+    (named_node
+        (identifier) (#EQ? "argument_list")
+        .
+    ) .
+) @rm
+(named_node
+    (identifier) (#EQ? "method_invocation")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    ) .
+) @rm
+(named_node
+    (identifier) (#EQ? "method_invocation")
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    ) .
+    (named_node
+        (identifier) (#EQ? "argument_list")
+        (named_node
+            (identifier) (#EQ? "identifier")
+            .
+        ) .
+    )
+) @rm
+(named_node
+    (identifier) (#EQ? "method_invocation")
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    ) .
+    (named_node
+        (identifier) (#EQ? "argument_list")
+        .
+    )
+) @rm
+(named_node
+    (identifier) (#EQ? "block") .
+    (named_node
+        (identifier) (#EQ? "try_statement")
+    ) @focus .
+    (capture
+        (identifier) (#EQ? "_root")
+    )
+)
+(named_node
+    (identifier) (#EQ? "method_invocation") .
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) @rm.all.full .
+    (predicate
+        (identifier) (#EQ? "EQ")
+    ) @rm.all.full .
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+    )
+)
+(named_node
+    (identifier) (#EQ? "catch_formal_parameter")
+    (named_node
+        (identifier) (#EQ? "identifier")
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred
+) @rm.all
+(named_node
+    (identifier) (#EQ? "catch_clause")
+    (named_node
+        (identifier) (#EQ? "catch_formal_parameter")
+        (named_node
+            (identifier) (#EQ? "identifier")
+        ) .
+        (predicate
+            (identifier) (#EQ? "EQ")
+            (parameters
+                (string)
+            )
+        )
+    ) @rm.all.full
+    (named_node
+        (identifier) (#EQ? "block")
+    )
+)
+(named_node
+    (identifier) (#EQ? "catch_clause")
+    (named_node
+        (identifier) (#EQ? "catch_formal_parameter")
+        (named_node
+            (identifier) (#EQ? "identifier")
+        )
+    ) @rm
+    (named_node
+        (identifier) (#EQ? "block")
+        .
+    )
+)
+(named_node
+    (identifier) (#EQ? "catch_clause")
+    (named_node
+        (identifier) (#EQ? "block")
+        (named_node
+            (identifier) (#EQ? "expression_statement") .
+        ) @rm
+    )
+)
+(named_node
+    (identifier) (#EQ? "catch_clause")
+    .
+    (named_node
+        (identifier) (#EQ? "block")
+        .
+    ) @rm
+)
+(named_node
+    (identifier) (#EQ? "argument_list")
+    (named_node
+        (identifier) (#EQ? "method_invocation") .
+        (named_node
+            (identifier) (#EQ? "identifier")
+        ) .
+        (predicate
+            (identifier) (#EQ? "EQ")
+            (parameters
+                (string) @label
+            )
+        ) @pred
+    )
+) @rm.all
+(named_node
+    (identifier) (#EQ? "argument_list")
+    (named_node
+        (identifier) (#EQ? "method_invocation") .
+        (named_node
+            (identifier) (#EQ? "identifier")
+        ) .
+        (predicate
+            (identifier) (#EQ? "EQ")
+            (parameters
+                (string)
+            )
+        )
+    ) @rm
+)
+(named_node
+    (identifier) (#EQ? "argument_list")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred
+) @rm.all
+(named_node
+    (identifier) (#EQ? "variable_declarator")
+    (named_node
+        (identifier) (#EQ? "method_invocation")
+        (named_node
+            (identifier) (#EQ? "argument_list")
+        ) @rm.all.full
+    ) .
+)
+(named_node
+    (identifier) (#EQ? "variable_declarator")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred @rm.all
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    ) .
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string) @label
+        )
+    ) @pred @rm.all
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "block") .
+    ) @rm.all.full
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "block")
+        (named_node
+            (identifier) (#EQ? "local_variable_declaration")
+        ) @rm.all.full
+    )
+)
+(named_node
+    (identifier) (#EQ? "method_declaration")
+    (named_node
+        (identifier) (#EQ? "formal_parameters")
+        (named_node
+            (identifier) (#EQ? "formal_parameter")
+            (named_node
+                (identifier) (#EQ? "identifier") .
+            ) .
+            (predicate
+                (identifier) (#EQ? "EQ")
+                (parameters
+                    (string) @label
+                )
+            ) @pred @rm.all
+        )
+    )
+)
+(named_node
+    (identifier) (#EQ? "enhanced_for_statement")
+    (named_node
+        (identifier) (#EQ? "block")
+    ) @rm
+)
+(named_node
+    (identifier) (#EQ? "method_invocation")
+    (named_node
+        (identifier) (#EQ? "identifier") .
+    )
+    (predicate
+        (identifier) (#EQ? "EQ")
+        (parameters
+            (string)
+        )
+    )
+    (named_node
+        (identifier) (#EQ? "argument_list")
+        .
+    )
+) @rm.all.full
+(named_node .
+    (identifier) .
+    "/" @rm.all.full .
+    (identifier) @rm.all.full
+)
+"#;

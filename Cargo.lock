@@ -4616,6 +4616,7 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-graph",
  "tree-sitter-java 0.21.0",
+ "tree-sitter-query",
 ]
 
 [[package]]

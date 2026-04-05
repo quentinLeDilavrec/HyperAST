@@ -1683,7 +1683,7 @@ pub fn filter_by_key_par<TR: Clone + PartialEq + Send + Sync>(
 }
 #[cfg(feature = "synth_par")]
 impl<Init: Clone + SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
-    pub fn actives(&mut self, active_size: usize) -> Vec<IdN> {
+    pub fn actives(&self, active_size: usize) -> Vec<IdN> {
         use rayon::iter::ParallelIterator;
 
         self.dedup[active_size]
@@ -2598,7 +2598,7 @@ type P = Vec<u16>;
 type Lab = String;
 type Cap = String;
 
-fn simp_search_positional_preds(
+pub fn simp_search_positional_preds(
     query_store: &QStore,
     query: IdNQ,
     meta_simp: &hyperast_tsquery::Query,

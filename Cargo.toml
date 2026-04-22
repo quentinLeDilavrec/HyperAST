@@ -37,9 +37,9 @@ default-members = [
 ]
 
 [workspace.dependencies]
-tree-sitter-graph = { version = "0.12.0" }
+tree-sitter-graph = { version = "0.13.0" }
 streaming-iterator = "0.1.9" # used for recent versions of tree-sitter
-tree-sitter = { version = "0.24.0" }
+tree-sitter = { version = "0.25.0" }
 hyper_diff = { path = "./crates/hyper_diff" }
 hyperast = { path = "./crates/hyper_ast", default-features = false }
 hyperast_tsquery = { path = "./crates/tsquery" }
@@ -55,7 +55,7 @@ hyperast_gen_ts_ts = { path = "./gen/tree-sitter/ts" }
 legion = { version = "^0.4.0" }
 
 [patch.crates-io]
-tree-sitter-graph = { git = "https://github.com/quentinLeDilavrec/tree-sitter-graph", rev = "c705168570dbb8c729710f57d415ab788d2388e5", version = "0.12" }
+tree-sitter-graph = { git = "https://github.com/quentinLeDilavrec/tree-sitter-graph", rev = "0f56930d32dc232ced0e42a7593f813be4877f85", version = "0.13" }
 # tree-sitter-graph = { path = "../tree-sitter-graph", optional = true }
 legion = { git = "https://github.com/quentinLeDilavrec/legion", rev = "9929c5cdd1f0b844071a00725632c7c39b6fff39" }
 # legion = { path = "../legion" }

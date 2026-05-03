@@ -86,6 +86,7 @@ impl Default for ComputeConfigQuery {
             examples: vec![
                 config_examples::BASE_TRY_FAIL_CATCH_EX.clone(),
                 config_examples::MORE_TRY_FAIL_CATCH_EX.clone(),
+                config_examples::MORE_TRY_FAIL_CATCH_EX_LAST_CHILD.clone(),
                 config_examples::BALANCED_EX.clone(),
             ],
             ..Into::into(&config_examples::MORE_TRY_FAIL_CATCH_EX)

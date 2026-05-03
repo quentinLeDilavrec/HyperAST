@@ -423,9 +423,9 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX: Example = Example {
     prepro_matching: true,
 };
 
-/// With problematic last child that are not properly handled before 0.26
+/// With problematic last child that are not properly handled before 0.25
 pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
-    name: "more on try fail catch",
+    name: "more on try fail catch with problematic last child constraints",
     commit: Commit {
         repo: Repo {
             forge: Forge::GitHub,
@@ -435,20 +435,20 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
         id: "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde",
     },
     meta_gen: r#"[
-    "{" ";" "." "try" "(" ")" "}" "catch" "import"
+    "{" ";" "." "," "try" "(" ")" "}" "catch" "import"
     (line_comment) (block_comment)
 ] @skip
 (type_identifier) @label
 (identifier) @label
 (_literal) @abstract"#,
     meta_simp: r#"(named_node
-    (identifier) (#EQ? "try_statement")
-) @uniq
-(named_node
-    (identifier) (#EQ? "catch_type")
-) @rm
-(named_node
-    (identifier) (#EQ? "string_literal")
+        (identifier) (#EQ? "try_statement")
+    ) @uniq
+    (named_node
+        (identifier) (#EQ? "catch_type")
+    ) @rm
+    (named_node
+        (identifier) (#EQ? "string_literal")
 ) @rm.all.full
 (named_node
     (identifier) (#EQ? "decimal_integer_literal")
@@ -461,19 +461,41 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
 ) @rm.all.full
 (named_node
     (identifier) (#EQ? "cast_expression")
+    .
 ) @rm.all.full
 (named_node
     (identifier) (#EQ? "unary_expression")
     (named_node
-        (identifier)
+        (identifier) .
     )
 ) @rm
+(named_node
+    (identifier) (#EQ? "unary_expression") .
+    (anonymous_node) .
+) @rm
+(named_node
+    (identifier) (#EQ? "binary_expression") .
+    (anonymous_node) .
+) @rm
+(named_node
+    (identifier) (#EQ? "binary_expression")
+    (named_node
+        (identifier) (#EQ? "string_literal")
+    ) @rm
+)
 (named_node
     (identifier) (#EQ? "object_creation_expression")
     (named_node
         (identifier) (#EQ? "argument_list")
+        .
     )
 ) @rm.all.full
+(named_node
+    (identifier) (#EQ? "argument_list")
+    (named_node
+        (identifier) (#EQ? "string_literal")
+    ) @rm
+)
 (named_node
     (identifier) (#EQ? "method_invocation")
     (named_node
@@ -489,7 +511,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
 (named_node
     (identifier) (#EQ? "method_invocation") .
     (named_node
-        (identifier) (#EQ? "identifier")
+        (identifier) (#EQ? "identifier") .
     ) .
     (predicate
         (identifier) (#EQ? "EQ")
@@ -499,12 +521,13 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
     ) .
     (named_node
         (identifier) (#EQ? "argument_list")
+        . (anonymous_node)* .
     ) .
 ) @rm
 (named_node
     (identifier) (#EQ? "method_invocation")
     (named_node
-        (identifier) (#EQ? "identifier")
+        (identifier) (#EQ? "identifier") .
     ) .
     (predicate
         (identifier) (#EQ? "EQ")
@@ -528,6 +551,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
         (identifier) (#EQ? "argument_list")
         (named_node
             (identifier) (#EQ? "identifier")
+            .
         ) .
     )
 ) @rm
@@ -544,6 +568,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
     ) .
     (named_node
         (identifier) (#EQ? "argument_list")
+        .
     )
 ) @rm
 (named_node
@@ -610,6 +635,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
     ) @rm
     (named_node
         (identifier) (#EQ? "block")
+        .
     )
 )
 (named_node
@@ -626,6 +652,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
     .
     (named_node
         (identifier) (#EQ? "block")
+        .
     ) @rm
 )
 (named_node
@@ -677,12 +704,12 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
         (named_node
             (identifier) (#EQ? "argument_list")
         ) @rm.all.full
-    )
+    ) .
 )
 (named_node
     (identifier) (#EQ? "variable_declarator")
     (named_node
-        (identifier) (#EQ? "identifier")
+        (identifier) (#EQ? "identifier") .
     ) .
     (predicate
         (identifier) (#EQ? "EQ")
@@ -694,7 +721,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
 (named_node
     (identifier) (#EQ? "method_declaration")
     (named_node
-        (identifier) (#EQ? "identifier")
+        (identifier) (#EQ? "identifier") .
     ) .
     (predicate
         (identifier) (#EQ? "EQ")
@@ -706,7 +733,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
 (named_node
     (identifier) (#EQ? "method_declaration")
     (named_node
-        (identifier) (#EQ? "block")
+        (identifier) (#EQ? "block") .
     ) @rm.all.full
 )
 (named_node
@@ -755,6 +782,7 @@ pub(super) static MORE_TRY_FAIL_CATCH_EX_LAST_CHILD: Example = Example {
     )
     (named_node
         (identifier) (#EQ? "argument_list")
+        .
     )
 ) @rm.all.full
 (named_node .

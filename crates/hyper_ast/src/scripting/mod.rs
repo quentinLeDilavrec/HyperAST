@@ -125,13 +125,16 @@ impl<HAST, Acc> From<std::sync::Arc<str>> for Prepro<HAST, Acc> {
     }
 }
 
-use crate::{store::defaults::NodeIdentifier, types::HyperType};
+use crate::store::defaults::NodeIdentifier;
 
 pub trait Scriptable {
     type Error: std::error::Error;
 
     type Scripts;
 }
+
+#[cfg(feature = "scripting")]
+use crate::types::HyperType;
 
 #[cfg(feature = "scripting")]
 pub trait Finishable: Scriptable {
@@ -191,6 +194,7 @@ impl<T> Clone for SubtreeHandle<T> {
 }
 
 pub struct Acc {
+    #[cfg(feature = "scripting")]
     id: u16,
 }
 

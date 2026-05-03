@@ -25,6 +25,7 @@ use crate::store::nodes::EntityBuilder;
 use crate::types::{ETypeStore, HyperAST, HyperASTShared};
 use crate::{hashed::NodeHashs, nodes::Space};
 
+#[cfg(feature = "ts")]
 use self::parser::Visibility;
 
 pub type Spaces = Vec<Space>;
@@ -448,15 +449,20 @@ pub trait TreeGen {
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 }
 
+#[cfg(feature = "ts")]
 #[derive(Debug)]
 pub struct Parents<Acc>(Vec<P<Acc>>);
+
+#[cfg(feature = "ts")]
 impl<Acc> From<Acc> for Parents<Acc> {
     fn from(value: Acc) -> Self {
         Self::new(P::Visible(value))
     }
 }
 
+#[cfg(feature = "ts")]
 #[derive(Debug)]
+#[allow(unused)]
 enum P<Acc> {
     ManualyHidden,
     BothHidden,
@@ -464,6 +470,7 @@ enum P<Acc> {
     Visible(Acc),
 }
 
+#[cfg(feature = "ts")]
 impl<Acc> P<Acc> {
     fn s(&self) -> &str {
         match self {
@@ -505,6 +512,7 @@ impl<Acc> P<Acc> {
     }
 }
 
+#[cfg(feature = "ts")]
 impl<Acc> P<Acc> {
     fn ok(self) -> Option<Acc> {
         match self {
@@ -524,6 +532,7 @@ impl<Acc> P<Acc> {
     }
 }
 
+#[cfg(feature = "ts")]
 impl<Acc> Parents<Acc> {
     fn new(value: P<Acc>) -> Self {
         Self(vec![value])

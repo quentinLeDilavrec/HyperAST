@@ -1,10 +1,8 @@
 use std::fmt::Display;
 
-use hyperast::{
-    tree_gen::utils_ts::TsEnableTS,
-    types::{
-        AAAA, AnyType, HyperType, LangRef, NodeId, TypeStore, TypeTrait, TypeU16, TypedNodeId,
-    },
+use hyperast::tree_gen::utils_ts::TsEnableTS;
+use hyperast::types::{
+    AAAA, AnyType, HyperType, LangRef, NodeId, TypeStore, TypeTrait, TypeU16, TypedNodeId,
 };
 
 #[cfg(feature = "impl")]

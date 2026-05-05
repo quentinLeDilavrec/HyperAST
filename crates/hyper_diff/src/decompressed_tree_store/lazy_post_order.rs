@@ -2,20 +2,19 @@ use std::fmt::Debug;
 
 use num_traits::{ToPrimitive, cast, one, zero};
 
-use crate::matchers::Decompressible;
+use hyperast::PrimInt;
+use hyperast::types::{self, AstLending, Children, Childrn, HyperAST, WithChildren, WithStats};
 
+use super::basic_post_order::{BasicPOSlice, BasicPostOrder};
+use super::complete_post_order::CompletePOSlice;
+use super::simple_post_order::{SimplePOSlice, SimplePostOrder};
 use super::{
     ContiguousDescendants, DecendantsLending, DecompressedParentsLending, DecompressedTreeStore,
     DecompressedWithParent, DecompressedWithSiblings, Iter, LazyDecompressed,
     LazyDecompressedTreeStore, LazyPOBorrowSlice, LazyPOSliceLending, PostOrder, PostOrderIterable,
     Shallow, ShallowDecompressedTreeStore,
-    basic_post_order::{BasicPOSlice, BasicPostOrder},
-    complete_post_order::CompletePOSlice,
-    simple_post_order::{SimplePOSlice, SimplePostOrder},
 };
-
-use hyperast::PrimInt;
-use hyperast::types::{self, AstLending, Children, Childrn, HyperAST, WithChildren, WithStats};
+use crate::matchers::Decompressible;
 
 pub struct LazyPostOrder<IdN, IdD> {
     pub id_compressed: Box<[IdN]>,

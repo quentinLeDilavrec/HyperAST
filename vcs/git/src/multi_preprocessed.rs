@@ -2,18 +2,13 @@ use std::collections::HashMap;
 
 use hyperast::store::nodes::DefaultNodeIdentifier as NodeIdentifier;
 
+use crate::maven::MavenModuleAcc;
+use crate::maven_processor::make;
+use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ConfiguredRepo2;
-use crate::{
-    Commit, SimpleStores,
-    git::Repo,
-    maven::MavenModuleAcc,
-    maven_processor::make,
-    preprocessed::RepositoryProcessor,
-    processing::{
-        ConfiguredRepoHandle2, RepoConfig,
-        erased::{CommitProcExt, ParametrizedCommitProcessorHandle},
-    },
-};
+use crate::processing::erased::{CommitProcExt, ParametrizedCommitProcessorHandle};
+use crate::processing::{ConfiguredRepoHandle2, RepoConfig};
+use crate::{Commit, SimpleStores, git::Repo};
 
 /// Preprocess git repositories
 /// share most components with PreProcessedRepository

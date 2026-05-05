@@ -1,4 +1,3 @@
-use crate::{TStore, java::handle_java_file};
 use hyperast::position::{Scout, StructuralPosition, StructuralPositionStore};
 use hyperast::store::SimpleStores;
 use hyperast::types::{LabelStore as _, NodeId};
@@ -6,6 +5,8 @@ use hyperast_gen_ts_java::impact::element::{IdentifierFormat, LabelPtr, RefsEnum
 use hyperast_gen_ts_java::impact::partial_analysis::PartialAnalysis;
 use hyperast_gen_ts_java::impact::usage;
 use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
+
+use crate::{TStore, java::handle_java_file};
 
 fn run(text: &[u8]) {
     let mut stores = SimpleStores::<TStore>::default();

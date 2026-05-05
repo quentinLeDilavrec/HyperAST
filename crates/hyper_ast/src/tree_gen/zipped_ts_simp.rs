@@ -1,8 +1,9 @@
 //! fully compress all subtrees from a cpp CST
 
+use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
+
 use legion::world::EntryRef;
 use num::ToPrimitive as _;
-use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
 
 use super::{P, parser::Visibility, utils_ts::*, zipped::Has};
 use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};

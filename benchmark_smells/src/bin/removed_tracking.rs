@@ -1,27 +1,22 @@
 #![allow(unused)]
 use std::collections::HashSet;
 
-use hyperast::{
-    position::{self, compute_position_with_no_spaces, position_accessors::WithPreOrderOffsets},
-    types::{
-        Children, Childrn as _, DecompressedFrom as _, HyperAST as _, HyperType, LabelStore,
-        Labeled, NodeStore, TypedNodeStore, WithChildren,
-    },
-    utils::memusage_linux,
-};
-use hyperast_benchmark_smells::{
-    DATASET, diffing,
-    github_ranges::{Pos, PositionWithContext, format_pos_as_github_url},
-    simple::count_matches,
-};
+use hyperast::position::compute_position_with_no_spaces;
+use hyperast::position::position_accessors::WithPreOrderOffsets;
+use hyperast::types::{Childrn as _, DecompressedFrom as _, HyperAST as _};
+use hyperast::types::{HyperType, LabelStore, Labeled, WithChildren};
+use hyperast::utils::memusage_linux;
 use hyperast_vcs_git::preprocessed::PreProcessedRepository;
 
-use hyper_diff::{
-    decompressed_tree_store::{
-        DecompressedWithParent, ShallowDecompressedTreeStore, lazy_post_order::LazyPostOrder,
-    },
-    matchers::{Decompressible, mapping_store::MonoMappingStore},
-};
+use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+use hyper_diff::decompressed_tree_store::{DecompressedWithParent, ShallowDecompressedTreeStore};
+use hyper_diff::matchers::Decompressible;
+use hyper_diff::matchers::mapping_store::MonoMappingStore;
+
+use hyperast_benchmark_smells::github_ranges::format_pos_as_github_url;
+use hyperast_benchmark_smells::github_ranges::{Pos, PositionWithContext};
+use hyperast_benchmark_smells::{DATASET, diffing};
+
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;
 

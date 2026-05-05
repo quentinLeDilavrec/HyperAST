@@ -1,8 +1,6 @@
-use std::{
-    fmt::{Debug, Display},
-    hash::{Hash, Hasher},
-    marker::PhantomData,
-};
+use std::fmt::{Debug, Display};
+use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 #[cfg(feature = "native")]
 use string_interner::DefaultHashBuilder;

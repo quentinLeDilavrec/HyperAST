@@ -4,6 +4,7 @@ use core::f32;
 use std::{ops::Mul, sync::Arc};
 
 use rerun::external::{arrow, re_types};
+
 pub fn log_languages() -> Result<(), Box<dyn std::error::Error>> {
     let rec = rerun::RecordingStream::global(rerun::StoreKind::Recording).unwrap();
 

@@ -1,9 +1,7 @@
 #![allow(unused)]
-use std::{
-    any::{Any, TypeId},
-    marker::PhantomData,
-    ops::Deref,
-};
+use std::any::{Any, TypeId};
+use std::marker::PhantomData;
+use std::ops::Deref;
 
 use crate::store::nodes::{CompressedCompo, ErasedHolder};
 use crate::tree_gen::metric_definition::{self, MetricAcc, MetricComputing, Subtree, Ty};

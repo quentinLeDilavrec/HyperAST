@@ -1,11 +1,10 @@
-use super::{Cursor, Status, Symbol, TextLending, TreeCursorStep};
 use hyperast::position::TreePath;
+use hyperast::position::TreePathMut;
+use hyperast::types::{HyperAST, TypeStore};
 use hyperast::types::{HyperASTShared, HyperType, NodeId, Tree};
 use hyperast::types::{LabelStore, Labeled, RoleStore, Tree};
-use hyperast::{
-    position::TreePathMut,
-    types::{HyperAST, TypeStore},
-};
+
+use super::{Cursor, Status, Symbol, TextLending, TreeCursorStep};
 
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 

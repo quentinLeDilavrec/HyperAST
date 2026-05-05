@@ -1,32 +1,29 @@
 //! This decompressed tree store is I thnk a pretty good utils to improve perfs of the bottom-up matcher.
 //! But it will require some more love, as I initially did not finish to implement everithing.
 
+use std::borrow::{Borrow, BorrowMut};
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::ops::Index;
+
+use bitvec::slice::BitSlice;
+use num_traits::{ToPrimitive, Zero, cast, zero};
+
+use hyperast::PrimInt;
+use hyperast::types::{self, AstLending, HyperAST, WithChildren, WithStats};
+
 use super::{
     ContiguousDescendants, DecendantsLending, IterKr, LazyDecompressed, LazyDecompressedTreeStore,
     LazyPOBorrowSlice, LazyPOSliceLending, PostOrdKeyRoots, PostOrderIterable, PostOrderKeyRoots,
     Shallow, lazy_post_order::LazyPostOrder,
 };
-use crate::{
-    decompressed_tree_store::{
-        DecompressedParentsLending, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-        ShallowDecompressedTreeStore,
-    },
-    matchers::{
-        Decompressible,
-        mapping_store::{MappingStore, MonoMappingStore},
-    },
+use crate::decompressed_tree_store::{
+    DecompressedParentsLending, DecompressedTreeStore, DecompressedWithParent, PostOrder,
+    ShallowDecompressedTreeStore,
 };
-use bitvec::slice::BitSlice;
-use hyperast::PrimInt;
-use hyperast::types::{self, AstLending, HyperAST, WithChildren, WithStats};
-use num_traits::{ToPrimitive, Zero, cast, zero};
-use std::{
-    borrow::{Borrow, BorrowMut},
-    collections::BTreeMap,
-    fmt::Debug,
-    marker::PhantomData,
-    ops::Index,
-};
+use crate::matchers::Decompressible;
+use crate::matchers::mapping_store::{MappingStore, MonoMappingStore};
 
 /// Wrap or just map a decommpressed tree in breadth-first eg. post-order,
 pub struct SimpleHiddingMapper<'a, IdD, DTS, M, R, D = DTS> {

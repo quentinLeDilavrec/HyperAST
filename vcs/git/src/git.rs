@@ -1,15 +1,14 @@
-use std::{
-    fmt::{Debug, Display},
-    fs,
-    path::{Path, PathBuf},
-    process,
-};
+use std::fmt::{Debug, Display};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process;
 
 pub use git2::Error;
 pub use git2::ErrorCode;
 pub use git2::Oid;
 pub use git2::Repository;
 use git2::{RemoteCallbacks, Revwalk, TreeEntry};
+
 use hyperast::{position::Position, utils::Url};
 
 use crate::processing::ObjectName;

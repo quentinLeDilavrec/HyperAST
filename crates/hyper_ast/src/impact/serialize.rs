@@ -1,9 +1,7 @@
-use std::{
-    fmt::{Debug, Display},
-    marker::PhantomData,
-    ops::Index,
-    str::Utf8Error,
-};
+use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
+use std::ops::Index;
+use std::str::Utf8Error;
 
 use num::ToPrimitive;
 use string_interner::{Symbol, symbol::SymbolU16};

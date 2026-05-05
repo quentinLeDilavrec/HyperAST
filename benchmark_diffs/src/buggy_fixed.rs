@@ -1,11 +1,17 @@
-use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess};
-use crate::preprocess::{JavaPreprocessFileSys, iter_dirs, parse_dir_pair, parse_string_pair};
-use crate::{other_tools, tempfile};
+use std::env;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use std::time::Instant;
+
 use hyper_diff::actions::Actions;
 use hyper_diff::algorithms;
 use hyper_diff::algorithms::{DiffResult, RuntimeMeasurement};
 use hyperast::store::{SimpleStores, labels::LabelStore, nodes::legion::NodeStore};
-use std::{env, fs::File, io::Write, path::Path, time::Instant};
+
+use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess};
+use crate::preprocess::{JavaPreprocessFileSys, iter_dirs, parse_dir_pair, parse_string_pair};
+use crate::{other_tools, tempfile};
 
 const DATASET_FORMAT: i32 = 1; // ok as of 33024da8de4c519bb1c1146b19d91d6cb4c81ea6
 // TODO find when format of dataset changed
@@ -471,34 +477,22 @@ mod examples {
 
 #[cfg(test)]
 mod test {
-    use hyperast::{
-        nodes::SyntaxWithIdsSerializer,
-        store::SimpleStores,
-        types::{DecompressedFrom, HyperASTShared, Typed},
-    };
+    use hyperast::types::{DecompressedFrom, HyperASTShared, Typed};
+    use hyperast::{nodes::SyntaxWithIdsSerializer, store::SimpleStores};
 
+    use hyperast_gen_ts_xml::legion::XmlTreeGen;
     use hyperast_gen_ts_xml::legion::tree_sitter_parse_xml as parse_xml;
-    use hyperast_gen_ts_xml::{legion::XmlTreeGen, types::TStore};
+    use hyperast_gen_ts_xml::types::TStore;
 
-    use hyper_diff::{
-        decompressed_tree_store::lazy_post_order::LazyPostOrder,
-        matchers::{
-            Decompressible,
-            Mapper,
-            Mapping,
-            heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher,
-            // heuristic::gt::greedy_subtree_matcher::{GreedySubtreeMatcher, SubtreeMatcher},
-            mapping_store::{DefaultMultiMappingStore, VecStore},
-        },
-    };
+    use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+    use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+    use hyper_diff::matchers::mapping_store::{DefaultMultiMappingStore, VecStore};
+    use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
 
-    use crate::{
-        other_tools::gumtree::subprocess,
-        postprocess::{
-            CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess, print_mappings,
-            print_mappings_no_ranges,
-        },
-    };
+    use crate::other_tools::gumtree::subprocess;
+    use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess};
+    use crate::postprocess::{print_mappings, print_mappings_no_ranges};
+
     static CASE7: &str = r#"<project>
     <dependency>
         <groupId>org.mockito</groupId>

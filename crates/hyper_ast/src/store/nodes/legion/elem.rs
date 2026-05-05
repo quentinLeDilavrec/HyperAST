@@ -1,27 +1,20 @@
-use std::{
-    cmp::PartialEq,
-    fmt::Debug,
-    hash::Hash,
-    marker::{PhantomData, Send, Sync},
-    ops::Deref,
-};
+use std::cmp::PartialEq;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::marker::{PhantomData, Send, Sync};
+use std::ops::Deref;
 
-use legion::{
-    storage::{Archetype, Component},
-    world::{ComponentError, EntityLocation},
-};
+use legion::storage::{Archetype, Component};
+use legion::world::{ComponentError, EntityLocation};
 use num::ToPrimitive;
 
-use crate::{
-    filter::{BF, Bloom, BloomResult, BloomSize},
-    hashed::{NodeHashs, SyntaxNodeHashs, SyntaxNodeHashsKinds},
-    impact::serialize::{CachedHasher, Keyed, MySerialize},
-    nodes::{CompressedNode, HashSize, RefContainer},
-    store::defaults::LabelIdentifier,
-    types::{
-        AnyType, Children, HyperType, NodeId, TypeTrait, Typed, TypedNodeId, WithChildren,
-        WithMetaData,
-    },
+use crate::filter::{BF, Bloom, BloomResult, BloomSize};
+use crate::hashed::{NodeHashs, SyntaxNodeHashs, SyntaxNodeHashsKinds};
+use crate::impact::serialize::{CachedHasher, Keyed, MySerialize};
+use crate::nodes::{CompressedNode, HashSize, RefContainer};
+use crate::store::defaults::LabelIdentifier;
+use crate::types::{
+    AnyType, Children, HyperType, NodeId, TypeTrait, Typed, TypedNodeId, WithChildren, WithMetaData,
 };
 
 use crate::store::nodes::compo::{self, CS, NoSpacesCS};

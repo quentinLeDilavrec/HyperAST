@@ -1,26 +1,19 @@
-use hyperast::{
-    store::SimpleStores,
-    test_utils::simple_tree::{DisplayTree, LS, SimpleTree, TStore},
-    types::DecompressedFrom,
-};
+use hyperast::test_utils::simple_tree::{DisplayTree, LS, SimpleTree, TStore};
+use hyperast::{store::SimpleStores, types::DecompressedFrom};
 
-use crate::{
-    decompressed_tree_store::{
-        CompletePostOrder, ShallowDecompressedTreeStore, lazy_post_order::LazyPostOrder,
-    },
-    matchers::{
-        Decompressible, Mapper, Mapping,
-        heuristic::gt::{
-            greedy_bottom_up_matcher::GreedyBottomUpMatcher,
-            lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
-            lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher,
-            marriage_bottom_up_matcher::MarriageBottomUpMatcher,
-        },
-        mapping_store::{DefaultMappingStore, MappingStore, VecStore},
-    },
-    tests::examples::*,
-    tree::simple_tree::{NS, Tree, vpair_to_stores},
+use crate::decompressed_tree_store::{
+    CompletePostOrder, ShallowDecompressedTreeStore, lazy_post_order::LazyPostOrder,
 };
+use crate::matchers::heuristic::gt::{
+    greedy_bottom_up_matcher::GreedyBottomUpMatcher,
+    lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
+    lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher,
+    marriage_bottom_up_matcher::MarriageBottomUpMatcher,
+};
+use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore, VecStore};
+use crate::matchers::{Decompressible, Mapper, Mapping};
+use crate::tests::examples::*;
+use crate::tree::simple_tree::{NS, Tree, vpair_to_stores};
 
 #[derive(Clone, Copy)]
 enum GumtreeVariant {

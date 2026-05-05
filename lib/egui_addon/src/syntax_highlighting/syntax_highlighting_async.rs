@@ -1,8 +1,5 @@
-#[allow(unused, dead_code)] // TODO finish the implementation
-use std::{
-    ops::Range,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::ops::Range;
+use std::sync::{Arc, Mutex, RwLock};
 
 use egui::text::LayoutJob;
 

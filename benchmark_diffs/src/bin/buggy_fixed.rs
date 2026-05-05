@@ -1,9 +1,8 @@
 use std::{env, path::Path};
 
-use hyperast_benchmark_diffs::{
-    buggy_fixed::{buggy_fixed_dataset_roots, run_dir},
-    setup_env_logger,
-};
+use hyperast_benchmark_diffs::buggy_fixed::{buggy_fixed_dataset_roots, run_dir};
+use hyperast_benchmark_diffs::setup_env_logger;
+
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;
 

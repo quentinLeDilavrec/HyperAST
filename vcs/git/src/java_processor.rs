@@ -899,11 +899,9 @@ impl RepositoryProcessor {
 #[allow(unused)]
 mod experiments {
     use super::*;
-    use crate::{
-        Accumulator,
-        git::{NamedObject, ObjectType, TypedObject, UniqueObject},
-        processing::InFiles,
-    };
+    use crate::Accumulator;
+    use crate::git::{NamedObject, ObjectType, TypedObject, UniqueObject};
+    use crate::processing::InFiles;
 
     pub(crate) struct GitProcessorMiddleWare<'repo, 'prepro, 'd, 'c> {
         repository: &'repo Repository,

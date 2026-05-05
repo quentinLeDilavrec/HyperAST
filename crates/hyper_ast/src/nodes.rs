@@ -1,16 +1,12 @@
-use std::{
-    fmt::{Debug, Display, Write},
-    hash::Hash,
-    marker::PhantomData,
-};
+use std::fmt::{Debug, Display, Write};
+use std::hash::Hash;
+use std::marker::PhantomData;
 
 use num::ToPrimitive;
 
+use crate::impact::serialize::{Keyed, MySerialize};
 use crate::types::Childrn;
-use crate::{
-    impact::serialize::{Keyed, MySerialize},
-    types::{AstLending, HyperAST, HyperType, NodeId, RoleStore},
-};
+use crate::types::{AstLending, HyperAST, HyperType, NodeId, RoleStore};
 
 // pub type TypeIdentifier = Type;
 

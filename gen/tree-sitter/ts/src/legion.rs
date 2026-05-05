@@ -1,30 +1,26 @@
 //! fully compress all subtrees from a typescript CST
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::TNode;
-use hyperast::store::nodes::legion::subtree_builder;
-use hyperast::tree_gen::{PreResult, ZippedTreeGen};
 use legion::world::EntryRef;
 
+use hyperast::filter::BloomSize;
+use hyperast::full::FullNode;
+use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::nodes::Space;
+use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo::{self, CS, NoSpacesCS};
-use hyperast::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    store::{
-        SimpleStores,
-        nodes::{DefaultNodeStore as NodeStore, legion::NodeIdentifier},
-    },
-    tree_gen::{
-        AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
-        SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-        compute_indentation, get_spacing, has_final_space,
-        parser::{Node as _, TreeCursor},
-    },
-    types::LabelStore as _,
+use hyperast::store::nodes::legion::subtree_builder;
+use hyperast::store::nodes::{DefaultNodeStore as NodeStore, legion::NodeIdentifier};
+use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+use hyperast::tree_gen::{
+    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
+    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
+    compute_indentation, get_spacing, has_final_space,
 };
+use hyperast::tree_gen::{PreResult, ZippedTreeGen};
+use hyperast::types::LabelStore as _;
 
+use crate::TNode;
 use crate::types::{TsEnabledTypeStore, Type};
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;

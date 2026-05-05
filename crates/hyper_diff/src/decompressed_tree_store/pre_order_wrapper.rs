@@ -1,7 +1,10 @@
-use crate::decompressed_tree_store::PostOrder;
-use hyperast::types::{HyperAST, LabelStore, Labeled, NodeStore, WithChildren, WithSerialization};
-use num_traits::{PrimInt, ToPrimitive, Zero};
 use std::fmt::{Debug, Display};
+
+use num_traits::{PrimInt, ToPrimitive, Zero};
+
+use hyperast::types::{HyperAST, LabelStore, Labeled, NodeStore, WithChildren, WithSerialization};
+
+use crate::decompressed_tree_store::PostOrder;
 
 pub struct SimplePreOrderMapper<'a, IdD, D> {
     pub map: Vec<IdD>,

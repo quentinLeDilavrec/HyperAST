@@ -7,13 +7,11 @@ use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use crate::hashed::NodeHashs;
 use crate::hashed::SyntaxNodeHashs;
+use crate::hashed::SyntaxNodeHashsKinds;
+use crate::nodes::HashSize;
+use crate::store::defaults::LabelIdentifier;
 use crate::types::Children;
-use crate::{
-    hashed::SyntaxNodeHashsKinds,
-    nodes::HashSize,
-    store::defaults::LabelIdentifier,
-    types::{Labeled, NodeId, Typed, TypedNodeId, WithChildren},
-};
+use crate::types::{Labeled, NodeId, Typed, TypedNodeId, WithChildren};
 
 pub struct HashedNodeRef<'a, Id>(pub(super) &'a boxing::ErasedMap, pub(super) PhantomData<Id>);
 

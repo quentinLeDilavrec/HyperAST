@@ -66,7 +66,7 @@ fn tsg_hyperast_stepped<'a, 'c, 'd>(
     code_text: &'a str,
     query: &(impl Display, impl AsRef<str>),
     stores: &'a mut SimpleStores,
-    md_cache: &'c mut std::collections::HashMap<legion::Entity, legion_with_refs::MD>,
+    md_cache: &'c mut hashbrown::HashMap<legion::Entity, legion_with_refs::MD>,
 ) -> tree_sitter_graph::graph::Graph<hyperast_gen_ts_java::tsg::stepped_query::Node<'a, SimpleStores>>
 {
     unsafe { legion_with_refs::HIDDEN_NODES = true };

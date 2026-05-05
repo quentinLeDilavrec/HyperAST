@@ -1,14 +1,15 @@
-use std::borrow::Borrow;
 use std::fmt::Display;
 
 use hyperast::PrimInt;
 use hyperast::position::PositionConverter;
 use hyperast::position::StructuralPosition;
 use hyperast::types::HyperAST;
-use hyperast::types::HyperASTShared;
 use hyperast::types::LendT;
 use hyperast::types::WithSerialization;
 use hyperast::types::WithStats;
+
+#[cfg(feature = "lattice")]
+use hyperast::types::HyperASTShared;
 
 use crate::code2query::QueryLattice;
 #[cfg(feature = "lattice")]
@@ -51,7 +52,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-    Q: Clone + Borrow<IdNQ> + PQ,
+    Q: Clone + std::borrow::Borrow<IdNQ> + PQ,
     P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy + Eq,
     for<'t> (&'t HAST, P): PPP,
 {
@@ -183,7 +184,7 @@ fn print_mermaid_graph<HAST: HyperAST, Q, P>(
     graph: &petgraph::Graph<Q, enumset::EnumSet<crate::code2query::TrMarker>>,
 ) -> Result<(), std::fmt::Error>
 where
-    Q: Borrow<IdNQ> + PQ,
+    Q: std::borrow::Borrow<IdNQ> + PQ,
     for<'t> (&'t HAST, P): PPP,
 {
     if graph.edge_count() > EDGE_LIMIT {

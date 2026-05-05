@@ -1,12 +1,13 @@
 //! Gather most of the common behaviors used to compute positions in an HyperAST
+use std::path::PathBuf;
+
+use num::ToPrimitive;
 
 use super::{Position, StructuralPosition, TreePath};
 use crate::types::{
     Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, WithChildren, WithSerialization,
 };
 use crate::{PrimInt, types::WithStats};
-use num::ToPrimitive;
-use std::path::PathBuf;
 
 /// precondition: root node do not contain a File node
 /// TODO make whole thing more specific to a path in a tree

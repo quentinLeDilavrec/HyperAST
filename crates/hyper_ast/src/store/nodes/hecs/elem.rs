@@ -2,12 +2,10 @@ use std::{hash::Hash, marker::Send, ops::Deref};
 
 use num::ToPrimitive;
 
-use crate::{
-    hashed::{SyntaxNodeHashs, SyntaxNodeHashsKinds},
-    nodes::HashSize,
-    store::defaults::LabelIdentifier,
-    types::*,
-};
+use crate::hashed::{SyntaxNodeHashs, SyntaxNodeHashsKinds};
+use crate::nodes::HashSize;
+use crate::store::defaults::LabelIdentifier;
+use crate::types::*;
 
 use super::compo;
 

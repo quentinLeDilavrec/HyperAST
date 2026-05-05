@@ -2,13 +2,13 @@ use std::hash::{Hash, Hasher};
 
 use axum::Json;
 use const_chunks::IteratorConstChunks;
-use hyperast::{
-    compat::HashMap,
-    store::defaults::{LabelIdentifier, NodeIdentifier},
-    types::{self, Children, Childrn, HyperAST, LabelStore, Labeled, NodeStore, WithChildren},
-};
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
+
+use hyperast::compat::HashMap;
+use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::types::{Children, Childrn, HyperAST, Labeled, WithChildren};
+use hyperast::types::{LabelStore, NodeStore, TypeStore};
 
 use crate::SharedState;
 
@@ -170,7 +170,7 @@ fn make_view<HAST>(
 ) -> View
 where
     HAST::IdN: Hash,
-    <HAST::TS as types::TypeStore>::Ty: Into<u16>,
+    <HAST::TS as TypeStore>::Ty: Into<u16>,
     // HAST: NodeStore<HAST::IdN, R<'a> = HAST::T> + LabelStore<str, I = HAST::Label>,
     HAST: HyperAST<Label = LabelIdentifier>,
     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,

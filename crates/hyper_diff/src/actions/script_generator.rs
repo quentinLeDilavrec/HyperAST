@@ -6,14 +6,12 @@ use bitvec::order::Lsb0;
 use hyperast::types::{HyperAST, HyperASTShared, Labeled, NodeStore as _};
 use num_traits::{PrimInt, cast};
 
-use crate::{
-    decompressed_tree_store::{
-        BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-        PostOrderIterable,
-    },
-    matchers::mapping_store::{DefaultMappingStore, MappingStore, MonoMappingStore},
-    utils::sequence_algorithms::longest_common_subsequence,
+use crate::decompressed_tree_store::{
+    BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
+    PostOrderIterable,
 };
+use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore, MonoMappingStore};
+use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 pub trait Actions {
     fn len(&self) -> usize;

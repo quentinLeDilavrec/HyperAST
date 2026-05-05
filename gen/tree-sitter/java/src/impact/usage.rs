@@ -1,32 +1,31 @@
-use crate::types::{TIdN, Type};
 use core::fmt;
-use hyperast::{
-    filter::BloomResult,
-    nodes::RefContainer,
-    position::{
-        Scout, SpHandle, StructuralPositionStore, TreePath, TreePathMut, TypedScout, TypedTreePath,
-    },
-    store::defaults::LabelIdentifier,
-    types::{
-        Children, HyperAST, HyperASTShared, IterableChildren, LabelStore, Labeled, NodeId, Tree,
-        TypeStore, TypeTrait, Typed, TypedHyperAST, TypedNodeStore, TypedTree, WithChildren,
-        WithSerialization,
-    },
-};
-use num::{ToPrimitive, Zero, cast, one, zero};
 use std::fmt::Debug;
 
-use crate::impact::{
-    element::{IdentifierFormat, LabelPtr},
-    reference::DisplayRef,
+use num::{ToPrimitive, Zero, cast, one, zero};
+
+use hyperast::filter::BloomResult;
+use hyperast::nodes::RefContainer;
+use hyperast::position::{
+    Scout, SpHandle, StructuralPositionStore, TreePath, TreePathMut, TypedScout, TypedTreePath,
 };
+use hyperast::store::defaults::LabelIdentifier;
 use hyperast::types::AnyType;
+use hyperast::types::{
+    Children, HyperAST, HyperASTShared, IterableChildren, LabelStore, Labeled, NodeId, Tree,
+    TypeStore, TypeTrait, Typed, TypedHyperAST, TypedNodeStore, TypedTree, WithChildren,
+    WithSerialization,
+};
 
 use super::{
     element::ExplorableRef,
     element::{RefPtr, RefsEnum},
     partial_analysis::PartialAnalysis,
 };
+use crate::impact::{
+    element::{IdentifierFormat, LabelPtr},
+    reference::DisplayRef,
+};
+use crate::types::{TIdN, Type};
 
 // TODO use generic node and store
 

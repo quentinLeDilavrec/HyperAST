@@ -1,12 +1,8 @@
 use std::ops::Deref;
 
-use hyperast::{
-    store::{
-        defaults::{LabelIdentifier, NodeIdentifier},
-        nodes::legion::{HashedNodeRef, NodeStore},
-    },
-    types::{self, AAAA, Children, NodeId},
-};
+use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::store::nodes::legion::{HashedNodeRef, NodeStore};
+use hyperast::types::{self, AAAA, Children, NodeId};
 
 pub fn as_nospaces<'a, TS>(
     stores: &'a hyperast::store::SimpleStores<TS>,

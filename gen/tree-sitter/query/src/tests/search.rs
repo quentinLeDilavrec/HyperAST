@@ -2,11 +2,8 @@
 use crate::tests::cpp_tree;
 use hyperast::nodes::SyntaxSerializer;
 use hyperast::nodes::TextSerializer;
-use hyperast::{
-    position::{TreePath, structural_pos::CursorHead},
-    store::defaults::NodeIdentifier,
-    types::Typed,
-};
+use hyperast::position::{TreePath, structural_pos::CursorHead};
+use hyperast::store::defaults::NodeIdentifier;
 
 use hyperast_gen_ts_cpp::iter::IterAll as CppIter;
 

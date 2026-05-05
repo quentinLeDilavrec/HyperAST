@@ -1,8 +1,7 @@
 use hyperast::types::DecompressedFrom;
 
-use crate::decompressed_tree_store::{
-    LazyDecompressedTreeStore, ShallowDecompressedTreeStore, lazy_post_order::LazyPostOrder,
-};
+use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+use crate::decompressed_tree_store::{LazyDecompressedTreeStore, ShallowDecompressedTreeStore};
 use crate::tree::simple_tree::{DisplayTree, vpair_to_stores};
 use crate::{matchers::Decompressible, tests};
 

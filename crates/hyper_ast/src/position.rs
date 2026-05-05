@@ -35,10 +35,8 @@
 
 use std::{fmt::Debug, path::PathBuf};
 
-use crate::{
-    store::defaults::NodeIdentifier,
-    types::{HyperAST, NodeId, TypedNodeId},
-};
+use crate::store::defaults::NodeIdentifier;
+use crate::types::{HyperAST, NodeId, TypedNodeId};
 
 pub trait TreePath<IdN = NodeIdentifier, Idx = u16> {
     fn node(&self) -> Option<&IdN>;
@@ -46,7 +44,6 @@ pub trait TreePath<IdN = NodeIdentifier, Idx = u16> {
     fn check<HAST>(&self, stores: &HAST) -> Result<(), ()>
     where
         HAST: HyperAST<IdN = IdN::IdN>,
-        // for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithChildren<ChildIdx = Idx>,
         HAST::IdN: Eq,
         IdN: NodeId,
         IdN::IdN: NodeId<IdN = IdN::IdN>;
@@ -280,7 +277,7 @@ pub mod position_accessors {
         let third_it = p.iter();
         set.insert(node);
         for (((o0, x), (o1, y)), o2) in it.into_iter().zip(snd_it).zip(third_it) {
-            dbg!(&prev, o0);
+            dbg!(&prev, o0.index());
             assert_eq!(x, y);
             assert_eq!(o0, o1);
             assert_eq!(o2, o1);

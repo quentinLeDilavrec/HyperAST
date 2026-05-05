@@ -5,13 +5,12 @@ use num_traits::{cast, one, zero};
 use hyperast::PrimInt;
 use hyperast::types::{self, Children, Childrn, HyperAST, WithChildren, WithStats};
 
-use crate::matchers::Decompressible;
-
 use super::{
     CompletePostOrder, DecompressedTreeStore, InitializableWithStats, Iter, IterKr,
     PostOrdKeyRoots, PostOrder, PostOrderIterable, PostOrderKeyRoots, ShallowDecompressedTreeStore,
     basic_post_order::BasicPostOrder, simple_post_order::SimplePostOrder,
 };
+use crate::matchers::Decompressible;
 
 /// made for the zs diff algo
 /// - post order

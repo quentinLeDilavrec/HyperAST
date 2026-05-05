@@ -10,21 +10,20 @@ mod quantile;
 mod refs;
 mod stats;
 
-use crate::SharedState;
+use std::fmt::Display;
+
 use average::Merge;
 use axum::Json;
+use rhai::packages::{BasicArrayPackage, CorePackage, Package};
+use rhai::{Array, Dynamic, Engine, Instant, Scope};
+use serde::{Deserialize, Serialize};
+
+use hyperast::store::defaults::NodeIdentifier;
 use hyperast::store::nodes::compo::Flags;
 use hyperast::types::HyperAST;
-use hyperast::{
-    store::defaults::NodeIdentifier,
-    types::{HyperType, LabelStore, Labeled, WithChildren, WithStats},
-};
-use rhai::{
-    Array, Dynamic, Engine, Instant, Scope,
-    packages::{BasicArrayPackage, CorePackage, Package},
-};
-use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use hyperast::types::{HyperType, LabelStore, Labeled, WithChildren, WithStats};
+
+use crate::SharedState;
 
 #[derive(Deserialize, Clone)]
 pub struct ScriptingParam {

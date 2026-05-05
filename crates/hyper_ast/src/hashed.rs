@@ -1,16 +1,12 @@
-use std::{
-    fmt::Debug,
-    hash::{Hash, Hasher},
-};
+use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
 
-use crate::{
-    PrimInt,
-    types::{AnyType, HashKind, HyperType, NodeId},
-};
-use crate::{store::labels::DefaultLabelIdentifier, store::nodes::DefaultNodeIdentifier};
 use num::traits::WrappingAdd;
 
+use crate::PrimInt;
 use crate::nodes::{CompressedNode, HashSize};
+use crate::types::{AnyType, HashKind, HyperType, NodeId};
+use crate::{store::labels::DefaultLabelIdentifier, store::nodes::DefaultNodeIdentifier};
 
 pub type HashedNode = HashedCompressedNode<
     SyntaxNodeHashs<HashSize>,

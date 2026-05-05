@@ -5,10 +5,8 @@
 //! The most important layout is Post Order.
 //! We need both post-order traversal and breadth-first.
 
-use hyperast::{
-    PrimInt,
-    types::{HyperAST, NodeStore, Stored, WithStats},
-};
+use hyperast::PrimInt;
+use hyperast::types::{HyperAST, NodeStore, Stored, WithStats};
 
 // pub mod breath_first;
 pub mod basic_post_order;

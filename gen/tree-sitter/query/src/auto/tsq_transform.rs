@@ -1,8 +1,6 @@
-use hyperast::{
-    PrimInt,
-    store::{SimpleStores, defaults::NodeIdentifier},
-    types::{Childrn, Labeled},
-};
+use hyperast::PrimInt;
+use hyperast::store::{SimpleStores, defaults::NodeIdentifier};
+use hyperast::types::{Childrn, Labeled};
 
 use crate::types::TIdN;
 

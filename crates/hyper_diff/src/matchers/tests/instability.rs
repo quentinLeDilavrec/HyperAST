@@ -1,17 +1,13 @@
-use crate::{
-    decompressed_tree_store::{
-        CompletePostOrder, DecompressedTreeStore, ShallowDecompressedTreeStore,
-    },
-    matchers::{
-        Decompressible, Mapper,
-        heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher,
-        mapping_store::{MappingStore, VecStore},
-    },
-    tests::examples::example_unstable,
-};
-
 use hyperast::types::{LabelStore, Labeled};
 use hyperast::{test_utils::simple_tree::vpair_to_stores, types::DecompressedFrom as _};
+
+use crate::decompressed_tree_store::{
+    CompletePostOrder, DecompressedTreeStore, ShallowDecompressedTreeStore,
+};
+use crate::matchers::heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
+use crate::matchers::mapping_store::{MappingStore, VecStore};
+use crate::matchers::{Decompressible, Mapper};
+use crate::tests::examples::example_unstable;
 
 #[test]
 fn test_unstable_greedy() {

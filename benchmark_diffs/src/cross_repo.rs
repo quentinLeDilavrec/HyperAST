@@ -1,5 +1,8 @@
-use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess};
-use crate::{other_tools, window_combination::write_perfs};
+use std::io::Write;
+use std::path::PathBuf;
+
+use num_traits::ToPrimitive;
+
 use hyper_diff::algorithms;
 use hyperast::types::{LabelStore, WithStats};
 use hyperast::utils::memusage_linux;
@@ -8,9 +11,9 @@ use hyperast_vcs_git::processing::ConfiguredRepoHandle2;
 use hyperast_vcs_git::processing::erased::ParametrizedCommitProc2 as _;
 use hyperast_vcs_git::processing::{CacheHolding as _, ConfiguredRepoTrait as _};
 use hyperast_vcs_git::{maven::MavenModuleAcc, maven_processor::MavenProcessorHolder};
-use num_traits::ToPrimitive;
-use std::io::Write;
-use std::path::PathBuf;
+
+use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess};
+use crate::{other_tools, window_combination::write_perfs};
 
 pub struct CommitCompareParameters<'a> {
     pub configured_repo: ConfiguredRepoHandle2,

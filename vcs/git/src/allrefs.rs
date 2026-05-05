@@ -1,5 +1,7 @@
 use std::{borrow::Borrow, fmt::Display, io::Write, path::Path, time::Instant};
 
+use num::ToPrimitive;
+
 use hyperast::position::{
     Position, SpHandle, StructuralPosition, StructuralPositionStore, TreePath, TreePathMut,
     TypedTreePath,
@@ -9,14 +11,12 @@ use hyperast::store::nodes::legion::HashedNodeRef;
 use hyperast::types::{
     IterableChildren, LabelStore, Labeled, NodeId, TypeTrait, Typed, TypedNodeStore, WithChildren,
 };
-use hyperast_gen_ts_java::impact::{
-    element::{IdentifierFormat, LabelPtr, RefPtr, RefsEnum},
-    partial_analysis::PartialAnalysis,
-    reference::DisplayRef,
-    usage::{self, remake_pkg_ref},
-};
-use hyperast_gen_ts_java::{types::Type, usage::declarations::IterDeclarations};
-use num::ToPrimitive;
+use hyperast_gen_ts_java::impact::element::{IdentifierFormat, LabelPtr, RefPtr, RefsEnum};
+use hyperast_gen_ts_java::impact::partial_analysis::PartialAnalysis;
+use hyperast_gen_ts_java::impact::reference::DisplayRef;
+use hyperast_gen_ts_java::impact::usage::{self, remake_pkg_ref};
+use hyperast_gen_ts_java::types::Type;
+use hyperast_gen_ts_java::usage::declarations::IterDeclarations;
 
 use crate::{SimpleStores, maven::IterMavenModules, preprocessed::child_by_name_with_idx};
 

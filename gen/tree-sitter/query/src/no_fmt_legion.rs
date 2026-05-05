@@ -1,6 +1,8 @@
 //! fully compress all subtrees from a tree-sitter query CST
 use std::{collections::HashMap, fmt::Debug};
 
+use num::ToPrimitive;
+
 use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
@@ -15,8 +17,6 @@ use hyperast::tree_gen::{
 };
 use hyperast::types::{HyperType, WithSerialization};
 use hyperast::{full::FullNode, types::LabelStore as _};
-
-use num::ToPrimitive;
 
 use crate::types::{TsQueryEnabledTypeStore, Type};
 use crate::{TNode, types::TIdN};

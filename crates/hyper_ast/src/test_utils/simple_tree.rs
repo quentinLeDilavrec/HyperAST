@@ -1,13 +1,14 @@
+use std::borrow::Borrow;
+use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
+
+use num::{NumCast, PrimInt, ToPrimitive, cast};
+
+use crate::store::nodes::compo;
+use crate::types;
 use crate::types::{
     HashKind, HyperType, LabelStore, Labeled, NodeId, NodeStore, NodeStoreMut, Stored, Typed,
     WithChildren, WithStats,
-};
-use crate::{store::nodes::compo, types};
-use num::{NumCast, PrimInt, ToPrimitive, cast};
-use std::{
-    borrow::Borrow,
-    fmt::{Debug, Display},
-    marker::PhantomData,
 };
 
 pub struct SimpleTree<K, DD = ()> {

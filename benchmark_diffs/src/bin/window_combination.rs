@@ -1,6 +1,8 @@
 //! Computes diffs on combination of commits in a given window/
 //! NOTE a window of length one is just like computing diffs on consecutive commits (i.e., simple case)
-use std::{env, path::PathBuf, str::FromStr};
+use std::env;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 

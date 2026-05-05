@@ -7,17 +7,16 @@
 //!
 use std::fmt::Debug;
 
-use hyperast::types::HyperAST;
 use num_traits::PrimInt;
 
-use crate::{
-    decompressed_tree_store::{
-        FullyDecompressedTreeStore, PostOrder,
-        complete_post_order::DisplayCompletePostOrder,
-        pre_order_wrapper::{DisplaySimplePreOrderMapper, SimplePreOrderMapper},
-    },
-    matchers::mapping_store::MonoMappingStore,
+use hyperast::types::HyperAST;
+
+use crate::decompressed_tree_store::complete_post_order::DisplayCompletePostOrder;
+use crate::decompressed_tree_store::pre_order_wrapper::{
+    DisplaySimplePreOrderMapper, SimplePreOrderMapper,
 };
+use crate::decompressed_tree_store::{FullyDecompressedTreeStore, PostOrder};
+use crate::matchers::mapping_store::MonoMappingStore;
 
 pub fn print_mappings_no_ranges<
     'store: 'a,

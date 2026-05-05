@@ -1,8 +1,6 @@
 use core::fmt;
-use std::{
-    fmt::{Debug, Display},
-    path::PathBuf,
-};
+use std::fmt::{Debug, Display};
+use std::path::PathBuf;
 
 use crate::PrimInt;
 

@@ -27,10 +27,8 @@ pub mod tests;
 
 use git::BasicGitObject;
 use git2::Oid;
-use hyperast::{
-    store::{defaults::LabelIdentifier, nodes::legion::NodeStoreInner},
-    utils::Bytes,
-};
+use hyperast::store::{defaults::LabelIdentifier, nodes::legion::NodeStoreInner};
+use hyperast::utils::Bytes;
 
 mod type_store;
 

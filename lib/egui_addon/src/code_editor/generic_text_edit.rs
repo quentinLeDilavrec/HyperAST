@@ -1,22 +1,19 @@
 use std::sync::Arc;
 
 use emath::{Rect, TSTransform};
-use epaint::{
-    StrokeKind,
-    text::{Galley, LayoutJob, cursor::CCursor},
-};
+use epaint::StrokeKind;
+use epaint::text::{Galley, LayoutJob, cursor::CCursor};
 
+use egui::os::OperatingSystem;
+use egui::output::OutputEvent;
+use egui::text_selection::{
+    self, CCursorRange, text_cursor_state::cursor_rect, visuals::paint_text_selection,
+};
 use egui::{
     Align, Align2, Color32, Context, CursorIcon, Event, EventFilter, FontSelection, Id, ImeEvent,
     Key, KeyboardShortcut, Margin, Modifiers, NumExt as _, Response, Sense, Shape, TextBuffer,
     TextStyle, TextWrapMode, Ui, Vec2, Widget, WidgetInfo, WidgetText, WidgetWithState, epaint,
-    os::OperatingSystem,
-    output::OutputEvent,
-    response,
-    text_selection::{
-        self, CCursorRange, text_cursor_state::cursor_rect, visuals::paint_text_selection,
-    },
-    vec2,
+    response, vec2,
 };
 
 use crate::code_editor::generic_state::TextEditState;

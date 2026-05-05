@@ -1,20 +1,16 @@
-use std::{
-    borrow::Borrow,
-    collections::HashMap,
-    fmt::{Debug, Display},
-    hash::Hash,
-    marker::PhantomData,
-    ops::Deref,
-};
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::ops::Deref;
 
 use bitvec::slice::BitSlice;
 use num_traits::{ToPrimitive, Zero, cast};
 
 use hyperast::PrimInt;
-use hyperast::{
-    position::Position,
-    types::{self, HyperAST, HyperType, NodeId, WithSerialization},
-};
+use hyperast::position::Position;
+use hyperast::types::{self, HyperAST, HyperType, NodeId, WithSerialization};
 
 use super::{
     DecompressedParentsLending, DecompressedTreeStore, DecompressedWithParent,

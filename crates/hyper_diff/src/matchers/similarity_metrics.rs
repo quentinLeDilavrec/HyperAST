@@ -2,7 +2,8 @@ use std::ops::Range;
 
 use num_traits::{PrimInt, ToPrimitive, cast};
 
-use crate::{decompressed_tree_store::Shallow, matchers::mapping_store::MappingStore};
+use crate::decompressed_tree_store::Shallow;
+use crate::matchers::mapping_store::MappingStore;
 
 use super::mapping_store::{MonoMappingStore, VecStore};
 

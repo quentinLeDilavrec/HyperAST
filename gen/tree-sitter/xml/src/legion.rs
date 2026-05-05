@@ -6,11 +6,9 @@ use tuples::CombinConcat;
 
 use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
+use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo::{self, CS, NoSpacesCS};
-use hyperast::store::nodes::{
-    DefaultNodeStore as NodeStore,
-    legion::{NodeIdentifier, PendingInsert, eq_node},
-};
+use hyperast::store::nodes::legion::{NodeIdentifier, PendingInsert, eq_node};
 use hyperast::tree_gen::parser::{Node as _, TreeCursor};
 use hyperast::tree_gen::{
     AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,

@@ -8,11 +8,9 @@ use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
 
 use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use crate::store::SimpleStores;
+use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
-use crate::store::nodes::{
-    DefaultNodeStore as NodeStore,
-    legion::{NodeIdentifier, dyn_builder, eq_node},
-};
+use crate::store::nodes::legion::{NodeIdentifier, dyn_builder, eq_node};
 use crate::tree_gen::parser::{Node as _, TreeCursor};
 use crate::tree_gen::{
     self, Accumulator, BasicAccumulator, GlobalData, Parents, PreResult, SubTreeMetrics,

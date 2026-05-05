@@ -1,14 +1,7 @@
-use hyperast::{
-    store::{
-        defaults,
-        labels::label_id_from_usize, // ::fetched,
-        nodes::{
-            self,
-            fetched::{self, NodeIdentifier},
-        },
-    },
-    types::{Childrn, WithChildren, WithSerialization, WithStats},
-};
+use hyperast::store::nodes::fetched::{self, NodeIdentifier};
+use hyperast::store::nodes::{self};
+use hyperast::store::{defaults, labels::label_id_from_usize};
+use hyperast::types::{Childrn, WithChildren, WithSerialization, WithStats};
 use hyperast_vcs_git::TStore;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;

@@ -1,12 +1,12 @@
+use std::{fmt::Debug, hash::Hash, ops::Deref};
+
+use hashbrown::hash_map::DefaultHashBuilder;
+use legion::storage::{Component, IntoComponentSource};
+use legion::{EntityStore, World};
+
 use super::{Compo, CompoRegister, ErasedHolder, ErasedInserter};
 use crate::types::{NodeId, Typed, TypedNodeId, TypedNodeStore};
 use crate::utils::make_hash;
-use hashbrown::hash_map::DefaultHashBuilder;
-use legion::{
-    EntityStore, World,
-    storage::{Component, IntoComponentSource},
-};
-use std::{fmt::Debug, hash::Hash, ops::Deref};
 
 pub mod dyn_builder;
 mod elem;
@@ -522,12 +522,10 @@ impl Default for NodeStore {
 }
 
 mod stores_impl {
-    use crate::{
-        store::{SimpleStores, defaults::LabelIdentifier},
-        types::{
-            self, HyperAST, HyperASTShared, LStore, LendN, NStore, NodeId, NodeStore, TypeStore,
-            TypeTrait, TypedHyperAST, TypedNodeId,
-        },
+    use crate::store::{SimpleStores, defaults::LabelIdentifier};
+    use crate::types::{
+        self, HyperAST, HyperASTShared, LStore, LendN, NStore, NodeId, NodeStore, TypeStore,
+        TypeTrait, TypedHyperAST, TypedNodeId,
     };
 
     impl<TS, NS, LS> HyperASTShared for SimpleStores<TS, NS, LS>

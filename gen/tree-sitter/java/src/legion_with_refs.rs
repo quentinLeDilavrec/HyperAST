@@ -1,39 +1,38 @@
 //! fully compress all subtrees from a Java CST
-use crate::TNode;
-use crate::types::JavaEnabledTypeStore;
-use crate::types::{TStore, Type};
+use num::ToPrimitive;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+
+use legion::world::EntryRef;
+
+use hyperast::cyclomatic::Mcc;
+use hyperast::filter::BloomSize;
+use hyperast::full::FullNode;
+use hyperast::hashed::{self, SyntaxNodeHashs, SyntaxNodeHashsKinds};
+use hyperast::hashed::{HashedNode, IndexingHashBuilder, MetaDataHashsBuilder};
+use hyperast::nodes::Space;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::DedupMap;
 use hyperast::store::nodes::legion::{HashedNodeRef, eq_node, subtree_builder};
+use hyperast::store::{SimpleStores, nodes::DefaultNodeStore as NodeStore};
 use hyperast::store::{defaults::LabelIdentifier, nodes::EntityBuilder};
 use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{self, Parents, PreResult, SubTreeMetrics, TreeGen, WithByteRange};
 use hyperast::tree_gen::{
+    AccIndentation, Accumulator, BasicAccumulator, Spaces, ZippedTreeGen, compute_indentation,
+    get_spacing, has_final_space,
+};
+use hyperast::tree_gen::{
     GlobalData as _, StatsGlobalData, TextedGlobalData, TotalBytesGlobalData as _,
 };
 use hyperast::tree_gen::{NoOpMore, RoleAcc, add_md_precomp_queries};
-use hyperast::{
-    cyclomatic::Mcc,
-    full::FullNode,
-    hashed::{HashedNode, IndexingHashBuilder, MetaDataHashsBuilder},
-    types::{self, AnyType, NodeStoreExt, Role, TypeTrait, WithHashs, WithStats},
-};
-use hyperast::{
-    filter::BloomSize,
-    hashed::{self, SyntaxNodeHashs, SyntaxNodeHashsKinds},
-    nodes::Space,
-    store::{SimpleStores, nodes::DefaultNodeStore as NodeStore},
-    tree_gen::{
-        AccIndentation, Accumulator, BasicAccumulator, Spaces, ZippedTreeGen, compute_indentation,
-        get_spacing, has_final_space,
-    },
-    types::LabelStore as LabelStoreTrait,
-};
-use legion::world::EntryRef;
-use num::ToPrimitive;
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use hyperast::types::LabelStore as LabelStoreTrait;
+use hyperast::types::{self, AnyType, NodeStoreExt, Role, TypeTrait, WithHashs, WithStats};
+
+use crate::TNode;
+use crate::types::JavaEnabledTypeStore;
+use crate::types::{TStore, Type};
 
 #[cfg(feature = "impact")]
 mod reference_analysis;

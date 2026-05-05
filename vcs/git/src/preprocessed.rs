@@ -1,24 +1,19 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::Peekable,
-    path::{Components, PathBuf},
-    time::{Duration, Instant},
-    todo, usize,
-};
+use std::collections::{HashMap, HashSet};
+use std::iter::Peekable;
+use std::path::{Components, PathBuf};
+use std::time::{Duration, Instant};
+use std::{todo, usize};
 
 use git2::{Oid, Repository};
-use hyperast::{
-    store::{defaults::LabelIdentifier, nodes::DefaultNodeIdentifier as NodeIdentifier},
-    types::{AnyType, Childrn, LabelStore as _, WithChildren},
-    utils::memusage,
-};
 use log::info;
 
-use crate::{
-    Commit, DefaultMetrics,
-    git::{all_commits_between, all_first_parents_between, retrieve_commit},
-    processing::{ConfiguredRepo2, file_sys},
-};
+use hyperast::store::{defaults::LabelIdentifier, nodes::DefaultNodeIdentifier as NodeIdentifier};
+use hyperast::types::{AnyType, Childrn, LabelStore as _, WithChildren};
+use hyperast::utils::memusage;
+
+use crate::git::{all_commits_between, all_first_parents_between, retrieve_commit};
+use crate::processing::{ConfiguredRepo2, file_sys};
+use crate::{Commit, DefaultMetrics};
 
 /// Preprocess a git repository
 /// using the hyperAST and caching git object transformations

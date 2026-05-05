@@ -1,11 +1,9 @@
 use egui::Widget;
 use re_ui::UiExt;
 
-use crate::app::{
-    QResId,
-    querying::{self, ComputeConfigQuery},
-    types::{self, Commit, Config},
-};
+use crate::app::QResId;
+use crate::app::querying::{self, ComputeConfigQuery};
+use crate::app::types::{self, Commit, Config};
 
 use super::{QueryDataVec, QueryId, TabId, utils_results_batched::ComputeError};
 

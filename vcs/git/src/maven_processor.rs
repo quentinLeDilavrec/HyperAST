@@ -1,31 +1,29 @@
+use std::iter::Peekable;
+use std::marker::PhantomData;
+use std::path::{Components, PathBuf};
+
+use git2::{Oid, Repository};
+
+use hyperast::hashed::MetaDataHashsBuilder;
+use hyperast::store::nodes::compo;
+use hyperast::store::nodes::legion::RawHAST;
+use hyperast::store::{defaults::NodeIdentifier, nodes::EntityBuilder};
+use hyperast::tree_gen::Accumulator;
+use hyperast::types::ETypeStore as _;
+use hyperast::types::LabelStore;
+use hyperast_gen_ts_xml::types::Type;
+
+use crate::Processor;
 use crate::StackEle;
+use crate::git::{BasicGitObject, NamedObject, ObjectType, TypedObject};
+use crate::maven::{MD, MavenModuleAcc};
+use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::{
     CommitProcessorHandle, ParametrizedCommitProcessor2Handle as PCP2Handle,
 };
-use crate::{
-    Processor,
-    git::{BasicGitObject, NamedObject, ObjectType, TypedObject},
-    maven::{MD, MavenModuleAcc},
-    preprocessed::RepositoryProcessor,
-    processing::{CacheHolding, InFiles, ObjectName, erased::ParametrizedCommitProc2},
-};
-use git2::{Oid, Repository};
-use hyperast::store::nodes::compo;
-use hyperast::store::nodes::legion::RawHAST;
-use hyperast::types::ETypeStore as _;
-use hyperast::{
-    hashed::MetaDataHashsBuilder,
-    store::{defaults::NodeIdentifier, nodes::EntityBuilder},
-    tree_gen::Accumulator,
-    types::LabelStore,
-};
-use hyperast_gen_ts_xml::types::Type;
-use std::{
-    iter::Peekable,
-    marker::PhantomData,
-    path::{Components, PathBuf},
-};
+use crate::processing::{CacheHolding, InFiles, ObjectName, erased::ParametrizedCommitProc2};
+
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::types::TStore>;
 
 /// RMS: Resursive Module Search

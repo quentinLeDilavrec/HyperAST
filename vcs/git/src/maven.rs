@@ -1,24 +1,21 @@
+use num::ToPrimitive;
+use std::fmt::{self, Debug};
+use std::ops::AddAssign;
+use std::path::PathBuf;
+
+use enumset::EnumSet;
+
+use hyperast::position::{StructuralPosition, TreePath, TreePathMut};
+use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::tree_gen::SubTreeMetrics;
+use hyperast::types::{Childrn, LabelStore as _, Labeled, Tree, Typed, WithChildren};
+use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
+use hyperast_gen_ts_xml::legion::XmlTreeGen;
+use hyperast_gen_ts_xml::types::{TStore, Type};
+
 use crate::{
     Accumulator, BasicDirAcc, DefaultMetrics, PROPAGATE_ERROR_ON_BAD_CST_NODE, ParseErr,
     SimpleStores, processing::ObjectName,
-};
-use enumset::EnumSet;
-use hyperast::{
-    position::{StructuralPosition, TreePath, TreePathMut},
-    store::defaults::{LabelIdentifier, NodeIdentifier},
-    tree_gen::SubTreeMetrics,
-    types::{Childrn, LabelStore as _, Labeled, Tree, Typed, WithChildren},
-};
-use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
-use hyperast_gen_ts_xml::{
-    legion::XmlTreeGen,
-    types::{TStore, Type},
-};
-use num::ToPrimitive;
-use std::{
-    fmt::{self, Debug},
-    ops::AddAssign,
-    path::PathBuf,
 };
 
 pub(crate) fn handle_pom_file<'a>(

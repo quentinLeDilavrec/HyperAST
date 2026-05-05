@@ -2,15 +2,11 @@
 use core::fmt;
 use std::fmt::Debug;
 
-use hyperast::{
-    position::{TreePath, TreePathMut},
-    store::defaults::NodeIdentifier,
-    types::{
-        AAAA, AnyType, Children, HyperAST, HyperType, NodeId, NodeStore, Tree, TypeTrait, Typed,
-        TypedHyperAST, TypedNodeStore, TypedTree, WithChildren,
-    },
-};
 use num::ToPrimitive;
+
+use hyperast::position::TreePath;
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast::types::{AAAA, HyperAST, NodeId, TypedNodeStore};
 
 use crate::types::Type;
 

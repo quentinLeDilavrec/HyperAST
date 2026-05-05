@@ -1,20 +1,21 @@
+use std::{collections::HashMap, fmt::Debug, hash::Hash, ops::Deref};
+
+use num_traits::{ToPrimitive, Zero, cast, one, zero};
+
+use hyperast::PrimInt;
+use hyperast::position::Position;
+use hyperast::types::{
+    self, Children, Childrn, HyperAST, HyperASTShared, HyperType, LabelStore, Labeled, NodeStore,
+    WithChildren, WithSerialization,
+};
+
+use super::basic_post_order::{BasicPOSlice, BasicPostOrder};
 use super::{
     ContiguousDescendants, DecendantsLending, DecompressedParentsLending, DecompressedTreeStore,
     DecompressedWithParent, DecompressedWithSiblings, FullyDecompressedTreeStore, PostOrder,
     ShallowDecompressedTreeStore,
-    basic_post_order::{BasicPOSlice, BasicPostOrder},
 };
 use crate::matchers::Decompressible;
-use hyperast::PrimInt;
-use hyperast::{
-    position::Position,
-    types::{
-        self, Children, Childrn, HyperAST, HyperASTShared, HyperType, LabelStore, Labeled,
-        NodeStore, WithChildren, WithSerialization,
-    },
-};
-use num_traits::{ToPrimitive, Zero, cast, one, zero};
-use std::{collections::HashMap, fmt::Debug, hash::Hash, ops::Deref};
 
 #[derive(Clone)]
 pub struct SimplePostOrder<IdN, IdD> {

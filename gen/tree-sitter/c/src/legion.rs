@@ -5,6 +5,10 @@ use std::{collections::HashMap, fmt::Debug, vec};
 use legion::world::EntryRef;
 use num::ToPrimitive as _;
 
+use hyperast::filter::BloomSize;
+use hyperast::full::FullNode;
+use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::subtree_builder;
@@ -23,13 +27,7 @@ use hyperast::tree_gen::{
     ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
 };
 use hyperast::types;
-use hyperast::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    types::{LabelStore as _, Role},
-};
+use hyperast::types::{LabelStore as _, Role};
 
 use crate::TNode;
 use crate::types::{CEnabledTypeStore, Type};

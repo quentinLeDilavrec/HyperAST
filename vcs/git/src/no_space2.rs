@@ -1,20 +1,13 @@
 use std::ops::Deref;
 
-use hyperast::{
-    store::{
-        defaults::{LabelIdentifier, NodeIdentifier},
-        nodes::legion::{HashedNodeRef, NodeStore},
-    },
-    types::{self, AAAA, Children, NodeId},
-};
+use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::store::nodes::legion::{HashedNodeRef, NodeStore};
+use hyperast::types::{self, AAAA, Children, NodeId};
 
 pub fn as_nospaces<TS>(
-    stores: & hyperast::store::SimpleStores<TS>,
-) -> & hyperast::store::SimpleStores<
-    TS,
-    NoSpaceNodeStoreWrapper,
-    hyperast::store::labels::LabelStore,
-> {
+    stores: &hyperast::store::SimpleStores<TS>,
+) -> &hyperast::store::SimpleStores<TS, NoSpaceNodeStoreWrapper, hyperast::store::labels::LabelStore>
+{
     // SAFETY: The transmute is safe because layouts are the same and we do not modify the data.
     // it would make no sense to add nodes without spaces to an AST with spaces.
     unsafe { std::mem::transmute(stores) }

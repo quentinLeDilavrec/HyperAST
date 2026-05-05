@@ -113,6 +113,7 @@ impl TypeStore for TStore {
         }
         #[cfg(not(debug_assertions))]
         panic!();
+        #[cfg(debug_assertions)]
         let id = erazed.lang_id();
         #[cfg(debug_assertions)]
         panic!("{} is not handled", id.name());

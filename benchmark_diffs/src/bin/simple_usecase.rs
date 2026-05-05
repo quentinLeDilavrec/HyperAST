@@ -1,11 +1,12 @@
 //! Computes structural diffs on consecutive commits.
-use hyperast_vcs_git::{multi_preprocessed::PreProcessedRepositories, processing::RepoConfig};
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::PathBuf,
-    str::FromStr,
-};
+
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
+use hyperast_vcs_git::processing::RepoConfig;
 
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;

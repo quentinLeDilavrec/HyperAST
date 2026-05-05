@@ -71,10 +71,8 @@ fn type_test_generic_eq() {
 mod structure {
     use hyperast::store::SimpleStores;
 
-    use crate::{
-        legion_with_refs::{self, JavaTreeGen},
-        types::TStore,
-    };
+    use crate::legion_with_refs::{self, JavaTreeGen};
+    use crate::types::TStore;
 
     #[test]
     fn structure_test() {

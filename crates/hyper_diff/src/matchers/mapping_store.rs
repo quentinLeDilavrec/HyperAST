@@ -1,11 +1,9 @@
-use std::{
-    fmt::{Debug, Display},
-    hash::Hash,
-    ops::Range,
-};
+use num_traits::{PrimInt, cast, one, zero};
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+use std::ops::Range;
 
 use hyperast::compat::HashMap;
-use num_traits::{PrimInt, cast, one, zero};
 
 pub trait MappingStore {
     type Src;

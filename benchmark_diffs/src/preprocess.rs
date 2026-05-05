@@ -1,15 +1,15 @@
-use hyperast::{
-    cyclomatic::Mcc,
-    hashed::{IndexingHashBuilder, MetaDataHashsBuilder},
-    store::{SimpleStores, defaults::LabelIdentifier},
-    types::LabelStore as _,
-};
-use hyperast_gen_ts_java::{
-    legion_with_refs::{self, FNode, JavaTreeGen, Local, MD, MDCache},
-    types::{TStore, Type},
-};
-use hyperast_vcs_git::java::JavaAcc;
 use std::path::{Path, PathBuf};
+
+use hyperast::cyclomatic::Mcc;
+use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
+use hyperast::store::{SimpleStores, defaults::LabelIdentifier};
+use hyperast::types::LabelStore as _;
+
+use hyperast_gen_ts_java::language;
+use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
+use hyperast_gen_ts_java::legion_with_refs::{FNode, JavaTreeGen, Local, MD, MDCache};
+use hyperast_gen_ts_java::types::{Lang, TStore, Type};
+use hyperast_vcs_git::java::JavaAcc;
 
 pub fn iter_dirs(root_buggy: &std::path::Path) -> impl Iterator<Item = std::fs::DirEntry> + use<> {
     std::fs::read_dir(root_buggy)
@@ -21,7 +21,6 @@ pub fn iter_dirs(root_buggy: &std::path::Path) -> impl Iterator<Item = std::fs::
 pub fn parse_string_pair<'a>(
     stores: &mut SimpleStores<TStore>,
     md_cache: &mut MDCache,
-    // java_tree_gen: &mut JavaTreeGen<'a, '_, TStore>,
     buggy: &'a str,
     fixed: &'a str,
 ) -> (FNode, FNode) {
@@ -33,11 +32,10 @@ pub fn parse_string_pair<'a>(
 fn parse_unchecked<'b: 'stores, 'stores>(
     content: &'b str,
     name: &str,
-    // java_tree_gen: &mut JavaTreeGen<'stores, '_, TStore>,
     stores: &'stores mut SimpleStores<TStore>,
     md_cache: &'_ mut MDCache,
 ) -> FNode {
-    let tree = match legion_with_refs::tree_sitter_parse(content.as_bytes()) {
+    let tree = match tree_sitter_parse(content.as_bytes()) {
         Ok(t) => t,
         Err(t) => t,
     };
@@ -71,11 +69,11 @@ impl JavaPreprocessFileSys {
             "\n".as_bytes().to_vec()
         };
         use hyperast::types::LLang;
-        dbg!(hyperast_gen_ts_java::types::Java::TE.len());
-        dbg!(hyperast_gen_ts_java::language().node_kind_count());
+        dbg!(Lang::TE.len());
+        dbg!(language().node_kind_count());
         let mut java_tree_gen = JavaTreeGen::new(&mut self.main_stores, &mut self.java_md_cache)
             .with_line_break(line_break);
-        let full_node = match legion_with_refs::tree_sitter_parse(text.as_bytes()) {
+        let full_node = match tree_sitter_parse(text.as_bytes()) {
             Ok(tree) => {
                 Ok(java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk()))
             }
@@ -112,58 +110,43 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
         .filter_map(|x| x.ok());
     let mut w = JavaAcc::new("".to_string(), None);
     for x in a {
-        match x.file_type() {
-            Ok(t) => {
-                if t.is_file() {
-                    let file = std::fs::read_to_string(x.path()).expect("the code");
-                    let name = x.file_name();
-                    let name = name.to_string_lossy();
-                    {
-                        let name: &str = &name;
-                        let tree = match legion_with_refs::tree_sitter_parse(file.as_bytes()) {
-                            Ok(t) => t,
-                            Err(t) => t,
-                        };
-
-                        let line_break = if file.as_bytes().contains(&b'\r') {
-                            "\r\n".as_bytes().to_vec()
-                        } else {
-                            "\n".as_bytes().to_vec()
-                        };
-                        let mut java_tree_gen = JavaTreeGen::new(
-                            &mut java_gen.main_stores,
-                            &mut java_gen.java_md_cache,
-                        )
-                        .with_line_break(line_break);
-                        let full_node = java_tree_gen.generate_file(
-                            name.as_bytes(),
-                            file.as_bytes(),
-                            tree.walk(),
-                        );
-
-                        {
-                            let local = full_node.local;
-                            let name = java_gen.main_stores.label_store.get_or_insert(name);
-                            w.push(name, local);
-                        }
-                    }
-                } else if t.is_dir() {
-                    let local = parse_filesys(java_gen, &x.path());
-                    let name = java_gen.main_stores.label_store.get_or_insert(
-                        x.path()
-                            .components()
-                            .next_back()
-                            .unwrap()
-                            .as_os_str()
-                            .to_string_lossy(),
-                    );
-                    w.push(name, local);
-                } else {
-                    todo!("{:?}", x)
-                }
-            }
-            Err(_) => panic!("no file type"),
+        let Ok(t) = x.file_type() else {
+            panic!("no file type")
         };
+        if t.is_file() {
+            let file = std::fs::read_to_string(x.path()).expect("the code");
+            let name = x.file_name();
+            let name = name.to_string_lossy();
+            let name: &str = &name;
+            let tree = match tree_sitter_parse(file.as_bytes()) {
+                Ok(t) => t,
+                Err(t) => t,
+            };
+
+            let line_break = if file.as_bytes().contains(&b'\r') {
+                "\r\n".as_bytes().to_vec()
+            } else {
+                "\n".as_bytes().to_vec()
+            };
+            let mut java_tree_gen =
+                JavaTreeGen::new(&mut java_gen.main_stores, &mut java_gen.java_md_cache)
+                    .with_line_break(line_break);
+            let full_node =
+                java_tree_gen.generate_file(name.as_bytes(), file.as_bytes(), tree.walk());
+
+            let local = full_node.local;
+            let name = java_gen.main_stores.label_store.get_or_insert(name);
+            w.push(name, local);
+        } else if t.is_dir() {
+            let local = parse_filesys(java_gen, &x.path());
+            let path = x.path();
+            let component = path.components().next_back().unwrap();
+            let node = component.as_os_str().to_string_lossy();
+            let name = java_gen.main_stores.label_store.get_or_insert(node);
+            w.push(name, local);
+        } else {
+            todo!("{:?}", x)
+        }
     }
     make(w, &mut java_gen.main_stores)
 }
@@ -306,10 +289,7 @@ impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
     }
 }
 
-fn make(
-    acc: JavaAcc,
-    stores: &mut SimpleStores<TStore>,
-) -> hyperast_gen_ts_java::legion_with_refs::Local {
+fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
     let kind = Type::Directory;
@@ -340,9 +320,8 @@ fn make(
         };
     }
 
-    let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(
-        hyperast_gen_ts_java::types::Lang,
-    );
+    let mut dyn_builder =
+        hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(Lang);
 
     let ana = None;
 

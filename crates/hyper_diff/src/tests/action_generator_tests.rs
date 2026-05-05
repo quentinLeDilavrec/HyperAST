@@ -1,14 +1,14 @@
-use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::matchers::Decompressible;
-use crate::{
-    actions::script_generator::{self, Actions, SimpleAction, TestActions},
-    decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore},
-    matchers::mapping_store::{DefaultMappingStore, MappingStore},
-    tests::examples::{example_action, example_gt_java_code},
-    tree::simple_tree::{DisplayTree, vpair_to_stores},
-};
-use hyperast::types::{DecompressedFrom, LabelStore, Labeled, NodeStore};
 use std::fmt;
+
+use hyperast::types::{DecompressedFrom, LabelStore, Labeled, NodeStore};
+
+use crate::actions::script_generator::{self, Actions, SimpleAction, TestActions};
+use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
+use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
+use crate::matchers::Decompressible;
+use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::tests::examples::{example_action, example_gt_java_code};
+use crate::tree::simple_tree::{DisplayTree, vpair_to_stores};
 
 pub struct Fmt<F>(pub F)
 where

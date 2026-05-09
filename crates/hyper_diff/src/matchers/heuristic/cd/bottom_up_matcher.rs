@@ -1,10 +1,10 @@
-use std::fmt::Debug;
-
 use num_traits::ToPrimitive;
+use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::{HyperAST, LendT, NodeId, WithHashs, WithMetaData};
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT, WithHashs, WithMetaData};
 
 use crate::decompressed_tree_store::DecompressedTreeStore;
 use crate::matchers::Mapper;

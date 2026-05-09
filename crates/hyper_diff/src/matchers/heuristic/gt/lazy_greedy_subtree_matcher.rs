@@ -1,18 +1,21 @@
-use crate::decompressed_tree_store::{
-    ContiguousDescendants, DecompressedWithParent, LazyDecompressed, LazyDecompressedTreeStore,
-    Shallow,
-};
+use num_traits::ToPrimitive;
+use std::fmt::Debug;
+use std::hash::Hash;
+
+use hyperast::PrimInt;
+use hyperast::compat::HashMap;
+use hyperast::types::NodeId;
+use hyperast::types::NodeStore as _;
+use hyperast::types::{HyperAST, Labeled, LendT};
+use hyperast::types::{WithHashs, WithStats};
+
+use crate::decompressed_tree_store::Shallow;
+use crate::decompressed_tree_store::{ContiguousDescendants, DecompressedWithParent};
+use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{mapping_store::MultiMappingStore, similarity_metrics};
 use crate::utils::sequence_algorithms::longest_common_subsequence;
-use hyperast::PrimInt;
-use hyperast::compat::HashMap;
-use hyperast::types::{HyperAST, Labeled, LendT, NodeId, NodeStore};
-use hyperast::types::{WithHashs, WithStats};
-use num_traits::ToPrimitive;
-use std::fmt::Debug;
-use std::hash::Hash;
 
 pub struct LazyGreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
     _phantom: std::marker::PhantomData<*const Mpr>,

@@ -1,11 +1,16 @@
-use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
-use crate::matchers::{Mapper, mapping_store::MonoMappingStore};
-use crate::utils::sequence_algorithms::longest_common_subsequence;
-use hyperast::PrimInt;
-use hyperast::types::{self, HyperAST, LendT, NodeId, NodeStore, TypeStore, WithHashs};
 use num_traits::ToPrimitive;
-use std::{collections::HashMap, hash::Hash};
-use types::Tree;
+use std::collections::HashMap;
+use std::hash::Hash;
+
+use hyperast::PrimInt;
+use hyperast::types::NodeId;
+use hyperast::types::NodeStore as _;
+use hyperast::types::{HyperAST, LendT, Tree, TypeStore, WithHashs};
+
+use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::matchers::Mapper;
+use crate::matchers::mapping_store::MonoMappingStore;
+use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 impl<
     Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
@@ -118,14 +123,14 @@ where
     }
 
     pub(super) fn are_srcs_unmapped(&self, src: &M::Src) -> bool {
-        // look at descendants in mappings
+        // look at all src descendants in mappings
         self.src_arena
             .descendants(src)
             .iter()
             .all(|x| !self.mappings.is_src(x))
     }
     pub(super) fn are_dsts_unmapped(&self, dst: &M::Dst) -> bool {
-        // look at descendants in mappings
+        // look at all dst descendants in mappings
         self.dst_arena
             .descendants(dst)
             .iter()
@@ -133,7 +138,7 @@ where
     }
 
     pub(super) fn has_unmapped_src_children(&self, src: &M::Src) -> bool {
-        // look at descendants in mappings
+        // look at any src descendants in mappings
         self.src_arena
             .descendants(src)
             .iter()
@@ -141,7 +146,7 @@ where
     }
 
     pub(super) fn has_unmapped_dst_children(&self, dst: &M::Dst) -> bool {
-        // look at descendants in mappings
+        // look at any dst descendants in mappings
         self.dst_arena
             .descendants(dst)
             .iter()

@@ -1,13 +1,21 @@
 #![allow(unexpected_cfgs)]
-use super::{Similarity, TextSimilarity, is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
-use crate::decompressed_tree_store::{ContiguousDescendants, LazyDecompressedTreeStore, Shallow};
-use crate::matchers::Mapper;
-use crate::matchers::mapping_store::MonoMappingStore;
-use hyperast::PrimInt;
-use hyperast::store::nodes::compo;
-use hyperast::types::{HashKind, HyperAST, LendT, NodeId, NodeStore, WithHashs, WithMetaData};
 use num_traits::one;
 use std::fmt::Debug;
+
+use hyperast::PrimInt;
+use hyperast::store::nodes::compo;
+use hyperast::types::NodeId;
+use hyperast::types::NodeStore as _;
+use hyperast::types::{HashKind, HyperAST, LendT};
+use hyperast::types::{WithHashs, WithMetaData};
+
+use super::{Similarity, TextSimilarity};
+use super::{is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
+use crate::decompressed_tree_store::ContiguousDescendants;
+use crate::decompressed_tree_store::LazyDecompressedTreeStore;
+use crate::decompressed_tree_store::Shallow;
+use crate::matchers::Mapper;
+use crate::matchers::mapping_store::MonoMappingStore;
 
 pub struct LazyLeavesMatcher<
     Mpr,

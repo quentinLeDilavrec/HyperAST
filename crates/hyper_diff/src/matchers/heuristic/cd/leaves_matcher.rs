@@ -1,14 +1,18 @@
 #![allow(unexpected_cfgs)]
-use super::{Similarity, TextSimilarity, is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
-use crate::decompressed_tree_store::{
-    DecompressedTreeStore, PostOrder, PostOrderIterable, Shallow, ShallowDecompressedTreeStore,
-};
+use std::fmt::Debug;
+
+use hyperast::PrimInt;
+use hyperast::store::nodes::compo;
+use hyperast::types::{HashKind, NodeId};
+use hyperast::types::{HyperAST, LendT, NodeStore as _};
+use hyperast::types::{WithHashs, WithMetaData};
+
+use super::{Similarity, TextSimilarity};
+use super::{is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
+use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrder, PostOrderIterable};
+use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::{Mapper, Mapping};
-use hyperast::store::nodes::compo;
-use hyperast::types::{HyperAST, LendT, NodeId, NodeStore as _, WithMetaData};
-use hyperast::{PrimInt, types};
-use std::fmt::Debug;
 
 pub struct LeavesMatcher<
     Mpr,
@@ -73,7 +77,7 @@ where
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
-        for<'t> LendT<'t, HAST>: types::WithHashs,
+        for<'t> LendT<'t, HAST>: WithHashs,
     {
         mapper.mapping.mappings.topit(
             mapper.mapping.src_arena.len(),
@@ -88,7 +92,7 @@ where
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
     where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
-        for<'t> LendT<'t, HAST>: types::WithHashs,
+        for<'t> LendT<'t, HAST>: WithHashs,
     {
         mapper.mapping.mappings.topit(
             mapper.mapping.src_arena.len(),
@@ -103,7 +107,7 @@ where
     where
         M::Src: Shallow<M::Src>,
         M::Dst: Shallow<M::Dst>,
-        for<'t> LendT<'t, HAST>: types::WithHashs,
+        for<'t> LendT<'t, HAST>: WithHashs,
     {
         mapper.mapping.mappings.topit(
             mapper.mapping.src_arena.len(),
@@ -118,7 +122,7 @@ where
         is_leaf_src: fn(HAST, &Dsrc, M::Src) -> bool,
         is_leaf_dst: fn(HAST, &Ddst, M::Dst) -> bool,
     ) where
-        for<'t> LendT<'t, HAST>: types::WithHashs,
+        for<'t> LendT<'t, HAST>: WithHashs,
     {
         let hyperast = internal.hyperast;
         let mut leaves_mappings = vec![];
@@ -140,12 +144,12 @@ where
                     if tsrc == tdst {
                         let p = Self::ori_pair(&internal.mapping, src, dst);
 
-                        if types::WithHashs::hash(
+                        if WithHashs::hash(
                             &hyperast.node_store().resolve(&p[0]),
-                            &types::HashKind::structural(),
-                        ) != types::WithHashs::hash(
+                            &HashKind::structural(),
+                        ) != WithHashs::hash(
                             &hyperast.node_store().resolve(&p[1]),
-                            &types::HashKind::structural(),
+                            &HashKind::structural(),
                         ) {
                             continue; // cannot easily link descendants
                             // NOTE having the same number of descendants might be a sufficient condition

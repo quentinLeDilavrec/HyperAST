@@ -1,12 +1,17 @@
+use num_traits::{cast, one};
+use std::fmt::Debug;
+
+use hyperast::PrimInt;
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT, WithHashs};
+use hyperast::types::{NodeStore as _, Tree as _};
+
 use crate::decompressed_tree_store::POBorrowSlice;
 use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
 use crate::matchers::mapping_store::MonoMappingStore;
+use crate::matchers::optimal::zs::ZsMatcher;
+use crate::matchers::similarity_metrics;
 use crate::matchers::{Decompressible, Mapper};
-use crate::matchers::{optimal::zs::ZsMatcher, similarity_metrics};
-use hyperast::PrimInt;
-use hyperast::types::{DecompressedFrom, HyperAST, LendT, NodeId, NodeStore, Tree, WithHashs};
-use num_traits::{cast, one};
-use std::fmt::Debug;
 
 use super::factorized_bounds::DecompTreeBounds;
 
@@ -161,13 +166,10 @@ where
         src: M::Src,
         dst: M::Dst,
     ) {
-        // let src_s = mapper.src_arena.descendants_count(&src);
-        // let dst_s = mapper.dst_arena.descendants_count(&dst);
-        // if !(src_s < cast(SIZE_THRESHOLD).unwrap() || dst_s < cast(SIZE_THRESHOLD).unwrap()) {
-        //     return;
-        // }
-        let stores = self.hyperast;
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
+        use hyperast::types::DecompressedFrom as _;
+
+        let stores = self.hyperast;
         let o_src = self.mapping.src_arena.original(&src);
         let o_dst = self.mapping.dst_arena.original(&dst);
         let src_arena = ZsTree::<HAST::IdN, M::Src>::decompress(stores, &o_src);

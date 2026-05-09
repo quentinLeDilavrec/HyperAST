@@ -1,13 +1,17 @@
+use num_traits::ToPrimitive as _;
+use std::fmt::Debug;
+
+use hyperast::PrimInt;
+use hyperast::store::nodes::compo;
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT, Tree};
+use hyperast::types::{WithHashs, WithMetaData, WithStats};
+
 use crate::decompressed_tree_store::{ContiguousDescendants, LazyDecompressedTreeStore, Shallow};
 use crate::matchers::Mapper;
 use crate::matchers::heuristic::factorized_bounds::LazyDecompTreeBounds;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics;
-use hyperast::PrimInt;
-use hyperast::store::nodes::compo;
-use hyperast::types::{HyperAST, LendT, NodeId, Tree, WithHashs, WithMetaData, WithStats};
-use num_traits::ToPrimitive as _;
-use std::fmt::Debug;
 
 use super::leaf_count;
 

@@ -1,9 +1,12 @@
+use std::fmt::Debug;
+
+use hyperast::PrimInt;
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT, WithHashs};
+
 use crate::matchers::Mapper;
 use crate::matchers::mapping_store::MonoMappingStore;
 use crate::matchers::similarity_metrics::SimilarityMeasure;
-use hyperast::PrimInt;
-use hyperast::types::{HyperAST, LendT, NodeId, WithHashs};
-use std::fmt::Debug;
 
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 

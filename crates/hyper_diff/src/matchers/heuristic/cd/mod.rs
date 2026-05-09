@@ -1,11 +1,13 @@
-use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
-use crate::matchers::optimal::zs::str_distance_patched::QGram;
+use str_distance::DistanceMetric;
+
 use hyperast::nodes::TextSerializer;
 use hyperast::store::nodes::compo;
-use hyperast::types::{self, LendT};
-use str_distance::DistanceMetric;
-use types::{HyperAST, NodeId, WithMetaData};
-use types::{HyperType as _, LabelStore as _, NodeStore as _};
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT, WithChildren, WithMetaData};
+use hyperast::types::{HyperType as _, LabelStore as _, Labeled as _, NodeStore as _};
+
+use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
+use crate::matchers::optimal::zs::str_distance_patched::QGram;
 
 // pub(self) use super::factorized_bounds;
 
@@ -64,7 +66,6 @@ where
     HAST: HyperAST + Clone,
     HAST::Label: Clone,
 {
-    use types::Labeled;
     let n = hyperast.node_store().resolve(&x);
     n.try_get_label().cloned()
 }
@@ -74,7 +75,6 @@ where
     HAST: HyperAST + Clone,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    use types::Labeled;
     let n = hyperast.node_store().resolve(&x);
     let l = n.try_get_label();
     if let Some(l) = l {
@@ -171,7 +171,6 @@ where
     IdD: Shallow<IdS>,
     D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
 {
-    use types::WithChildren;
     let o = arena.original(&idd);
     stores.node_store().resolve(&o).child_count() == num_traits::zero()
 }

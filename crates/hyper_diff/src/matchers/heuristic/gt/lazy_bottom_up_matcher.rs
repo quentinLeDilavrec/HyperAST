@@ -1,13 +1,16 @@
-use crate::decompressed_tree_store::{
-    DecompressedTreeStore, DecompressedWithParent, LazyDecompressed, LazyDecompressedTreeStore,
-    Shallow, ShallowDecompressedTreeStore,
-};
-use crate::matchers::Mapper;
-use crate::matchers::mapping_store::{MappingStore, MonoMappingStore};
+use num_traits::ToPrimitive;
+
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
-use hyperast::types::{HyperAST, LendT, NodeId, NodeStore as _, WithHashs};
-use num_traits::ToPrimitive;
+use hyperast::types::NodeId;
+use hyperast::types::NodeStore as _;
+use hyperast::types::{HyperAST, LendT, WithHashs};
+
+use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
+use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
+use crate::matchers::Mapper;
+use crate::matchers::mapping_store::{MappingStore, MonoMappingStore};
 
 impl<
     Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
@@ -312,7 +315,6 @@ where
         let dst_offset = dst - dst_arena.root();
         use crate::matchers::optimal::zs::ZsMatcher;
         let zs_mappings: MZs = ZsMatcher::match_with(self.hyperast, src_arena, dst_arena);
-        // use num_traits::ToPrimitive;
         assert_eq!(
             mapping.src_arena.first_descendant(&src).to_usize(),
             src_offset.to_usize()

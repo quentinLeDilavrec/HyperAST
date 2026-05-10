@@ -219,8 +219,8 @@ where
             .map(|p| self.dst_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
         if src_type == dst_type {
-            // self.histogram_matching_lazy(src, dst, |_, _, _| ());
-            self.histogram_matching_lazy(src, dst, Mapper::more_histogram_matching_lazy);
+            self.histogram_matching_lazy(src, dst, |_, _, _| ());
+            // self.histogram_matching_lazy(src, dst, Mapper::more_histogram_matching_lazy);
         }
     }
 
@@ -280,6 +280,7 @@ where
         }
     }
 
+    #[allow(unused)]
     fn more_histogram_matching_lazy(
         &mut self,
         src_histogram: Vec<Dsrc::IdD>,

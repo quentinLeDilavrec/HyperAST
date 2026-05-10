@@ -82,16 +82,12 @@ where
         dst: Ddst::IdD,
         cmp: impl Fn(&Self, Dsrc::IdD, Ddst::IdD) -> bool,
     ) {
-        let src_children = self
-            .src_arena
-            .decompress_children(&src)
+        let src_children = (self.src_arena.decompress_children(&src))
             .into_iter()
             .filter(|child| !self.mappings.is_src(child.shallow()))
             .collect::<Vec<_>>();
 
-        let dst_children = self
-            .dst_arena
-            .decompress_children(&dst)
+        let dst_children = (self.dst_arena.decompress_children(&dst))
             .into_iter()
             .filter(|child| !self.mappings.is_dst(child.shallow()))
             .collect::<Vec<_>>();
@@ -223,66 +219,92 @@ where
             .map(|p| self.dst_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
         if src_type == dst_type {
-            self.histogram_matching_lazy(src, dst);
+            // self.histogram_matching_lazy(src, dst, |_, _, _| ());
+            self.histogram_matching_lazy(src, dst, Mapper::more_histogram_matching_lazy);
         }
     }
 
-    /// Matches all pairs of nodes whose types appear only once in src and dst (step 3 of simple recovery)
-    fn histogram_matching_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
-        let src_histogram: HashMap<_, Vec<Dsrc::IdD>> = self
-            .src_arena
-            .decompress_children(&src)
+    fn prep_histogram_matching_lazy(
+        &mut self,
+        src: Dsrc::IdD,
+        dst: Ddst::IdD,
+    ) -> impl Iterator<
+        Item = (
+            <HAST::TS as hyperast::types::TypeStore>::Ty,
+            (Vec<Dsrc::IdD>, Vec<Ddst::IdD>),
+        ),
+    > + use<HAST, Dsrc, Ddst, M> {
+        let src_histogram = (self.src_arena.decompress_children(&src))
             .into_iter()
             .filter(|child| !self.mappings.is_src(child.shallow()))
-            .fold(HashMap::new(), |mut acc, child| {
-                let child_type = self.hyperast.resolve_type(&self.src_arena.original(&child));
-                acc.entry(child_type).or_insert_with(Vec::new).push(child);
+            .fold(HashMap::<_, Vec<Dsrc::IdD>>::new(), |mut acc, child| {
+                let t = self.hyperast.resolve_type(&self.src_arena.original(&child));
+                acc.entry(t).or_insert_with(Vec::new).push(child);
                 acc
             });
 
-        let dst_histogram: HashMap<_, Vec<Ddst::IdD>> = self
-            .dst_arena
-            .decompress_children(&dst)
+        let mut dst_histogram = (self.dst_arena.decompress_children(&dst))
             .into_iter()
             .filter(|child| !self.mappings.is_dst(child.shallow()))
-            .fold(HashMap::new(), |mut acc, child| {
-                let child_type = self.hyperast.resolve_type(&self.dst_arena.original(&child));
-                acc.entry(child_type).or_insert_with(Vec::new).push(child);
+            .fold(HashMap::<_, Vec<Ddst::IdD>>::new(), |mut acc, child| {
+                let t = self.hyperast.resolve_type(&self.dst_arena.original(&child));
+                acc.entry(t).or_insert_with(Vec::new).push(child);
                 acc
             });
 
-        for src_type in src_histogram.keys() {
-            if !dst_histogram.contains_key(src_type) {
-                continue;
-            }
-            if src_histogram[src_type].len() == 1 && dst_histogram[src_type].len() == 1 {
-                let t1 = src_histogram[src_type][0];
-                let t2 = dst_histogram[src_type][0];
+        src_histogram.into_iter().filter_map(move |(t, src_hist)| {
+            dst_histogram
+                .remove(&t)
+                .map(|dst_hist| (t, (src_hist, dst_hist)))
+        })
+    }
+
+    /// Matches all pairs of nodes whose types appear only once in src and dst (step 3 of simple recovery)
+    fn histogram_matching_lazy(
+        &mut self,
+        src: Dsrc::IdD,
+        dst: Ddst::IdD,
+        more: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, Vec<Dsrc::IdD>, Vec<Ddst::IdD>),
+    ) {
+        let it = self.prep_histogram_matching_lazy(src, dst);
+        for (_t, (src_histogram, dst_histogram)) in it {
+            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
+                let t1 = src_histogram[0];
+                let t2 = dst_histogram[0];
                 self.mappings
                     .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
                 self.last_chance_match_histogram_lazy(t1, t2);
                 continue;
             }
-            let mut v: Vec<_> = src_histogram[src_type]
-                .iter()
-                .filter(|x| self.mapping.src_arena.descendants_count(x) == 0)
-                .flat_map(|x| {
-                    dst_histogram[src_type]
-                        .iter()
-                        .filter(|y| self.mapping.dst_arena.descendants_count(y) == 0)
-                        .map(|y| (*x, *y))
-                })
-                .collect();
-            v.sort_by(|alink, blink| {
-                (alink.0.index().abs_diff(alink.1.index()))
-                    .cmp(&blink.0.index().abs_diff(blink.1.index()))
-            });
-            for (t1, t2) in v {
-                self.mappings
-                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
-            }
+            more(self, src_histogram, dst_histogram);
         }
     }
+
+    fn more_histogram_matching_lazy(
+        &mut self,
+        src_histogram: Vec<Dsrc::IdD>,
+        dst_histogram: Vec<Ddst::IdD>,
+    ) {
+        let mut v: Vec<_> = src_histogram
+            .iter()
+            .filter(|x| self.mapping.src_arena.descendants_count(x) == 0)
+            .flat_map(|x| {
+                dst_histogram
+                    .iter()
+                    .filter(|y| self.mapping.dst_arena.descendants_count(y) == 0)
+                    .map(|y| (*x, *y))
+            })
+            .collect();
+        v.sort_by(|alink, blink| {
+            (alink.0.index().abs_diff(alink.1.index()))
+                .cmp(&blink.0.index().abs_diff(blink.1.index()))
+        });
+        for (t1, t2) in v {
+            self.mappings
+                .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
+        }
+    }
+
     /// Optimal ZS recovery algorithm (finds mappings between src and dst descendants)
     pub fn last_chance_match_zs_lazy<
         MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,

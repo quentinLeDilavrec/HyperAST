@@ -7,7 +7,7 @@ pub mod greedy_bottom_up_matcher;
 pub mod greedy_subtree_matcher;
 pub mod hybrid_bottom_up_matcher;
 pub mod marriage_bottom_up_matcher;
-pub mod simple_bottom_up_matcher3;
+pub mod simple_bottom_up_matcher;
 
 // lazy versions, that do not decompress directly subtrees
 pub mod lazy_bottom_up_matcher;

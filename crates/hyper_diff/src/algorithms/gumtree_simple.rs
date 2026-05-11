@@ -7,12 +7,12 @@ use super::DiffRes;
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::algorithms::check_oneshot_decompressed_against_lazy;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::matchers::Mapper;
 use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
+use crate::matchers::Mapper;
 use hyperast::types::{self, HyperAST, NodeId};
 
 use crate::matchers::heuristic::gt::greedy_subtree_matcher::GreedySubtreeMatcher;
-use crate::matchers::heuristic::gt::simple_bottom_up_matcher3::SimpleBottomUpMatcher;
+use crate::matchers::heuristic::gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
 
 type MM = DefaultMultiMappingStore<u32>;
 

@@ -283,7 +283,7 @@ fn mapping_group(c: &mut Criterion) {
                         |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                         |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
                     );
-                    use gt::simple_bottom_up_matcher3::SimpleBottomUpMatcher;
+                    use gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
                     let mapper_bottom_up = SimpleBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 });

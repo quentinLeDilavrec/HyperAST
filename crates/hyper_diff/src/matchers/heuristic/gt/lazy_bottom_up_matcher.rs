@@ -10,7 +10,7 @@ use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithPare
 use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
 use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::{MappingStore, MonoMappingStore};
+use crate::mappings::{MappingStore, MonoMappingStore};
 
 impl<
     Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
@@ -442,7 +442,7 @@ where
 
 use crate::decompressed_tree_store::ContiguousDescendants;
 use crate::matchers::heuristic::factorized_bounds::LazyDecompTreeBounds;
-use crate::matchers::similarity_metrics::SimilarityMeasure;
+use crate::similarity_metrics::SimilarityMeasure;
 impl<
     Dsrc: LazyDecompTreeBounds<HAST, M::Src>,
     Ddst: LazyDecompTreeBounds<HAST, M::Dst>,
@@ -587,7 +587,7 @@ impl<
     Dsrc: LazyDecompTreeBounds<HAST, M::Src>,
     Ddst: LazyDecompTreeBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
-    M: crate::matchers::mapping_store::MultiMappingStore,
+    M: crate::mappings::MultiMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
 where
     M::Src: PrimInt,

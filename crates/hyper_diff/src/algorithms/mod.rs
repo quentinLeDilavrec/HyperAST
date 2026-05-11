@@ -1,7 +1,8 @@
 use crate::actions::action_vec::ActionsVec;
 use crate::actions::script_generator2::SimpleAction;
 use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
-use crate::matchers::{Mapper, mapping_store::VecStore};
+use crate::mappings::VecStore;
+use crate::matchers::Mapper;
 
 pub mod change_distiller;
 pub mod change_distiller_lazy;
@@ -408,7 +409,7 @@ pub struct ResultsSummary<MD> {
 impl<A, MD: Clone, HAST, DS, DD> DiffResult<A, Mapper<HAST, DS, DD, VecStore<u32>>, MD> {
     pub fn summarize(&self) -> ResultsSummary<MD> {
         use crate::actions::Actions;
-        use crate::matchers::mapping_store::MappingStore;
+        use crate::mappings::MappingStore;
         ResultsSummary {
             // mapping_durations: self.mapping_durations.clone(),
             mappings: self.mapper.mapping.mappings.len(),

@@ -12,9 +12,9 @@ use hyperast::types::{WithHashs, WithStats};
 use crate::decompressed_tree_store::Shallow;
 use crate::decompressed_tree_store::{ContiguousDescendants, DecompressedWithParent};
 use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
+use crate::mappings::{MonoMappingStore, MultiMappingStore};
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::{mapping_store::MultiMappingStore, similarity_metrics};
+use crate::similarity_metrics;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 pub struct LazyGreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
@@ -140,22 +140,25 @@ where
         };
 
         // Select the best ambiguous mappings
-        let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
-        let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
+        // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
+        // let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
         for (src, dst) in mapping_list {
-            let src_i = src.shallow().index();
-            let dst_i = dst.shallow().index();
-            if !(src_ignored[src_i] || dst_ignored[dst_i]) {
+            // let src_i = src.shallow().index();
+            // let dst_i = dst.shallow().index();
+            if !(mapper.mappings.is_src(src.shallow()) || mapper.mappings.is_dst(dst.shallow())) {
                 mapper.add_mapping_recursively_lazy(&src, &dst);
-                src_ignored.set(src_i, true);
-                (mapper.src_arena.descendants(&src))
-                    .iter()
-                    .for_each(|src| src_ignored.set(src.index(), true));
-                dst_ignored.set(dst_i, true);
-                (mapper.dst_arena.descendants(&dst))
-                    .iter()
-                    .for_each(|dst| dst_ignored.set(dst.index(), true));
             }
+            // if !(src_ignored[src_i] || dst_ignored[dst_i]) {
+            //     mapper.add_mapping_recursively_lazy(&src, &dst);
+            //     src_ignored.set(src_i, true);
+            //     (mapper.src_arena.descendants(&src))
+            //         .iter()
+            //         .for_each(|src| src_ignored.set(src.index(), true));
+            //     dst_ignored.set(dst_i, true);
+            //     (mapper.dst_arena.descendants(&dst))
+            //         .iter()
+            //         .for_each(|dst| dst_ignored.set(dst.index(), true));
+            // }
             // TODO return additional mappings
         }
     }

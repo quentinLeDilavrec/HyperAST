@@ -864,7 +864,7 @@ mod tests {
 
         for x in diff.mapper.mapping.src_arena.iter_df_post::<true>() {
             use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
-            use hyper_diff::matchers::mapping_store::MappingStore;
+            use hyper_diff::mappings::MappingStore;
             let s = diff.mapper.mapping.src_arena.original(&x);
             // let t = stores.resolve_type(&s);
 

@@ -14,8 +14,8 @@ use super::{is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
 use crate::decompressed_tree_store::ContiguousDescendants;
 use crate::decompressed_tree_store::LazyDecompressedTreeStore;
 use crate::decompressed_tree_store::Shallow;
+use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::MonoMappingStore;
 
 pub struct LazyLeavesMatcher<
     Mpr,
@@ -284,7 +284,8 @@ where
 mod tests {
     use super::*;
     use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-    use crate::matchers::{Decompressible, mapping_store::MappingStore};
+    use crate::mappings::MappingStore;
+    use crate::matchers::Decompressible;
     use crate::tests::examples::example_change_distiller;
     use hyperast::test_utils::simple_tree::vpair_to_stores;
     use hyperast::types::{DecompressedFrom, HyperASTShared};
@@ -313,7 +314,7 @@ mod tests {
             mapping: crate::matchers::Mapping {
                 src_arena: src_arena.as_mut(),
                 dst_arena: dst_arena.as_mut(),
-                mappings: crate::matchers::mapping_store::VecStore::default(),
+                mappings: crate::mappings::VecStore::default(),
             },
         };
         let mapping = LazyLeavesMatcher::<_, TextSimilarity>::match_all(mapping);
@@ -406,7 +407,7 @@ mod tests {
             mapping: crate::matchers::Mapping {
                 src_arena: src_arena.as_mut(),
                 dst_arena: dst_arena.as_mut(),
-                mappings: crate::matchers::mapping_store::VecStore::default(),
+                mappings: crate::mappings::VecStore::default(),
             },
         };
         let mapping = LazyLeavesMatcher::<_, TextSimilarity>::match_stmt(mapping);

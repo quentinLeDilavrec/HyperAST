@@ -10,8 +10,8 @@ use hyperast_vcs_git::preprocessed::PreProcessedRepository;
 
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use hyper_diff::decompressed_tree_store::{DecompressedWithParent, ShallowDecompressedTreeStore};
+use hyper_diff::mappings::MonoMappingStore;
 use hyper_diff::matchers::Decompressible;
-use hyper_diff::matchers::mapping_store::MonoMappingStore;
 
 use hyperast_benchmark_smells::github_ranges::format_pos_as_github_url;
 use hyperast_benchmark_smells::github_ranges::{Pos, PositionWithContext};

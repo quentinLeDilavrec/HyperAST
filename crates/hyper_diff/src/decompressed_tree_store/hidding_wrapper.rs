@@ -22,8 +22,8 @@ use crate::decompressed_tree_store::{
     DecompressedParentsLending, DecompressedTreeStore, DecompressedWithParent, PostOrder,
     ShallowDecompressedTreeStore,
 };
+use crate::mappings::{MappingStore, MonoMappingStore};
 use crate::matchers::Decompressible;
-use crate::matchers::mapping_store::{MappingStore, MonoMappingStore};
 
 /// Wrap or just map a decommpressed tree in breadth-first eg. post-order,
 pub struct SimpleHiddingMapper<'a, IdD, DTS, M, R, D = DTS> {
@@ -231,9 +231,7 @@ where
         Self::Dst: PrimInt,
         Self: Sized,
     {
-        crate::matchers::similarity_metrics::number_of_common_descendants_ranges(
-            src, dst, self.back,
-        )
+        crate::similarity_metrics::number_of_common_descendants_ranges(src, dst, self.back)
 
         // (src.start.to_usize().unwrap()..src.end.to_usize().unwrap())
         //         .into_iter()

@@ -5,7 +5,7 @@ use crate::decompressed_tree_store::{
     CompletePostOrder, DecompressedTreeStore, ShallowDecompressedTreeStore,
 };
 use crate::matchers::heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
-use crate::matchers::mapping_store::{MappingStore, VecStore};
+use crate::mappings::{MappingStore, VecStore};
 use crate::matchers::{Decompressible, Mapper};
 use crate::tests::examples::example_unstable;
 

@@ -4,9 +4,9 @@ use hyperast::PrimInt;
 use hyperast::types::NodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
+use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::similarity_metrics;
+use crate::similarity_metrics;
 
 use super::factorized_bounds::DecompTreeBounds;
 

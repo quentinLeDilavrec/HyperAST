@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use rayon::prelude::ParallelIterator;
 
 use hyper_diff::matchers::Mapper;
-use hyper_diff::matchers::mapping_store::{MonoMappingStore, VecStore};
+use hyper_diff::mappings::{MonoMappingStore, VecStore};
 use hyper_diff::tree::tree_path::{CompressedTreePath, TreePath};
 use hyperast::PrimInt;
 use hyperast::position::Position;

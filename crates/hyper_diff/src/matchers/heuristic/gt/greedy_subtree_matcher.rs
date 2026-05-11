@@ -11,8 +11,9 @@ use hyperast::types::{WithChildren, WithHashs};
 
 use crate::decompressed_tree_store::ContiguousDescendants;
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
-use crate::matchers::mapping_store::{MonoMappingStore, MultiMappingStore};
-use crate::matchers::{Mapper, similarity_metrics};
+use crate::mappings::{MonoMappingStore, MultiMappingStore};
+use crate::matchers::Mapper;
+use crate::similarity_metrics;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 pub struct GreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
@@ -90,21 +91,22 @@ where
         let mapping_list: Vec<_> = mapper.sort(ambiguous_list).collect();
 
         // Select the best ambiguous mappings
-        let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
-        let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
+        // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
+        // let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
         for (src, dst) in mapping_list {
-            let src_i = src.index();
-            let dst_i = dst.index();
-            if !(src_ignored[src_i] || dst_ignored[dst_i]) {
+            // let src_i = src.index();
+            // let dst_i = dst.index();
+            // if !(src_ignored[src_i] || dst_ignored[dst_i]) {
+            if !(mapper.mappings.is_src(&src) || mapper.mappings.is_dst(&dst)) {
                 mapper.add_mapping_recursively(&src, &dst);
-                src_ignored.set(src_i, true);
-                (mapper.src_arena.descendants(&src))
-                    .iter()
-                    .for_each(|src| src_ignored.set(src.index(), true));
-                dst_ignored.set(dst_i, true);
-                (mapper.dst_arena.descendants(&dst))
-                    .iter()
-                    .for_each(|dst| dst_ignored.set(dst.index(), true));
+                //     src_ignored.set(src_i, true);
+                //     (mapper.src_arena.descendants(&src))
+                //         .iter()
+                //         .for_each(|src| src_ignored.set(src.index(), true));
+                //     dst_ignored.set(dst_i, true);
+                //     (mapper.dst_arena.descendants(&dst))
+                //         .iter()
+                //         .for_each(|dst| dst_ignored.set(dst.index(), true));
             }
         }
     }

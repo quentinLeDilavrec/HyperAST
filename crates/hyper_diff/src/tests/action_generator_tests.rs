@@ -6,7 +6,7 @@ use crate::actions::script_generator::{self, Actions, SimpleAction, TestActions}
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
 use crate::matchers::Decompressible;
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::tests::examples::{example_action, example_gt_java_code};
 use crate::tree::simple_tree::{DisplayTree, vpair_to_stores};
 

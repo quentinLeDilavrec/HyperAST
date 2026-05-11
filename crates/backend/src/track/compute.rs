@@ -9,8 +9,9 @@ use hyperast::{PrimInt, types};
 use hyper_diff::decompressed_tree_store::DecompressedWithParent as _;
 use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore as _;
 use hyper_diff::decompressed_tree_store::{Shallow, lazy_post_order::LazyPostOrder};
-use hyper_diff::matchers::mapping_store::{MappingStore, MonoMappingStore, MultiMappingStore};
-use hyper_diff::matchers::{Decompressible, Mapper, mapping_store};
+use hyper_diff::mappings::mapping_store;
+use hyper_diff::mappings::{MappingStore, MonoMappingStore, MultiMappingStore};
+use hyper_diff::matchers::{Decompressible, Mapper};
 
 use hyperast::position::position_accessors;
 use hyperast::position::{compute_position, compute_position_and_nodes, path_with_spaces};
@@ -263,7 +264,7 @@ where
 
     let (pos, _) = compute_position(other_tr, &mut path.iter().copied(), with_spaces_stores);
     let fallback = LocalPieceOfCode::from_position(&pos, path, path_ids);
-    
+
     postprocess_matching(fallback)
 }
 

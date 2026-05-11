@@ -10,7 +10,7 @@ use crate::decompressed_tree_store::{
     BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
     PostOrderIterable,
 };
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore, MonoMappingStore};
+use crate::mappings::{DefaultMappingStore, MappingStore, MonoMappingStore};
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 pub trait Actions {

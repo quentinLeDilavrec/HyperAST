@@ -1,7 +1,7 @@
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
-use hyper_diff::matchers::mapping_store::{DefaultMultiMappingStore, MappingStore, VecStore};
+use hyper_diff::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
 use hyperast::types::{self, HyperAST, NodeId};
 use std::fmt::Debug;

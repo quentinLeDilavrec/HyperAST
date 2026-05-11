@@ -10,8 +10,8 @@ use tokio::time::Instant;
 
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+use hyper_diff::mappings::mapping_store;
 use hyper_diff::matchers::Mapper;
-use hyper_diff::matchers::mapping_store;
 use hyperast::store::defaults::NodeIdentifier as IdN;
 use hyperast::types::{Childrn, HyperAST, NodeStore, WithChildren};
 use mapping_store::MappingStore;

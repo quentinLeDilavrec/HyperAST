@@ -5,6 +5,8 @@ use std::ops::Range;
 
 use hyperast::compat::HashMap;
 
+use crate::matchers::Mapping;
+
 pub trait MappingStore {
     type Src;
     type Dst;
@@ -42,7 +44,7 @@ pub trait MonoMappingStore: MappingStore {
         Self::Dst: num_traits::PrimInt,
         Self: Sized,
     {
-        super::similarity_metrics::number_of_common_descendants_ranges(src, dst, self)
+        crate::similarity_metrics::number_of_common_descendants_ranges(src, dst, self)
     }
 }
 
@@ -448,7 +450,7 @@ impl<T: PrimInt> MultiMappingStore for MultiVecStore<T> {
     }
 }
 
-impl<Dsrc, Ddst, M: MappingStore> MappingStore for super::Mapping<Dsrc, Ddst, M> {
+impl<Dsrc, Ddst, M: MappingStore> MappingStore for crate::matchers::Mapping<Dsrc, Ddst, M> {
     type Src = M::Src;
 
     type Dst = M::Dst;
@@ -486,7 +488,7 @@ impl<Dsrc, Ddst, M: MappingStore> MappingStore for super::Mapping<Dsrc, Ddst, M>
     }
 }
 impl<Dsrc, Ddst, M: MultiMappingStore, Src, Dst> MultiRangeMappingStore<Src, Dst>
-    for super::Mapping<Dsrc, Ddst, M>
+    for Mapping<Dsrc, Ddst, M>
 where
     Ddst: crate::decompressed_tree_store::RawContiguousDescendants<Self::Dst, Dst>,
     Dsrc: crate::decompressed_tree_store::RawContiguousDescendants<Self::Src, Src>,

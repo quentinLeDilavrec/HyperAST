@@ -8,10 +8,10 @@ use hyperast::types::{NodeStore as _, Tree as _};
 
 use crate::decompressed_tree_store::POBorrowSlice;
 use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
-use crate::matchers::mapping_store::MonoMappingStore;
+use crate::mappings::MonoMappingStore;
 use crate::matchers::optimal::zs::ZsMatcher;
-use crate::matchers::similarity_metrics;
 use crate::matchers::{Decompressible, Mapper};
+use crate::similarity_metrics;
 
 use super::factorized_bounds::DecompTreeBounds;
 

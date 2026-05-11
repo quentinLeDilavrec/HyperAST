@@ -3,9 +3,8 @@ use std::ops::Range;
 use num_traits::{PrimInt, ToPrimitive, cast};
 
 use crate::decompressed_tree_store::Shallow;
-use crate::matchers::mapping_store::MappingStore;
-
-use super::mapping_store::{MonoMappingStore, VecStore};
+use crate::mappings::mapping_store::MultiRangeMappingStore;
+use crate::mappings::{MonoMappingStore, VecStore};
 
 pub struct SimilarityMeasure {
     ncd: u32,
@@ -43,7 +42,7 @@ impl SimilarityMeasure {
         Id2: PrimInt + Shallow<Dst>,
         Src: PrimInt,
         Dst: PrimInt,
-        Store: super::mapping_store::MultiRangeMappingStore<Src, Dst, Src = Id1, Dst = Id2>,
+        Store: MultiRangeMappingStore<Src, Dst, Src = Id1, Dst = Id2>,
     >(
         src: &Range<Id1>,
         dst: &Range<Id2>,
@@ -183,7 +182,7 @@ pub fn number_of_common_descendants_ranges_multimap<
     Id2: PrimInt + Shallow<Dst>,
     Src: PrimInt,
     Dst: PrimInt,
-    Store: super::mapping_store::MultiRangeMappingStore<Src, Dst, Src = Id1, Dst = Id2>,
+    Store: MultiRangeMappingStore<Src, Dst, Src = Id1, Dst = Id2>,
 >(
     src: &Range<Id1>,
     dst: &Range<Id2>,
@@ -222,6 +221,7 @@ pub fn number_of_common_descendants_ranges_par(
     dst: &Range<u32>,
     mappings: &VecStore<u32>,
 ) -> u32 {
+    use crate::mappings::mapping_store::MappingStore as _;
     use specs::prelude::ParallelIterator;
     use specs::rayon::prelude::IntoParallelIterator;
     (src.start.to_usize().unwrap()..src.end.to_usize().unwrap())

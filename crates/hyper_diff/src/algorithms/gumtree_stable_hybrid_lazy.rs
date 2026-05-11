@@ -7,7 +7,7 @@ use super::DiffRes;
 use crate::actions::script_generator3::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::{DefaultMultiMappingStore, MappingStore, VecStore};
+use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use hyperast::types::{self, HyperAST, NodeId};
 
 // use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;

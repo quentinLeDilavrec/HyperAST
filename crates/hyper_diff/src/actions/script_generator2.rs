@@ -14,11 +14,10 @@ use hyperast::types::{HyperAST, Labeled};
 use super::Actions;
 use super::action_vec::ActionsVec;
 
-use crate::decompressed_tree_store::{
-    BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-    PostOrderIterable,
-};
-use crate::matchers::{Mapping, mapping_store::MonoMappingStore};
+use crate::decompressed_tree_store::{BreadthFirstIterable, PostOrder, PostOrderIterable};
+use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::mappings::MonoMappingStore;
+use crate::matchers::Mapping;
 use crate::tree::tree_path::TreePath;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 

@@ -18,12 +18,11 @@ use num_traits::{PrimInt, ToPrimitive};
 
 use hyperast::types::{Stored, WithChildren};
 
-use crate::decompressed_tree_store::{
-    DecompressedTreeStore, DecompressedWithParent, PostOrderIterable,
-};
-use crate::mapping::CmBuilder;
-use crate::matchers::mapping_store::VecStore;
-use crate::matchers::mapping_store::{MappingStore, MonoMappingStore};
+use super::CmBuilder;
+use crate::decompressed_tree_store::PostOrderIterable;
+use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::mappings::VecStore;
+use crate::mappings::{MappingStore, MonoMappingStore};
 use crate::tree::tree_path::TreePath;
 
 use super::CompressedMappingStore;
@@ -487,7 +486,7 @@ mod test {
     use crate::mapping::remapping::Remapper;
     use crate::mapping::visualize::print_mappings_no_ranges;
     use crate::mapping::{ArenaMStore, CompressedMappingStore, SimpleCompressedMapping};
-    use crate::matchers::mapping_store::{self, DefaultMappingStore, MappingStore};
+    use crate::mappings::{self, DefaultMappingStore, MappingStore};
     use crate::tests::examples;
     use crate::tree::{
         simple_tree::{Tree, TreeRef, vpair_to_stores},

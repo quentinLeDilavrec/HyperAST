@@ -10,7 +10,7 @@ use crate::matchers::heuristic::gt::{
     lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher,
     marriage_bottom_up_matcher::MarriageBottomUpMatcher,
 };
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore, VecStore};
+use crate::mappings::{DefaultMappingStore, MappingStore, VecStore};
 use crate::matchers::{Decompressible, Mapper, Mapping};
 use crate::tests::examples::*;
 use crate::tree::simple_tree::{NS, Tree, vpair_to_stores};

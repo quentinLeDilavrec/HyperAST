@@ -1,5 +1,5 @@
 use crate::decompressed_tree_store::{ShallowDecompressedTreeStore, SimpleZsTree};
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::matchers::{Decompressible, optimal::zs::ZsMatcher};
 use crate::tests::examples::{example_gt_java_code, example_gt_slides, example_zs_paper};
 

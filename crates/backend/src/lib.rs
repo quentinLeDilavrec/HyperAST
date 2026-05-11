@@ -7,7 +7,7 @@ use dashmap::DashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
-use hyper_diff::matchers::mapping_store::VecStore;
+use hyper_diff::mappings::VecStore;
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 

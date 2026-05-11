@@ -21,7 +21,7 @@ use crate::decompressed_tree_store::{
     PostOrderIterable,
 };
 use crate::matchers::Mapping;
-use crate::matchers::mapping_store::MonoMappingStore;
+use crate::mappings::MonoMappingStore;
 use crate::tree::tree_path::TreePath;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 

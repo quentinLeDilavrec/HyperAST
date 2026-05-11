@@ -11,7 +11,7 @@ use super::{Similarity, TextSimilarity};
 use super::{is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
 use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrder, PostOrderIterable};
 use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
-use crate::matchers::mapping_store::MonoMappingStore;
+use crate::mappings::MonoMappingStore;
 use crate::matchers::{Mapper, Mapping};
 
 pub struct LeavesMatcher<
@@ -285,7 +285,7 @@ mod tests {
     use super::*;
     use crate::decompressed_tree_store::CompletePostOrder;
     use crate::matchers::Decompressible;
-    use crate::matchers::mapping_store::MappingStore;
+    use crate::mappings::MappingStore;
     use crate::tests::examples::example_change_distiller;
     use hyperast::test_utils::simple_tree::vpair_to_stores;
     use hyperast::types::{DecompressedFrom, HyperASTShared};
@@ -315,7 +315,7 @@ mod tests {
         let mapping = Mapper {
             hyperast: &stores,
             mapping: crate::matchers::Mapping {
-                mappings: crate::matchers::mapping_store::VecStore::default(),
+                mappings: crate::mappings::VecStore::default(),
                 src_arena,
                 dst_arena,
             },
@@ -406,7 +406,7 @@ mod tests {
             mapping: crate::matchers::Mapping {
                 src_arena,
                 dst_arena,
-                mappings: crate::matchers::mapping_store::VecStore::default(),
+                mappings: crate::mappings::VecStore::default(),
             },
         };
         // NOTE cannot use TextSimilarity here because `SimpleTree` does not have a textual source code representation

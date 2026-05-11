@@ -6,9 +6,9 @@ use hyperast::types::NodeStore as _;
 use hyperast::types::{HyperAST, LendT, Tree, WithHashs};
 
 use crate::decompressed_tree_store::POBorrowSlice;
+use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::similarity_metrics;
+use crate::similarity_metrics;
 
 use super::factorized_bounds::DecompTreeBounds;
 

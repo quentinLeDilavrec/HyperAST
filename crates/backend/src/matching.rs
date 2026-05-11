@@ -9,7 +9,7 @@ use hyper_diff::decompressed_tree_store::hidding_wrapper;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use hyper_diff::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
 use hyper_diff::matchers::heuristic::gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
-use hyper_diff::matchers::mapping_store::{DefaultMultiMappingStore, MappingStore, VecStore};
+use hyper_diff::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use hyper_diff::matchers::{Decompressible, Mapper};
 
 pub use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
@@ -68,7 +68,7 @@ where
 
 pub fn bottom_up_hiding<'a, 'b, 's: 'a, HAST: 's + HyperAST + Copy>(
     hyperast: HAST,
-    mm: &hyper_diff::matchers::mapping_store::MultiVecStore<IdD>,
+    mm: &hyper_diff::mappings::MultiVecStore<IdD>,
     mapper: &'b mut LazyVecMapper<'a, HAST>,
 ) where
     HAST::IdN: Clone + Debug + Eq,
@@ -120,7 +120,7 @@ pub fn bottom_up_hiding<'a, 'b, 's: 'a, HAST: 's + HyperAST + Copy>(
 
 pub fn bottom_up<'store, 'a, 'b, HAST: HyperAST + Copy>(
     hyperast: HAST,
-    mm: &hyper_diff::matchers::mapping_store::MultiVecStore<IdD>,
+    mm: &hyper_diff::mappings::MultiVecStore<IdD>,
     mapper: &'b mut LazyVecMapper<'a, HAST>,
 ) where
     HAST::IdN: Clone + Debug + Eq,

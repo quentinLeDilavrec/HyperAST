@@ -11,7 +11,7 @@ use backend::app::{
     smells_app, track_code_route, tsg_app, view_code_route,
 };
 use backend::examples::{example_app, kv_store_app};
-use hyper_diff::matchers::mapping_store::VecStore;
+use hyper_diff::mappings::VecStore;
 use hyperast_vcs_git::git::Forge;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 

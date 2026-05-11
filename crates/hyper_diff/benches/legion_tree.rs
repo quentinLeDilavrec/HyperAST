@@ -1,12 +1,11 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hyper_diff::{
-    decompressed_tree_store::SimpleZsTree,
-    matchers::{Decompressible, mapping_store::DefaultMappingStore, optimal::zs::ZsMatcher},
-};
-use hyperast_gen_ts_java::{
-    legion_with_refs::{self, JavaTreeGen},
-    types::TStore,
-};
+use hyper_diff::decompressed_tree_store::SimpleZsTree;
+use hyper_diff::mappings::DefaultMappingStore;
+use hyper_diff::matchers::Decompressible;
+use hyper_diff::matchers::optimal::zs::ZsMatcher;
+use hyperast_gen_ts_java::legion_with_refs::JavaTreeGen;
+use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
+use hyperast_gen_ts_java::types::TStore;
 
 fn compare_simple_tree_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("LegionTree");
@@ -27,12 +26,12 @@ fn compare_simple_tree_group(c: &mut Criterion) {
     let pairs = PAIRS
         .into_iter()
         .map(|(src, dst)| {
-            let tree = match legion_with_refs::tree_sitter_parse(src) {
+            let tree = match tree_sitter_parse(src) {
                 Ok(t) => t,
                 Err(t) => t,
             };
             let src = java_tree_gen.generate_file(b"", src, tree.walk());
-            let tree = match legion_with_refs::tree_sitter_parse(dst) {
+            let tree = match tree_sitter_parse(dst) {
                 Ok(t) => t,
                 Err(t) => t,
             };

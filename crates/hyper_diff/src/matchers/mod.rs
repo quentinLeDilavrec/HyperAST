@@ -10,9 +10,7 @@
 //! Moreover, matchers can also be composed.
 
 pub mod heuristic;
-pub mod mapping_store;
 pub mod optimal;
-pub mod similarity_metrics;
 
 #[cfg(test)]
 mod tests;
@@ -21,7 +19,7 @@ use std::ops::{Deref, DerefMut};
 
 use hyperast::types::{DecompressedFrom, HyperAST, HyperASTShared};
 
-use crate::matchers::mapping_store::MappingStore;
+use crate::mappings::mapping_store::{MappingStore, VecStore};
 
 pub struct Decompressible<HAST, D> {
     /// the HyperAST which is being decompressed
@@ -193,8 +191,8 @@ impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
         }
     }
 }
-impl<HAST: Copy, Dsrc, Ddst, IdD> Mapper<HAST, Dsrc, Ddst, mapping_store::VecStore<IdD>> {
-    pub fn mirror(self) -> Mapper<HAST, Ddst, Dsrc, mapping_store::VecStore<IdD>> {
+impl<HAST: Copy, Dsrc, Ddst, IdD> Mapper<HAST, Dsrc, Ddst, VecStore<IdD>> {
+    pub fn mirror(self) -> Mapper<HAST, Ddst, Dsrc, VecStore<IdD>> {
         Mapper {
             hyperast: self.hyperast,
             mapping: Mapping {
@@ -224,6 +222,7 @@ impl<HAST, Dsrc, Ddst, M> DerefMut for Mapper<HAST, Dsrc, Ddst, M> {
 }
 
 #[derive(Clone)]
+/// A mapping between two trees, containing mappings between node pairs (or tuples).
 pub struct Mapping<Dsrc, Ddst, M> {
     pub src_arena: Dsrc,
     pub dst_arena: Ddst,

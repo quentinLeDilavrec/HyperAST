@@ -11,7 +11,7 @@ use crate::actions::script_generator2::{Act, ApplicablePath, ScriptGenerator, Si
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
 use crate::matchers::Decompressible;
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::tests::examples::{example_action, example_action2, example_gt_java_code};
 use crate::tree::simple_tree::{DisplayTree, NS, Tree, vpair_to_stores};
 use crate::tree::tree_path::{CompressedTreePath, TreePath};

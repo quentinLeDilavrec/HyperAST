@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
+use hyper_diff::mappings::VecStore;
 use hyper_diff::matchers::{Decompressible, Mapper};
 use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{Childrn, HyperAST, HyperType, WithChildren, WithStats};
@@ -88,9 +89,9 @@ pub(crate) fn added_deleted(
         let mut locked = binding.lock();
         let tree_pair = locked.as_mut(stores);
 
-        let mappings = hyper_diff::matchers::mapping_store::VecStore::default();
+        let mappings = VecStore::default();
         let mut mapper = hyper_diff::matchers::Mapper::prep(stores, mappings, tree_pair);
-        use hyper_diff::matchers::mapping_store::DefaultMultiMappingStore as MM;
+        use hyper_diff::mappings::DefaultMultiMappingStore as MM;
         let mapped = crate::changes::continue_compute_mappings_full::<_, _, MM<_>>(
             &state.mappings_alone,
             &mut mapper,
@@ -292,9 +293,9 @@ pub fn global_pos_with_spaces<It: Iterator<Item = u32>>(
 use crate::MappingAloneCacheRef;
 use hyper_diff::decompressed_tree_store::Shallow;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use hyper_diff::matchers::mapping_store::MonoMappingStore;
-use hyper_diff::matchers::mapping_store::MultiMappingStore;
-use hyper_diff::matchers::mapping_store::{self, MappingStore};
+use hyper_diff::mappings::MappingStore;
+use hyper_diff::mappings::MonoMappingStore;
+use hyper_diff::mappings::MultiMappingStore;
 use hyperast::PrimInt;
 use hyperast::types;
 use types::WithHashs;
@@ -332,7 +333,6 @@ where
         mapper.dst_arena.original(&mapper.dst_arena.root()),
     )) {
         Entry::Occupied(mut entry) => {
-            use mapping_store::MappingStore;
             mapper.mapping.mappings.topit(
                 mapper.mapping.src_arena.len(),
                 mapper.mapping.dst_arena.len(),
@@ -374,7 +374,6 @@ where
             entry.into_ref().downgrade()
         }
         Entry::Vacant(entry) => {
-            use mapping_store::MappingStore;
             mapper.mapping.mappings.topit(
                 mapper.mapping.src_arena.len(),
                 mapper.mapping.dst_arena.len(),
@@ -429,9 +428,9 @@ fn compute_and_cache_full_diff(
     let mut locked = binding.lock();
     let tree_pair = locked.as_mut(stores);
 
-    let mappings = hyper_diff::matchers::mapping_store::VecStore::default();
+    let mappings = VecStore::default();
     let mut mapper = hyper_diff::matchers::Mapper::prep(stores, mappings, tree_pair);
-    use hyper_diff::matchers::mapping_store::DefaultMultiMappingStore as MM;
+    use hyper_diff::mappings::DefaultMultiMappingStore as MM;
     crate::changes::continue_compute_mappings_full::<_, _, MM<_>>(
         &state.mappings_alone,
         &mut mapper,

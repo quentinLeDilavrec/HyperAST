@@ -7,7 +7,7 @@ use crate::actions::script_generator2::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
 use crate::matchers::Decompressible;
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::tree::tree_path::CompressedTreePath;
 
 use crate::tests::action_generator2_tests::Fmt;

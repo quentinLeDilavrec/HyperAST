@@ -7,10 +7,10 @@ use hyperast_vcs_git::git::Oid;
 
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use hyper_diff::matchers::mapping_store::{MappingStore, VecStore};
-use hyper_diff::matchers::similarity_metrics::SimilarityMeasure;
-use hyper_diff::matchers::{Decompressible, mapping_store::MultiMappingStore};
-use hyper_diff::matchers::{Mapper, Mapping};
+use hyper_diff::mappings::mapping_store::MultiMappingStore;
+use hyper_diff::mappings::{MappingStore, MultiVecStore, VecStore};
+use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
+use hyper_diff::similarity_metrics::SimilarityMeasure;
 use hyperast::nodes::TextSerializer;
 use hyperast::position::position_accessors::{
     SolvedPosition, WithFullPostOrderPath, WithPreOrderOffsets,
@@ -18,9 +18,7 @@ use hyperast::position::position_accessors::{
 use hyperast::position::{StructuralPosition, compute_position_and_nodes};
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{
-    Children, Childrn, HyperAST, HyperType, Labeled, Typed, WithChildren, WithStats,
-};
+use hyperast::types::{HyperAST, HyperType, WithStats};
 use hyperast_vcs_git::TStore;
 
 use crate::SharedState;
@@ -813,14 +811,8 @@ pub fn differential(
             }
             baseline_idx.sort();
             other_idx.sort();
-            let mut baseline_results = baseline_results
-                .into_iter()
-                .map(Some)
-                .collect::<Vec<_>>();
-            let mut other_results = other_results
-                .into_iter()
-                .map(Some)
-                .collect::<Vec<_>>();
+            let mut baseline_results = baseline_results.into_iter().map(Some).collect::<Vec<_>>();
+            let mut other_results = other_results.into_iter().map(Some).collect::<Vec<_>>();
             let baseline_results = baseline_idx
                 .into_iter()
                 .map(|idx| baseline_results[idx].take().unwrap())
@@ -1077,7 +1069,7 @@ fn diferential_filter(
     hyperast: &NoS,
     baseline_results: Vec<Position>,
     other_results: Vec<Position>,
-    subtree_mappings: hyper_diff::matchers::mapping_store::MultiVecStore<IdD>,
+    subtree_mappings: MultiVecStore<IdD>,
     mut mapper: Mapper<&NoS, Arena, Arena, impl MappingStore<Src = IdD, Dst = IdD>>,
 ) -> (Vec<Position>, Vec<Position>) {
     let baseline_results: Vec<_> = baseline_results

@@ -3,22 +3,19 @@ use std::hint::black_box;
 use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main, measurement::Measurement,
 };
-use hyper_diff::{
-    decompressed_tree_store::{CompletePostOrder, lazy_post_order::LazyPostOrder},
-    matchers::{Decompressible, mapping_store::VecStore},
-};
-use hyperast::{
-    store::nodes::legion::NodeIdentifier,
-    types::{HyperAST as _, HyperASTShared, WithStats as _},
-};
+use hyper_diff::decompressed_tree_store::{CompletePostOrder, lazy_post_order::LazyPostOrder};
+use hyper_diff::mappings::VecStore;
+use hyper_diff::matchers::Decompressible;
+use hyperast::store::nodes::legion::NodeIdentifier;
+use hyperast::types::{HyperAST as _, HyperASTShared, WithStats as _};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 
 #[allow(type_alias_bounds)]
 type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
 #[allow(type_alias_bounds)]
 type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
-type M = hyper_diff::matchers::mapping_store::VecStore<u32>;
-type MM = hyper_diff::matchers::mapping_store::DefaultMultiMappingStore<u32>;
+type M = hyper_diff::mappings::VecStore<u32>;
+type MM = hyper_diff::mappings::DefaultMultiMappingStore<u32>;
 
 struct Input {
     repo: hyperast_vcs_git::git::Repo,

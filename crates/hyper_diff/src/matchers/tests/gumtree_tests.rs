@@ -5,7 +5,7 @@ use crate::decompressed_tree_store::{
 };
 use crate::decompressed_tree_store::{Initializable as _, ShallowDecompressedTreeStore as _};
 use crate::matchers::heuristic::gt;
-use crate::matchers::mapping_store::{DefaultMappingStore, MappingStore};
+use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::tests::examples::{example_bottom_up, example_eq_simple_class_rename, example_gumtree};
 use crate::tree::simple_tree::{NS, Tree, TreeRef, vpair_to_stores};
 use gt::bottom_up_matcher::BottomUpMatcher;

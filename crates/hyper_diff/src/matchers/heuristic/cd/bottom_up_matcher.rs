@@ -7,10 +7,10 @@ use hyperast::types::NodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs, WithMetaData};
 
 use crate::decompressed_tree_store::DecompressedTreeStore;
+use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
 use crate::matchers::heuristic::factorized_bounds::DecompTreeBounds;
-use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::similarity_metrics;
+use crate::similarity_metrics;
 
 use super::leaf_count;
 
@@ -277,9 +277,9 @@ where
 mod tests {
     use super::super::leaves_matcher::LeavesMatcher;
     use crate::decompressed_tree_store::CompletePostOrder;
+    use crate::mappings::MappingStore;
     use crate::matchers::Decompressible;
     use crate::matchers::heuristic::cd::TextSimilarity;
-    use crate::matchers::mapping_store::MappingStore;
     use hyperast::test_utils::simple_tree::vpair_to_stores;
     use hyperast::types::{DecompressedFrom, HyperASTShared};
 
@@ -309,7 +309,7 @@ mod tests {
             mapping: crate::matchers::Mapping {
                 src_arena,
                 dst_arena,
-                mappings: crate::matchers::mapping_store::VecStore::default(),
+                mappings: crate::mappings::VecStore::default(),
             },
         };
         //  MappingStore mappings = new ChangeDistillerLeavesMatcher().match(src, dst);

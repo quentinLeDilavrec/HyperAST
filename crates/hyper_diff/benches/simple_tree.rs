@@ -1,7 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use hyper_diff::decompressed_tree_store::SimpleZsTree;
+use hyper_diff::mappings::DefaultMappingStore;
 use hyper_diff::matchers::Decompressible;
-use hyper_diff::matchers::mapping_store::DefaultMappingStore;
 use hyper_diff::matchers::optimal::zs::ZsMatcher;
 use hyperast::test_utils::simple_tree::{SimpleTree, vpair_to_stores};
 

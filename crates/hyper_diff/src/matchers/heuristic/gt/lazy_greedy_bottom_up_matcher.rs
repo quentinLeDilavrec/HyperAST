@@ -8,9 +8,9 @@ use hyperast::types::NodeId;
 use hyperast::types::{HyperAST, LendT, Tree};
 use hyperast::types::{WithHashs, WithStats};
 
+use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::MonoMappingStore;
-use crate::matchers::similarity_metrics;
+use crate::similarity_metrics;
 
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 

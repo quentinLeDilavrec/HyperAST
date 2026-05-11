@@ -65,8 +65,6 @@ where
         // Select unique mappings first and extract ambiguous mappings.
         let mut ambiguous_list: Vec<(M::Src, M::Dst)> = vec![];
         let mut ignored = bitvec::bitbox![0;mapper.src_arena.len()];
-        let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
-        let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
         for src in multi_mappings.all_mapped_srcs() {
             let mut is_mapping_unique = false;
             if multi_mappings.is_src_unique(&src) {
@@ -92,21 +90,19 @@ where
         let mapping_list: Vec<_> = mapper.sort(ambiguous_list).collect();
 
         // Select the best ambiguous mappings
+        let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
+        let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
         for (src, dst) in mapping_list {
             let src_i = src.index();
             let dst_i = dst.index();
             if !(src_ignored[src_i] || dst_ignored[dst_i]) {
                 mapper.add_mapping_recursively(&src, &dst);
                 src_ignored.set(src_i, true);
-                mapper
-                    .src_arena
-                    .descendants(&src)
+                (mapper.src_arena.descendants(&src))
                     .iter()
                     .for_each(|src| src_ignored.set(src.index(), true));
                 dst_ignored.set(dst_i, true);
-                mapper
-                    .dst_arena
-                    .descendants(&dst)
+                (mapper.dst_arena.descendants(&dst))
                     .iter()
                     .for_each(|dst| dst_ignored.set(dst.index(), true));
             }

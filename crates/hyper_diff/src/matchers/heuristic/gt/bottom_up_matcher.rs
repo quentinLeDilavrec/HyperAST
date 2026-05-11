@@ -112,8 +112,21 @@ where
         let dst_type = (self.dst_arena.parent(&dst))
             .map(|p| self.dst_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
-        if src_type == dst_type {
-            self.histogram_matching(src, dst, |_, _, _| ());
+        if src_type != dst_type {
+            return;
+        }
+
+        let it = self.prep_histogram_matching(src, dst);
+        for (_t, (src_histogram, dst_histogram)) in it {
+            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
+                // TODO use an option instead of a vec
+                // we are only retrieving the first element anyway,
+                // we just have to set to None on the second insertion to keep them same behavior
+                let src = src_histogram[0];
+                let dst = dst_histogram[0];
+                self.mappings.link_if_both_unmapped(src, dst);
+                self.last_chance_match_histogram(&src, &dst);
+            }
         }
     }
 
@@ -261,29 +274,7 @@ where
         })
     }
 
-    pub(super) fn histogram_matching(
-        &mut self,
-        src: &M::Src,
-        dst: &M::Dst,
-        more: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, Vec<M::Src>, Vec<M::Dst>),
-    ) {
-        let it = self.prep_histogram_matching(src, dst);
-        for (_t, (src_histogram, dst_histogram)) in it {
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                // TODO use an option instead of a vec
-                // we are only retrieving the first element anyway,
-                // we just have to set to None on the second insertion to keep them same behavior
-                let src = src_histogram[0];
-                let dst = dst_histogram[0];
-                self.mappings.link_if_both_unmapped(src, dst);
-                self.last_chance_match_histogram(&src, &dst);
-                continue;
-            }
-            more(self, src_histogram, dst_histogram);
-        }
-    }
-
-    #[allow(unused)]
+    /// Matches more pairs of leafs
     fn more_histogram_matching(&mut self, src_histogram: Vec<M::Src>, dst_histogram: Vec<M::Dst>) {
         let mut v: Vec<_> = src_histogram
             .iter()
@@ -301,6 +292,36 @@ where
         });
         for (t1, t2) in v {
             self.mappings.link_if_both_unmapped(t1, t2);
+        }
+    }
+
+    pub fn last_chance_match_histogram2(&mut self, src: &M::Src, dst: &M::Dst) {
+        self.lcs_equal_matching(src, dst);
+        self.lcs_structure_matching(src, dst);
+
+        let src_type = (self.src_arena.parent(&src))
+            .map(|p| self.src_arena.original(&p))
+            .map(|p| self.hyperast.resolve_type(&p));
+        let dst_type = (self.dst_arena.parent(&dst))
+            .map(|p| self.dst_arena.original(&p))
+            .map(|p| self.hyperast.resolve_type(&p));
+        if src_type != dst_type {
+            return;
+        }
+
+        let it = self.prep_histogram_matching(src, dst);
+        for (_t, (src_histogram, dst_histogram)) in it {
+            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
+                // TODO use an option instead of a vec
+                // we are only retrieving the first element anyway,
+                // we just have to set to None on the second insertion to keep them same behavior
+                let src = src_histogram[0];
+                let dst = dst_histogram[0];
+                self.mappings.link_if_both_unmapped(src, dst);
+                self.last_chance_match_histogram(&src, &dst);
+                continue;
+            }
+            self.more_histogram_matching(src_histogram, dst_histogram);
         }
     }
 

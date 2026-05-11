@@ -212,19 +212,30 @@ where
         self.lcs_equal_matching_lazy(src, dst);
         self.lcs_structure_matching_lazy(src, dst);
 
+        // then histogram matching
         let src_type = (self.src_arena.parent(&src))
             .map(|p| self.src_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
         let dst_type = (self.dst_arena.parent(&dst))
             .map(|p| self.dst_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
-        if src_type == dst_type {
-            self.histogram_matching_lazy(src, dst, |_, _, _| ());
-            // self.histogram_matching_lazy(src, dst, Mapper::more_histogram_matching_lazy);
+        if src_type != dst_type {
+            return;
+        }
+        let it = self.prep_histogram_matching_lazy(src, dst);
+        for (_t, (src_histogram, dst_histogram)) in it {
+            // Matches all pairs of nodes whose types appear only once in src and dst
+            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
+                let t1 = src_histogram[0];
+                let t2 = dst_histogram[0];
+                self.mappings
+                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
+                self.last_chance_match_histogram_lazy(t1, t2);
+            }
         }
     }
 
-    fn prep_histogram_matching_lazy(
+    pub(crate) fn prep_histogram_matching_lazy(
         &mut self,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
@@ -239,7 +250,7 @@ where
             .filter(|child| !self.mappings.is_src(child.shallow()))
             .fold(HashMap::<_, Vec<Dsrc::IdD>>::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.src_arena.original(&child));
-                acc.entry(t).or_insert_with(Vec::new).push(child);
+                acc.entry(t).or_default().push(child);
                 acc
             });
 
@@ -248,7 +259,7 @@ where
             .filter(|child| !self.mappings.is_dst(child.shallow()))
             .fold(HashMap::<_, Vec<Ddst::IdD>>::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.dst_arena.original(&child));
-                acc.entry(t).or_insert_with(Vec::new).push(child);
+                acc.entry(t).or_default().push(child);
                 acc
             });
 
@@ -259,28 +270,7 @@ where
         })
     }
 
-    /// Matches all pairs of nodes whose types appear only once in src and dst (step 3 of simple recovery)
-    fn histogram_matching_lazy(
-        &mut self,
-        src: Dsrc::IdD,
-        dst: Ddst::IdD,
-        more: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, Vec<Dsrc::IdD>, Vec<Ddst::IdD>),
-    ) {
-        let it = self.prep_histogram_matching_lazy(src, dst);
-        for (_t, (src_histogram, dst_histogram)) in it {
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                let t1 = src_histogram[0];
-                let t2 = dst_histogram[0];
-                self.mappings
-                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
-                self.last_chance_match_histogram_lazy(t1, t2);
-                continue;
-            }
-            more(self, src_histogram, dst_histogram);
-        }
-    }
-
-    #[allow(unused)]
+    /// Matches more pairs of leafs
     fn more_histogram_matching_lazy(
         &mut self,
         src_histogram: Vec<Dsrc::IdD>,
@@ -303,6 +293,35 @@ where
         for (t1, t2) in v {
             self.mappings
                 .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
+        }
+    }
+
+    /// Extend [`last_chance_match_histogram_lazy`] with a more aggressive matching strategy for leafs
+    pub fn last_chance_match_histogram_lazy2(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
+        self.lcs_equal_matching_lazy(src, dst);
+        self.lcs_structure_matching_lazy(src, dst);
+
+        // then histogram matching
+        let src_type = (self.src_arena.parent(&src))
+            .map(|p| self.src_arena.original(&p))
+            .map(|p| self.hyperast.resolve_type(&p));
+        let dst_type = (self.dst_arena.parent(&dst))
+            .map(|p| self.dst_arena.original(&p))
+            .map(|p| self.hyperast.resolve_type(&p));
+        if src_type != dst_type {
+            return;
+        }
+        let it = self.prep_histogram_matching_lazy(src, dst);
+        for (_t, (src_histogram, dst_histogram)) in it {
+            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
+                let t1 = src_histogram[0];
+                let t2 = dst_histogram[0];
+                self.mappings
+                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
+                self.last_chance_match_histogram_lazy2(t1, t2);
+                continue;
+            }
+            self.more_histogram_matching_lazy(src_histogram, dst_histogram);
         }
     }
 

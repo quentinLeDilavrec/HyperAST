@@ -67,7 +67,7 @@ where
     }
 
     /// Hybrid recovery algorithm (finds mappings between src and dst descendants)
-    /// Uses ZS (optimal) if the number of descendents is below SIZE_THRESHOLD
+    /// Uses ZS (optimal) if the number of descendants is below SIZE_THRESHOLD
     /// Uses simple recovery otherwise
     pub fn last_chance_match_hybrid(
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,

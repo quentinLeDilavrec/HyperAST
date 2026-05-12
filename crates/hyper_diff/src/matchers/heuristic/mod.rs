@@ -1,5 +1,6 @@
 pub mod cd;
 pub mod gt;
+pub mod lazy_xy_bottom_up_matcher;
 pub mod xy_bottom_up_matcher;
 
 mod factorized_bounds {

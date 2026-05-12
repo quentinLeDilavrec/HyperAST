@@ -1,6 +1,7 @@
 use num_traits::ToPrimitive;
-use std::collections::HashMap;
 use std::hash::Hash;
+
+use hyperast::compat::HashMap;
 
 use hyperast::PrimInt;
 use hyperast::types::NodeId;
@@ -241,7 +242,7 @@ where
         dst: &M::Dst,
     ) -> impl Iterator<Item = (<HAST::TS as hyperast::types::TypeStore>::Ty, (Src, Dst))>
     + use<HAST, Dsrc, Ddst, Src, Dst, M> {
-        use std::collections::hash_map::Entry;
+        use hyperast::compat::hash_map::Entry;
         // both src and dst -histogram have type Map<Type, List<ITree>>
         let src_histogram = (self.src_arena.children(src))
             .into_iter()
@@ -253,7 +254,7 @@ where
                         v.get_mut().push(child);
                     }
                     Entry::Vacant(v) => {
-                        v.insert(Src::first(child));
+                        v.insert(Extendable::first(child));
                     }
                 }
                 acc
@@ -269,7 +270,7 @@ where
                         v.get_mut().push(child);
                     }
                     Entry::Vacant(v) => {
-                        v.insert(Dst::first(child));
+                        v.insert(Extendable::first(child));
                     }
                 }
                 acc

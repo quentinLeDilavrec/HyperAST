@@ -102,9 +102,9 @@ where
     HAST::Label: Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    pub fn last_chance_match_histogram(&mut self, src: &M::Src, dst: &M::Dst) {
-        self.lcs_equal_matching(src, dst);
-        self.lcs_structure_matching(src, dst);
+    pub fn last_chance_match_histogram(&mut self, src: M::Src, dst: M::Dst) {
+        self.lcs_equal_matching(&src, &dst);
+        self.lcs_structure_matching(&src, &dst);
 
         let src_type = (self.src_arena.parent(&src))
             .map(|p| self.src_arena.original(&p))
@@ -116,7 +116,7 @@ where
             return;
         }
 
-        let it = self.prep_histogram_matching(src, dst);
+        let it = self.prep_histogram_matching(&src, &dst);
         for (_t, (src_histogram, dst_histogram)) in it {
             if src_histogram.len() == 1 && dst_histogram.len() == 1 {
                 // TODO use an option instead of a vec
@@ -125,7 +125,7 @@ where
                 let src = src_histogram[0];
                 let dst = dst_histogram[0];
                 self.mappings.link_if_both_unmapped(src, dst);
-                self.last_chance_match_histogram(&src, &dst);
+                self.last_chance_match_histogram(src, dst);
             }
         }
     }
@@ -318,7 +318,7 @@ where
                 let src = src_histogram[0];
                 let dst = dst_histogram[0];
                 self.mappings.link_if_both_unmapped(src, dst);
-                self.last_chance_match_histogram(&src, &dst);
+                self.last_chance_match_histogram(src, dst);
                 continue;
             }
             self.more_histogram_matching(src_histogram, dst_histogram);

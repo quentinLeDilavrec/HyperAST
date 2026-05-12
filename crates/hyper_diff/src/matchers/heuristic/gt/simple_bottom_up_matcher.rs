@@ -80,7 +80,7 @@ where
                 }
 
                 if let Some(dst) = best {
-                    mapper.last_chance_match_histogram(&src, &dst);
+                    mapper.last_chance_match_histogram(src, dst);
                     mapper.mappings.link(src, dst);
                 }
             } else if mapper.mappings.is_src(&src)
@@ -88,7 +88,7 @@ where
                 && let Some(dst) = mapper.mappings.get_dst(&src)
                 && mapper.has_unmapped_dst_children(&dst)
             {
-                mapper.last_chance_match_histogram(&src, &dst);
+                mapper.last_chance_match_histogram(src, dst);
             }
         }
 
@@ -96,6 +96,6 @@ where
         let src = mapper.mapping.src_arena.root();
         let dst = mapper.mapping.dst_arena.root();
         mapper.mapping.mappings.link(src, dst);
-        mapper.last_chance_match_histogram(&src, &dst);
+        mapper.last_chance_match_histogram(src, dst);
     }
 }

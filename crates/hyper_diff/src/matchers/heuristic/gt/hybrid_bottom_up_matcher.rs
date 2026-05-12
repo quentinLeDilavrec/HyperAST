@@ -116,7 +116,7 @@ where
         {
             mapper.last_chance_match_zs_slice::<MZs>(src, dst);
         } else {
-            mapper.last_chance_match_histogram(&src, &dst);
+            mapper.last_chance_match_histogram(src, dst);
         }
     }
 }

@@ -124,7 +124,8 @@ where
 
             if !(ignored[src.shallow().index()] || is_mapping_unique) {
                 let adsts = multi_mappings.get_dsts(&src);
-                let asrcs = multi_mappings.get_srcs(&multi_mappings.get_dsts(&src)[0]);
+                let dst = multi_mappings.get_dsts(&src)[0];
+                let asrcs = multi_mappings.get_srcs(&dst);
                 for asrc in asrcs {
                     ignored.set(asrc.shallow().index(), true);
                     for adst in adsts {

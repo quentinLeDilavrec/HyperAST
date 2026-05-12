@@ -76,17 +76,17 @@ where
         return true;
     }
 
-    let _src = hyperast.node_store().resolve(src);
-    let _dst = hyperast.node_store().resolve(dst);
+    let src_ = hyperast.node_store().resolve(src);
+    let dst_ = hyperast.node_store().resolve(dst);
     if HASH && !STRUCTURAL {
-        let src_hash = WithHashs::hash(&_src, &HashKind::label());
-        let dst_hash = WithHashs::hash(&_dst, &HashKind::label());
+        let src_hash = WithHashs::hash(&src_, &HashKind::label());
+        let dst_hash = WithHashs::hash(&dst_, &HashKind::label());
         if src_hash != dst_hash {
             return false;
         }
     } else if HASH && STRUCTURAL {
-        let src_hash = WithHashs::hash(&_src, &HashKind::structural());
-        let dst_hash = WithHashs::hash(&_dst, &HashKind::structural());
+        let src_hash = WithHashs::hash(&src_, &HashKind::structural());
+        let dst_hash = WithHashs::hash(&dst_, &HashKind::structural());
         if src_hash != dst_hash {
             return false;
         }
@@ -99,15 +99,15 @@ where
     }
 
     if !STRUCTURAL {
-        let src_label = _src.try_get_label();
-        let dst_label = _dst.try_get_label();
+        let src_label = src_.try_get_label();
+        let dst_label = dst_.try_get_label();
         if src_label != dst_label {
             return false;
         }
     }
 
-    let src_children: Option<Vec<_>> = _src.children().map(|x| x.iter_children().collect());
-    let dst_children: Option<Vec<_>> = _dst.children().map(|x| x.iter_children().collect());
+    let src_children: Option<Vec<_>> = src_.children().map(|x| x.iter_children().collect());
+    let dst_children: Option<Vec<_>> = dst_.children().map(|x| x.iter_children().collect());
     match (src_children, dst_children) {
         (None, None) => true,
         (Some(src_c), Some(dst_c)) => {

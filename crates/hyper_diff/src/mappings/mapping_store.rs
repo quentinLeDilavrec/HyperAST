@@ -59,8 +59,8 @@ pub trait MultiMappingStore: MappingStore {
     fn get_dsts(&self, src: &Self::Src) -> &[Self::Dst];
     fn all_mapped_srcs(&self) -> Self::Iter1<'_>;
     fn all_mapped_dsts(&self) -> Self::Iter2<'_>;
-    fn is_src_unique(&self, dst: &Self::Src) -> bool;
-    fn is_dst_unique(&self, src: &Self::Dst) -> bool;
+    fn is_src_unique(&self, src: &Self::Src) -> bool;
+    fn is_dst_unique(&self, dst: &Self::Dst) -> bool;
 }
 pub type DefaultMultiMappingStore<T> = MultiVecStore<T>;
 

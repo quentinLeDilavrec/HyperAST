@@ -1,7 +1,7 @@
 //! makes greedy_bottom_up_matcher lazy
 //! - [ ] first make post order iterator lazy
 //!
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::types::NodeId;
@@ -21,7 +21,7 @@ pub struct LazyGreedyBottomUpMatcher<
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: PhantomData<*const (Mpr, MZs)>,
+    _phantom: std::marker::PhantomData<*const (Mpr, MZs)>,
 }
 
 impl<

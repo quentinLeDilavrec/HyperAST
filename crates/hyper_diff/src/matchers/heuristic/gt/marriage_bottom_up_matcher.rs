@@ -60,31 +60,30 @@ where
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
         assert!(mapper.src_arena.len() > 0);
-        for a in mapper.src_arena.iter_df_post::<false>() {
-            if !mapper.mappings.is_src(&a) && Self::src_has_children(mapper, a) {
-                if let Some(best_dst) = Self::best_dst_candidate(mapper, &a)
-                    && Self::best_src_candidate(mapper, &best_dst) == Some(a)
+        for src in mapper.src_arena.iter_df_post::<false>() {
+            if !mapper.mappings.is_src(&src) && Self::src_has_children(mapper, src) {
+                if let Some(best_dst) = Self::best_dst_candidate(mapper, &src)
+                    && Self::best_src_candidate(mapper, &best_dst) == Some(src)
                 {
-                    Self::last_chance_match_zs(mapper, a, best_dst);
-                    mapper.mappings.link(a, best_dst);
+                    Self::last_chance_match_zs(mapper, src, best_dst);
+                    mapper.mappings.link(src, best_dst);
                 }
-            } else if let Some(dst) = mapper.mappings.get_dst(&a)
-                && mapper.mappings.is_src(&a)
-                && Self::has_unmapped_src_children(mapper, &a)
+            } else if let Some(dst) = mapper.mappings.get_dst(&src)
+                && mapper.mappings.is_src(&src)
+                && Self::has_unmapped_src_children(mapper, &src)
                 && Self::has_unmapped_dst_children(
                     mapper,
-                    &mapper.mappings.get_dst(&a).expect("No dst found for src"),
+                    &mapper.mappings.get_dst(&src).expect("No dst found for src"),
                 )
             {
-                Self::last_chance_match_zs(mapper, a, dst);
+                Self::last_chance_match_zs(mapper, src, dst);
             }
         }
         // for root
-        mapper.mapping.mappings.link(
-            mapper.mapping.src_arena.root(),
-            mapper.mapping.dst_arena.root(),
-        );
-        Self::last_chance_match_zs(mapper, mapper.src_arena.root(), mapper.dst_arena.root());
+        let src = mapper.mapping.src_arena.root();
+        let dst = mapper.mapping.dst_arena.root();
+        mapper.mapping.mappings.link(src, dst);
+        Self::last_chance_match_zs(mapper, src, dst);
     }
 
     fn src_has_children(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src) -> bool {

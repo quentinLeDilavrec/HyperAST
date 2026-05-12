@@ -55,9 +55,9 @@ where
         let similarity_threshold: f64 =
             SIMILARITY_THRESHOLD_NUM as f64 / SIMILARITY_THRESHOLD_DEN as f64;
 
-        for node in mapper.src_arena.iter_df_post::<false>() {
-            if !mapper.mappings.is_src(&node) && mapper.src_has_children(node) {
-                let candidates = mapper.get_dst_candidates(&node);
+        for src in mapper.src_arena.iter_df_post::<false>() {
+            if !mapper.mappings.is_src(&src) && mapper.src_has_children(src) {
+                let candidates = mapper.get_dst_candidates(&src);
                 let mut best = None;
                 let mut max_similarity: f64 = -1.;
 
@@ -68,7 +68,7 @@ where
                     // In gumtree implementation they check if Simliarity_Threshold is set, otherwise they compute a fitting value
                     // But here we assume threshold is always set.
                     let similarity = similarity_metrics::chawathe_similarity(
-                        &mapper.src_arena.descendants(&node),
+                        &mapper.src_arena.descendants(&src),
                         &mapper.dst_arena.descendants(&candidate),
                         &mapper.mappings,
                     );
@@ -79,23 +79,23 @@ where
                     }
                 }
 
-                if let Some(best_candidate) = best {
-                    mapper.last_chance_match_histogram(&node, &best_candidate);
-                    mapper.mappings.link(node, best_candidate);
+                if let Some(dst) = best {
+                    mapper.last_chance_match_histogram(&src, &dst);
+                    mapper.mappings.link(src, dst);
                 }
-            } else if mapper.mappings.is_src(&node)
-                && mapper.has_unmapped_src_children(&node)
-                && let Some(dst) = mapper.mappings.get_dst(&node)
+            } else if mapper.mappings.is_src(&src)
+                && mapper.has_unmapped_src_children(&src)
+                && let Some(dst) = mapper.mappings.get_dst(&src)
                 && mapper.has_unmapped_dst_children(&dst)
             {
-                mapper.last_chance_match_histogram(&node, &dst);
+                mapper.last_chance_match_histogram(&src, &dst);
             }
         }
 
-        mapper.mapping.mappings.link(
-            mapper.mapping.src_arena.root(),
-            mapper.mapping.dst_arena.root(),
-        );
-        mapper.last_chance_match_histogram(&mapper.src_arena.root(), &mapper.dst_arena.root());
+        // for root
+        let src = mapper.mapping.src_arena.root();
+        let dst = mapper.mapping.dst_arena.root();
+        mapper.mapping.mappings.link(src, dst);
+        mapper.last_chance_match_histogram(&src, &dst);
     }
 }

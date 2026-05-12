@@ -9,8 +9,8 @@ use hyperast::types::{HyperAST, LendT, WithHashs};
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
 use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
 use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
-use crate::matchers::Mapper;
 use crate::mappings::{MappingStore, MonoMappingStore};
+use crate::matchers::Mapper;
 
 impl<
     Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
@@ -67,7 +67,7 @@ where
     }
 
     pub(crate) fn add_mapping_recursively_lazy(&mut self, src: &Dsrc::IdD, dst: &Ddst::IdD) {
-        self.mappings.link(*src.shallow(), *dst.shallow());
+        self.mappings.link(src.to_shallow(), dst.to_shallow());
         // WARN check if it works well
         let src = self.src_arena.descendants(src);
         let dst = self.dst_arena.descendants(dst);
@@ -172,7 +172,10 @@ where
         })
     }
 
-    pub(super) fn get_dst_candidates_lazily(&mut self, src: &Dsrc::IdD) -> Vec<Ddst::IdD> {
+    pub(in crate::matchers) fn get_dst_candidates_lazily(
+        &mut self,
+        src: &Dsrc::IdD,
+    ) -> Vec<Ddst::IdD> {
         let mut seeds = vec![];
         for c in self.mapping.src_arena.descendants(src) {
             if let Some(m) = self.mapping.mappings.get_dst(&c) {
@@ -433,7 +436,7 @@ where
                 let odst = mapping.dst_arena.original(&dst);
                 let tdst = self.hyperast.resolve_type(&odst);
                 if tsrc == tdst {
-                    mappings.link(*src.shallow(), *dst.shallow());
+                    mappings.link(src.to_shallow(), dst.to_shallow());
                 }
             }
         }
@@ -467,23 +470,23 @@ where
         recovery: impl Fn(&mut Self, Dsrc::IdD, Ddst::IdD),
     ) {
         assert!(self.src_arena.len() > 0);
-        for a in self.src_arena.iter_df_post::<false>() {
-            if self.mappings.is_src(&a) {
+        for src in self.src_arena.iter_df_post::<false>() {
+            if self.mappings.is_src(&src) {
                 continue;
             }
-            let a_ = self.mapping.src_arena.decompress_to(&a);
-            if self.src_has_children_lazy(a_) {
-                let Some(best) = self.best_dst_candidate_lazy(&threshold, &similarity, a_) else {
+            let src_ = self.mapping.src_arena.decompress_to(&src);
+            if self.src_has_children_lazy(src_) {
+                let Some(dst) = self.best_dst_candidate_lazy(&threshold, &similarity, src_) else {
                     continue;
                 };
-                recovery(self, a_, best);
-                self.mappings.link(*a_.shallow(), *best.shallow());
-            } else if self.has_unmapped_src_descendants_lazy(&a_)
-                && let Some(dst) = self.mappings.get_dst(&a)
+                recovery(self, src_, dst);
+                self.mappings.link(*src_.shallow(), *dst.shallow());
+            } else if self.has_unmapped_src_descendants_lazy(&src_)
+                && let Some(dst) = self.mappings.get_dst(&src)
             {
                 let dst = self.dst_arena.decompress_to(&dst);
                 if self.has_unmapped_dst_descendants_lazy(&dst) {
-                    recovery(self, a_, dst);
+                    recovery(self, src_, dst);
                 }
             }
         }
@@ -505,21 +508,21 @@ where
         recovery: impl Fn(&mut Self, Dsrc::IdD, Ddst::IdD),
     ) {
         assert!(self.src_arena.len() > 0);
-        for a in self.src_arena.iter_df_post::<false>() {
-            let is_mapped = self.mappings.is_src(&a);
+        for src in self.src_arena.iter_df_post::<false>() {
+            let is_mapped = self.mappings.is_src(&src);
             if is_mapped {
                 continue;
             }
-            let a = self.mapping.src_arena.decompress_to(&a);
-            if !self.src_has_children_lazy(a) {
+            let src = self.mapping.src_arena.decompress_to(&src);
+            if !self.src_has_children_lazy(src) {
                 continue;
             }
-            let Some(best_dst) = self.best_dst_candidate_lazy(&threshold, &similarity, a) else {
+            let Some(dst) = self.best_dst_candidate_lazy(&threshold, &similarity, src) else {
                 continue;
             };
-            if Some(a) == self.best_src_candidate_lazy(&threshold, &similarity, best_dst) {
-                recovery(self, a, best_dst);
-                self.mappings.link(*a.shallow(), *best_dst.shallow());
+            if Some(src) == self.best_src_candidate_lazy(&threshold, &similarity, dst) {
+                recovery(self, src, dst);
+                self.mappings.link(*src.shallow(), *dst.shallow());
             }
         }
         // for root

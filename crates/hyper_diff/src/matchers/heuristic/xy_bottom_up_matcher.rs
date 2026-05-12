@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use hyperast::PrimInt;
 use hyperast::types::NodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs};
-use hyperast::types::{NodeStore as _, Tree as _};
 
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
@@ -47,16 +46,16 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        for a in mapper.src_arena.iter_df_post::<false>() {
-            if mapper.mappings.is_src(&a) || !Self::src_has_children(mapper, a) {
+        for src in mapper.src_arena.iter_df_post::<false>() {
+            if mapper.mappings.is_src(&src) || !mapper.src_has_children(src) {
                 continue;
             }
-            let candidates = mapper.get_dst_candidates(&a);
+            let candidates = mapper.get_dst_candidates(&src);
             let mut best = None;
             let mut max: f64 = -1.;
             for cand in candidates {
                 let sim = similarity_metrics::SimilarityMeasure::range(
-                    &mapper.src_arena.descendants_range(&a),
+                    &mapper.src_arena.descendants_range(&src),
                     &mapper.dst_arena.descendants_range(&cand),
                     &mapper.mappings,
                 )
@@ -67,9 +66,9 @@ where
                 }
             }
 
-            if let Some(best) = best {
-                Self::last_chance_match(mapper, a, best);
-                mapper.mappings.link(a, best);
+            if let Some(dst) = best {
+                Self::last_chance_match(mapper, src, dst);
+                mapper.mappings.link(src, dst);
             }
         }
         // for root
@@ -77,21 +76,6 @@ where
         let dst = mapper.mapping.dst_arena.root();
         mapper.mapping.mappings.link(src, dst);
         Self::last_chance_match(mapper, src, dst);
-    }
-
-    fn src_has_children(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src) -> bool {
-        use num_traits::ToPrimitive;
-        let r = (mapper.hyperast.node_store())
-            .resolve(&mapper.src_arena.original(&src))
-            .has_children();
-        debug_assert_eq!(
-            r,
-            mapper.src_arena.lld(&src) < src,
-            "{:?} {:?}",
-            mapper.src_arena.lld(&src),
-            src.to_usize()
-        );
-        r
     }
 
     fn last_chance_match(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src, dst: M::Dst) {

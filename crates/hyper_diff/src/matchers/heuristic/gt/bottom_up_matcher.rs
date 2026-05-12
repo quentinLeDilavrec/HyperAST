@@ -8,8 +8,8 @@ use hyperast::types::NodeStore as _;
 use hyperast::types::{HyperAST, LendT, Tree, TypeStore, WithHashs};
 
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
-use crate::matchers::Mapper;
 use crate::mappings::MonoMappingStore;
+use crate::matchers::Mapper;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 impl<
@@ -198,7 +198,7 @@ where
     }
 
     /// Return true if src has *any* children
-    pub(super) fn src_has_children(&mut self, src: M::Src) -> bool {
+    pub(in crate::matchers) fn src_has_children(&mut self, src: M::Src) -> bool {
         (self.hyperast.node_store())
             .resolve(&self.src_arena.original(&src))
             .has_children()

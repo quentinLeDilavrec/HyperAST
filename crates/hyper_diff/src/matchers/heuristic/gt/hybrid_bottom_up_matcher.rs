@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use hyperast::PrimInt;
 use hyperast::types::NodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs};
-use hyperast::types::{NodeStore as _, Tree as _};
 
 use crate::decompressed_tree_store::POBorrowSlice;
 use crate::mappings::MonoMappingStore;
@@ -70,49 +69,41 @@ where
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         recovery: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, M::Src, M::Dst),
     ) {
-        for t in mapper.mapping.src_arena.iter_df_post::<true>() {
-            if mapper.mapping.src_arena.parent(&t).is_none() {
-                mapper.mapping.mappings.link(
-                    mapper.mapping.src_arena.root(),
-                    mapper.mapping.dst_arena.root(),
-                );
-                Self::last_chance_match_hybrid(
-                    mapper,
-                    mapper.mapping.src_arena.root(),
-                    mapper.mapping.dst_arena.root(),
-                );
-                break;
-            }
-            if !mapper.mappings.is_src(&t) && Self::src_has_children(mapper, t) {
-                let candidates = mapper.get_dst_candidates(&t);
+        for src in mapper.mapping.src_arena.iter_df_post::<false>() {
+            if !mapper.mappings.is_src(&src) && mapper.src_has_children(src) {
+                let candidates = mapper.get_dst_candidates(&src);
                 let mut best = None;
                 let mut max_sim = -1f64;
-                for candidate in candidates {
+                for cand in candidates {
                     let sim = similarity_metrics::SimilarityMeasure::range(
-                        &mapper.src_arena.descendants_range(&t),
-                        &mapper.dst_arena.descendants_range(&candidate),
+                        &mapper.src_arena.descendants_range(&src),
+                        &mapper.dst_arena.descendants_range(&cand),
                         &mapper.mappings,
                     )
                     .chawathe();
-                    let threshold = Mapper::adaptive_threshold(mapper, t, candidate);
-                    // SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64;
+                    let threshold = Mapper::adaptive_threshold(mapper, src, cand);
                     if sim > max_sim && sim >= threshold {
                         max_sim = sim;
-                        best = Some(candidate);
+                        best = Some(cand);
                     }
                 }
-                if let Some(best) = best {
-                    recovery(mapper, t, best);
-                    mapper.mappings.link(t, best);
+                if let Some(dst) = best {
+                    recovery(mapper, src, dst);
+                    mapper.mappings.link(src, dst);
                 }
-            } else if mapper.mappings.is_src(&t)
-                && mapper.has_unmapped_src_children(&t)
-                && let Some(dst) = mapper.mappings.get_dst(&t)
+            } else if mapper.mappings.is_src(&src)
+                && mapper.has_unmapped_src_children(&src)
+                && let Some(dst) = mapper.mappings.get_dst(&src)
                 && mapper.has_unmapped_dst_children(&dst)
             {
-                recovery(mapper, t, dst);
+                recovery(mapper, src, dst);
             }
         }
+        // for root
+        let src = mapper.mapping.src_arena.root();
+        let dst = mapper.mapping.dst_arena.root();
+        mapper.mapping.mappings.link(src, dst);
+        Self::last_chance_match_hybrid(mapper, src, dst);
     }
 
     fn last_chance_match_hybrid(
@@ -127,23 +118,6 @@ where
         } else {
             mapper.last_chance_match_histogram(&src, &dst);
         }
-    }
-
-    fn src_has_children(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src) -> bool {
-        use num_traits::ToPrimitive;
-        let r = mapper
-            .hyperast
-            .node_store()
-            .resolve(&mapper.src_arena.original(&src))
-            .has_children();
-        assert_eq!(
-            r,
-            mapper.src_arena.lld(&src) < src,
-            "{:?} {:?}",
-            mapper.src_arena.lld(&src),
-            src.to_usize()
-        );
-        r
     }
 }
 

@@ -59,9 +59,12 @@ where
     fn last_chance_match(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: Dsrc::IdD, dst: Ddst::IdD) {
         let it = mapper.prep_histogram_matching_lazy(src, dst);
         for (_t, (src_histogram, dst_histogram)) in it {
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                let src = src_histogram[0].to_shallow();
-                let dst = dst_histogram[0].to_shallow();
+            // Matches all pairs of nodes whose types appear only once in src and dst
+            if let Some(src) = src_histogram
+                && let Some(dst) = dst_histogram
+            {
+                let src = src.to_shallow();
+                let dst = dst.to_shallow();
                 mapper.mappings.link_if_both_unmapped(src, dst);
             }
         }

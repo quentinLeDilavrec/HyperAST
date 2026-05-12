@@ -228,41 +228,55 @@ where
         let it = self.prep_histogram_matching_lazy(src, dst);
         for (_t, (src_histogram, dst_histogram)) in it {
             // Matches all pairs of nodes whose types appear only once in src and dst
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                let t1 = src_histogram[0];
-                let t2 = dst_histogram[0];
+            if let Some(src) = src_histogram
+                && let Some(dst) = dst_histogram
+            {
                 self.mappings
-                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
-                self.last_chance_match_histogram_lazy(t1, t2);
+                    .link_if_both_unmapped(src.to_shallow(), dst.to_shallow());
+                self.last_chance_match_histogram_lazy(src, dst);
             }
         }
     }
 
-    pub(crate) fn prep_histogram_matching_lazy(
+    pub(crate) fn prep_histogram_matching_lazy<
+        Src: Extendable<Dsrc::IdD>,
+        Dst: Extendable<Ddst::IdD>,
+    >(
         &mut self,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
-    ) -> impl Iterator<
-        Item = (
-            <HAST::TS as hyperast::types::TypeStore>::Ty,
-            (Vec<Dsrc::IdD>, Vec<Ddst::IdD>),
-        ),
-    > + use<HAST, Dsrc, Ddst, M> {
+    ) -> impl Iterator<Item = (<HAST::TS as hyperast::types::TypeStore>::Ty, (Src, Dst))>
+    + use<HAST, Dsrc, Ddst, Src, Dst, M> {
+        use hyperast::compat::hash_map::Entry;
         let src_histogram = (self.src_arena.decompress_children(&src))
             .into_iter()
             .filter(|child| !self.mappings.is_src(child.shallow()))
-            .fold(HashMap::<_, Vec<Dsrc::IdD>>::new(), |mut acc, child| {
+            .fold(HashMap::<_, Src>::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.src_arena.original(&child));
-                acc.entry(t).or_default().push(child);
+                match acc.entry(t) {
+                    Entry::Occupied(mut v) => {
+                        v.get_mut().push(child);
+                    }
+                    Entry::Vacant(v) => {
+                        v.insert(Extendable::first(child));
+                    }
+                }
                 acc
             });
 
         let mut dst_histogram = (self.dst_arena.decompress_children(&dst))
             .into_iter()
             .filter(|child| !self.mappings.is_dst(child.shallow()))
-            .fold(HashMap::<_, Vec<Ddst::IdD>>::new(), |mut acc, child| {
+            .fold(HashMap::<_, Dst>::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.dst_arena.original(&child));
-                acc.entry(t).or_default().push(child);
+                match acc.entry(t) {
+                    Entry::Occupied(mut v) => {
+                        v.get_mut().push(child);
+                    }
+                    Entry::Vacant(v) => {
+                        v.insert(Extendable::first(child));
+                    }
+                }
                 acc
             });
 
@@ -293,9 +307,9 @@ where
             (alink.0.index().abs_diff(alink.1.index()))
                 .cmp(&blink.0.index().abs_diff(blink.1.index()))
         });
-        for (t1, t2) in v {
+        for (src, dst) in v {
             self.mappings
-                .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
+                .link_if_both_unmapped(src.to_shallow(), dst.to_shallow());
         }
     }
 
@@ -314,14 +328,14 @@ where
         if src_type != dst_type {
             return;
         }
-        let it = self.prep_histogram_matching_lazy(src, dst);
+        let it = self.prep_histogram_matching_lazy::<Vec<_>, Vec<_>>(src, dst);
         for (_t, (src_histogram, dst_histogram)) in it {
             if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                let t1 = src_histogram[0];
-                let t2 = dst_histogram[0];
+                let src = src_histogram[0];
+                let dst = dst_histogram[0];
                 self.mappings
-                    .link_if_both_unmapped(*t1.shallow(), *t2.shallow());
-                self.last_chance_match_histogram_lazy2(t1, t2);
+                    .link_if_both_unmapped(src.to_shallow(), dst.to_shallow());
+                self.last_chance_match_histogram_lazy2(src, dst);
                 continue;
             }
             self.more_histogram_matching_lazy(src_histogram, dst_histogram);
@@ -445,6 +459,7 @@ where
 
 use crate::decompressed_tree_store::ContiguousDescendants;
 use crate::matchers::heuristic::factorized_bounds::LazyDecompTreeBounds;
+use crate::matchers::heuristic::gt::bottom_up_matcher::Extendable;
 use crate::similarity_metrics::SimilarityMeasure;
 impl<
     Dsrc: LazyDecompTreeBounds<HAST, M::Src>,

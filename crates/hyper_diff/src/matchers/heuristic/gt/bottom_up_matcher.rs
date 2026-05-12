@@ -118,12 +118,9 @@ where
 
         let it = self.prep_histogram_matching(&src, &dst);
         for (_t, (src_histogram, dst_histogram)) in it {
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                // TODO use an option instead of a vec
-                // we are only retrieving the first element anyway,
-                // we just have to set to None on the second insertion to keep them same behavior
-                let src = src_histogram[0];
-                let dst = dst_histogram[0];
+            if let Some(src) = src_histogram
+                && let Some(dst) = dst_histogram
+            {
                 self.mappings.link_if_both_unmapped(src, dst);
                 self.last_chance_match_histogram(src, dst);
             }
@@ -238,32 +235,43 @@ where
         super::isomorphic::<_, true, STRUCTURAL>(self.hyperast, &src, &dst)
     }
 
-    pub(crate) fn prep_histogram_matching(
+    pub(crate) fn prep_histogram_matching<Src: Extendable<M::Src>, Dst: Extendable<M::Dst>>(
         &mut self,
         src: &M::Src,
         dst: &M::Dst,
-    ) -> impl Iterator<
-        Item = (
-            <HAST::TS as hyperast::types::TypeStore>::Ty,
-            (Vec<M::Src>, Vec<M::Dst>),
-        ),
-    > + use<HAST, Dsrc, Ddst, M> {
+    ) -> impl Iterator<Item = (<HAST::TS as hyperast::types::TypeStore>::Ty, (Src, Dst))>
+    + use<HAST, Dsrc, Ddst, Src, Dst, M> {
+        use std::collections::hash_map::Entry;
         // both src and dst -histogram have type Map<Type, List<ITree>>
         let src_histogram = (self.src_arena.children(src))
             .into_iter()
             .filter(|child| !self.mappings.is_src(child))
-            .fold(HashMap::<_, Vec<M::Src>>::new(), |mut acc, child| {
+            .fold(HashMap::<_, Src>::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.src_arena.original(&child));
-                acc.entry(t).or_default().push(child);
+                match acc.entry(t) {
+                    Entry::Occupied(mut v) => {
+                        v.get_mut().push(child);
+                    }
+                    Entry::Vacant(v) => {
+                        v.insert(Src::first(child));
+                    }
+                }
                 acc
             });
 
         let mut dst_histogram = (self.dst_arena.children(dst))
             .into_iter()
             .filter(|child| !self.mappings.is_dst(child))
-            .fold(HashMap::<_, Vec<M::Dst>>::new(), |mut acc, child| {
+            .fold(HashMap::<_, Dst>::new(), |mut acc, child| {
                 let t = self.hyperast.resolve_type(&self.dst_arena.original(&child));
-                acc.entry(t).or_default().push(child);
+                match acc.entry(t) {
+                    Entry::Occupied(mut v) => {
+                        v.get_mut().push(child);
+                    }
+                    Entry::Vacant(v) => {
+                        v.insert(Dst::first(child));
+                    }
+                }
                 acc
             });
 
@@ -309,12 +317,9 @@ where
             return;
         }
 
-        let it = self.prep_histogram_matching(src, dst);
+        let it = self.prep_histogram_matching::<Vec<_>, Vec<_>>(src, dst);
         for (_t, (src_histogram, dst_histogram)) in it {
             if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                // TODO use an option instead of a vec
-                // we are only retrieving the first element anyway,
-                // we just have to set to None on the second insertion to keep them same behavior
                 let src = src_histogram[0];
                 let dst = dst_histogram[0];
                 self.mappings.link_if_both_unmapped(src, dst);
@@ -345,5 +350,28 @@ where
                 }
             }
         }
+    }
+}
+
+pub(crate) trait Extendable<T> {
+    fn first(value: T) -> Self;
+    fn push(&mut self, value: T);
+}
+
+impl<T> Extendable<T> for Vec<T> {
+    fn first(value: T) -> Self {
+        vec![value]
+    }
+    fn push(&mut self, value: T) {
+        self.push(value);
+    }
+}
+
+impl<T> Extendable<T> for Option<T> {
+    fn first(value: T) -> Self {
+        Some(value)
+    }
+    fn push(&mut self, _value: T) {
+        *self = None;
     }
 }

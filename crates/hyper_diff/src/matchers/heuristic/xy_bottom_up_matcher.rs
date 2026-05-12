@@ -81,9 +81,9 @@ where
     fn last_chance_match(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src: M::Src, dst: M::Dst) {
         let it = mapper.prep_histogram_matching(&src, &dst);
         for (_t, (src_histogram, dst_histogram)) in it {
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                let src = src_histogram[0];
-                let dst = dst_histogram[0];
+            if let Some(src) = src_histogram
+                && let Some(dst) = dst_histogram
+            {
                 mapper.mappings.link_if_both_unmapped(src, dst);
             }
         }

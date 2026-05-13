@@ -89,7 +89,7 @@ where
             }
         }
 
-        let mapping_list: Vec<_> = mapper.sort(ambiguous_list).collect();
+        let mapping_list: Vec<_> = mapper.sort_ambiguous_mappings(ambiguous_list).collect();
 
         // Select the best ambiguous mappings
         // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
@@ -130,41 +130,41 @@ where
     HAST::Label: Eq + Clone,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    fn sort(
+    fn sort_ambiguous_mappings(
         &mut self,
         mut ambiguous_mappings: Vec<(M::Src, M::Dst)>,
     ) -> impl Iterator<Item = (M::Src, M::Dst)> {
-        let mut sib_sim = HashMap::<(M::Src, M::Dst), f64>::default();
-        let mut psib_sim = HashMap::<(M::Src, M::Dst), f64>::default();
-        let mut p_in_p_sim = HashMap::<(M::Src, M::Dst), f64>::default();
         log::trace!("ambiguous_mappings.len: {}", &ambiguous_mappings.len());
-        ambiguous_mappings.sort_by(|a, b| {
+        ambiguous_mappings.sort_by(self.ambiguous_mappings_comparator());
+        ambiguous_mappings.into_iter()
+    }
+
+    fn ambiguous_mappings_comparator(
+        &mut self,
+    ) -> impl FnMut(&(M::Src, M::Dst), &(M::Src, M::Dst)) -> std::cmp::Ordering {
+        let mut sib_sim = HashMap::<(M::Src, M::Dst), f64>::default();
+        let mut psib_sim = sib_sim.clone();
+        let mut p_in_p_sim = sib_sim.clone();
+        move |a, b| {
             let cached_coef_sib =
                 |l: &(M::Src, M::Dst)| *sib_sim.entry(*l).or_insert_with(|| self.coef_sib(l));
             let cached_coef_parent =
                 |l: &(M::Src, M::Dst)| *psib_sim.entry(*l).or_insert_with(|| self.coef_parent(l));
-            let (alink, blink) = (a, b);
-            if self.same_parents(alink, blink) {
+            let cached_coef_pos_in_parent = |l: &(M::Src, M::Dst)| {
+                *p_in_p_sim
+                    .entry(*l)
+                    .or_insert_with(|| self.coef_pos_in_parent(l))
+            };
+            if self.same_parents(a, b) {
                 std::cmp::Ordering::Equal
             } else {
                 self.cached_compare(cached_coef_sib, a, b)
                     .reverse()
                     .then_with(|| self.cached_compare(cached_coef_parent, a, b).reverse())
             }
-            .then_with(|| {
-                self.cached_compare(
-                    |l: &(M::Src, M::Dst)| {
-                        *p_in_p_sim
-                            .entry(*l)
-                            .or_insert_with(|| self.coef_pos_in_parent(l))
-                    },
-                    a,
-                    b,
-                )
-            })
-            .then_with(|| self.compare_delta_pos(alink, blink))
-        });
-        ambiguous_mappings.into_iter()
+            .then_with(|| self.cached_compare(cached_coef_pos_in_parent, a, b))
+            .then_with(|| self.compare_delta_pos(a, b))
+        }
     }
 
     fn cached_compare<I, F: FnMut(&I) -> O, O: PartialOrd>(
@@ -211,7 +211,7 @@ where
     }
 
     fn coef_pos_in_parent(&self, l: &(M::Src, M::Dst)) -> f64 {
-        let srcs = vec![l.0]
+        let srcs = Some(l.0)
             .into_iter()
             .chain(self.src_arena.parents(l.0))
             .filter_map(|x| {
@@ -224,7 +224,7 @@ where
                         / self.src_arena.children(&p).len().to_f64().unwrap()
                 })
             });
-        let dsts = vec![l.1]
+        let dsts = Some(l.1)
             .into_iter()
             .chain(self.dst_arena.parents(l.1))
             .filter_map(|x| {
@@ -243,9 +243,9 @@ where
             .sqrt()
     }
 
-    fn same_parents(&self, alink: &(M::Src, M::Dst), blink: &(M::Src, M::Dst)) -> bool {
-        let ap = self.mapping_parents(alink);
-        let bp = self.mapping_parents(blink);
+    fn same_parents(&self, a: &(M::Src, M::Dst), b: &(M::Src, M::Dst)) -> bool {
+        let ap = self.mapping_parents(a);
+        let bp = self.mapping_parents(b);
         ap.0 == bp.0 && ap.1 == bp.1
     }
 
@@ -253,12 +253,8 @@ where
         (self.src_arena.parent(&l.0), self.dst_arena.parent(&l.1))
     }
 
-    fn compare_delta_pos(
-        &self,
-        alink: &(M::Src, M::Dst),
-        blink: &(M::Src, M::Dst),
-    ) -> std::cmp::Ordering {
-        (alink.0.index().abs_diff(alink.1.index())).cmp(&blink.0.index().abs_diff(blink.1.index()))
+    fn compare_delta_pos(&self, a: &(M::Src, M::Dst), b: &(M::Src, M::Dst)) -> std::cmp::Ordering {
+        (a.0.index().abs_diff(a.1.index())).cmp(&b.0.index().abs_diff(b.1.index()))
     }
 }
 
@@ -306,10 +302,7 @@ where
             &mapper.dst_arena,
             mapper.dst_arena.root(),
         );
-        // let mut aaa = 0;
         while src_trees.peek_height() != -1 && dst_trees.peek_height() != -1 {
-            // aaa += 1;
-            // println!("multi_mappings={}", multi_mappings.len());
             while src_trees.peek_height() != dst_trees.peek_height() {
                 Self::pop_larger(&mut src_trees, &mut dst_trees);
                 // if src_trees.peek_height() == -1 || dst_trees.peek_height() == -1 {
@@ -322,41 +315,21 @@ where
 
             let mut marks_for_src_trees = bitvec::bitbox![0;current_height_src_trees.len()];
             let mut marks_for_dst_trees = bitvec::bitbox![0;current_height_dst_trees.len()];
-            // println!(
-            //     "{aaa} marks={},{}",
-            //     marks_for_src_trees.len(),
-            //     marks_for_dst_trees.len()
-            // );
 
             for (i, src) in current_height_src_trees.iter().enumerate() {
                 for (j, dst) in current_height_dst_trees.iter().enumerate() {
                     if Self::isomorphic(mapper, src, dst) {
-                        // println!("isomorphic={},{}", i, j);
-                        // println!(
-                        //     "children={},{}",
-                        //     self.node_store
-                        //         .resolve(&self.src_arena.original(&src))
-                        //         .try_get_children()
-                        //         .map_or(0, |x| x.len()),
-                        //     self.node_store
-                        //         .resolve(&self.dst_arena.original(&dst))
-                        //         .try_get_children()
-                        //         .map_or(0, |x| x.len())
-                        // );
-                        // println!("id={:?},{:?}", src, dst);
                         multi_mappings.link(*src, *dst);
                         marks_for_src_trees.set(i, true);
                         marks_for_dst_trees.set(j, true);
                     }
                 }
             }
-            // println!("multi_mappings'={}", multi_mappings.len());
             for i in 0..marks_for_src_trees.len() {
                 if !marks_for_src_trees[i] {
                     src_trees.open_tree(&current_height_src_trees[i]);
                 }
             }
-            // println!("multi_mappings''={}", multi_mappings.len());
             for j in 0..marks_for_dst_trees.len() {
                 if !marks_for_dst_trees[j] {
                     dst_trees.open_tree(&current_height_dst_trees[j]);

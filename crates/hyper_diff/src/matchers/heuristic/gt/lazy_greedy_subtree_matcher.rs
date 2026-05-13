@@ -168,10 +168,16 @@ where
         mapper: &Mapper<HAST, Dsrc, Ddst, M>,
         ambiguous_mappings: &mut [(Dsrc::IdD, Ddst::IdD)],
     ) {
+        ambiguous_mappings.sort_by(Self::ambiguous_mappings_comparator(mapper));
+    }
+
+    fn ambiguous_mappings_comparator(
+        mapper: &Mapper<HAST, Dsrc, Ddst, M>,
+    ) -> impl FnMut(&(Dsrc::IdD, Ddst::IdD), &(Dsrc::IdD, Ddst::IdD)) -> std::cmp::Ordering {
         let mut sib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
-        let mut psib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
-        let mut p_in_p_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
-        ambiguous_mappings.sort_by(|a, b| {
+        let mut psib_sim = sib_sim.clone();
+        let mut p_in_p_sim = sib_sim.clone();
+        move |a, b| {
             let cached_coef_sib = |l: &(Dsrc::IdD, Ddst::IdD)| {
                 *sib_sim
                     .entry(*l)
@@ -182,27 +188,21 @@ where
                     .entry(*l)
                     .or_insert_with(|| Self::coef_parent(mapper, l))
             };
-            let (alink, blink) = (a, b);
-            if Self::same_parents(mapper, alink, blink) {
+            let cached_coef_pos_in_parent = |l: &(Dsrc::IdD, Ddst::IdD)| {
+                *p_in_p_sim
+                    .entry(*l)
+                    .or_insert_with(|| Self::coef_pos_in_parent(mapper, l))
+            };
+            if Self::same_parents(mapper, a, b) {
                 std::cmp::Ordering::Equal
             } else {
                 Self::cached_compare(cached_coef_sib, a, b)
                     .reverse()
                     .then_with(|| Self::cached_compare(cached_coef_parent, a, b).reverse())
             }
-            .then_with(|| {
-                Self::cached_compare(
-                    |l: &(Dsrc::IdD, Ddst::IdD)| {
-                        *p_in_p_sim
-                            .entry(*l)
-                            .or_insert_with(|| Self::coef_pos_in_parent(mapper, l))
-                    },
-                    a,
-                    b,
-                )
-            })
-            .then_with(|| Self::compare_delta_pos(alink, blink))
-        });
+            .then_with(|| Self::cached_compare(cached_coef_pos_in_parent, a, b))
+            .then_with(|| Self::compare_delta_pos(a, b))
+        }
     }
 
     fn cached_compare<I, O: PartialOrd>(
@@ -218,7 +218,7 @@ where
     fn coef_sib(mapper: &Mapper<HAST, Dsrc, Ddst, M>, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
         let (p_src, p_dst) = Self::parents(mapper, l);
         similarity_metrics::SimilarityMeasure::range(
-            &mapper.src_arena.descendants_range(&p_src), //descendants
+            &mapper.src_arena.descendants_range(&p_src),
             &mapper.dst_arena.descendants_range(&p_dst),
             &mapper.mappings,
         )
@@ -254,7 +254,7 @@ where
     }
 
     fn coef_pos_in_parent(mapper: &Mapper<HAST, Dsrc, Ddst, M>, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
-        let srcs = vec![l.0]
+        let srcs = Some(l.0)
             .into_iter()
             .chain(mapper.src_arena.parents(l.0))
             .filter_map(|x| {
@@ -264,7 +264,7 @@ where
                     pos.to_f64().unwrap() / len.to_f64().unwrap()
                 })
             });
-        let dsts = vec![l.1]
+        let dsts = Some(l.1)
             .into_iter()
             .chain(mapper.dst_arena.parents(l.1))
             .filter_map(|x| {
@@ -282,11 +282,11 @@ where
 
     fn same_parents(
         mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-        alink: &(Dsrc::IdD, Ddst::IdD),
-        blink: &(Dsrc::IdD, Ddst::IdD),
+        a: &(Dsrc::IdD, Ddst::IdD),
+        b: &(Dsrc::IdD, Ddst::IdD),
     ) -> bool {
-        let ap = Self::mapping_parents(mapper, alink);
-        let bp = Self::mapping_parents(mapper, blink);
+        let ap = Self::mapping_parents(mapper, a);
+        let bp = Self::mapping_parents(mapper, b);
         ap.0 == bp.0 && ap.1 == bp.1
     }
 
@@ -298,12 +298,12 @@ where
     }
 
     fn compare_delta_pos(
-        alink: &(Dsrc::IdD, Ddst::IdD),
-        blink: &(Dsrc::IdD, Ddst::IdD),
+        a: &(Dsrc::IdD, Ddst::IdD),
+        b: &(Dsrc::IdD, Ddst::IdD),
     ) -> std::cmp::Ordering {
         usize::cmp(
-            &(alink.0.shallow().index()).abs_diff(alink.1.shallow().index()),
-            &(blink.0.shallow().index()).abs_diff(blink.1.shallow().index()),
+            &(a.0.shallow().index()).abs_diff(a.1.shallow().index()),
+            &(b.0.shallow().index()).abs_diff(b.1.shallow().index()),
         )
     }
 }
@@ -346,7 +346,6 @@ where
             dst_arena,
         );
         while src_trees.peek_height() != -1 && dst_trees.peek_height() != -1 {
-            // println!("multi_mappings={}", multi_mappings.len());
             while src_trees.peek_height() != dst_trees.peek_height() {
                 // open larger
                 if src_trees.peek_height() > dst_trees.peek_height() {
@@ -354,10 +353,6 @@ where
                 } else {
                     dst_trees.open();
                 }
-                // TODO uncomment ?
-                // if src_trees.peek_height() == -1 || dst_trees.peek_height() == -1 {
-                //     break;
-                // }
             }
 
             let current_height_src_trees = src_trees.pop().unwrap();

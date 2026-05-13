@@ -233,26 +233,8 @@ where
     }
 
     fn coef_pos_in_parent(mapper: &Mapper<HAST, Dsrc, Ddst, M>, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
-        let srcs = Some(l.0)
-            .into_iter()
-            .chain(mapper.src_arena.parents(l.0))
-            .filter_map(|x| {
-                mapper.src_arena.parent(&x).map(|p| {
-                    let pos = mapper.src_arena.position_in_parent::<usize>(&x).unwrap();
-                    let len = mapper.src_arena.children(&p).len();
-                    pos.to_f64().unwrap() / len.to_f64().unwrap()
-                })
-            });
-        let dsts = Some(l.1)
-            .into_iter()
-            .chain(mapper.dst_arena.parents(l.1))
-            .filter_map(|x| {
-                mapper.dst_arena.parent(&x).map(|p| {
-                    let pos = mapper.dst_arena.position_in_parent::<usize>(&x).unwrap();
-                    let len = mapper.dst_arena.children(&p).len();
-                    pos.to_f64().unwrap() / len.to_f64().unwrap()
-                })
-            });
+        let srcs = positions(&mapper.src_arena, l.0);
+        let dsts = positions(&mapper.dst_arena, l.1);
         srcs.zip(dsts)
             .map(|(src, dst)| (src - dst) * (src - dst))
             .sum::<f64>()
@@ -285,6 +267,21 @@ where
             &(b.0.shallow().index()).abs_diff(b.1.shallow().index()),
         )
     }
+}
+
+fn positions<D, IdS, HAST: HyperAST + Copy>(arena: &D, x: D::IdD) -> impl Iterator<Item = f64>
+where
+    D: DecompressedWithParent<HAST, D::IdD> + LazyDecompressedTreeStore<HAST, IdS>,
+    D::IdD: PrimInt,
+    IdS: PrimInt,
+{
+    Some(x).into_iter().chain(arena.parents(x)).filter_map(|x| {
+        arena.parent(&x).map(|p| {
+            let pos = arena.position_in_parent::<usize>(&x).unwrap();
+            let len = arena.children(&p).len();
+            pos.to_f64().unwrap() / len.to_f64().unwrap()
+        })
+    })
 }
 
 impl<

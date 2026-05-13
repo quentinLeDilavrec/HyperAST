@@ -194,36 +194,10 @@ where
     }
 
     fn coef_pos_in_parent(&self, l: &(M::Src, M::Dst)) -> f64 {
-        let srcs = Some(l.0)
-            .into_iter()
-            .chain(self.src_arena.parents(l.0))
-            .filter_map(|x| {
-                self.src_arena.parent(&x).map(|p| {
-                    self.src_arena
-                        .position_in_parent::<usize>(&x)
-                        .unwrap()
-                        .to_f64()
-                        .unwrap()
-                        / self.src_arena.children(&p).len().to_f64().unwrap()
-                })
-            });
-        let dsts = Some(l.1)
-            .into_iter()
-            .chain(self.dst_arena.parents(l.1))
-            .filter_map(|x| {
-                self.dst_arena.parent(&x).map(|p| {
-                    self.dst_arena
-                        .position_in_parent::<usize>(&x)
-                        .unwrap()
-                        .to_f64()
-                        .unwrap()
-                        / self.dst_arena.children(&p).len().to_f64().unwrap()
-                })
-            });
-        srcs.zip(dsts)
-            .map(|(src, dst)| (src - dst) * (src - dst))
-            .sum::<f64>()
-            .sqrt()
+        let srcs = positions(&self.src_arena, l.0);
+        let dsts = positions(&self.dst_arena, l.1);
+        let squared_diff = |(src, dst)| (src - dst) * (src - dst);
+        srcs.zip(dsts).map(squared_diff).sum::<f64>().sqrt()
     }
 
     fn same_parents(&self, a: &(M::Src, M::Dst), b: &(M::Src, M::Dst)) -> bool {
@@ -239,6 +213,21 @@ where
     fn compare_delta_pos(&self, a: &(M::Src, M::Dst), b: &(M::Src, M::Dst)) -> std::cmp::Ordering {
         (a.0.index().abs_diff(a.1.index())).cmp(&b.0.index().abs_diff(b.1.index()))
     }
+}
+
+fn positions<D, I, HAST: HyperAST + Copy>(arena: &D, x: I) -> impl Iterator<Item = f64>
+where
+    D: crate::decompressed_tree_store::ShallowDecompressedTreeStore<HAST, I>
+        + DecompressedWithParent<HAST, I>,
+    I: PrimInt,
+{
+    Some(x).into_iter().chain(arena.parents(x)).filter_map(|x| {
+        arena.parent(&x).map(|p| {
+            let pos = arena.position_in_parent::<usize>(&x).unwrap();
+            let len = arena.children(&p).len();
+            pos.to_f64().unwrap() / len.to_f64().unwrap()
+        })
+    })
 }
 
 pub struct SubtreeMatcher<Mpr, const MIN_HEIGHT: usize> {

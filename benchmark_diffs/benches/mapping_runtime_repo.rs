@@ -91,7 +91,7 @@ fn no_size_threshold(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -112,7 +112,7 @@ fn no_size_threshold(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -140,7 +140,7 @@ fn no_size_threshold(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -171,7 +171,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
 ) {
     use hyper_diff::matchers::heuristic::gt;
 
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -199,7 +199,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -231,7 +231,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -259,7 +259,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -291,7 +291,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
 ) {
     use hyper_diff::matchers::heuristic::gt;
 
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -313,7 +313,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -342,7 +342,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -366,7 +366,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -394,7 +394,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -431,7 +431,7 @@ fn with_second_sim_threshold<
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::cd;
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -452,7 +452,7 @@ fn with_second_sim_threshold<
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -480,7 +480,7 @@ fn with_second_sim_threshold<
             });
         },
     );
-    prep_bench(
+    prep_and_bench(
         group,
         repositories,
         p,
@@ -505,7 +505,7 @@ fn with_second_sim_threshold<
     );
 }
 
-fn prep_bench<Mea: Measurement>(
+fn prep_and_bench<Mea: Measurement>(
     group: &mut criterion::BenchmarkGroup<'_, Mea>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,

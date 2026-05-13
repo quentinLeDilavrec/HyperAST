@@ -90,7 +90,7 @@ fn bottomup_group(c: &mut Criterion) {
 
     for p in inputs.iter() {
         use hyper_diff::matchers::heuristic::cd;
-        prep_bench_cd_subtree(
+        prep_cd_subtree_and_bench(
             &mut group,
             &mut repositories,
             p,
@@ -120,7 +120,7 @@ fn bottomup_group(c: &mut Criterion) {
                 );
             },
         );
-        prep_bench_cd_subtree(
+        prep_cd_subtree_and_bench(
             &mut group,
             &mut repositories,
             p,
@@ -164,7 +164,7 @@ fn bench_xy(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::xy_bottom_up_matcher;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -194,7 +194,7 @@ fn bench_lazy_xy(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::lazy_xy_bottom_up_matcher;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -228,7 +228,7 @@ fn bench_lazy_greedy<const MAX_SIZE: usize>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -263,7 +263,7 @@ fn bench_greedy<const MAX_SIZE: usize>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -293,7 +293,7 @@ fn bench_hybrid<const MAX_SIZE: usize>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -324,7 +324,7 @@ fn bench_lazy_hybrid<const MAX_SIZE: usize>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -359,7 +359,7 @@ fn bench_stable<const MAX_SIZE: usize>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -390,7 +390,7 @@ fn bench_lazy_stable<const MAX_SIZE: usize>(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -425,7 +425,7 @@ fn bench_simple(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -455,7 +455,7 @@ fn bench_lazy_simple(
     p: &Input,
 ) {
     use hyper_diff::matchers::heuristic::gt;
-    prep_bench_gt_subtree(
+    prep_gt_subtree_and_bench(
         group,
         repositories,
         p,
@@ -491,7 +491,7 @@ type OwnedLazyMapping = (
     VecStore<u32>,
 );
 
-fn prep_bench_gt_subtree<Mea: Measurement>(
+fn prep_gt_subtree_and_bench<Mea: Measurement>(
     group: &mut criterion::BenchmarkGroup<'_, Mea>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
@@ -521,7 +521,7 @@ fn prep_bench_gt_subtree<Mea: Measurement>(
     );
 }
 
-fn prep_bench_cd_subtree<Mea: Measurement>(
+fn prep_cd_subtree_and_bench<Mea: Measurement>(
     group: &mut criterion::BenchmarkGroup<'_, Mea>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,

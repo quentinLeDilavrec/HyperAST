@@ -175,7 +175,10 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
         group,
         repositories,
         p,
-        BenchmarkId::new("PartialLazyHybridGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("PartialLazyHybridGumtree {}", MAX_SIZE),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -203,7 +206,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
         group,
         repositories,
         p,
-        BenchmarkId::new("LazyHybridGumtree", p.repo.name()),
+        BenchmarkId::new(format!("LazyHybridGumtree {}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -235,7 +238,10 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("PartialLazySimpleGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("PartialLazySimpleGumtree {}/{}", NUM, DEN),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -263,7 +269,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("LazySimpleGumtree", p.repo.name()),
+        BenchmarkId::new(format!("LazySimpleGumtree {}/{}", NUM, DEN), p.repo.name()),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -295,7 +301,10 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("GreedyGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("GreedyGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
@@ -317,7 +326,10 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("PartialLazyGreedyGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("PartialLazyGreedyGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -346,7 +358,10 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("LazyGreedyGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("LazyGreedyGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -370,7 +385,10 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("PartialLazyStableGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("PartialLazyStableGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -398,7 +416,10 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new("LazyStableGumtree", p.repo.name()),
+        BenchmarkId::new(
+            format!("LazyStableGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -435,7 +456,13 @@ fn with_second_sim_threshold<
         group,
         repositories,
         p,
-        BenchmarkId::new("ChangeDistiller", p.repo.name()),
+        BenchmarkId::new(
+            format!(
+                "ChangeDistiller {} {}/{} {}/{}",
+                MAX_SIZE, NUM, DEN, NUM2, DEN2
+            ),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -456,7 +483,13 @@ fn with_second_sim_threshold<
         group,
         repositories,
         p,
-        BenchmarkId::new("PartialLazyChangeDistiller", p.repo.name()),
+        BenchmarkId::new(
+            format!(
+                "PartialLazyChangeDistiller {} {}/{} {}/{}",
+                MAX_SIZE, NUM, DEN, NUM2, DEN2
+            ),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -484,7 +517,13 @@ fn with_second_sim_threshold<
         group,
         repositories,
         p,
-        BenchmarkId::new("LazyChangeDistiller", p.repo.name()),
+        BenchmarkId::new(
+            format!(
+                "LazyChangeDistiller {} {}/{} {}/{}",
+                MAX_SIZE, NUM, DEN, NUM2, DEN2
+            ),
+            p.repo.name(),
+        ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;

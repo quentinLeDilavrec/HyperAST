@@ -65,7 +65,15 @@ where
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         multi_mappings: &MM,
     ) {
-        // Select unique mappings first and extract ambiguous mappings.
+        let ambiguous_list = Self::handle_non_ambiguous_mappings(mapper, multi_mappings);
+        Self::handle_ambiguous_mappings(mapper, ambiguous_list);
+    }
+
+    /// Integrate unique mappings, while extracting the ambiguous ones.
+    fn handle_non_ambiguous_mappings<MM: MultiMappingStore<Src = M::Src, Dst = M::Dst>>(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        multi_mappings: &MM,
+    ) -> Vec<(M::Src, M::Dst)> {
         let mut ambiguous_list: Vec<(M::Src, M::Dst)> = vec![];
         let mut ignored = bitvec::bitbox![0;mapper.src_arena.len()];
         for src in multi_mappings.all_mapped_srcs() {
@@ -90,13 +98,20 @@ where
                 asrcs.iter().for_each(|x| ignored.set(x.index(), true))
             }
         }
+        ambiguous_list
+    }
 
-        let mapping_list: Vec<_> = mapper.sort_ambiguous_mappings(ambiguous_list).collect();
-
+    /// Integrate the best ambiguous mappings.
+    fn handle_ambiguous_mappings(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mut ambiguous_list: Vec<(M::Src, M::Dst)>,
+    ) {
+        log::trace!("ambiguous_mappings.len: {}", &ambiguous_list.len());
+        ambiguous_list.sort_by(mapper.ambiguous_mappings_comparator());
         // Select the best ambiguous mappings
         // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
         // let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
-        for (src, dst) in mapping_list {
+        for (src, dst) in ambiguous_list {
             // let src_i = src.index();
             // let dst_i = dst.index();
             // if !(src_ignored[src_i] || dst_ignored[dst_i]) {
@@ -132,15 +147,6 @@ where
     HAST::Label: Eq + Clone,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    fn sort_ambiguous_mappings(
-        &mut self,
-        mut ambiguous_mappings: Vec<(M::Src, M::Dst)>,
-    ) -> impl Iterator<Item = (M::Src, M::Dst)> {
-        log::trace!("ambiguous_mappings.len: {}", &ambiguous_mappings.len());
-        ambiguous_mappings.sort_by(self.ambiguous_mappings_comparator());
-        ambiguous_mappings.into_iter()
-    }
-
     fn ambiguous_mappings_comparator(
         &mut self,
     ) -> impl FnMut(&(M::Src, M::Dst), &(M::Src, M::Dst)) -> std::cmp::Ordering {

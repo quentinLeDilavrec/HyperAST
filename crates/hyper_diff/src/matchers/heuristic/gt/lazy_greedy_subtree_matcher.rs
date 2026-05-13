@@ -109,7 +109,15 @@ where
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         multi_mappings: &MM,
     ) {
-        // Select unique mappings first and extract ambiguous mappings.
+        let ambiguous_list = Self::handle_non_ambiguous_mappings(mapper, multi_mappings);
+        Self::handle_ambiguous_mappings(mapper, ambiguous_list);
+    }
+
+    /// Integrate unique mappings, while extracting the ambiguous ones.
+    fn handle_non_ambiguous_mappings<MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD>>(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        multi_mappings: &MM,
+    ) -> Vec<(Dsrc::IdD, Ddst::IdD)> {
         let mut ambiguous_list: Vec<(Dsrc::IdD, Ddst::IdD)> = vec![];
         let mut ignored = bitvec::bitbox![0;mapper.src_arena.len()];
         for src in multi_mappings.all_mapped_srcs() {
@@ -134,16 +142,20 @@ where
                 }
             }
         }
+        ambiguous_list
+    }
 
-        let mapping_list: Vec<_> = {
-            Self::sort(mapper, &mut ambiguous_list);
-            ambiguous_list
-        };
+    /// Integrate the best ambiguous mappings.
+    fn handle_ambiguous_mappings(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        mut ambiguous_list: Vec<(Dsrc::IdD, Ddst::IdD)>,
+    ) {
+        ambiguous_list.sort_by(Self::ambiguous_mappings_comparator(mapper));
 
         // Select the best ambiguous mappings
         // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
         // let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
-        for (src, dst) in mapping_list {
+        for (src, dst) in ambiguous_list {
             // let src_i = src.shallow().index();
             // let dst_i = dst.shallow().index();
             if !(mapper.mappings.is_src(src.shallow()) || mapper.mappings.is_dst(dst.shallow())) {
@@ -162,13 +174,6 @@ where
             // }
             // TODO return additional mappings
         }
-    }
-
-    fn sort(
-        mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-        ambiguous_mappings: &mut [(Dsrc::IdD, Ddst::IdD)],
-    ) {
-        ambiguous_mappings.sort_by(Self::ambiguous_mappings_comparator(mapper));
     }
 
     fn ambiguous_mappings_comparator(

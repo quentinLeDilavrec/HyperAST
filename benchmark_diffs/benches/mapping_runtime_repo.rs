@@ -1,8 +1,8 @@
+use criterion::measurement::Measurement;
+use criterion::{BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main};
 use std::hint::black_box;
 
-use criterion::{
-    BenchmarkId, Criterion, Throughput, criterion_group, criterion_main, measurement::Measurement,
-};
 use hyper_diff::decompressed_tree_store::{CompletePostOrder, lazy_post_order::LazyPostOrder};
 use hyper_diff::mappings::VecStore;
 use hyper_diff::matchers::Decompressible;

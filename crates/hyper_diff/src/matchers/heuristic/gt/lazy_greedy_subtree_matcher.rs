@@ -316,13 +316,13 @@ where
     ) {
         let mut src_trees = PriorityTreeList::<'_, Dsrc, M::Src, Dsrc::IdD, HAST, MIN_HEIGHT>::new(
             hyperast,
-            src_arena.starter(),
             src_arena,
+            src_arena.starter(),
         );
         let mut dst_trees = PriorityTreeList::<'_, Ddst, M::Dst, Ddst::IdD, HAST, MIN_HEIGHT>::new(
             hyperast,
-            dst_arena.starter(),
             dst_arena,
+            dst_arena.starter(),
         );
         while src_trees.peek_height() != -1 && dst_trees.peek_height() != -1 {
             while src_trees.peek_height() != dst_trees.peek_height() {
@@ -393,7 +393,7 @@ where
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithStats,
 {
-    pub(super) fn new(store: HAST, tree: D::IdD, arena: &'b mut D) -> Self {
+    pub(super) fn new(store: HAST, arena: &'b mut D, tree: D::IdD) -> Self {
         let id = arena.original(&tree);
         let h = store.resolve(&id).height() - 1;
         let list_size = if h >= MIN_HEIGHT {

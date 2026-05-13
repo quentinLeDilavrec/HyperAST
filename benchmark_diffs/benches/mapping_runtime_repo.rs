@@ -136,6 +136,28 @@ fn mapping_group(c: &mut Criterion) {
             &mut group,
             &mut repositories,
             p,
+            BenchmarkId::new("LazyXy", p.repo.name()),
+            |b, (repositories, (src, dst))| {
+                b.iter(|| {
+                    let hyperast = &repositories.processor.main_stores;
+                    let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
+                    let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
+                        &mut mapper_owned,
+                        M::default(),
+                    );
+
+                    use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+                    let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
+                    use hyper_diff::matchers::heuristic::lazy_xy_bottom_up_matcher::LazyXYBottomUpMatcher;
+                    let mapper_bottom_up = LazyXYBottomUpMatcher::<_>::match_it(mapper);
+                    black_box(mapper_bottom_up);
+                });
+            },
+        );
+        prep_bench(
+            &mut group,
+            &mut repositories,
+            p,
             BenchmarkId::new("GreedyGumtree", p.repo.name()),
             |b, (repositories, (src, dst))| {
                 b.iter(|| {

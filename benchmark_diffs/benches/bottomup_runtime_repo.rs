@@ -62,6 +62,7 @@ fn bottomup_group(c: &mut Criterion) {
     }
     for p in inputs.iter() {
         bench_xy(&mut group, &mut repositories, p);
+        bench_lazy_xy(&mut group, &mut repositories, p);
         bench_greedy::<100>(&mut group, &mut repositories, p);
         bench_greedy::<200>(&mut group, &mut repositories, p);
         bench_greedy::<400>(&mut group, &mut repositories, p);
@@ -179,6 +180,40 @@ fn bench_xy(
                     );
                     use xy_bottom_up_matcher::XYBottomUpMatcher;
                     let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
+                    black_box(mapper_bottom_up);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
+fn bench_lazy_xy(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    repositories: &mut PreProcessedRepositories,
+    p: &Input,
+) {
+    use hyper_diff::matchers::heuristic::lazy_xy_bottom_up_matcher;
+    prep_bench_gt_subtree(
+        group,
+        repositories,
+        p,
+        BenchmarkId::new(format!("LazyXY"), p.repo.name()),
+        |b, (repositories, (owned, mappings))| {
+            let hyperast = &repositories.processor.main_stores;
+            b.iter_batched(
+                || hyper_diff::matchers::Mapper::prep(hyperast, mappings.clone(), owned.clone()),
+                |mut mapper| {
+                    let mapper = Mapper::new(
+                        hyperast,
+                        mapper.mapping.mappings,
+                        (
+                            mapper.mapping.src_arena.as_mut(),
+                            mapper.mapping.dst_arena.as_mut(),
+                        ),
+                    );
+                    use lazy_xy_bottom_up_matcher::LazyXYBottomUpMatcher;
+                    let mapper_bottom_up = LazyXYBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
                 },
                 BatchSize::SmallInput,

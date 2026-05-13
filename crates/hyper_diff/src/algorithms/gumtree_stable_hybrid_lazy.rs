@@ -6,8 +6,8 @@ use super::CDS;
 use super::DiffRes;
 use crate::actions::script_generator3::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::matchers::Mapper;
 use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
+use crate::matchers::Mapper;
 use hyperast::types::{self, HyperAST, NodeId};
 
 // use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
@@ -43,7 +43,7 @@ where
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = LazyHybridMarriageBottomUpMatcher::<_, M, 300, 1, 8>::match_it(mapper);
+    let mapper = LazyHybridMarriageBottomUpMatcher::<_, M, 300>::match_it(mapper);
     let bottomup_mappings_s = mapper.mappings().len();
     tr!(bottomup_mappings_s);
 

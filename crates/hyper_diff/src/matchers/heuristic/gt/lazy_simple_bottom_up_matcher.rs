@@ -12,8 +12,8 @@ use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazySimpleBottomUpMatcher<
     Mpr,
-    const SIMILARITY_THRESHOLD_NUM: u64 = 1,
-    const SIMILARITY_THRESHOLD_DEN: u64 = 2,
+    const SIM_THRESHOLD_NUM: u64 = 1,
+    const SIM_THRESHOLD_DEN: u64 = 2,
 > {
     _phantom: std::marker::PhantomData<*const Mpr>,
 }

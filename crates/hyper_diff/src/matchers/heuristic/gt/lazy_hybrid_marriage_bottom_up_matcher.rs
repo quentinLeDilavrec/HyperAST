@@ -15,8 +15,6 @@ pub struct LazyHybridMarriageBottomUpMatcher<
     Mpr: crate::matchers::WithMappings,
     MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIZE_THRESHOLD: usize = 1000,
-    const SIM_THRESHOLD_NUM: u64 = 1,
-    const SIM_THRESHOLD_DEN: u64 = 2,
 > {
     _phantom: PhantomData<*const (Mpr, MZs)>,
 }
@@ -28,16 +26,7 @@ impl<
     M,
     MZs,
     const SIZE_THRESHOLD: usize,
-    const SIM_THRESHOLD_NUM: u64,
-    const SIM_THRESHOLD_DEN: u64,
->
-    LazyHybridMarriageBottomUpMatcher<
-        Mapper<HAST, Dsrc, Ddst, M>,
-        MZs,
-        SIZE_THRESHOLD,
-        SIM_THRESHOLD_NUM,
-        SIM_THRESHOLD_DEN,
-    >
+> LazyHybridMarriageBottomUpMatcher<Mapper<HAST, Dsrc, Ddst, M>, MZs, SIZE_THRESHOLD>
 where
     for<'t> LendT<'t, HAST>: Tree + WithHashs + WithStats,
     HAST::IdN: Clone + Eq + Debug,
@@ -68,8 +57,6 @@ where
                 _,
                 MZs,
                 SIZE_THRESHOLD,
-                SIM_THRESHOLD_NUM,
-                SIM_THRESHOLD_DEN,
             >::last_chance_match_hybrid,
         );
     }

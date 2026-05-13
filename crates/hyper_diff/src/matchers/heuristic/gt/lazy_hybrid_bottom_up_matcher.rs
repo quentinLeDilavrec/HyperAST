@@ -19,8 +19,6 @@ pub struct LazyHybridBottomUpMatcher<
     Mpr: crate::matchers::WithMappings,
     MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIZE_THRESHOLD: usize = 1000,
-    const SIM_THRESHOLD_NUM: u64 = 1,
-    const SIM_THRESHOLD_DEN: u64 = 2,
 > {
     _phantom: PhantomData<*const (Mpr, MZs)>,
 }
@@ -32,16 +30,7 @@ impl<
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const SIZE_THRESHOLD: usize,
-    const SIM_THRESHOLD_NUM: u64,
-    const SIM_THRESHOLD_DEN: u64,
->
-    LazyHybridBottomUpMatcher<
-        Mapper<HAST, Dsrc, Ddst, M>,
-        MZs,
-        SIZE_THRESHOLD,
-        SIM_THRESHOLD_NUM,
-        SIM_THRESHOLD_DEN,
-    >
+> LazyHybridBottomUpMatcher<Mapper<HAST, Dsrc, Ddst, M>, MZs, SIZE_THRESHOLD>
 where
     for<'t> LendT<'t, HAST>: WithHashs,
     M::Src: PrimInt,

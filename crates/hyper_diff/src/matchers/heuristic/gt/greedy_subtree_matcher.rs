@@ -146,36 +146,19 @@ where
         let mut psib_sim = sib_sim.clone();
         let mut p_in_p_sim = sib_sim.clone();
         move |a, b| {
-            let cached_coef_sib =
-                |l: &(M::Src, M::Dst)| *sib_sim.entry(*l).or_insert_with(|| self.coef_sib(l));
-            let cached_coef_parent =
-                |l: &(M::Src, M::Dst)| *psib_sim.entry(*l).or_insert_with(|| self.coef_parent(l));
-            let cached_coef_pos_in_parent = |l: &(M::Src, M::Dst)| {
-                *p_in_p_sim
-                    .entry(*l)
-                    .or_insert_with(|| self.coef_pos_in_parent(l))
-            };
+            let mut sib_sim = cached(&mut sib_sim, |l| self.coef_sib(l));
+            let mut psib_sim = cached(&mut psib_sim, |l| self.coef_parent(l));
+            let mut p_in_p_sim = cached(&mut p_in_p_sim, |l| self.coef_pos_in_parent(l));
             if self.same_parents(a, b) {
                 std::cmp::Ordering::Equal
             } else {
-                self.cached_compare(cached_coef_sib, a, b)
+                sib_sim(a, b)
                     .reverse()
-                    .then_with(|| self.cached_compare(cached_coef_parent, a, b).reverse())
+                    .then_with(|| psib_sim(a, b).reverse())
             }
-            .then_with(|| self.cached_compare(cached_coef_pos_in_parent, a, b))
+            .then_with(|| p_in_p_sim(a, b))
             .then_with(|| self.compare_delta_pos(a, b))
         }
-    }
-
-    fn cached_compare<I, F: FnMut(&I) -> O, O: PartialOrd>(
-        &self,
-        mut cached: F,
-        a: &I,
-        b: &I,
-    ) -> std::cmp::Ordering {
-        cached(a)
-            .partial_cmp(&cached(b))
-            .unwrap_or(std::cmp::Ordering::Equal)
     }
 
     fn coef_sib(&self, l: &(M::Src, M::Dst)) -> f64 {
@@ -577,4 +560,28 @@ where
             }
         }
     }
+}
+
+pub(super) fn cached<K: Copy + Eq + Hash, T: Copy + PartialOrd>(
+    c: &mut HashMap<K, T>,
+    f: impl Copy + Fn(&K) -> T,
+) -> impl FnMut(&K, &K) -> std::cmp::Ordering {
+    move |a, b| cached_compare(_cached(c, f), a, b)
+}
+
+pub(super) fn _cached<K: Copy + Eq + Hash, T: Copy>(
+    c: &mut HashMap<K, T>,
+    f: impl Fn(&K) -> T,
+) -> impl FnMut(&K) -> T {
+    move |l: &K| *c.entry(*l).or_insert_with(|| f(l))
+}
+
+pub(super) fn cached_compare<I, O: PartialOrd>(
+    mut cached: impl FnMut(&I) -> O,
+    a: &I,
+    b: &I,
+) -> std::cmp::Ordering {
+    cached(a)
+        .partial_cmp(&cached(b))
+        .unwrap_or(std::cmp::Ordering::Equal)
 }

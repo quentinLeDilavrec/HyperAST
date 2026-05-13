@@ -178,41 +178,20 @@ where
         let mut psib_sim = sib_sim.clone();
         let mut p_in_p_sim = sib_sim.clone();
         move |a, b| {
-            let cached_coef_sib = |l: &(Dsrc::IdD, Ddst::IdD)| {
-                *sib_sim
-                    .entry(*l)
-                    .or_insert_with(|| Self::coef_sib(mapper, l))
-            };
-            let cached_coef_parent = |l: &(Dsrc::IdD, Ddst::IdD)| {
-                *psib_sim
-                    .entry(*l)
-                    .or_insert_with(|| Self::coef_parent(mapper, l))
-            };
-            let cached_coef_pos_in_parent = |l: &(Dsrc::IdD, Ddst::IdD)| {
-                *p_in_p_sim
-                    .entry(*l)
-                    .or_insert_with(|| Self::coef_pos_in_parent(mapper, l))
-            };
+            use super::greedy_subtree_matcher::cached;
+            let mut sib_sim = cached(&mut sib_sim, |l| Self::coef_sib(mapper, l));
+            let mut psib_sim = cached(&mut psib_sim, |l| Self::coef_parent(mapper, l));
+            let mut p_in_p_sim = cached(&mut p_in_p_sim, |l| Self::coef_pos_in_parent(mapper, l));
             if Self::same_parents(mapper, a, b) {
                 std::cmp::Ordering::Equal
             } else {
-                Self::cached_compare(cached_coef_sib, a, b)
+                sib_sim(a, b)
                     .reverse()
-                    .then_with(|| Self::cached_compare(cached_coef_parent, a, b).reverse())
+                    .then_with(|| psib_sim(a, b).reverse())
             }
-            .then_with(|| Self::cached_compare(cached_coef_pos_in_parent, a, b))
+            .then_with(|| p_in_p_sim(a, b))
             .then_with(|| Self::compare_delta_pos(a, b))
         }
-    }
-
-    fn cached_compare<I, O: PartialOrd>(
-        mut cached: impl FnMut(&I) -> O,
-        a: &I,
-        b: &I,
-    ) -> std::cmp::Ordering {
-        cached(a)
-            .partial_cmp(&cached(b))
-            .unwrap_or(std::cmp::Ordering::Equal)
     }
 
     fn coef_sib(mapper: &Mapper<HAST, Dsrc, Ddst, M>, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {

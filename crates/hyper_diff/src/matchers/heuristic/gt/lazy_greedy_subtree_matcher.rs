@@ -311,12 +311,12 @@ where
         dst_arena: &mut Ddst,
         multi_mappings: &mut MM,
     ) {
-        let mut src_trees = PriorityTreeList::<'_, Dsrc, M::Src, Dsrc::IdD, HAST, MIN_HEIGHT>::new(
+        let mut src_trees = PriorityTreeList::<'_, _, _, _, _, MIN_HEIGHT>::new(
             hyperast,
             src_arena,
             src_arena.starter(),
         );
-        let mut dst_trees = PriorityTreeList::<'_, Ddst, M::Dst, Ddst::IdD, HAST, MIN_HEIGHT>::new(
+        let mut dst_trees = PriorityTreeList::<'_, _, _, _, _, MIN_HEIGHT>::new(
             hyperast,
             dst_arena,
             dst_arena.starter(),
@@ -340,12 +340,12 @@ where
             for (i, src) in current_height_src_trees.iter().enumerate() {
                 for (j, dst) in current_height_dst_trees.iter().cloned().enumerate() {
                     let src = src.clone();
-                    let is_iso = {
+                    let iso = {
                         let src = src_trees.arena.original(&src);
                         let dst = dst_trees.arena.original(&dst);
                         super::isomorphic::<_, true, false>(hyperast, &src, &dst)
                     };
-                    if is_iso {
+                    if iso {
                         multi_mappings.link(src, dst);
                         marks_for_src_trees.set(i, true);
                         marks_for_dst_trees.set(j, true);

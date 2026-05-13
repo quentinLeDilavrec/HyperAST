@@ -3,9 +3,8 @@ use std::hash::Hash;
 
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
-use hyperast::types::HyperAST;
-use hyperast::types::{Childrn as _, NodeStore as _, Tree as _};
-use hyperast::types::{HashKind, NodeId};
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, NodeStore as _};
 use hyperast::types::{Labeled, LendT};
 use hyperast::types::{WithChildren, WithHashs};
 
@@ -54,7 +53,10 @@ where
         let mut mm: MM = Default::default();
         mm.topit(mapper.src_arena.len(), mapper.dst_arena.len());
         SubtreeMatcher::<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>::matchh_to_be_filtered(
-            mapper, &mut mm,
+            mapper.hyperast,
+            &mut mapper.mapping.src_arena,
+            &mut mapper.mapping.dst_arena,
+            &mut mm,
         );
         Self::filter_mappings(mapper, &mm);
     }
@@ -261,19 +263,15 @@ where
     }
 
     fn matchh_to_be_filtered<MM: MultiMappingStore<Src = M::Src, Dst = M::Dst>>(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        hyperast: HAST,
+        src_arena: &mut Dsrc,
+        dst_arena: &mut Ddst,
         multi_mappings: &mut MM,
     ) {
-        let mut src_trees = PriorityTreeList::<_, _, HAST, MIN_HEIGHT>::new(
-            mapper.hyperast,
-            &mapper.src_arena,
-            mapper.src_arena.root(),
-        );
-        let mut dst_trees = PriorityTreeList::<_, _, HAST, MIN_HEIGHT>::new(
-            mapper.hyperast,
-            &mapper.dst_arena,
-            mapper.dst_arena.root(),
-        );
+        let mut src_trees =
+            PriorityTreeList::<_, _, _, MIN_HEIGHT>::new(hyperast, src_arena, src_arena.root());
+        let mut dst_trees =
+            PriorityTreeList::<_, _, _, MIN_HEIGHT>::new(hyperast, dst_arena, dst_arena.root());
         while src_trees.peek_height() != -1 && dst_trees.peek_height() != -1 {
             while src_trees.peek_height() != dst_trees.peek_height() {
                 Self::pop_larger(&mut src_trees, &mut dst_trees);
@@ -290,7 +288,12 @@ where
 
             for (i, src) in current_height_src_trees.iter().enumerate() {
                 for (j, dst) in current_height_dst_trees.iter().enumerate() {
-                    if Self::isomorphic(mapper, src, dst) {
+                    let iso = {
+                        let src = src_trees.arena.original(&src);
+                        let dst = dst_trees.arena.original(&dst);
+                        super::isomorphic::<_, true, false>(hyperast, &src, &dst)
+                    };
+                    if iso {
                         multi_mappings.link(*src, *dst);
                         marks_for_src_trees.set(i, true);
                         marks_for_dst_trees.set(j, true);
@@ -363,79 +366,6 @@ where
 
     fn get_max_tree_size(mapper: &Mapper<HAST, Dsrc, Ddst, M>) -> usize {
         Ord::max(mapper.src_arena.len(), mapper.dst_arena.len())
-    }
-
-    pub(crate) fn isomorphic(
-        mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-        src: &M::Src,
-        dst: &M::Dst,
-    ) -> bool {
-        let src = mapper.src_arena.original(src);
-        let dst = mapper.dst_arena.original(dst);
-
-        Self::isomorphic_aux::<true>(mapper, &src, &dst)
-    }
-
-    /// if H then test the hash otherwise do not test it,
-    /// considering hash colisions testing it should only be useful once.
-    pub(crate) fn isomorphic_aux<const H: bool>(
-        mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-        src: &HAST::IdN,
-        dst: &HAST::IdN,
-    ) -> bool {
-        if src == dst {
-            return true;
-        }
-        let _src = mapper.hyperast.node_store().resolve(src);
-        let src_h = if H {
-            Some(WithHashs::hash(&_src, &HashKind::label()))
-        } else {
-            None
-        };
-        // let src_t = src.get_type();
-        let src_t = mapper.hyperast.resolve_type(src);
-        let src_l = if _src.has_label() {
-            Some(_src.get_label_unchecked())
-        } else {
-            None
-        };
-        let src_c: Option<Vec<_>> = _src.children().map(|x| x.iter_children().collect());
-
-        let _dst = mapper.hyperast.node_store().resolve(dst);
-
-        if let Some(src_h) = src_h {
-            let dst_h = WithHashs::hash(&_dst, &HashKind::label());
-            if src_h != dst_h {
-                return false;
-            }
-        }
-        // let dst_t = dst.get_type();
-        let dst_t = mapper.hyperast.resolve_type(dst);
-        if src_t != dst_t {
-            return false;
-        }
-        if _dst.has_label() && (src_l.is_none() || src_l.unwrap() != _dst.get_label_unchecked()) {
-            return false;
-        };
-
-        let dst_c: Option<Vec<_>> = _dst.children().map(|x| x.iter_children().collect());
-
-        match (src_c, dst_c) {
-            (None, None) => true,
-            (Some(src_c), Some(dst_c)) => {
-                if src_c.len() != dst_c.len() {
-                    false
-                } else {
-                    for (src, dst) in src_c.iter().zip(dst_c.iter()) {
-                        if !Self::isomorphic_aux::<false>(mapper, src, dst) {
-                            return false;
-                        }
-                    }
-                    true
-                }
-            }
-            _ => false,
-        }
     }
 }
 

@@ -101,32 +101,46 @@ where
         ambiguous_list
     }
 
-    /// Integrate the best ambiguous mappings.
+    // Integrate the best ambiguous mappings.
+    ///
+    /// Returns the rest.
     fn handle_ambiguous_mappings(
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         mut ambiguous_list: Vec<(M::Src, M::Dst)>,
-    ) {
+    ) -> Vec<(M::Src, M::Dst)> {
         log::trace!("ambiguous_mappings.len: {}", &ambiguous_list.len());
         ambiguous_list.sort_by(mapper.ambiguous_mappings_comparator());
-        // Select the best ambiguous mappings
-        // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
-        // let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
-        for (src, dst) in ambiguous_list {
-            // let src_i = src.index();
-            // let dst_i = dst.index();
-            // if !(src_ignored[src_i] || dst_ignored[dst_i]) {
-            if !(mapper.mappings.is_src(&src) || mapper.mappings.is_dst(&dst)) {
-                mapper.add_mapping_recursively(&src, &dst);
-                //     src_ignored.set(src_i, true);
-                //     (mapper.src_arena.descendants(&src))
-                //         .iter()
-                //         .for_each(|src| src_ignored.set(src.index(), true));
-                //     dst_ignored.set(dst_i, true);
-                //     (mapper.dst_arena.descendants(&dst))
-                //         .iter()
-                //         .for_each(|dst| dst_ignored.set(dst.index(), true));
-            }
-        }
+        ambiguous_list
+            .into_iter()
+            .filter_map(|(src, dst)| {
+                if !(mapper.mappings.is_src(&src) || mapper.mappings.is_dst(&dst)) {
+                    mapper.add_mapping_recursively(&src, &dst);
+                    None
+                } else {
+                    Some((src, dst))
+                }
+            })
+            .collect::<Vec<_>>()
+
+        // // Select the best ambiguous mappings
+        // // let mut src_ignored = bitvec::bitbox![0;mapper.src_arena.len()];
+        // // let mut dst_ignored = bitvec::bitbox![0;mapper.dst_arena.len()];
+        // for (src, dst) in ambiguous_list {
+        //     // let src_i = src.index();
+        //     // let dst_i = dst.index();
+        //     // if !(src_ignored[src_i] || dst_ignored[dst_i]) {
+        //     if !(mapper.mappings.is_src(&src) || mapper.mappings.is_dst(&dst)) {
+        //         mapper.add_mapping_recursively(&src, &dst);
+        //         //     src_ignored.set(src_i, true);
+        //         //     (mapper.src_arena.descendants(&src))
+        //         //         .iter()
+        //         //         .for_each(|src| src_ignored.set(src.index(), true));
+        //         //     dst_ignored.set(dst_i, true);
+        //         //     (mapper.dst_arena.descendants(&dst))
+        //         //         .iter()
+        //         //         .for_each(|dst| dst_ignored.set(dst.index(), true));
+        //     }
+        // }
     }
 }
 

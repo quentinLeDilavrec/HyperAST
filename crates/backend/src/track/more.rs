@@ -1,5 +1,6 @@
 use axum::{Json, response::IntoResponse};
 use enumset::{EnumSet, EnumSetType};
+use hyper_diff::mappings::MultiVecStore;
 use hyper_diff::matchers::Mapping;
 use hyperast::PrimInt;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
@@ -10,15 +11,14 @@ use tokio::time::Instant;
 
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use hyper_diff::mappings::mapping_store;
+use hyper_diff::mappings::MappingStore;
+use hyper_diff::mappings::VecStore;
 use hyper_diff::matchers::Mapper;
 use hyperast::store::defaults::NodeIdentifier as IdN;
 use hyperast::types::{Childrn, HyperAST, NodeStore, WithChildren};
-use mapping_store::MappingStore;
 
 type IdD = u32;
-type LazyVecMapping =
-    Mapping<LazyPostOrder<IdN, IdD>, LazyPostOrder<IdN, IdD>, mapping_store::VecStore<IdD>>;
+type LazyVecMapping = Mapping<LazyPostOrder<IdN, IdD>, LazyPostOrder<IdN, IdD>, VecStore<IdD>>;
 type LazyRefMut<'a> = clashmap::mapref::one::RefMut<'a, IdN, LazyPostOrder<IdN, IdD>>;
 
 // WARN lazy subtrees are not complete
@@ -28,8 +28,8 @@ fn lazy_mapping<'a>(
     src_tr: IdN,
     dst_tr: IdN,
 ) -> dashmap::mapref::one::RefMut<'a, (IdN, IdN), LazyVecMapping> {
-    use mapping_store::DefaultMappingStore as M;
-    use mapping_store::DefaultMultiMappingStore as MM;
+    use hyper_diff::mappings::DefaultMappingStore as M;
+    use hyper_diff::mappings::DefaultMultiMappingStore as MM;
 
     use hyper_diff::matchers::heuristic::gt;
 
@@ -92,12 +92,12 @@ fn lazy_subtree_mapping<'a>(
     partial_comp_cache: &'a crate::PartialDecompCache,
     src_tr: IdN,
     dst_tr: IdN,
-) -> Mapping<LazyRefMut<'a>, LazyRefMut<'a>, mapping_store::MultiVecStore<IdD>> {
+) -> Mapping<LazyRefMut<'a>, LazyRefMut<'a>, MultiVecStore<IdD>> {
     use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher as SubtreeMatcher;
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+    use hyper_diff::mappings::DefaultMultiMappingStore as MM;
+    use hyper_diff::mappings::VecStore as M;
     use hyper_diff::matchers::heuristic::gt;
-    use mapping_store::DefaultMultiMappingStore as MM;
-    use mapping_store::VecStore as M;
 
     let hyperast = &repositories.processor.main_stores;
     let src = &src_tr;

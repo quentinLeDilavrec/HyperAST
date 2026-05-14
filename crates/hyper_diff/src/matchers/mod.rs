@@ -19,7 +19,7 @@ use std::ops::{Deref, DerefMut};
 
 use hyperast::types::{DecompressedFrom, HyperAST, HyperASTShared};
 
-use crate::mappings::mapping_store::{MappingStore, VecStore};
+use crate::mappings::{MappingStore, VecStore};
 
 pub struct Decompressible<HAST, D> {
     /// the HyperAST which is being decompressed

@@ -9,7 +9,7 @@ use hyperast::{PrimInt, types};
 use hyper_diff::decompressed_tree_store::DecompressedWithParent as _;
 use hyper_diff::decompressed_tree_store::LazyDecompressedTreeStore as _;
 use hyper_diff::decompressed_tree_store::{Shallow, lazy_post_order::LazyPostOrder};
-use hyper_diff::mappings::mapping_store;
+use hyper_diff::mappings;
 use hyper_diff::mappings::{MappingStore, MonoMappingStore, MultiMappingStore};
 use hyper_diff::matchers::{Decompressible, Mapper};
 
@@ -98,7 +98,7 @@ where
     let mut locked = binding.lock();
     let tree_pair = locked.as_mut(stores);
 
-    let mappings = mapping_store::VecStore::default();
+    let mappings = mappings::VecStore::default();
     let mut mapper = Mapper::prep(stores, mappings, tree_pair);
     let fuller_mappings = if flags.some() {
         // case where we want to track through multiple commits
@@ -125,7 +125,7 @@ where
                 // It happens when going through the greedy tracking
                 // maybe an issue with DashMaps ?
                 use crate::changes::continue_compute_mappings_full;
-                use mapping_store::DefaultMultiMappingStore as MM;
+                use mappings::DefaultMultiMappingStore as MM;
                 continue_compute_mappings_full::<_, _, MM<_>>(
                     mappings_alone,
                     &mut mapper,
@@ -137,7 +137,7 @@ where
         }
         // let mut mapper = mapper.mirror();
         use crate::changes::continue_compute_mappings_full;
-        use mapping_store::DefaultMultiMappingStore as MM;
+        use mappings::DefaultMultiMappingStore as MM;
         continue_compute_mappings_full::<_, _, MM<_>>(
             mappings_alone,
             &mut mapper,
@@ -145,7 +145,7 @@ where
         )
     } else {
         use crate::changes::continue_compute_mappings_full;
-        use mapping_store::DefaultMultiMappingStore as MM;
+        use mappings::DefaultMultiMappingStore as MM;
         continue_compute_mappings_full::<_, _, MM<_>>(mappings_alone, &mut mapper, None)
     };
     let fuller_mappings = &fuller_mappings.1;
@@ -419,7 +419,7 @@ type MapperNos<'store, 'a, M, Src, Dst> = Mapper<
 fn track_greedy<'s, C, P, M>(
     with_spaces_stores: &'s SimpleStores<TStore>,
     mapper: &mut MapperNos<'s, '_, M, IdD, IdD>,
-    subtree_mappings: &mapping_store::MultiVecStore<IdD>,
+    subtree_mappings: &mappings::MultiVecStore<IdD>,
     flags: &Flags,
     target: &P,
     postprocess_matching: &impl Fn(LocalPieceOfCode<IdN, super::Idx>) -> C,

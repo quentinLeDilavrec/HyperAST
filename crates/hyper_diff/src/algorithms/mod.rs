@@ -1,8 +1,20 @@
+use std::fmt::{Debug, Display};
+
+use hyperast::PrimInt;
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, HyperASTShared, LendT};
+use hyperast::types::{WithHashs, WithSerialization, WithStats};
+
 use crate::actions::action_vec::ActionsVec;
 use crate::actions::script_generator2::SimpleAction;
+use crate::decompressed_tree_store;
+use crate::decompressed_tree_store::CompletePostOrder;
 use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
+use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use crate::mappings::VecStore;
+use crate::matchers::Decompressible;
 use crate::matchers::Mapper;
+use crate::tree::tree_path::CompressedTreePath;
 
 pub mod change_distiller;
 pub mod change_distiller_lazy;
@@ -112,9 +124,10 @@ impl<P1: RuntimeMeasurement, P2: RuntimeMeasurement> Phased<P1, P2> {
         }
     }
 }
+
 impl<P1: RuntimeMeasurement, P2: RuntimeMeasurement> RuntimeMeasurement for Phased<P1, P2> {
     type M = Prepared<P1::M, P2::M>;
-    fn display(&self) -> impl std::fmt::Display {
+    fn display(&self) -> impl Display {
         format!("{} + {}", self.current.display(), self.prev.display())
     }
     fn sum<T: 'static + Clone + std::ops::Add<Output = T>>(&self) -> Option<T> {
@@ -164,7 +177,7 @@ impl<D: RuntimeMetric> Prepared<D::M, D> {
 
 impl<D1: RuntimeMeasurement, D2: RuntimeMeasurement> RuntimeMeasurement for Prepared<D1, D2> {
     type M = Prepared<D1::M, D2::M>;
-    fn display(&self) -> impl std::fmt::Display {
+    fn display(&self) -> impl Display {
         format!("{} + {}", self.prep.display(), self.mapping.display())
     }
     fn sum<D: 'static + Clone + std::ops::Add<Output = D>>(&self) -> Option<D> {
@@ -185,7 +198,7 @@ pub trait RuntimeMetric {
 
 pub trait RuntimeMeasurement {
     type M;
-    fn display(&self) -> impl std::fmt::Display;
+    fn display(&self) -> impl Display;
     fn sum<D: 'static + Clone + std::ops::Add<Output = D>>(&self) -> Option<D>;
 }
 
@@ -204,11 +217,9 @@ impl<M1: RuntimeMetric, M2: RuntimeMetric> RuntimeMetric for (M1, M2) {
 
 impl<M1: RuntimeMeasurement, M2: RuntimeMeasurement> RuntimeMeasurement for (M1, M2) {
     type M = (M1::M, M2::M);
-    fn display(&self) -> impl std::fmt::Display {
+    fn display(&self) -> impl Display {
         struct DisplayTuple<'a, T>(&'a T);
-        impl<M1: RuntimeMeasurement, M2: RuntimeMeasurement> std::fmt::Display
-            for DisplayTuple<'_, (M1, M2)>
-        {
+        impl<M1: RuntimeMeasurement, M2: RuntimeMeasurement> Display for DisplayTuple<'_, (M1, M2)> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "({} ; {})", self.0.0.display(), self.0.1.display())
             }
@@ -229,9 +240,9 @@ impl<M1: RuntimeMeasurement, M2: RuntimeMeasurement> RuntimeMeasurement for (M1,
 
 impl RuntimeMeasurement for () {
     type M = ();
-    fn display(&self) -> impl std::fmt::Display {
+    fn display(&self) -> impl Display {
         struct DisplayEmpty();
-        impl std::fmt::Display for DisplayEmpty {
+        impl Display for DisplayEmpty {
             fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 Ok(())
             }
@@ -259,9 +270,9 @@ impl RuntimeMetric for std::time::Instant {
 
 impl RuntimeMeasurement for std::time::Duration {
     type M = std::time::Instant;
-    fn display(&self) -> impl std::fmt::Display {
+    fn display(&self) -> impl Display {
         struct Disp(std::time::Duration);
-        impl std::fmt::Display for Disp {
+        impl Display for Disp {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let secs = self.0.as_secs_f64();
                 write!(f, "{:.3}s", secs)
@@ -302,7 +313,7 @@ impl RuntimeMetric for AllocatedMemory {
 
 impl RuntimeMeasurement for AllocatedMemory {
     type M = AllocatedMemory;
-    fn display(&self) -> impl std::fmt::Display {
+    fn display(&self) -> impl Display {
         self
     }
 
@@ -313,7 +324,7 @@ impl RuntimeMeasurement for AllocatedMemory {
     }
 }
 
-impl std::fmt::Display for AllocatedMemory {
+impl Display for AllocatedMemory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let div = self.0.div_euclid(1000);
         if div == 0 {
@@ -324,7 +335,7 @@ impl std::fmt::Display for AllocatedMemory {
     }
 }
 
-impl std::fmt::Debug for AllocatedMemory {
+impl Debug for AllocatedMemory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AllocatedMemory")
             .field("bytes", &self.0)
@@ -428,7 +439,7 @@ impl<MD> ResultsSummary<MD> {
     }
 }
 
-impl<HAST, Dsrc, Ddst, M, MD> std::fmt::Display
+impl<HAST, Dsrc, Ddst, M, MD> Display
     for DiffResult<
         crate::actions::script_generator2::SimpleAction<
             HAST::Label,
@@ -441,54 +452,42 @@ impl<HAST, Dsrc, Ddst, M, MD> std::fmt::Display
 where
     Dsrc: ShallowDecompressedTreeStore<HAST, u32>,
     Ddst: ShallowDecompressedTreeStore<HAST, u32>,
-    HAST: types::HyperAST + Copy,
-    for<'t> <HAST as types::AstLending<'t>>::RT: types::WithSerialization,
-    for<'t> <HAST as types::AstLending<'t>>::RT: types::WithStats,
-    HAST::IdN: Copy + types::NodeId<IdN = HAST::IdN> + std::fmt::Debug,
+    HAST: HyperAST + Copy,
+    for<'t> LendT<'t, HAST>: WithStats + WithSerialization,
+    HAST::IdN: Copy + Debug,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // writeln!(f, "structural diff {:?}s", self.time())?;
-        let src = self
-            .mapper
-            .src_arena
-            .original(&self.mapper.src_arena.root());
-        let dst = self
-            .mapper
-            .dst_arena
-            .original(&self.mapper.dst_arena.root());
+        let stores = self.mapper.hyperast;
+        let src = self.mapper.src_arena.root();
+        let src = self.mapper.src_arena.original(&src);
+        let dst = self.mapper.dst_arena.root();
+        let dst = self.mapper.dst_arena.original(&dst);
         let Some(actions) = &self.actions else {
             return Ok(());
         };
-        crate::actions::action_vec::actions_vec_f(f, actions, self.mapper.hyperast, src, dst)
+        crate::actions::action_vec::actions_vec_f(f, actions, stores, src, dst)
     }
 }
 
-use crate::decompressed_tree_store;
-use crate::matchers;
-use crate::tree::tree_path::CompressedTreePath;
-
 #[allow(type_alias_bounds)]
-type DS<HAST: types::HyperASTShared> = matchers::Decompressible<
-    HAST,
-    decompressed_tree_store::lazy_post_order::LazyPostOrder<HAST::IdN, u32>,
->;
+type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
 
 #[allow(type_alias_bounds)]
 #[allow(clippy::upper_case_acronyms)]
-type CDS<HAST: types::HyperASTShared> =
-    matchers::Decompressible<HAST, decompressed_tree_store::CompletePostOrder<HAST::IdN, u32>>;
+type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
 
-fn check_oneshot_decompressed_against_lazy<HAST: types::HyperAST + Copy>(
+fn check_oneshot_decompressed_against_lazy<HAST: HyperAST + Copy>(
     hyperast: HAST,
     src: &HAST::IdN,
     dst: &HAST::IdN,
     mapper: &Mapper<HAST, CDS<HAST>, CDS<HAST>, VecStore<u32>>,
 ) where
-    HAST::IdN: Clone + std::fmt::Debug + Eq,
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
-    HAST::Idx: hyperast::PrimInt,
-    HAST::Label: std::fmt::Debug + Clone + Copy + Eq,
-    for<'t> <HAST as types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    HAST::Idx: PrimInt,
+    HAST::IdN: Clone + Debug + Eq,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::Label: Debug + Clone + Copy + Eq,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let mapper = mapper.src_arena.decomp.deref();
     let mapper = mapper.deref();
@@ -500,13 +499,8 @@ fn check_oneshot_decompressed_against_lazy<HAST: types::HyperAST + Copy>(
         "naive:\t{:?}",
         &mapper.llds.iter().take(20).collect::<Vec<_>>()
     );
-    use matchers::Decompressible;
-    use types::HyperASTShared;
     #[allow(type_alias_bounds)]
-    type DS<HAST: HyperASTShared> = Decompressible<
-        HAST,
-        crate::decompressed_tree_store::lazy_post_order::LazyPostOrder<HAST::IdN, u32>,
-    >;
+    type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
     let _mapper: (HAST, (DS<HAST>, DS<HAST>)) = hyperast.decompress_pair(src, dst);
     let mut _mapper_owned: Mapper<_, DS<HAST>, DS<HAST>, VecStore<u32>> = _mapper.into();
     let _mapper = Mapper {
@@ -551,5 +545,4 @@ macro_rules! tr {
         )*
     };
 }
-use hyperast::types::{self, HyperASTShared};
 use tr;

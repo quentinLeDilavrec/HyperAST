@@ -1,18 +1,15 @@
-use super::DiffResult;
-use super::tr;
 use std::fmt::Debug;
 
-use super::CDS;
-use super::DiffRes;
+use hyperast::PrimInt;
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT};
+use hyperast::types::{WithHashs, WithStats};
+
+use super::{CDS, DS, DiffRes, DiffResult, tr};
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::matchers::Mapper;
 use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
-use hyperast::types::{self, HyperAST, NodeId};
-
-// use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use super::DS;
-
+use crate::matchers::Mapper;
 use crate::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
 use crate::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 
@@ -26,11 +23,11 @@ pub fn diff<HAST: HyperAST + Copy>(
     dst: &HAST::IdN,
 ) -> DiffRes<HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
-    HAST::Idx: hyperast::PrimInt,
-    for<'t> types::LendT<'t, HAST>: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let measure = super::DefaultMetricSetup::prepare();
     let mut mapper_owned: (DS<HAST>, DS<HAST>) = hyperast.decompress_pair(src, dst).1;
@@ -92,11 +89,11 @@ pub fn lazy_top_down<'a, HAST: HyperAST + Copy + 'a>(
     mapper_owned: &'a mut (DS<HAST>, DS<HAST>),
 ) -> LazyMapper<'a, HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
-    HAST::Idx: hyperast::PrimInt,
-    for<'t> types::LendT<'t, HAST>: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let mapper = Mapper::with_mut_decompressible(mapper_owned, M::default());
     LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper)

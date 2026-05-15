@@ -1,16 +1,16 @@
-use super::DiffResult;
-use super::tr;
 use std::fmt::Debug;
 
-use super::CDS;
-use super::DiffRes;
+use hyperast::PrimInt;
+use hyperast::types::NodeId;
+use hyperast::types::{HyperAST, LendT};
+use hyperast::types::{WithHashs, WithStats};
+
+use super::{CDS, DiffRes, DiffResult, tr};
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::algorithms::check_oneshot_decompressed_against_lazy;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use crate::matchers::Mapper;
-use hyperast::types::{self, HyperAST, NodeId};
-
 use crate::matchers::heuristic::gt::greedy_subtree_matcher::GreedySubtreeMatcher;
 use crate::matchers::heuristic::gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
 
@@ -22,11 +22,11 @@ pub fn diff<HAST: HyperAST + Copy>(
     dst: &HAST::IdN,
 ) -> DiffRes<HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
-    HAST::Idx: hyperast::PrimInt,
     HAST::Label: Debug + Clone + Copy + Eq,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let measure = super::DefaultMetricSetup::prepare();
     let mapper: Mapper<_, CDS<HAST>, CDS<HAST>, VecStore<_>> =

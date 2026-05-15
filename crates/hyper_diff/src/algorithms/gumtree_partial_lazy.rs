@@ -1,18 +1,15 @@
-use super::DiffResult;
-use super::tr;
 use std::fmt::Debug;
 
-use super::CDS;
-use super::DiffRes;
+use hyperast::PrimInt;
+use hyperast::types::{HyperAST, LendT};
+use hyperast::types::{NodeId, TypeStore};
+use hyperast::types::{WithHashs, WithStats};
+
+use super::{CDS, DS, DiffRes, DiffResult, tr};
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::matchers::Mapper;
 use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
-use hyperast::types::{self, HyperAST, NodeId};
-
-// use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use super::DS;
-
+use crate::matchers::Mapper;
 use crate::matchers::heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
 use crate::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 
@@ -25,12 +22,12 @@ pub fn diff<HAST: HyperAST + Copy>(
     dst: &HAST::IdN,
 ) -> DiffRes<HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
-    HAST::Idx: hyperast::PrimInt,
-    <HAST::TS as types::TypeStore>::Ty: Eq + Debug,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    <HAST::TS as TypeStore>::Ty: Eq + Debug,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let measure = super::DefaultMetricSetup::prepare();
     let mut mapper_owned: (DS<HAST>, DS<HAST>) = hyperast.decompress_pair(src, dst).1;

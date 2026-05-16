@@ -1,3 +1,10 @@
+//! Provide tree diff algorithms over the HyperAST.
+//!
+//! In large, the signature between non-lazy and lazy tree diffs should be identical.
+//!
+//! These algorithms are meant to be examples.
+//! Thus, if you start chaining them, you should inline them and directly use the matchers.
+
 use std::fmt::{Debug, Display};
 
 use hyperast::PrimInt;

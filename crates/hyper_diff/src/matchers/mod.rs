@@ -1,13 +1,27 @@
 //! Matchers associate nodes in pairs of tree.
 //!
 //! Originally, the matching was a phase in a tree-diff algorithm,
-//! where interpreting the matchings would allow to produce a set of actions to transform a given tree into another.
-//! In this context, the objective is to minimise the transformation cost, e.g., the number and types of actions.
+//! where interpreting the matchings (or mappings) would allow to produce a set of actions to transform a given tree into another.
+//! In this context, the objective is to minimize the transformation cost, e.g., the number and types of actions.
 //!
 //! Later the notion of matchings was extended,
 //! leading to many different matching approaches.
 //! Certain matching approaches also consider more semantic interpretations.
 //! Moreover, matchers can also be composed.
+//!
+//! [`Decompressible`], [`Mapper`], and [`Mapping`] are the core types
+//! structuring the matching process, allowing to switch between different memory layouts
+//! required by different matching approaches.
+//! See [`crate::decompressed_tree_store`] and [`crate::mappings`] for the available layouts.
+//!
+//! As a side note, relative to non-trivial decision involving the HyperAST.
+//! While matching trees, you should most likely not require an owned or mutably referenced HyperAST.
+//! More specifically, when seeing `HAST: HyperAST + Copy` the `Copy` should preferably be an immutable reference to an HyperAST.
+//! Consequently, [`Decompressible`] and [`Mapper`] should be short lived, dropped before going back adding more code to the HyperAST.
+//! In the case, you need longer-lived handling of mappings, only keep [`Mapping`] alive, then later re-associate it with the same HyperAST.
+//!
+//! Caution: Directly manipulating [`Mapping`] while holding multiple HyperASTs could lead to incoherent results,
+//! if the same [`Mapping`] is reused with a different HyperAST.
 
 pub mod heuristic;
 pub mod optimal;
@@ -66,13 +80,6 @@ impl<HAST, D> Decompressible<HAST, D> {
     }
 }
 
-// impl<HAST, D> std::ops::Deref for Decompressible<HAST, &mut D> {
-//     type Target = D;
-//     fn deref(&self) -> &Self::Target {
-//         self.decomp
-//     }
-// }
-
 impl<HAST, D> std::ops::DerefMut for Decompressible<HAST, D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.decomp
@@ -107,6 +114,7 @@ pub trait WithMappings {
     type M;
 }
 
+/// Convenience wrapper enabling the computation of mappings between two trees stored in a [`HyperAST`].
 #[derive(Clone)]
 pub struct Mapper<HAST, Dsrc, Ddst, M> {
     /// the hyperAST to whom mappings are coming
@@ -114,6 +122,8 @@ pub struct Mapper<HAST, Dsrc, Ddst, M> {
     /// the decompressed subtrees coming from hyperAST and their mappings
     pub mapping: Mapping<Dsrc, Ddst, M>,
 }
+
+// TODO provide an helper to safely "disconnect and reconnect" to the same HyperAST
 
 impl<HAST, Dsrc, Ddst, M> WithMappings for Mapper<HAST, Dsrc, Ddst, M> {
     type M = M;
@@ -259,6 +269,18 @@ impl<HAST, Dsrc, Ddst, M: MappingStore> Mapper<HAST, Dsrc, Ddst, M> {
             mapping: self.mapping.map(f_src, f_dst),
         }
     }
+    pub fn map_src<Dsrc2, Fsrc: Fn(Dsrc) -> Dsrc2>(
+        self,
+        f_src: Fsrc,
+    ) -> Mapper<HAST, Dsrc2, Ddst, M> {
+        self.map(f_src, |x| x)
+    }
+    pub fn map_dst<Ddst2, Fdst: Fn(Ddst) -> Ddst2>(
+        self,
+        f_dst: Fdst,
+    ) -> Mapper<HAST, Dsrc, Ddst2, M> {
+        self.map(|x| x, f_dst)
+    }
 }
 
 impl<Dsrc, Ddst, M: MappingStore> Mapping<Dsrc, Ddst, M> {
@@ -281,27 +303,7 @@ impl<HAST: HyperASTShared, Dsrc, Ddst, M> HyperASTShared for Mapper<HAST, Dsrc, 
     type Idx = HAST::Idx;
 
     type Label = HAST::Label;
-
-    // type T<'t> = HAST::T<'t>;
-
-    // type RT = HAST::RT;
 }
-
-// impl<TS, NS, LS>  for SimpleStores<TS, NS, LS>
-// where
-//     NS: crate::types::NStore,
-//     NS: crate::types::NodeStore<<NS as crate::types::NStore>::IdN>,
-//     LS: crate::types::LStore,
-//     <NS as crate::types::NStore>::IdN:
-//         crate::types::NodeId<IdN = <NS as crate::types::NStore>::IdN>,
-//     for<'t> <NS as crate::types::NLending<'t, <NS as crate::types::NStore>::IdN>>::N:
-//         crate::types::Tree<
-//             Label = <LS as crate::types::LStore>::I,
-//             TreeId = <NS as crate::types::NStore>::IdN,
-//             ChildIdx = <NS as crate::types::NStore>::Idx,
-//         >,
-// {
-// }
 
 impl<'a, HAST: HyperAST, Dsrc, Ddst, M> hyperast::types::NLending<'a, HAST::IdN>
     for Mapper<HAST, Dsrc, Ddst, M>
@@ -316,7 +318,6 @@ impl<'a, HAST: HyperAST, Dsrc, Ddst, M> hyperast::types::AstLending<'a>
 }
 
 impl<HAST: HyperAST, Dsrc, Ddst, M> HyperAST for Mapper<HAST, Dsrc, Ddst, M> {
-    // type TM = HAST::TM;
     type NS = HAST::NS;
 
     fn node_store(&self) -> &Self::NS {

@@ -1,4 +1,7 @@
-use std::{fmt::Debug, hash::Hash, ops::Deref};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::marker::{Send, Sync};
+use std::ops::Deref;
 
 use hashbrown::hash_map::DefaultHashBuilder;
 use legion::storage::{Component, IntoComponentSource};
@@ -524,8 +527,8 @@ impl Default for NodeStore {
 mod stores_impl {
     use crate::store::{SimpleStores, defaults::LabelIdentifier};
     use crate::types::{
-        self, HyperAST, HyperASTShared, LStore, LendN, NStore, NodeId, NodeStore, TypeStore,
-        TypeTrait, TypedHyperAST, TypedNodeId,
+        self, HyperAST, HyperASTShared, LStore, LendN, NStore, NodeStore, TypeStore, TypeTrait,
+        TypedHyperAST, TypedNodeId, UniformNodeId,
     };
 
     impl<TS, NS, LS> HyperASTShared for SimpleStores<TS, NS, LS>
@@ -533,7 +536,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
     {
         type IdN = NS::IdN;
         type Idx = NS::Idx;
@@ -545,7 +548,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
     {
         type N = <NS as types::NLending<'a, <NS as NStore>::IdN>>::N;
     }
@@ -555,7 +558,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         for<'t> LendN<'t, NS, <NS as NStore>::IdN>: types::Tree<
                 Label = <LS as LStore>::I,
                 TreeId = <NS as NStore>::IdN,
@@ -570,7 +573,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
     {
         type IdN = NS::IdN;
         type Idx = NS::Idx;
@@ -582,7 +585,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         for<'t> LendN<'t, NS, <NS as NStore>::IdN>: types::Tree<
                 Label = <LS as LStore>::I,
                 TreeId = <NS as NStore>::IdN,
@@ -597,7 +600,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         for<'t> LendN<'t, NS, <NS as NStore>::IdN>: types::Tree<
                 Label = <LS as LStore>::I,
                 TreeId = <NS as NStore>::IdN,
@@ -611,7 +614,7 @@ mod stores_impl {
     where
         TS: TypeStore,
         NS: NStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         NS: NodeStore<NS::IdN>,
         LS: LStore,
         LS: types::LabelStore<str, I = <LS as LStore>::I>,
@@ -640,7 +643,7 @@ mod stores_impl {
         NS: NStore,
         NS: NodeStore<<NS as NStore>::IdN>,
         LS: LStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         for<'t> LendN<'t, NS, <NS as NStore>::IdN>: types::Tree<
                 Label = <LS as LStore>::I,
                 TreeId = <NS as NStore>::IdN,
@@ -673,7 +676,7 @@ mod stores_impl {
     where
         TS: TypeStore,
         NS: NStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         NS: NodeStore<NS::IdN>,
         LS: LStore,
         LS: types::LabelStore<str, I = <LS as LStore>::I>,
@@ -704,7 +707,7 @@ mod stores_impl {
         TIdN::Ty: TypeTrait,
         TS: TypeStore,
         NS: NStore,
-        <NS as NStore>::IdN: NodeId<IdN = <NS as NStore>::IdN>,
+        <NS as NStore>::IdN: UniformNodeId,
         NS: NodeStore<NS::IdN>,
         LS: LStore,
         LS: types::LabelStore<str, I = <LS as LStore>::I>,
@@ -741,15 +744,9 @@ mod stores_impl {
         TS: Copy + types::TypeStore,
         NS: NStore,
         NS: NodeStore<NS::IdN>,
-        NS::IdN: NodeId<IdN = NS::IdN>,
-        // LS: LStore,
-        // LS: types::LabelStore<str, I = <LS as LStore>::I>,
-        for<'t> LendN<'t, NS, NS::IdN>: types::Tree<
-                // Label = <LS as LStore>::I,
-                Label = LabelIdentifier,
-                TreeId = NS::IdN,
-                ChildIdx = NS::Idx,
-            >,
+        NS::IdN: UniformNodeId,
+        for<'t> LendN<'t, NS, NS::IdN>:
+            types::Tree<Label = LabelIdentifier, TreeId = NS::IdN, ChildIdx = NS::Idx>,
         NS: types::NStoreRefAssoc,
         &'a NS::S: NStore<IdN = NS::IdN, Idx = NS::Idx>,
         &'a NS::S: NodeStore<NS::IdN>,
@@ -765,15 +762,9 @@ mod stores_impl {
         NS: NStore,
         for<'a> NS: 'a,
         NS: NodeStore<NS::IdN>,
-        NS::IdN: NodeId<IdN = NS::IdN>,
-        // LS: LStore,
-        // LS: types::LabelStore<str, I = <LS as LStore>::I>,
-        for<'t> LendN<'t, NS, NS::IdN>: types::Tree<
-                // Label = <LS as LStore>::I,
-                Label = LabelIdentifier,
-                TreeId = NS::IdN,
-                ChildIdx = NS::Idx,
-            >,
+        NS::IdN: UniformNodeId,
+        for<'t> LendN<'t, NS, NS::IdN>:
+            types::Tree<Label = LabelIdentifier, TreeId = NS::IdN, ChildIdx = NS::Idx>,
         NS: types::NStoreRefAssoc,
         for<'a> &'a NS::S: NStore<IdN = NS::IdN, Idx = NS::Idx>,
         for<'a> &'a NS::S: NodeStore<NS::IdN>,
@@ -791,9 +782,9 @@ pub fn eq_node<'a, K, L, I>(
     children: &'a [I],
 ) -> impl Fn(EntryRef) -> bool + 'a
 where
-    K: 'static + Eq + Copy + std::marker::Send + std::marker::Sync,
-    L: 'static + Eq + Copy + std::marker::Send + std::marker::Sync,
-    I: 'static + Eq + Copy + std::marker::Send + std::marker::Sync,
+    K: 'static + Eq + Copy + Send + Sync,
+    L: 'static + Eq + Copy + Send + Sync,
+    I: 'static + Eq + Copy + Send + Sync,
 {
     move |x: EntryRef| {
         let t = x.get_component::<K>();
@@ -810,7 +801,7 @@ where
 
 pub fn eq_node_cs<I>(children: &[I]) -> impl Fn(EntryRef) -> bool + '_
 where
-    I: 'static + Eq + Copy + std::marker::Send + std::marker::Sync,
+    I: 'static + Eq + Copy + Send + Sync,
 {
     move |x: EntryRef| {
         use crate::store::nodes::compo;

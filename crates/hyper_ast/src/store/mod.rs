@@ -91,7 +91,7 @@ where
 impl<IdN, TS, NS, LS> crate::types::NodeStoreLean<IdN> for SimpleStores<TS, NS, LS>
 where
     NS::R: crate::types::Tree<TreeId = IdN>,
-    IdN: crate::types::NodeId<IdN = IdN>,
+    IdN: crate::types::UniformNodeId,
     NS: crate::types::NodeStoreLean<IdN>,
 {
     type R = NS::R;

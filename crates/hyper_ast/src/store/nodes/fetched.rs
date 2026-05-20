@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use string_interner::DefaultHashBuilder;
 use string_interner::Symbol;
 
-use crate::types::{AnyType, Children, HyperType, NodeId, TypeTrait, TypedNodeId, UniformNodeId};
+use crate::types::{AnyType, Children, HyperType, NodeId, TypeTrait, TypedNodeId};
 
 use strum_macros::*;
 #[cfg(feature = "native")]

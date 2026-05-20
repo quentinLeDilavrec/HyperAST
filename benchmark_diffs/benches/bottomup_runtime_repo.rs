@@ -12,19 +12,14 @@ use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::types::{HyperAST as _, HyperASTShared, WithStats as _};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 
+use hyperast_benchmark_diffs::{Input, prep_commits};
+
 #[allow(type_alias_bounds)]
 type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
 #[allow(type_alias_bounds)]
 type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
 type M = hyper_diff::mappings::VecStore<u32>;
 type MM = hyper_diff::mappings::DefaultMultiMappingStore<u32>;
-
-struct Input {
-    repo: hyperast_vcs_git::git::Repo,
-    commit: &'static str,
-    config: hyperast_vcs_git::processing::RepoConfig,
-    fetch: bool,
-}
 
 fn bottomup_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("Gumtree_BottomUp_runtime");
@@ -89,71 +84,12 @@ fn bottomup_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("ChangDistiller_BottomUp_runtime");
 
     for p in inputs.iter() {
-        use hyper_diff::matchers::heuristic::cd;
-        prep_cd_subtree_and_bench(
-            &mut group,
-            &mut repositories,
-            p,
-            BenchmarkId::new("Baseline", p.repo.name()),
-            |b, (repositories, (owned, mappings))| {
-                let hyperast = &repositories.processor.main_stores;
-                b.iter_batched(
-                    || {
-                        hyper_diff::matchers::Mapper::prep(
-                            hyperast,
-                            mappings.clone(),
-                            owned.clone(),
-                        )
-                    },
-                    |mapper| {
-                        dbg!(mapper.mappings.len());
-                        let mapper = mapper.map(
-                            |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                            |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                        );
-                        use cd::bottom_up_matcher::BottomUpMatcher;
-                        let mapper = BottomUpMatcher::<_>::match_it(mapper);
-                        dbg!(mapper.mappings.len(), mapper.mappings.capacity());
-                        black_box(mapper);
-                    },
-                    BatchSize::SmallInput,
-                );
-            },
-        );
-        prep_cd_subtree_and_bench(
-            &mut group,
-            &mut repositories,
-            p,
-            BenchmarkId::new("Lazy", p.repo.name()),
-            |b, (repositories, (owned, mappings))| {
-                let hyperast = &repositories.processor.main_stores;
-                b.iter_batched(
-                    || {
-                        hyper_diff::matchers::Mapper::prep(
-                            hyperast,
-                            mappings.clone(),
-                            owned.clone(),
-                        )
-                    },
-                    |mut mapper| {
-                        dbg!(mapper.mappings.len());
-                        let mapper = Mapper::new(
-                            hyperast,
-                            mapper.mapping.mappings,
-                            (
-                                mapper.mapping.src_arena.as_mut(),
-                                mapper.mapping.dst_arena.as_mut(),
-                            ),
-                        );
-                        use cd::lazy_bottom_up_matcher::BottomUpMatcher;
-                        let mapper = BottomUpMatcher::<_>::match_it(mapper);
-                        dbg!(mapper.mappings.len(), mapper.mappings.capacity());
-                        black_box(mapper);
-                    },
-                    BatchSize::SmallInput,
-                );
-            },
-        );
+        bench_cd::<100>(&mut group, &mut repositories, p);
+        bench_cd::<200>(&mut group, &mut repositories, p);
+        bench_cd::<400>(&mut group, &mut repositories, p);
+        bench_lazy_cd::<100>(&mut group, &mut repositories, p);
+        bench_lazy_cd::<200>(&mut group, &mut repositories, p);
+        bench_lazy_cd::<400>(&mut group, &mut repositories, p);
     }
     group.finish();
 }
@@ -483,6 +419,74 @@ fn bench_lazy_simple(
     );
 }
 
+fn bench_cd<const MAX_SIZE: usize>(
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
+    repositories: &mut PreProcessedRepositories,
+    p: &Input,
+) {
+    use hyper_diff::matchers::heuristic::cd;
+    prep_cd_subtree_and_bench(
+        group,
+        repositories,
+        p,
+        BenchmarkId::new("Baseline", p.repo.name()),
+        |b, (repositories, (owned, mappings))| {
+            let hyperast = &repositories.processor.main_stores;
+            b.iter_batched(
+                || hyper_diff::matchers::Mapper::prep(hyperast, mappings.clone(), owned.clone()),
+                |mapper| {
+                    dbg!(mapper.mappings.len());
+                    let mapper = mapper.map(
+                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
+                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
+                    );
+                    use cd::bottom_up_matcher::BottomUpMatcher;
+                    let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
+                    dbg!(mapper.mappings.len(), mapper.mappings.capacity());
+                    black_box(mapper);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
+fn bench_lazy_cd<const MAX_SIZE: usize>(
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
+    repositories: &mut PreProcessedRepositories,
+    p: &Input,
+) {
+    use hyper_diff::matchers::heuristic::cd;
+    prep_cd_subtree_and_bench(
+        group,
+        repositories,
+        p,
+        BenchmarkId::new("Lazy", p.repo.name()),
+        |b, (repositories, (owned, mappings))| {
+            let hyperast = &repositories.processor.main_stores;
+            b.iter_batched(
+                || hyper_diff::matchers::Mapper::prep(hyperast, mappings.clone(), owned.clone()),
+                |mut mapper| {
+                    dbg!(mapper.mappings.len());
+                    let mapper = Mapper::new(
+                        hyperast,
+                        mapper.mapping.mappings,
+                        (
+                            mapper.mapping.src_arena.as_mut(),
+                            mapper.mapping.dst_arena.as_mut(),
+                        ),
+                    );
+                    use cd::lazy_bottom_up_matcher::BottomUpMatcher;
+                    let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
+                    dbg!(mapper.mappings.len(), mapper.mappings.capacity());
+                    black_box(mapper);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
 type OwnedLazyMapping = (
     (
         LazyPostOrder<NodeIdentifier, u32>,
@@ -555,41 +559,6 @@ fn prep_cd_subtree_and_bench<Mea: Measurement>(
         },
         f,
     );
-}
-
-fn prep_commits(
-    p: &Input,
-    repositories: &mut PreProcessedRepositories,
-) -> (NodeIdentifier, NodeIdentifier) {
-    let repo = repositories
-        .get_config(p.repo.clone())
-        .ok_or_else(|| "missing config for repository".to_string())
-        .unwrap();
-    let repository = if p.fetch
-        && repositories
-            .get_commit(
-                &repo.config,
-                &hyperast_vcs_git::git::Oid::from_str(p.commit).unwrap(),
-            )
-            .is_none()
-    {
-        repo.fetch()
-    } else {
-        repo.nofetch()
-    };
-
-    let commits = repositories
-        .pre_process_with_limit(&repository, "", p.commit, 2)
-        .unwrap();
-    let src = repositories
-        .get_commit(&repository.config, &commits[1])
-        .unwrap()
-        .ast_root;
-    let dst = repositories
-        .get_commit(&repository.config, &commits[0])
-        .unwrap()
-        .ast_root;
-    (src, dst)
 }
 
 #[cfg(target_os = "linux")]

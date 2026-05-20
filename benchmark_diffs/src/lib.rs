@@ -32,6 +32,9 @@ pub mod preprocess;
 
 use std::{env, fs, io, path, time};
 
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
+
 pub fn tempfile() -> io::Result<(path::PathBuf, fs::File)> {
     let mut path = env::temp_dir();
     let file_name = time::SystemTime::UNIX_EPOCH;
@@ -78,4 +81,46 @@ pub fn setup_env_logger() {
             }
         })
         .init();
+}
+
+pub struct Input {
+    pub repo: hyperast_vcs_git::git::Repo,
+    pub commit: &'static str,
+    pub config: hyperast_vcs_git::processing::RepoConfig,
+    pub fetch: bool,
+}
+
+pub fn prep_commits(
+    p: &Input,
+    repositories: &mut PreProcessedRepositories,
+) -> (NodeIdentifier, NodeIdentifier) {
+    let repo = repositories
+        .get_config(p.repo.clone())
+        .ok_or_else(|| "missing config for repository".to_string())
+        .unwrap();
+    let repository = if p.fetch
+        && repositories
+            .get_commit(
+                &repo.config,
+                &hyperast_vcs_git::git::Oid::from_str(p.commit).unwrap(),
+            )
+            .is_none()
+    {
+        repo.fetch()
+    } else {
+        repo.nofetch()
+    };
+
+    let commits = repositories
+        .pre_process_with_limit(&repository, "", p.commit, 2)
+        .unwrap();
+    let src = repositories
+        .get_commit(&repository.config, &commits[1])
+        .unwrap()
+        .ast_root;
+    let dst = repositories
+        .get_commit(&repository.config, &commits[0])
+        .unwrap()
+        .ast_root;
+    (src, dst)
 }

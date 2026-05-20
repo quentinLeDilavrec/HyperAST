@@ -10,19 +10,14 @@ use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::types::{HyperAST as _, HyperASTShared, WithStats as _};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 
+use hyperast_benchmark_diffs::{Input, prep_commits};
+
 #[allow(type_alias_bounds)]
 type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
 #[allow(type_alias_bounds)]
 type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
 type M = hyper_diff::mappings::VecStore<u32>;
 type MM = hyper_diff::mappings::DefaultMultiMappingStore<u32>;
-
-struct Input {
-    repo: hyperast_vcs_git::git::Repo,
-    commit: &'static str,
-    config: hyperast_vcs_git::processing::RepoConfig,
-    fetch: bool,
-}
 
 fn mapping_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("Mapping_runtime");
@@ -569,41 +564,6 @@ fn prep_and_bench<Mea: Measurement>(
         },
         f,
     );
-}
-
-fn prep_commits(
-    p: &Input,
-    repositories: &mut PreProcessedRepositories,
-) -> (NodeIdentifier, NodeIdentifier) {
-    let repo = repositories
-        .get_config(p.repo.clone())
-        .ok_or_else(|| "missing config for repository".to_string())
-        .unwrap();
-    let repository = if p.fetch
-        && repositories
-            .get_commit(
-                &repo.config,
-                &hyperast_vcs_git::git::Oid::from_str(p.commit).unwrap(),
-            )
-            .is_none()
-    {
-        repo.fetch()
-    } else {
-        repo.nofetch()
-    };
-
-    let commits = repositories
-        .pre_process_with_limit(&repository, "", p.commit, 2)
-        .unwrap();
-    let src = repositories
-        .get_commit(&repository.config, &commits[1])
-        .unwrap()
-        .ast_root;
-    let dst = repositories
-        .get_commit(&repository.config, &commits[0])
-        .unwrap()
-        .ast_root;
-    (src, dst)
 }
 
 #[cfg(target_os = "linux")]

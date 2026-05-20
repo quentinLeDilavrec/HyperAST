@@ -1,14 +1,13 @@
-//! different decompressed tree layouts optimized for different traversals and exposing different behavior.
+//! Different decompressed tree layouts optimized for different traversals and exposing different behavior.
 //!
-//! Here decomressed means that nodes are not shared ie. each node only has one parent.
+//! Here decompressed means that nodes are not shared ie. each node only has one parent.
 //!
 //! The most important layout is Post Order.
 //! We need both post-order traversal and breadth-first.
 
 use hyperast::PrimInt;
-use hyperast::types::{HyperAST, NodeStore, Stored, WithStats};
+use hyperast::types::HyperAST;
 
-// pub mod breath_first;
 pub mod basic_post_order;
 pub mod bfs_wrapper;
 pub mod breadth_first;
@@ -25,15 +24,6 @@ pub use simple_zs_tree::SimpleZsTree;
 
 pub use hyperast::types::DecompressedSubtree;
 
-// /// show that the decompression can be done
-// /// - needed to initialize in matchers
-// pub trait Initializable<'a, T: Stored> {
-//     /// decompress the tree at [`root`] in [`store`]
-//     fn decompress<S>(store: &'a S, root: &T::TreeId) -> Self
-//     where
-//         S: NodeStore<T::TreeId, N = T>;
-// }
-
 /// TODO remove this trait when the specialization feature improves
 ///
 /// NOTE compared to Initializable this trait only adds WithStats bound on T.
@@ -41,17 +31,6 @@ pub use hyperast::types::DecompressedSubtree;
 /// the WithStats bound helps a lot with lazy decompressions
 pub trait InitializableWithStats<IdN>: DecompressedSubtree<IdN> {
     fn considering_stats(&self, root: &IdN) -> Self;
-}
-
-/// create a lazy decompresed tree store
-///
-/// You should also implement a way of finalysing the decompression
-/// eg. fn finalyze(store: &'a S, lazy: Lazy) -> Self
-/// - I do not think it can be easily made into a trait
-pub trait LazyInitializable<'a, T: Stored + WithStats> {
-    fn create<S>(store: &'a S, root: &T::TreeId) -> Self
-    where
-        S: NodeStore<T::TreeId, N = T>;
 }
 
 pub trait FullyDecompressedTreeStore<HAST: HyperAST + Copy, IdD>:
@@ -109,7 +88,6 @@ pub trait LazyDecompressedTreeStore<HAST: HyperAST + Copy, IdS>:
     fn decompress_descendants(&mut self, x: &Self::IdD) {
         let mut q = self.decompress_children(x);
         while let Some(x) = q.pop() {
-            // assert!(self.id_parent[x.to_usize().unwrap()] != zero());
             q.extend(self.decompress_children(&x));
         }
     }

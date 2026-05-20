@@ -4,8 +4,8 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::ParallelIterator;
 
-use hyper_diff::matchers::Mapper;
 use hyper_diff::mappings::{MonoMappingStore, VecStore};
+use hyper_diff::matchers::Mapper;
 use hyper_diff::tree::tree_path::{CompressedTreePath, TreePath};
 use hyperast::PrimInt;
 use hyperast::position::Position;
@@ -755,8 +755,8 @@ pub fn print_mappings<
     mappings: &M,
 ) where
     for<'t> LendT<'t, HAST>: WithSerialization,
-    SD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD>, // + DecompressedWithParent<HAST, IdD>,
-    DD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD>, //+ DecompressedWithParent<HAST, IdD>,
+    SD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD>,
+    DD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD>,
 {
     use complete_post_order::DisplayCompletePostOrder;
 

@@ -1,22 +1,27 @@
-use std::{borrow::Borrow, fmt::Debug, marker::PhantomData};
+use std::{borrow::Borrow, fmt::Debug};
 
 use num_traits::{cast, zero};
 
-use crate::decompressed_tree_store::{
-    BreadthFirstIterable, DecompressedParentsLending, DecompressedTreeStore,
-    DecompressedWithParent, PostOrder, ShallowDecompressedTreeStore,
-};
 use hyperast::PrimInt;
 use hyperast::types::HyperAST;
 
-use super::BreadthFirstIt;
+use super::PostOrder;
+use super::ShallowDecompressedTreeStore;
+use super::{BreadthFirstIt, BreadthFirstIterable, DecompressedTreeStore};
+use super::{DecompressedParentsLending, DecompressedWithParent};
 
 /// Wrap or just map a decompressed tree in breadth-first eg. post-order,
 pub struct SimpleBfsMapper<'a, IdD, DTS, D: Borrow<DTS> = DTS> {
+    /// back ids ordered in breadth-first order
     map: Vec<IdD>,
+    // Note: not sure if it is needed
     rev: Vec<IdD>,
+    /// Backend tree
+    ///
+    /// Thanks to Borrow, gives flexibility on ownership of backend tree.
     pub back: D,
-    phantom: PhantomData<&'a DTS>,
+    /// Bounds are on DTS
+    phantom: std::marker::PhantomData<&'a DTS>,
 }
 
 impl<IdD: Debug, DTS: Debug, D: Borrow<DTS>> Debug for SimpleBfsMapper<'_, IdD, DTS, D> {
@@ -31,6 +36,14 @@ impl<IdD: Debug, DTS: Debug, D: Borrow<DTS>> Debug for SimpleBfsMapper<'_, IdD, 
 }
 
 impl<IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'_, IdD, DTS, D> {
+    fn new(back: D, map: Vec<IdD>, rev: Vec<IdD>) -> Self {
+        Self {
+            map,
+            rev,
+            back,
+            phantom: std::marker::PhantomData,
+        }
+    }
     pub fn with_store<HAST>(_store: HAST, back: D) -> Self
     where
         HAST: HyperAST + Copy,
@@ -52,13 +65,7 @@ impl<IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'_, IdD, DTS, D> {
         }
 
         map.shrink_to_fit();
-        Self {
-            map,
-            // fc,
-            rev,
-            back,
-            phantom: PhantomData,
-        }
+        Self::new(back, map, rev)
     }
 }
 
@@ -82,13 +89,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD>, D: Borr
         }
 
         map.shrink_to_fit();
-        Self {
-            map,
-            // fc,
-            rev,
-            back,
-            phantom: PhantomData,
-        }
+        Self::new(back, map, rev)
     }
 }
 

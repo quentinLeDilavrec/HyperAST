@@ -2,13 +2,15 @@ use std::fmt::{Debug, Display};
 
 use num_traits::{PrimInt, ToPrimitive, Zero};
 
-use hyperast::types::{HyperAST, LabelStore, Labeled, NodeStore, WithChildren, WithSerialization};
+use hyperast::types::HyperAST;
+use hyperast::types::WithChildren as _;
+use hyperast::types::WithSerialization;
+use hyperast::types::{LabelStore, Labeled, NodeStore};
 
 use crate::decompressed_tree_store::PostOrder;
 
 pub struct SimplePreOrderMapper<'a, IdD, D> {
     pub map: Vec<IdD>,
-    // fc: Vec<IdD>,
     rev: Vec<IdD>,
     pub(crate) depth: Vec<u16>,
     back: &'a D,
@@ -28,7 +30,6 @@ impl<'a, IdD: PrimInt, D> From<&'a D> for SimplePreOrderMapper<'a, IdD, D>
 where
 // HAST: HyperAST + Copy,
 // T: for<'t> types::NLending<'t, T::TreeId>,
-// for<'t> <T as types::NLending<'t, T::TreeId>>::N: WithChildren,
 // D: PostOrder<HAST, IdD> + FullyDecompressedTreeStore<HAST, IdD>,
 {
     fn from(_x: &'a D) -> Self {

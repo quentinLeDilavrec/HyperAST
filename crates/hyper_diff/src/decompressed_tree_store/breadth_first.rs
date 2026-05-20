@@ -3,15 +3,13 @@ use std::marker::PhantomData;
 use num_traits::{cast, zero};
 
 use hyperast::PrimInt;
-use hyperast::types::WithChildren;
-use hyperast::types::{self, Childrn, HyperAST};
+use hyperast::types::HyperAST;
+use hyperast::types::NodeId;
+use hyperast::types::WithChildren as _;
 
-use super::{BreadthFirstIt, DecompressedTreeStore, Iter, ShallowDecompressedTreeStore};
-
-use super::{
-    BreadthFirstContiguousSiblings, BreadthFirstIterable, DecompressedParentsLending,
-    DecompressedWithParent,
-};
+use super::{BreadthFirstContiguousSiblings, BreadthFirstIterable};
+use super::{BreadthFirstIt, DecompressedTreeStore, ShallowDecompressedTreeStore};
+use super::{DecompressedParentsLending, DecompressedWithParent};
 use crate::matchers::Decompressible;
 
 /// Decompressed subtree of an HyperAST layed out in breadth-first ie. contiguous siblings
@@ -25,7 +23,7 @@ pub struct BreadthFirst<IdN, IdD: PrimInt> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstContiguousSiblings<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn has_children(&self, id: &IdD) -> bool {
         BreadthFirstContiguousSiblings::first_child(self, id).is_some()
@@ -44,18 +42,18 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstIt<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    type It<'a> = Iter<IdD>;
+    type It<'a> = super::Iter<IdD>;
 }
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstIterable<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
-    fn iter_bf(&self) -> Iter<IdD> {
-        Iter {
+    fn iter_bf(&self) -> super::Iter<IdD> {
+        super::Iter {
             current: zero(),
             len: (cast(self.id_compressed.len())).unwrap(),
         }
@@ -71,7 +69,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedParentsLending<'a, IdD
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn parent(&self, id: &IdD) -> Option<IdD> {
         let r = self.id_parent[id.to_usize().unwrap()];
@@ -128,11 +126,12 @@ impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     type Out = Self;
 
     fn decompress(self, root: &HAST::IdN) -> Self {
+        use hyperast::types::Childrn as _;
         let store = self.hyperast;
         let mut id_compressed: Vec<HAST::IdN> = vec![root.clone()];
         let mut id_parent: Vec<IdD> = vec![num_traits::zero()];
@@ -142,7 +141,7 @@ where
         while i < id_compressed.len() {
             let x = store.resolve(&id_compressed[i].clone());
             let l = x.children();
-            let value = if l.as_ref().is_some_and(|x| !types::Childrn::is_empty(x)) {
+            let value = if l.as_ref().is_some_and(|x| !x.is_empty()) {
                 cast(id_compressed.len()).unwrap()
             } else {
                 num_traits::zero()
@@ -170,7 +169,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn original(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
@@ -218,7 +217,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn descendants(&self, x: &IdD) -> Vec<IdD> {
         let store = self.hyperast;

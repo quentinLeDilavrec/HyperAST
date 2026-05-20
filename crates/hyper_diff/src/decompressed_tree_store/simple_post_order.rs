@@ -4,17 +4,19 @@ use num_traits::{ToPrimitive, Zero, cast, one, zero};
 
 use hyperast::PrimInt;
 use hyperast::position::Position;
-use hyperast::types::{
-    self, Children, Childrn, HyperAST, HyperASTShared, HyperType, LabelStore, Labeled, NodeStore,
-    WithChildren, WithSerialization,
-};
 
+use hyperast::types::HyperType;
+use hyperast::types::NodeId;
+use hyperast::types::{Children as _, WithChildren as _};
+use hyperast::types::{HyperAST, HyperASTShared, LendT};
+use hyperast::types::{LabelStore, NodeStore};
+use hyperast::types::{Labeled, WithSerialization};
+
+use super::PostOrder;
 use super::basic_post_order::{BasicPOSlice, BasicPostOrder};
-use super::{
-    ContiguousDescendants, DecendantsLending, DecompressedParentsLending, DecompressedTreeStore,
-    DecompressedWithParent, DecompressedWithSiblings, FullyDecompressedTreeStore, PostOrder,
-    ShallowDecompressedTreeStore,
-};
+use super::{ContiguousDescendants, DecendantsLending};
+use super::{DecompressedParentsLending, DecompressedWithParent, DecompressedWithSiblings};
+use super::{DecompressedTreeStore, FullyDecompressedTreeStore, ShallowDecompressedTreeStore};
 use crate::matchers::Decompressible;
 
 #[derive(Clone)]
@@ -83,7 +85,7 @@ impl<'a, HAST: HyperAST + Copy, IdD> Decompressible<HAST, SimplePOSlice<'a, HAST
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn _position_in_parent(&self, c: &IdD, p: &IdD) -> HAST::Idx {
         let mut r = 0;
@@ -116,7 +118,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedParentsLending<'a, IdD
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn parent(&self, id: &IdD) -> Option<IdD> {
         if id == &self.root() {
@@ -180,7 +182,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithSiblings<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn lsib(&self, x: &IdD) -> Option<IdD> {
         let p = self.parent(x)?;
@@ -210,7 +212,7 @@ impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn lld(&self, i: &IdD) -> IdD {
         self.as_basic().lld(i)
@@ -225,16 +227,10 @@ where
     }
 }
 
-// impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, SimplePostOrder<HAST::IdN, IdD>> {
-//     pub(crate) fn size(&self, i: &IdD) -> IdD {
-//         *i - self.llds[(*i).to_usize().unwrap()] + one()
-//     }
-// }
-
-impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> types::DecompressedFrom<HAST>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> hyperast::types::DecompressedFrom<HAST>
     for SimplePostOrder<HAST::IdN, IdD>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     type Out = Self;
 
@@ -246,7 +242,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     type Out = Self;
 
@@ -260,8 +256,9 @@ where
 impl<IdN, IdD: PrimInt> SimplePostOrder<IdN, IdD> {
     fn make<HAST: HyperAST<IdN = IdN> + Copy>(stores: HAST, root: &IdN) -> Self
     where
-        IdN: types::NodeId<IdN = IdN>,
+        IdN: NodeId<IdN = IdN>,
     {
+        use hyperast::types::Childrn as _;
         let aaa = Element::<_, _, IdD> {
             curr: root.clone(),
             idx: zero(),
@@ -342,7 +339,7 @@ struct Element<IdC, Idx, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn len(&self) -> usize {
         self.id_compressed.len()
@@ -357,11 +354,12 @@ where
     }
 
     fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+        use hyperast::types::Childrn as _;
         let mut r = *x;
         for d in p {
             let a = self.original(&r);
             let node = self.hyperast.resolve(&a);
-            let cs = node.children().filter(|x| !types::Childrn::is_empty(x));
+            let cs = node.children().filter(|x| !x.is_empty());
             let Some(cs) = cs else {
                 panic!("no children in this tree")
             };
@@ -404,7 +402,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt> FullyDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
 }
 
@@ -417,7 +415,7 @@ impl<IdN, IdD: PrimInt> SimplePostOrder<IdN, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn descendants(&self, x: &IdD) -> Vec<IdD> {
         (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
@@ -447,7 +445,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecendantsLending<'a>
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ContiguousDescendants<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn descendants_range(&self, x: &IdD) -> std::ops::Range<IdD> {
         self.first_descendant(x)..*x
@@ -468,7 +466,7 @@ where
 impl<'a, HAST: HyperAST + Copy, IdD: PrimInt>
     Decompressible<HAST, &'a SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub(super) fn _slice(&self, x: &IdD) -> SimplePOSlice<'a, HAST::IdN, IdD> {
         let range = self.as_basic().slice_range(x);
@@ -485,7 +483,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
     Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     pub fn lsib(&self, c: &IdD, p_lld: &IdD) -> Option<IdD> {
         assert!(p_lld <= c, "{:?}<={:?}", p_lld.to_usize(), c.to_usize());
@@ -501,8 +499,9 @@ where
 
 fn size2<HAST: HyperAST + Copy>(store: HAST, x: &HAST::IdN) -> usize
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
+    use hyperast::types::Childrn as _;
     let tmp = store.resolve(x);
     let Some(cs) = tmp.children() else {
         return 1;
@@ -556,9 +555,9 @@ impl<'a, HAST: HyperASTShared + Copy, IdD: PrimInt + Hash + Eq>
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq> RecCachedPositionProcessor<'_, HAST, IdD>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::IdN: Debug,
-    for<'t> <HAST as types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
 {
     pub fn position(&mut self, c: &IdD) -> &Position {
         let stores = self.ds.hyperast;
@@ -684,7 +683,7 @@ impl<'a, HAST: HyperASTShared + Copy, IdD: PrimInt + Hash + Eq, U, F, G>
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq, U: Clone + Default, F, G>
     RecCachedProcessor<'_, HAST, IdD, U, F, G>
 where
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::IdN: Debug,
     F: Fn(U, HAST::IdN) -> U,
     G: Fn(U, HAST::IdN) -> U,

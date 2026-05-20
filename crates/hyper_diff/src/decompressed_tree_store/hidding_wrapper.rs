@@ -534,18 +534,6 @@ impl<
         }
     }
 }
-// pub struct Iter<IdD> {
-//     map: M,
-//     phantom: PhantomData<IdD>,
-// }
-
-// impl<IdD: PrimInt, M: Borrow<Vec<IdD>>> Iterator for Iter<IdD, M> {
-//     type Item = IdD;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-
-//     }
-// }
 
 impl<
     'a,
@@ -575,77 +563,12 @@ impl<
         let conv = self.map.borrow()[self.map.borrow().len() - 1 - x.to_usize().unwrap()]; //self.back.borrow_mut().lld(aaa);
         let lld = self.back.borrow().lld(&conv);
         return lld..conv;
-        // let mut y = *x;
-        // // dbg!(self.map.borrow());
-        // loop {
-        //     if y.is_zero() {
-        //         break;
-        //     }
-        //     // dbg!(y, lld);
-        //     let Some(conv) = self
-        //         .map
-        //         .borrow()
-        //         .get(self.map.borrow().len() - 1 - y.to_usize().unwrap())
-        //     else {
-        //         break;
-        //     };
-        //     if lld < *conv {
-        //         y = y - num_traits::one();
-        //     } else {
-        //         break;
-        //     }
-        // }
-        // y..*x
     }
-
-    // type Slice<'b>
-    //     = SimplePOSlice<'b, T, IdD>
-    // where
-    //     Self: 'b;
 
     fn slice(&self, _x: &IdD) -> <Self as DecendantsLending<'_>>::Slice {
         todo!()
     }
 }
-
-// impl<
-//         'd,
-//         T: WithChildren,
-//         IdD: PrimInt,
-//         DTS: DecompressedTreeStore<'d, T, IdD> + DecompressedWithParent<'d, T, IdD>,
-//         M: Borrow<Vec<IdD>>,
-// R: Borrow<BTreeMap<IdD,IdD>>,
-//         D: BorrowMut<DTS>,
-//     > DecompressedWithParent<'d, T, IdD> for SimpleHiddingMapper<'d, IdD, DTS, M, D>
-// where
-//     T::TreeId: Debug,
-// {
-//     fn has_parent(&self, id: &IdD) -> bool {
-//         <LazyPostOrder<HAST::IdN, IdD>>::has_parent(&self, id)
-//     }
-
-//     fn parent(&self, id: &IdD) -> Option<IdD> {
-//         <LazyPostOrder<HAST::IdN, IdD>>::parent(&self, id)
-//     }
-
-//     type PIt<'a> = IterParents<'a, IdD> where IdD: 'a, T::TreeId:'a, T: 'a, Self: 'a;
-
-//     fn parents(&self, id: IdD) -> <Self as DecompressedParentsLending<'_, IdD>>::PIt {
-//         <LazyPostOrder<HAST::IdN, IdD>>::parents(&self, id)
-//     }
-
-// fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
-//         <LazyPostOrder<HAST::IdN, IdD>>::position_in_parent(&self, c)
-//     }
-
-// fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
-//         <LazyPostOrder<HAST::IdN, IdD>>::path(&self, parent, descendant)
-//     }
-
-//     fn lca(&self, a: &IdD, b: &IdD) -> IdD {
-//         <LazyPostOrder<HAST::IdN, IdD>>::lca(&self, a, b)
-//     }
-// }
 
 pub struct IterParents<'a, IdD> {
     id: IdD,
@@ -664,40 +587,6 @@ impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
         Some(r)
     }
 }
-
-// impl<'a, T: WithChildren, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
-//     for SimpleHiddingMapper<'d, IdD, DTS, M, D>
-// where
-//     T::TreeId: Debug,
-// {
-//     fn len(&self) -> usize {
-//         <LazyPostOrder<HAST::IdN, IdD>>::len(&self)
-//     }
-
-//     fn original(&self, id: &IdD) -> <T>::TreeId {
-//         <LazyPostOrder<HAST::IdN, IdD>>::original(&self, id)
-//     }
-
-//     fn root(&self) -> IdD {
-//         <LazyPostOrder<HAST::IdN, IdD>>::root(&self)
-//     }
-
-// fn child<'b, S>(&self, store: &S, x: &IdD, p: &[<T as WithChildren>::ChildIdx]) -> IdD
-//     where
-//         //'a: 'b,
-//         S: 'b + NodeStore<T::TreeId, R<'b> = T>,
-//     {
-//         <LazyPostOrder<HAST::IdN, IdD>>::child(&self, store, x, p)
-//     }
-
-//     fn children<'b, S>(&self, store: &S, x: &IdD) -> Vec<IdD>
-//     where
-//         // 'a: 'b,
-//         S: NodeStore<T::TreeId, R<'b> = T>,
-//     {
-//         <LazyPostOrder<HAST::IdN, IdD>>::children(&self, store, x)
-//     }
-// }
 
 impl<
     IdS: PrimInt + Shallow<IdS> + Debug,

@@ -413,126 +413,6 @@ where
     }
 }
 
-// pub struct RecCachedPositionProcessor<'a, HAST: HyperASTShared + Copy, IdD: Hash + Eq> {
-//     pub(crate) ds: Decompressible<HAST, &'a CompletePostOrder<HAST::IdN, IdD>>,
-//     root: HAST::IdN,
-//     cache: HashMap<IdD, Position>,
-// }
-
-// impl<'a, HAST: HyperAST + Copy, IdD: PrimInt + Hash + Eq>
-//     From<(
-//         Decompressible<HAST, &'a CompletePostOrder<HAST::IdN, IdD>>,
-//         HAST::IdN,
-//     )> for RecCachedPositionProcessor<'a, HAST, IdD>
-// {
-//     fn from(
-//         (ds, root): (
-//             Decompressible<HAST, &'a CompletePostOrder<HAST::IdN, IdD>>,
-//             HAST::IdN,
-//         ),
-//     ) -> Self {
-//         Self {
-//             ds,
-//             root,
-//             cache: Default::default(),
-//         }
-//     }
-// }
-
-// // impl<'a, T: HyperAST + Copy, IdD: PrimInt + Hash + Eq> RecCachedPositionProcessor<'a, T, IdD> {
-// //     pub fn position<'b, HAST>(&mut self, stores: &'b HAST, c: &IdD) -> &Position
-// //     where
-// //         HAST: for<'t> HyperAST<IdN = T::IdN, Label = T::Label>,
-// //         // , T<'t> = T
-// //         HAST::IdN: Clone + Debug + UniformNodeId,
-// //         // T: WithSerialization,
-// //     {
-// //         if self.cache.contains_key(&c) {
-// //             return self.cache.get(&c).unwrap();
-// //         } else if let Some(p) = self.ds.parent(c) {
-// //             let id = self.ds.original(&p);
-// //             let p_r = stores.node_store().resolve(&id);
-// //             let p_t = stores.resolve_type(&id);
-// //             if p_t.is_directory() {
-// //                 let ori = self.ds.original(&c);
-// //                 if self.root == ori {
-// //                     let r = stores.node_store().resolve(&ori);
-// //                     return self.cache.entry(*c).or_insert(Position::new(
-// //                         stores.label_store().resolve(r.get_label_unchecked()).into(),
-// //                         0,
-// //                         r.try_bytes_len().unwrap_or(0),
-// //                     ));
-// //                 }
-// //                 let mut pos = self
-// //                     .cache
-// //                     .get(&p)
-// //                     .cloned()
-// //                     .unwrap_or_else(|| self.position(stores, &p).clone());
-// //                 let r = stores.node_store().resolve(&ori);
-// //                 pos.inc_path(stores.label_store().resolve(r.get_label_unchecked()));
-// //                 pos.set_len(r.try_bytes_len().unwrap_or(0));
-// //                 return self.cache.entry(*c).or_insert(pos);
-// //             }
-
-// //             if let Some(lsib) = super::DecompressedWithSiblings::lsib(&self.ds, c) {
-// //                 assert_ne!(lsib.to_usize(), c.to_usize());
-// //                 let mut pos = self
-// //                     .cache
-// //                     .get(&lsib)
-// //                     .cloned()
-// //                     .unwrap_or_else(|| self.position(stores, &lsib).clone());
-// //                 pos.inc_offset(pos.range().end - pos.range().start);
-// //                 let r = stores.node_store().resolve(&self.ds.original(&c));
-// //                 pos.set_len(r.try_bytes_len().unwrap());
-// //                 self.cache.entry(*c).or_insert(pos)
-// //             } else {
-// //                 assert!(
-// //                     self.ds.position_in_parent::<usize>(c).unwrap().is_zero(),
-// //                     "{:?}",
-// //                     self.ds.position_in_parent::<usize>(c).unwrap().to_usize()
-// //                 );
-// //                 let ori = self.ds.original(&c);
-// //                 if self.root == ori {
-// //                     let r = stores.node_store().resolve(&ori);
-// //                     return self.cache.entry(*c).or_insert(Position::new(
-// //                         "".into(),
-// //                         0,
-// //                         r.try_bytes_len().unwrap(),
-// //                     ));
-// //                 }
-// //                 let mut pos = self
-// //                     .cache
-// //                     .get(&p)
-// //                     .cloned()
-// //                     .unwrap_or_else(|| self.position(stores, &p).clone());
-// //                 let r = stores.node_store().resolve(&ori);
-// //                 pos.set_len(
-// //                     r.try_bytes_len()
-// //                         .unwrap_or_else(|| panic!("{:?}", stores.resolve_type(&ori))),
-// //                 );
-// //                 self.cache.entry(*c).or_insert(pos)
-// //             }
-// //         } else {
-// //             let ori = self.ds.original(&c);
-// //             assert_eq!(self.root, ori);
-// //             let r = stores.node_store().resolve(&ori);
-// //             let t = stores.resolve_type(&ori);
-// //             let pos = if t.is_directory() || t.is_file() {
-// //                 let file = stores.label_store().resolve(r.get_label_unchecked()).into();
-// //                 let offset = 0;
-// //                 let len = r.try_bytes_len().unwrap_or(0);
-// //                 Position::new(file, offset, len)
-// //             } else {
-// //                 let file = "".into();
-// //                 let offset = 0;
-// //                 let len = r.try_bytes_len().unwrap_or(0);
-// //                 Position::new(file, offset, len)
-// //             };
-// //             self.cache.entry(*c).or_insert(pos)
-// //         }
-// //     }
-// // }
-
 #[allow(unused)]
 pub struct RecCachedProcessor<'a, IdN, D, IdD: Hash + Eq, U, F, G> {
     pub(crate) ds: &'a D,
@@ -557,148 +437,24 @@ impl<'a, IdN, D, IdD: PrimInt + Hash + Eq, U, F, G> From<(&'a D, IdN, F, G)>
     }
 }
 
-#[allow(unused)]
 impl<IdN, D, IdD: PrimInt + Hash + Eq, U: Clone + Default, F, G>
     RecCachedProcessor<'_, IdN, D, IdD, U, F, G>
 where
     F: Fn(U, IdN) -> U,
     G: Fn(U, IdN) -> U,
 {
-    pub fn position<S>(&mut self, store: S, c: &IdD) -> &U
+    pub fn position<S>(&mut self, _store: S, _c: &IdD) -> &U
     where
         D: DecompressedTreeStore<S, IdD> + DecompressedWithSiblings<S, IdD> + PostOrder<S, IdD>,
         S: for<'t> HyperAST<IdN = IdN> + Copy,
         IdN: Clone + Debug,
-        // T: Tree + WithSerialization,
     {
         todo!()
-        // if self.cache.contains_key(&c) {
-        //     return self.cache.get(&c).unwrap();
-        // } else if let Some(p) = self.ds.parent(c) {
-        //     let id = self.ds.original(&p);
-        //     let p_r = store.node_store().resolve(&id);
-        //     let p_t = store.resolve_type(&id);
-        //     if p_t.is_directory() {
-        //         let ori = self.ds.original(&c);
-        //         if self.root == ori {
-        //             // let r = store.resolve(&ori);
-        //             return self
-        //                 .cache
-        //                 .entry(*c)
-        //                 .or_insert((self.with_p)(Default::default(), ori));
-        //             // Position::new(
-        //             //     lstore.resolve(&r.get_label()).into(),
-        //             //     0,
-        //             //     r.try_bytes_len().unwrap_or(0),
-        //             // )
-        //         }
-        //         let pos = self.position(store, &p).clone();
-        //         // let r = store.resolve(&ori);
-        //         // pos.inc_path(lstore.resolve(&r.get_label()));
-        //         // pos.set_len(r.try_bytes_len().unwrap_or(0));
-        //         // return self.cache.entry(*c).or_insert(pos);
-        //         return self.cache.entry(*c).or_insert((self.with_p)(pos, ori));
-        //     }
-
-        //     if let Some(lsib) = self.ds.lsib(c) {
-        //         assert_ne!(lsib.to_usize(), c.to_usize());
-        //         let pos = self.position(store, &lsib).clone();
-        //         // pos.inc_offset(pos.range().end - pos.range().start);
-        //         // let r = store.resolve(&self.ds.original(&c));
-        //         // pos.set_len(r.try_bytes_len().unwrap());
-        //         // self.cache.entry(*c).or_insert(pos)
-        //         self.cache
-        //             .entry(*c)
-        //             .or_insert((self.with_lsib)(pos, self.ds.original(&c)))
-        //     } else {
-        //         assert!(
-        //             self.ds.position_in_parent::<usize>(c).unwrap().is_zero(),
-        //             "{:?}",
-        //             self.ds.position_in_parent::<usize>(c).unwrap().to_usize()
-        //         );
-        //         let ori = self.ds.original(&c);
-        //         if self.root == ori {
-        //             // let r = store.resolve(&ori);
-        //             return self
-        //                 .cache
-        //                 .entry(*c)
-        //                 .or_insert((self.with_p)(Default::default(), ori));
-        //             // Position::new(
-        //             //     "".into(),
-        //             //     0,
-        //             //     r.try_bytes_len().unwrap(),
-        //             // )
-        //         }
-        //         let pos = self.position(store, &p).clone();
-        //         // let r = store.resolve(&ori);
-        //         // pos.set_len(
-        //         //     r.try_bytes_len()
-        //         //         .unwrap_or_else(|| panic!("{:?}", r.get_type())),
-        //         // );
-        //         // self.cache.entry(*c).or_insert(pos)
-        //         self.cache.entry(*c).or_insert((self.with_p)(pos, ori))
-        //     }
-        // } else {
-        //     let ori = self.ds.original(&c);
-        //     assert_eq!(self.root, ori);
-        //     // let r = store.resolve(&ori);
-        //     // let t = r.get_type();
-        //     // let pos = if t.is_directory() || t.is_file() {
-        //     //     let file = lstore.resolve(&r.get_label()).into();
-        //     //     let offset = 0;
-        //     //     let len = r.try_bytes_len().unwrap_or(0);
-        //     //     Position::new(file, offset, len)
-        //     // } else {
-        //     //     let file = "".into();
-        //     //     let offset = 0;
-        //     //     let len = r.try_bytes_len().unwrap_or(0);
-        //     //     Position::new(file, offset, len)
-        //     // };
-        //     // self.cache.entry(*c).or_insert(pos)
-        //     self.cache
-        //         .entry(*c)
-        //         .or_insert((self.with_p)(Default::default(), ori))
-        // }
+        // look at previous attempts in the history or find alternative
     }
-    pub fn position2(&mut self, c: &IdD) -> &U
-where
-        // T::TreeId: Clone + Debug,
-        // T: Stored,
-    {
+    pub fn position2(&mut self, _c: &IdD) -> &U {
         todo!()
-        // if self.cache.contains_key(&c) {
-        //     return self.cache.get(&c).unwrap();
-        // } else if let Some(p) = self.ds.parent(c) {
-        //     if let Some(lsib) = self.ds.lsib(c) {
-        //         assert_ne!(lsib.to_usize(), c.to_usize());
-        //         let pos = self.position2(&lsib).clone();
-        //         self.cache
-        //             .entry(*c)
-        //             .or_insert((self.with_lsib)(pos, self.ds.original(&c)))
-        //     } else {
-        //         assert!(
-        //             self.ds.position_in_parent(c).unwrap().is_zero(),
-        //             "{:?}",
-        //             self.ds.position_in_parent(c).unwrap().to_usize()
-        //         );
-        //         let ori = self.ds.original(&c);
-        //         if self.root == ori {
-        //             // let r = store.resolve(&ori);
-        //             return self
-        //                 .cache
-        //                 .entry(*c)
-        //                 .or_insert((self.with_p)(Default::default(), ori));
-        //         }
-        //         let pos = self.position2(&p).clone();
-        //         self.cache.entry(*c).or_insert((self.with_p)(pos, ori))
-        //     }
-        // } else {
-        //     let ori = self.ds.original(&c);
-        //     assert_eq!(self.root, ori);
-        //     self.cache
-        //         .entry(*c)
-        //         .or_insert((self.with_p)(Default::default(), ori))
-        // }
+        // look at previous attempts in the history or find alternative
     }
 }
 

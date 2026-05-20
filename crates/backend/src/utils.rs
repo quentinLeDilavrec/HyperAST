@@ -1,14 +1,16 @@
 use dashmap::SharedValue;
-
-use hyperast_vcs_git::git::Repo;
+use num::ToPrimitive;
 
 use hyper_diff::decompressed_tree_store::{Shallow, lazy_post_order};
-use hyperast::position::position_accessors::{self};
+use hyperast::position::position_accessors;
 use hyperast::store::{SimpleStores, defaults::NodeIdentifier};
-use hyperast::types::{self, HyperAST, PrimInt, TypeStore, WithStats};
+use hyperast::types::PrimInt;
+use hyperast::types::UniformNodeId;
+use hyperast::types::{HyperAST, LendT, TypeStore};
+use hyperast::types::{WithSerialization, WithStats};
 use hyperast_vcs_git::TStore;
 use hyperast_vcs_git::git::Oid;
-use num::ToPrimitive;
+use hyperast_vcs_git::git::Repo;
 
 pub(crate) type IdN = NodeIdentifier;
 pub(crate) type Idx = u16;
@@ -97,7 +99,7 @@ impl HashTablePairLockWrite<'_, (IdN, lazy_post_order::LazyPostOrder<IdN, u32>)>
         &mut lazy_post_order::LazyPostOrder<IdN, u32>,
     )
     where
-        for<'t> <HAST as types::AstLending<'t>>::RT: WithStats,
+        for<'t> LendT<'t, HAST>: WithStats,
     {
         use hyperast::types::DecompressedFrom;
         use hyperast::utils::make_hash;
@@ -368,11 +370,11 @@ pub(crate) fn remap<HAST: HyperAST, NoS, IdD>(
     tr: HAST::IdN,
 ) -> IdD
 where
-    for<'t> types::LendT<'t, HAST>: types::WithSerialization,
+    HAST::IdN: UniformNodeId,
     IdD: PrimInt + Shallow<IdD>,
-    HAST::IdN: types::UniformNodeId,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     NoS: HyperAST<IdN = HAST::IdN> + Copy,
-    for<'t> types::LendT<'t, NoS>: types::WithStats,
+    for<'t> LendT<'t, NoS>: WithStats,
 {
     let (_, _, path) =
         hyperast::position::compute_position_with_no_spaces(tr, &mut x.iter_offsets(), stores);

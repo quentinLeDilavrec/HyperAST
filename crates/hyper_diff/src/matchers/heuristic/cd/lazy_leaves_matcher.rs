@@ -4,7 +4,8 @@ use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
+
 use hyperast::types::NodeStore as _;
 use hyperast::types::{HashKind, HyperAST, LendT};
 use hyperast::types::{WithHashs, WithMetaData};
@@ -42,7 +43,7 @@ where
     Dsrc::IdD: Eq + Debug + Copy + PrimInt,
     HAST::Label: Eq,
     HAST::IdN: Debug,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub fn match_it(

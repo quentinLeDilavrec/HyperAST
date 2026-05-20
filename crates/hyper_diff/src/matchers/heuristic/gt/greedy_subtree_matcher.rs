@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, NodeStore as _};
 use hyperast::types::{Labeled, LendT};
 use hyperast::types::{WithChildren, WithHashs};
@@ -31,7 +31,7 @@ where
     M::Dst: PrimInt + Hash,
     for<'t> LendT<'t, HAST>: WithHashs,
     HAST::Label: Eq + Clone,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn match_it<MM>(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
@@ -159,7 +159,7 @@ where
     M::Dst: PrimInt + Hash,
     for<'t> LendT<'t, HAST>: WithHashs,
     HAST::Label: Eq + Clone,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn ambiguous_mappings_comparator(
         &mut self,
@@ -269,7 +269,7 @@ where
     M::Dst: PrimInt,
     for<'t> LendT<'t, HAST>: WithHashs,
     HAST::Label: Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn pop_larger<'b>(
         src_trees: &mut PriorityTreeList<'b, Dsrc, M::Src, HAST, MIN_HEIGHT>,
@@ -409,7 +409,7 @@ impl<
     const MIN_HEIGHT: usize,
 > PriorityTreeList<'a, D, IdD, HAST, MIN_HEIGHT>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub(super) fn new(
         store: HAST,

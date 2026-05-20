@@ -4,8 +4,8 @@ use std::hash::Hash;
 
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
-use hyperast::types::NodeId;
 use hyperast::types::NodeStore as _;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, Labeled, LendT};
 use hyperast::types::{WithHashs, WithStats};
 
@@ -42,7 +42,7 @@ where
     Ddst: DecompressedWithParent<HAST, Ddst::IdD>
         + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
         + LazyDecompressedTreeStore<HAST, M::Dst>,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn match_it<MM>(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
@@ -91,7 +91,7 @@ impl<
 > LazyGreedySubtreeMatcher<Mapper<HAST, Dsrc, Ddst, M>, MIN_HEIGHT>
 where
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::IdN: Clone,
     HAST::Label: Clone + Eq,
     Dsrc::IdD: PrimInt + Hash,
@@ -319,7 +319,7 @@ where
     M::Dst: Debug + Copy,
     Dsrc: DecompressedWithParent<HAST, Dsrc::IdD> + LazyDecompressedTreeStore<HAST, M::Src>,
     Ddst: DecompressedWithParent<HAST, Ddst::IdD> + LazyDecompressedTreeStore<HAST, M::Dst>,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn compute_multimapping<
         MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD>,

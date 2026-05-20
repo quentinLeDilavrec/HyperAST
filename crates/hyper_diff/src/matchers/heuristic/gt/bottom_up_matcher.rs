@@ -4,8 +4,8 @@ use std::hash::Hash;
 use hyperast::compat::HashMap;
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
 use hyperast::types::NodeStore as _;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, Tree, TypeStore, WithHashs};
 
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
@@ -101,7 +101,7 @@ where
     M::Dst: PrimInt,
     for<'t> LendT<'t, HAST>: WithHashs,
     HAST::Label: Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn last_chance_match_histogram(&mut self, src: M::Src, dst: M::Dst) {
         self.lcs_equal_matching(&src, &dst);

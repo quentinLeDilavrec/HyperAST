@@ -2,7 +2,7 @@ use str_distance::DistanceMetric;
 
 use hyperast::nodes::TextSerializer;
 use hyperast::store::nodes::compo;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, WithChildren, WithMetaData};
 use hyperast::types::{HyperType as _, LabelStore as _, Labeled as _, NodeStore as _};
 
@@ -29,7 +29,7 @@ where
     HAST: HyperAST + Clone,
     HAST::Label: Eq + Copy,
     HAST::IdN: Copy,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     type IdN = HAST::IdN;
     fn norm(hyperast: &HAST, p: &[Self::IdN; 2]) -> f64 {
@@ -73,7 +73,7 @@ where
 fn retrieve_text<HAST>(hyperast: &HAST, x: HAST::IdN) -> std::borrow::Cow<'_, str>
 where
     HAST: HyperAST + Clone,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     let n = hyperast.node_store().resolve(&x);
     let l = n.try_get_label();
@@ -91,7 +91,7 @@ where
     HAST: HyperAST + Clone,
     HAST::Label: Eq + Copy,
     HAST::IdN: Copy,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     type IdN = HAST::IdN;
 

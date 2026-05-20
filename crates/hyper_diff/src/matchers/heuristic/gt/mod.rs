@@ -1,4 +1,5 @@
-use hyperast::types::{Childrn, LendT, NodeId, NodeStore, WithChildren};
+use hyperast::types::{Childrn, LendT, NodeStore, WithChildren};
+use hyperast::types::{NodeId, UniformNodeId};
 
 use super::factorized_bounds;
 
@@ -23,7 +24,7 @@ pub mod lazy_simple_marriage_bottom_up_matcher;
 pub fn size<'a, IdC: Clone + NodeId<IdN = IdC>, S>(store: &'a S, x: &IdC) -> usize
 where
     S: NodeStore<IdC>,
-    for<'t> <S as hyperast::types::NLending<'t, IdC>>::N: WithChildren<TreeId = IdC>,
+    for<'t> hyperast::types::LendN<'t, S, IdC>: WithChildren<TreeId = IdC>,
 {
     let node = store.resolve(x);
     let cs = node.children().unwrap();
@@ -34,11 +35,11 @@ where
     z + 1
 }
 
-/// TODO specilize with WithStats when specilization is stabilized
+/// TODO specialize with WithStats when specialization is stabilized
 pub fn height<IdC: Clone + NodeId<IdN = IdC>, S>(store: &S, x: &IdC) -> usize
 where
     S: NodeStore<IdC>,
-    for<'t> <S as hyperast::types::NLending<'t, IdC>>::N: WithChildren<TreeId = IdC>,
+    for<'t> hyperast::types::LendN<'t, S, IdC>: WithChildren<TreeId = IdC>,
 {
     let node = store.resolve(x);
     let cs = node.children();
@@ -56,7 +57,7 @@ where
 }
 
 /// if H then test the hash otherwise do not test it,
-/// considering hash colisions testing it should only be useful once.
+/// considering hash collisions testing it should only be useful once.
 pub(crate) fn isomorphic<HAST, const HASH: bool, const STRUCTURAL: bool>(
     hyperast: HAST,
     src: &HAST::IdN,
@@ -67,7 +68,7 @@ where
     for<'t> LendT<'t, HAST>: hyperast::types::WithHashs,
     HAST::IdN: Clone + Eq,
     HAST::Label: Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     use hyperast::types::HashKind;
     use hyperast::types::Labeled;

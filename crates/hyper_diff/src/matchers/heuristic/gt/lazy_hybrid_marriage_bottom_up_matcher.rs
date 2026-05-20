@@ -1,7 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, Tree};
 use hyperast::types::{WithHashs, WithStats};
 
@@ -39,7 +39,7 @@ where
     M: MonoMappingStore,
     HAST::Label: Eq,
     HAST::IdN: Debug,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,

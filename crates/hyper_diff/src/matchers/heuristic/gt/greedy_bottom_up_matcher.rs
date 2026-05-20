@@ -2,7 +2,7 @@ use num_traits::{cast, one};
 use std::fmt::Debug;
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
 use crate::decompressed_tree_store::POBorrowSlice;
@@ -49,7 +49,7 @@ where
     M::Dst: PrimInt,
     HAST::Label: Eq,
     HAST::IdN: Debug,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
@@ -127,7 +127,7 @@ where
     M::Src: PrimInt,
     M::Dst: PrimInt,
     HAST::Label: Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub(crate) fn last_chance_match_zs<

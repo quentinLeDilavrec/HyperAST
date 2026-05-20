@@ -13,12 +13,13 @@ use crate::hashed::{NodeHashs, SyntaxNodeHashs, SyntaxNodeHashsKinds};
 use crate::impact::serialize::{CachedHasher, Keyed, MySerialize};
 use crate::nodes::{CompressedNode, HashSize, RefContainer};
 use crate::store::defaults::LabelIdentifier;
-use crate::types::{
-    AnyType, Children, HyperType, NodeId, TypeTrait, Typed, TypedNodeId, WithChildren, WithMetaData,
-};
-
 use crate::store::nodes::compo::{self, CS, NoSpacesCS};
+use crate::types::NodeId;
+use crate::types::TypedNodeId;
+use crate::types::{AnyType, Children, HyperType, TypeTrait, Typed};
+use crate::types::{WithChildren, WithMetaData};
 
+// TODO refactor alias into a transparent struct
 pub type NodeIdentifier = legion::Entity;
 pub type EntryRef<'a> = legion::world::EntryRef<'a>;
 #[derive(ref_cast::RefCast)]
@@ -40,7 +41,7 @@ impl<'a, T> HashedNodeRef<'a, T> {
 impl<'a, T> From<&'a EntryRef<'a>> for &'a HashedNodeRef<'a, T> {
     fn from(value: &'a EntryRef<'a>) -> Self {
         use ref_cast::RefCast;
-        // NOTE it makes compile time layout assertions
+        // NOTE it does compile time layout assertions
         HashedNodeRef::ref_cast(value)
     }
 }
@@ -73,8 +74,6 @@ pub struct HashedNode<Id: TypedNodeId<IdN = NodeIdentifier>> {
     hashs: SyntaxNodeHashs<u32>,
 }
 
-// impl<'a> Symbol<HashedNodeRef<'a>> for legion::Entity {}
-
 // * hashed node impl
 
 impl<Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNode<Id>
@@ -93,13 +92,6 @@ impl<Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNode<Id> {
         self.hashs.hash(&Default::default()).hash(state)
     }
 }
-// impl<'a, Id: TypedNodeId<IdN = NodeIdentifier, Ty=Type>> crate::types::Typed for HashedNode<Id> {
-//     type Type = Id::Ty;
-
-//     fn get_type(&self) -> Type {
-//         panic!()
-//     }
-// }
 
 impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNode<Id> {
     type Label = LabelIdentifier;
@@ -110,55 +102,8 @@ impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNode
 
     fn try_get_label(&self) -> Option<&Self::Label> {
         todo!()
-        // .or_else(|| {
-        //     let a = self.0.get_component::<Box<[Space]>>();
-        //     let mut b = String::new();
-        //     a.iter()
-        //         .for_each(|a| Space::fmt(a, &mut b, parent_indent).unwrap());
-
-        // })
     }
 }
-
-// impl<'a,T> crate::types::WithChildren for HashedNode<T> {
-//     type ChildIdx = u16;
-
-//     fn child_count(&self) -> Self::ChildIdx {
-//         todo!()
-//     }
-
-//     fn get_child(&self, idx: &Self::ChildIdx) -> Self::TreeId {
-//         todo!()
-//     }
-
-//     fn get_child_rev(&self, idx: &Self::ChildIdx) -> Self::TreeId {
-//         todo!()
-//     }
-
-//     fn get_children(&self) -> &[Self::TreeId] {
-//         todo!()
-//     }
-
-//     fn get_children_cpy(&self) -> Vec<Self::TreeId> {
-//         todo!()
-//     }
-
-//     fn try_get_children(&self) -> Option<&[Self::TreeId]> {
-//         todo!()
-//     }
-// }
-
-// impl<'a,T> crate::types::Tree for HashedNode<T> {
-//     fn has_children(&self) -> bool {
-//         todo!()
-//     }
-
-//     fn has_label(&self) -> bool {
-//         todo!()
-//     }
-// }
-
-// impl Symbol<HashedNode> for legion::Entity {}
 
 // * hashed node reference impl
 
@@ -199,37 +144,6 @@ impl<Id: TypedNodeId<IdN = NodeIdentifier>> HashedNodeRef<'_, Id> {
     where
         Id::Ty: 'static + TypeTrait + Send + Sync + Debug,
     {
-        // use crate::types::Typed;
-        // if self.get_type().is_spaces() {
-        //     self.0
-        //         .get_component::<compo::BytesLen>()
-        //         .expect(&format!(
-        //             "node with type {:?} don't have a len",
-        //             self.get_type()
-        //         ))
-        //         .0
-        //     // self.get_component::<Box<[Space]>>()
-        //     //     .expect("spaces node should have spaces")
-        //     //     .iter()
-        //     //     .map(|x| {
-        //     //         if x == &Space::ParentIndentation {
-        //     //             p_indent_len
-        //     //         } else {
-        //     //             1
-        //     //         }
-        //     //     })
-        //     //     .sum()
-        // } else {
-        //     self.0
-        //         .get_component::<compo::BytesLen>()
-        //         .expect(&format!(
-        //             "node with type {:?} don't have a len",
-        //             self.get_type()
-        //         ))
-        //         .0
-        // }
-        // .map_or_else(|_| self
-        //     .get_type().to_string().len() as u32,|x|x.0)
         self.0.get_component::<compo::BytesLen>().unwrap().0
     }
 }
@@ -240,26 +154,11 @@ impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> HashedNodeRef<'_, Id> {
     where
         Id::Ty: HyperType + Copy + Send + Sync,
     {
-        // use crate::types::Typed;
         if self.get_type().is_spaces() {
             self.0.get_component::<compo::BytesLen>().map(|x| x.0).ok()
-            // let s = self.get_component::<Box<[Space]>>().ok()?;
-            // let s = s
-            //     .iter()
-            //     .map(|x| {
-            //         if x == &Space::ParentIndentation {
-            //             p_indent_len
-            //         } else {
-            //             1
-            //         }
-            //     })
-            //     .sum();
-            // Some(s)
         } else {
             self.0.get_component::<compo::BytesLen>().map(|x| x.0).ok()
         }
-        // .map_or_else(|_| self
-        //     .get_type().to_string().len() as u32,|x|x.0)
     }
 
     pub fn is_directory(&self) -> bool
@@ -277,10 +176,6 @@ impl<T, C: Component> WithMetaData<C> for HashedNodeRef<'_, T> {
 }
 
 impl<'a, T> HashedNodeRef<'a, T> {
-    // pub(crate) fn new(entry: EntryRef<'a>) -> Self {
-    //     Self(entry)
-    // }
-
     /// Returns the entity's archetype.
     pub fn archetype(&self) -> &Archetype {
         self.0.archetype()
@@ -358,9 +253,6 @@ where
     pub fn into_compressed_node(
         &self,
     ) -> Result<CompressedNode<legion::Entity, LabelIdentifier, Id::Ty>, ComponentError> {
-        // if let Ok(spaces) = self.0.get_component::<Box<[Space]>>() {
-        //     return Ok(CompressedNode::Spaces(spaces.clone()));
-        // }
         let kind = self.0.get_component::<Id::Ty>()?;
         if kind.is_spaces() {
             let spaces = self.0.get_component::<LabelIdentifier>().unwrap();
@@ -369,8 +261,6 @@ where
         let a = self.0.get_component::<LabelIdentifier>();
         let label: Option<LabelIdentifier> = a.ok().copied();
         let children = self.children().map(|x| x.collect());
-        // .0.get_component::<CS<legion::Entity>>();
-        // let children = children.ok().map(|x| x.0.clone());
         Ok(CompressedNode::new(
             *kind,
             label,
@@ -397,11 +287,6 @@ impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Typed
         match self.0.get_component::<Id::TyErazed>() {
             Ok(t) => Id::unerase(t.clone()),
             e => Id::unerase(e.unwrap().clone()),
-            // Err(ComponentError::NotFound {..}) => {
-            //     let type_type = self.0.archetype().layout().component_types()[0];
-            //     self.0.
-            //     todo!()
-            // }
         }
     }
     fn try_get_type(&self) -> Option<Self::Type> {
@@ -485,13 +370,6 @@ impl<T> crate::types::Labeled for HashedNodeRef<'_, T> {
 
     fn try_get_label(&self) -> Option<&Self::Label> {
         self.0.get_component::<LabelIdentifier>().ok()
-        // .or_else(|| {
-        //     let a = self.0.get_component::<Box<[Space]>>();
-        //     let mut b = String::new();
-        //     a.iter()
-        //         .for_each(|a| Space::fmt(a, &mut b, parent_indent).unwrap());
-
-        // })
     }
 }
 
@@ -567,11 +445,6 @@ where
 
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<T::IdN> {
         let v = self.cs().ok()?;
-        // .unwrap_or_else(|x| {
-        //     log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-        //     panic!("{}", x)
-        // });
-        // v.0.get(v.len() - 1 - num::cast::<_, usize>(*idx).unwrap()).cloned()
         let c: Self::ChildIdx = v.child_count();
         let c = c.checked_sub(idx.checked_add(1)?)?;
         v.get(c).cloned()

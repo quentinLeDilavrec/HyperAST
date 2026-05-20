@@ -9,7 +9,7 @@ pub use elem::HashedNodeRef;
 
 pub type NodeIdentifier = NonZeroU64;
 
-impl crate::types::AAAA for NodeIdentifier {}
+impl crate::types::UniformNodeId for NodeIdentifier {}
 impl NodeId for NodeIdentifier {
     type IdN = Self;
     fn as_id(&self) -> &Self::IdN {

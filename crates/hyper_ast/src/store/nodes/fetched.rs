@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use string_interner::DefaultHashBuilder;
 use string_interner::Symbol;
 
-use crate::types::{AAAA, AnyType, Children, HyperType, NodeId, TypeTrait, TypedNodeId};
+use crate::types::{AnyType, Children, HyperType, NodeId, TypeTrait, TypedNodeId, UniformNodeId};
 
 use strum_macros::*;
 #[cfg(feature = "native")]
@@ -96,7 +96,7 @@ impl From<LabelIdentifier> for u32 {
 #[repr(transparent)]
 pub struct NodeIdentifier(std::num::NonZeroU32);
 
-impl AAAA for NodeIdentifier {}
+impl UniformNodeId for NodeIdentifier {}
 impl NodeId for NodeIdentifier {
     type IdN = Self;
     fn as_id(&self) -> &Self::IdN {

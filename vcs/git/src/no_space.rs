@@ -2,7 +2,8 @@ use std::ops::Deref;
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeStore};
-use hyperast::types::{self, AAAA, Children, NodeId};
+use hyperast::types::{self, Children};
+use hyperast::types::{NodeId, UniformNodeId};
 
 pub fn as_nospaces<'a, TS>(
     stores: &'a hyperast::store::SimpleStores<TS>,
@@ -77,7 +78,7 @@ impl<IdN> Deref for MIdN<IdN> {
     }
 }
 
-impl<IdN: Clone + Eq + AAAA> NodeId for MIdN<IdN> {
+impl<IdN: Clone + Eq + UniformNodeId> NodeId for MIdN<IdN> {
     type IdN = IdN;
 
     fn as_id(&self) -> &Self::IdN {

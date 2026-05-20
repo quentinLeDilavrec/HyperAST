@@ -1,8 +1,8 @@
 use crate::types::TIdN;
 use hyperast::position::{TreePath, TreePathMut};
 use hyperast::store::nodes::legion::NodeIdentifier;
-use hyperast::types::{AAAA, NodeStore, TypedHyperAST};
 use hyperast::types::{Childrn, HyperAST, NodeId, Tree, TypedNodeStore, WithChildren};
+use hyperast::types::{NodeStore, TypedHyperAST, UniformNodeId};
 use num::ToPrimitive;
 use std::fmt;
 
@@ -17,7 +17,7 @@ enum Id<IdN> {
     Other(IdN),
 }
 
-impl<IdN: Clone + Eq + AAAA> Id<IdN> {
+impl<IdN: Clone + Eq + UniformNodeId> Id<IdN> {
     fn id(&self) -> &IdN {
         match self {
             Id::Cpp(node) => node.as_id(),

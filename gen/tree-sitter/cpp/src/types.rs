@@ -3,7 +3,7 @@ use std::fmt::Display;
 use hyperast::tree_gen::TsEnableTS;
 use hyperast::tree_gen::TsType;
 use hyperast::types::{
-    AAAA, AnyType, HyperType, LangRef, NodeId, TypeStore, TypeTrait, TypeU16, TypedNodeId,
+    AnyType, HyperType, LangRef, NodeId, TypeStore, TypeTrait, TypeU16, TypedNodeId, UniformNodeId,
 };
 
 impl TsEnableTS for TStore {
@@ -122,7 +122,7 @@ impl Type {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TIdN<IdN>(IdN);
 
-impl<IdN: Clone + Eq + hyperast::types::AAAA> NodeId for TIdN<IdN> {
+impl<IdN: Clone + Eq + hyperast::types::UniformNodeId> NodeId for TIdN<IdN> {
     type IdN = IdN;
 
     fn as_id(&self) -> &Self::IdN {
@@ -138,7 +138,7 @@ impl<IdN: Clone + Eq + hyperast::types::AAAA> NodeId for TIdN<IdN> {
     }
 }
 
-impl<IdN: Clone + Eq + AAAA> TypedNodeId for TIdN<IdN> {
+impl<IdN: Clone + Eq + UniformNodeId> TypedNodeId for TIdN<IdN> {
     type Ty = Type;
     type TyErazed = TType;
     fn unerase(ty: Self::TyErazed) -> Self::Ty {

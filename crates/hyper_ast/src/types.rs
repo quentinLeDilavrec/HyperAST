@@ -809,14 +809,14 @@ pub trait NodeStoreLife<'store, IdN> {
 }
 
 pub trait NodeId: Eq + Clone + 'static {
-    type IdN: Eq + AAAA;
+    type IdN: Eq + UniformNodeId;
     fn as_id(&self) -> &Self::IdN;
     // fn as_ty(&self) -> &Self::Ty;
     unsafe fn from_id(id: Self::IdN) -> Self;
     unsafe fn from_ref_id(id: &Self::IdN) -> &Self;
 }
 
-impl AAAA for u16 {}
+pub trait UniformNodeId: NodeId<IdN = Self> {}
 
 impl NodeId for u16 {
     type IdN = u16;
@@ -832,7 +832,7 @@ impl NodeId for u16 {
     }
 }
 
-pub trait AAAA: NodeId<IdN = Self> {}
+impl UniformNodeId for u16 {}
 
 pub trait TypedNodeId: NodeId {
     type Ty: HyperType + Hash + Copy + Eq + Send + Sync;

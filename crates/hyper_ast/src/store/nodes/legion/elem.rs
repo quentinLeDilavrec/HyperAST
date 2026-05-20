@@ -45,8 +45,6 @@ impl<'a, T> From<&'a EntryRef<'a>> for &'a HashedNodeRef<'a, T> {
     }
 }
 
-impl crate::types::AAAA for NodeIdentifier {}
-
 impl NodeId for NodeIdentifier {
     type IdN = Self;
     fn as_id(&self) -> &Self::IdN {
@@ -60,6 +58,8 @@ impl NodeId for NodeIdentifier {
         id
     }
 }
+
+impl crate::types::UniformNodeId for NodeIdentifier {}
 
 impl TypedNodeId for NodeIdentifier {
     type Ty = crate::types::AnyType;
@@ -572,10 +572,6 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
     for HashedNodeRef<'_, T>
 {
     type ChildIdx = u16;
-    // type Children<'b>
-    //     = MySlice<Self::TreeId>
-    // where
-    //     Self: 'b;
 
     fn child_count(&self) -> u16 {
         self.cs()

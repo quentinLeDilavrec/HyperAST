@@ -6,7 +6,8 @@ use num::ToPrimitive;
 
 use hyperast::position::TreePath;
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{AAAA, HyperAST, NodeId, TypedNodeStore};
+use hyperast::types::{HyperAST, TypedNodeStore};
+use hyperast::types::{NodeId, UniformNodeId};
 
 use crate::types::Type;
 
@@ -21,7 +22,7 @@ enum Id<IdN> {
     Other(IdN),
 }
 
-impl<IdN: Clone + Eq + AAAA> Id<IdN> {
+impl<IdN: Clone + Eq + UniformNodeId> Id<IdN> {
     fn id(&self) -> &IdN {
         match self {
             Id::Java(node) => node.as_id(),

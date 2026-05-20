@@ -370,7 +370,7 @@ pub(crate) fn remap<HAST: HyperAST, NoS, IdD>(
 where
     for<'t> types::LendT<'t, HAST>: types::WithSerialization,
     IdD: PrimInt + Shallow<IdD>,
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: types::UniformNodeId,
     NoS: HyperAST<IdN = HAST::IdN> + Copy,
     for<'t> types::LendT<'t, NoS>: types::WithStats,
 {

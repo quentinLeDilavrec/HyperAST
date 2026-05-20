@@ -14,9 +14,11 @@ use crate::impact::serialize::{CachedHasher, Keyed, MySerialize};
 use crate::nodes::{CompressedNode, HashSize, RefContainer};
 use crate::store::defaults::LabelIdentifier;
 use crate::store::nodes::compo::{self, CS, NoSpacesCS};
+use crate::types::Labeled;
 use crate::types::NodeId;
 use crate::types::TypedNodeId;
-use crate::types::{AnyType, Children, HyperType, TypeTrait, Typed};
+use crate::types::{AnyType, HyperType, TypeTrait, Typed};
+use crate::types::{Children, Childrn};
 use crate::types::{WithChildren, WithMetaData};
 
 // TODO refactor alias into a transparent struct
@@ -175,11 +177,11 @@ impl<'a, T> HashedNodeRef<'a, T> {
 impl<'a, T: crate::types::NodeId<IdN = NodeIdentifier>> HashedNodeRef<'a, T> {
     pub fn get_child_by_name(
         &self,
-        name: &<HashedNodeRef<'a, T> as crate::types::Labeled>::Label,
+        name: &<HashedNodeRef<'a, T> as Labeled>::Label,
     ) -> Option<NodeIdentifier> {
         let labels = self
             .0
-            .get_component::<CS<<HashedNodeRef<'a, T> as crate::types::Labeled>::Label>>()
+            .get_component::<CS<<HashedNodeRef<'a, T> as Labeled>::Label>>()
             .ok()?;
         let idx = labels.0.iter().position(|x| x == name);
         idx.map(|idx| self.child(&idx.to_u16().unwrap()).unwrap())
@@ -187,11 +189,11 @@ impl<'a, T: crate::types::NodeId<IdN = NodeIdentifier>> HashedNodeRef<'a, T> {
 
     pub fn get_child_idx_by_name(
         &self,
-        name: &<HashedNodeRef<'a, T> as crate::types::Labeled>::Label,
+        name: &<HashedNodeRef<'a, T> as Labeled>::Label,
     ) -> Option<<HashedNodeRef<'a, T> as crate::types::WithChildren>::ChildIdx> {
         let labels = self
             .0
-            .get_component::<CS<<HashedNodeRef<'a, T> as crate::types::Labeled>::Label>>()
+            .get_component::<CS<<HashedNodeRef<'a, T> as Labeled>::Label>>()
             .ok()?;
         labels
             .0
@@ -200,11 +202,9 @@ impl<'a, T: crate::types::NodeId<IdN = NodeIdentifier>> HashedNodeRef<'a, T> {
             .map(|x| x.to_u16().unwrap())
     }
 
-    pub fn try_get_children_name(
-        &self,
-    ) -> Option<&[<HashedNodeRef<'a, T> as crate::types::Labeled>::Label]> {
+    pub fn try_get_children_name(&self) -> Option<&[<HashedNodeRef<'a, T> as Labeled>::Label]> {
         self.0
-            .get_component::<CS<<HashedNodeRef<'a, T> as crate::types::Labeled>::Label>>()
+            .get_component::<CS<<HashedNodeRef<'a, T> as Labeled>::Label>>()
             .ok()
             .map(|x| &*x.0)
     }
@@ -323,7 +323,7 @@ impl<T> crate::types::WithSerialization for HashedNodeRef<'_, T> {
     }
 }
 
-impl<T> crate::types::Labeled for HashedNodeRef<'_, T> {
+impl<T> Labeled for HashedNodeRef<'_, T> {
     type Label = LabelIdentifier;
 
     fn get_label_unchecked(&self) -> &LabelIdentifier {
@@ -388,13 +388,7 @@ where
     type ChildIdx = u16;
 
     fn child_count(&self) -> u16 {
-        self.cs()
-            .map_or(0, |x| {
-                let c: u16 = x.child_count();
-                c
-            })
-            .to_u16()
-            .expect("too much children")
+        self.cs().map_or(0, |x| x.child_count())
     }
 
     fn child(&self, idx: &Self::ChildIdx) -> Option<T::IdN> {
@@ -516,9 +510,7 @@ impl<Id> HashedNodeRef<'_, Id> {
 
 impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Tree for HashedNodeRef<'_, Id> {
     fn has_children(&self) -> bool {
-        self.cs()
-            .map(|x| !crate::types::Childrn::is_empty(&x))
-            .unwrap_or(false)
+        self.cs().map(|x| !x.is_empty()).unwrap_or(false)
     }
 
     fn has_label(&self) -> bool {
@@ -538,27 +530,28 @@ impl<T> RefContainer for HashedNodeRef<'_, T> {
             return BloomResult::MaybeContain;
         };
         macro_rules! check {
-        ( $($t:ty),* ) => {
-            match *e {
-                BloomSize::Much => {
-                    log::trace!("[Too Much]");
-                    BloomResult::MaybeContain
-                },
-                BloomSize::None => BloomResult::DoNotContain,
-                $( <$t>::SIZE => {
-                    let x = CachedHasher::<usize,<$t as BF<[u8]>>::S, <$t as BF<[u8]>>::H>::once(rf);
-                    let x = x.into_iter().map(|x|<$t>::check_raw(self.0.get_component::<$t>().unwrap(), x));
-
-                    for x in x {
-                        if let BloomResult::MaybeContain = x {
-                            return BloomResult::MaybeContain
-                        }
+            ( @some $t:ty ) => {{
+                let x = CachedHasher::<usize,<$t as BF<[u8]>>::S, <$t as BF<[u8]>>::H>::once(rf);
+                let c = self.0.get_component::<$t>().unwrap();
+                for x in x {
+                    let x = <$t>::check_raw(c, x);
+                    if let BloomResult::MaybeContain = x {
+                        return BloomResult::MaybeContain
                     }
-                    BloomResult::DoNotContain
-                }),*
-            }
-        };
-    }
+                }
+                BloomResult::DoNotContain
+            }};
+            ( $($t:ty),* ) => {
+                match *e {
+                    BloomSize::Much => {
+                        log::trace!("[Too Much]");
+                        BloomResult::MaybeContain
+                    },
+                    BloomSize::None => BloomResult::DoNotContain,
+                    $( <$t>::SIZE => check!(@some $t) ),*
+                }
+            };
+        }
         check![
             Bloom<&'static [u8], u16>,
             Bloom<&'static [u8], u32>,

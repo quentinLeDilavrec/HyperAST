@@ -22,8 +22,6 @@ pub struct BreadthFirst<IdN, IdD: PrimInt> {
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstContiguousSiblings<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn has_children(&self, id: &IdD) -> bool {
         BreadthFirstContiguousSiblings::first_child(self, id).is_some()
@@ -41,16 +39,12 @@ where
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstIt<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     type It<'a> = super::Iter<IdD>;
 }
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> BreadthFirstIterable<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn iter_bf(&self) -> super::Iter<IdD> {
         super::Iter {
@@ -68,8 +62,6 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedParentsLending<'a, IdD
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn parent(&self, id: &IdD) -> Option<IdD> {
         let r = self.id_parent[id.to_usize().unwrap()];
@@ -168,8 +160,6 @@ where
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn original(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
@@ -216,8 +206,6 @@ where
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn descendants(&self, x: &IdD) -> Vec<IdD> {
         let store = self.hyperast;

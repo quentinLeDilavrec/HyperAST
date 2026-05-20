@@ -64,7 +64,7 @@ where
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithPrecompQueries,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type NR = self::Node<'hast, HAST>;
 }
@@ -75,7 +75,7 @@ where
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithPrecompQueries,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
 }
@@ -86,7 +86,7 @@ where
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithPrecompQueries,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Node = self::Node<'hast, HAST>;
     // type NodeRef<'a>
@@ -208,7 +208,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn _goto_first_child_internal(&mut self) -> TreeCursorStep {
         use hyperast::types::NodeStore;
@@ -265,7 +265,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn role(&self) -> Option<<HAST::TS as RoleStore>::Role> {
         use hyperast::types::NodeStore;
@@ -333,7 +333,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn symbol(&self) -> Symbol {
         super::symbol(self.stores, *self.pos.node().unwrap())
@@ -407,7 +407,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn child_by_role(&mut self, role: <HAST::TS as RoleStore>::Role) -> Option<()> {
         // TODO what about multiple children with same role?

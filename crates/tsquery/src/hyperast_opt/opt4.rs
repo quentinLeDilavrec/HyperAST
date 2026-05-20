@@ -53,7 +53,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type NR = super::NodeRefK<'a, 'hast, HAST>;
 }
@@ -71,7 +71,7 @@ where
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
     for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Node = self::Node<'hast, HAST>;
 
@@ -179,7 +179,7 @@ where
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
     for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use crate::Cursor;
     let mut field_id = Default::default();

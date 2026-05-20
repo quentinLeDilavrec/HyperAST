@@ -297,7 +297,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         fn kind(&self) -> &'static str {
             use hyperast::position::position_accessors::SolvedPosition;
@@ -357,7 +357,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Cursor = TreeCursor<HAST>;
 
@@ -403,7 +403,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type SNode = Node<HAST>;
     }
@@ -414,7 +414,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Matches =
             MyQMatches<'a, crate::QueryCursor<'a, TreeCursorNoRef<HAST>, NodeNoRef<HAST>>, HAST>;
@@ -427,7 +427,7 @@ pub mod tsg_impl {
         HAST::Idx: Copy + Hash,
         HAST::TS: RoleStore,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Ext = ExtendingStringQuery<Self, Self::Lang>;
 
@@ -508,7 +508,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Match = MyQMatch<HAST>;
     }
@@ -518,7 +518,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         fn next(&mut self) -> Option<<Self as MatchLending<'_>>::Match> {
             todo!()
@@ -541,7 +541,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Nodes = CapturedNodesIter<'a, HAST>;
     }
@@ -551,7 +551,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Simple = Node<HAST>;
 
@@ -615,7 +615,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type SNode = Node<HAST>;
     }
@@ -625,7 +625,7 @@ pub mod tsg_impl {
         HAST::IdN: Copy,
         HAST::Idx: Copy + Hash,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         fn next(&mut self) -> Option<<Self as NodeLending<'_>>::SNode> {
             loop {
@@ -682,7 +682,7 @@ pub mod tsg_impl {
         HAST::Idx: Copy + Hash,
         HAST::TS: RoleStore,
         for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
-        HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: types::UniformNodeId,
     {
         type Query = QueryMatcher<HAST>;
         type Lang = tree_sitter::Language;

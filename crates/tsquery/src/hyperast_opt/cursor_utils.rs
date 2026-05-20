@@ -50,7 +50,7 @@ pub(super) fn text<'hast, 'l, HAST: HyperAST>(
     pos: &impl CursorHead<HAST::IdN, HAST::Idx>,
 ) -> crate::BiCow<'hast, 'l, str>
 where
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     let id = pos.node();
     use hyperast::types::NodeStore;
@@ -138,7 +138,7 @@ pub fn goto_next_sibling_internal<HAST: HyperAST>(
     pos: &mut impl CursorHeadMove<HAST::IdN, HAST::Idx>,
 ) -> TreeCursorStep
 where
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
     HAST::IdN: Copy,
 {
     use hyperast::types::NodeStore;
@@ -175,7 +175,7 @@ pub fn goto_first_child_internal<HAST: HyperAST>(
 ) -> TreeCursorStep
 where
     HAST::IdN: Copy,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use hyperast::types::NodeStore;
     let n = stores.node_store().resolve(&pos.node());
@@ -204,7 +204,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
 {
     if field_id == Default::default() {
         return false;
@@ -232,7 +232,7 @@ pub fn child_by_role<'hast, HAST: HyperAST>(
 where
     <HAST as HyperAST>::TS: RoleStore,
     <HAST as HyperASTShared>::IdN: Copy,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
 {

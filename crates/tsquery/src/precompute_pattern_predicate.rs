@@ -49,7 +49,7 @@ where
         + tree_gen::WithChildren<HAST::IdN>,
     for<'c> &'c Acc: tree_gen::WithLabel<L = &'c str>,
     for<'t> types::LendT<'t, HAST>: types::WithRoles,
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: types::UniformNodeId,
 {
     type Acc = Acc;
     const ENABLED: bool = true;
@@ -86,7 +86,7 @@ where
         + tree_gen::WithChildren<HAST::IdN>,
     for<'c> &'c Acc: tree_gen::WithLabel<L = &'c str>,
     for<'t> types::LendT<'t, HAST>: types::WithRoles,
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: types::UniformNodeId,
 {
     const GRAPHING: bool = false;
     fn compute_tsg(

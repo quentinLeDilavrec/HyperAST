@@ -436,7 +436,7 @@ where
 // where
 //     <HAST as HyperAST>::TS: RoleStore,
 //     <HAST as HyperASTShared>::IdN: Copy,
-//     HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+//     HAST::IdN: hyperast::types::UniformNodeId,
 //     HAST::TS: RoleStore,
 //     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
 // {

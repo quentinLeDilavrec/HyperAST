@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithHashs, WithMetaData, WithStats};
 
@@ -22,7 +22,7 @@ pub fn diff<HAST: HyperAST + Copy>(
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Copy + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::Label: Debug + Clone + Copy + Eq,
     for<'t> LendT<'t, HAST>: WithHashs
         + WithStats

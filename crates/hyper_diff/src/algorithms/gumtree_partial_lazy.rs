@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 
 use hyperast::PrimInt;
+use hyperast::types::TypeStore;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT};
-use hyperast::types::{NodeId, TypeStore};
 use hyperast::types::{WithHashs, WithStats};
 
 use super::{CDS, DS, DiffRes, DiffResult, tr};
@@ -24,7 +25,7 @@ pub fn diff<HAST: HyperAST + Copy>(
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::Label: Clone + Copy + Eq + Debug,
     <HAST::TS as TypeStore>::Ty: Eq + Debug,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,

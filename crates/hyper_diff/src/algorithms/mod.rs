@@ -8,7 +8,7 @@
 use std::fmt::{Debug, Display};
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, HyperASTShared, LendT};
 use hyperast::types::{WithHashs, WithSerialization, WithStats};
 
@@ -462,7 +462,7 @@ where
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithStats + WithSerialization,
     HAST::IdN: Copy + Debug,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let stores = self.mapper.hyperast;
@@ -492,7 +492,7 @@ fn check_oneshot_decompressed_against_lazy<HAST: HyperAST + Copy>(
 ) where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::Label: Debug + Clone + Copy + Eq,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {

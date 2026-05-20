@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithHashs, WithStats};
 
@@ -25,7 +25,7 @@ pub fn diff<HAST: HyperAST + Copy>(
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::Label: Clone + Copy + Eq + Debug,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
@@ -91,7 +91,7 @@ pub fn lazy_top_down<'a, HAST: HyperAST + Copy + 'a>(
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::Label: Clone + Copy + Eq + Debug,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {

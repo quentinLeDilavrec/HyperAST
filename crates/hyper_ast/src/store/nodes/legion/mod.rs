@@ -9,7 +9,7 @@ use super::{Compo, CompoRegister, ErasedHolder, ErasedInserter};
 
 pub mod dyn_builder;
 mod elem;
-pub use elem::{EntryRef, HashedNode, HashedNodeRef, NodeIdentifier};
+pub use elem::{EntryRef, HashedNodeRef, NodeIdentifier};
 
 mod node_store_impl;
 

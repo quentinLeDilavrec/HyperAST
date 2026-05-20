@@ -69,42 +69,6 @@ impl TypedNodeId for NodeIdentifier {
     }
 }
 
-pub struct HashedNode<Id: TypedNodeId<IdN = NodeIdentifier>> {
-    node: CompressedNode<NodeIdentifier, LabelIdentifier, Id::Ty>,
-    hashs: SyntaxNodeHashs<u32>,
-}
-
-// * hashed node impl
-
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNode<Id>
-where
-    Id::IdN: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.node == other.node
-    }
-}
-
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> Eq for HashedNode<Id> where Id::IdN: Eq {}
-
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> Hash for HashedNode<Id> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.hashs.hash(&Default::default()).hash(state)
-    }
-}
-
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Labeled for HashedNode<Id> {
-    type Label = LabelIdentifier;
-
-    fn get_label_unchecked(&self) -> &LabelIdentifier {
-        panic!()
-    }
-
-    fn try_get_label(&self) -> Option<&Self::Label> {
-        todo!()
-    }
-}
-
 // * hashed node reference impl
 
 impl<Id: TypedNodeId<IdN = NodeIdentifier>> PartialEq for HashedNodeRef<'_, Id> {
@@ -377,11 +341,6 @@ impl<T> crate::types::Node for HashedNodeRef<'_, T> {}
 
 impl<T: crate::types::NodeId> crate::types::Stored for HashedNodeRef<'_, T> {
     type TreeId = T;
-}
-
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Node for HashedNode<Id> {}
-impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Stored for HashedNode<Id> {
-    type TreeId = Id::IdN;
 }
 
 impl<T: crate::types::NodeId> HashedNodeRef<'_, T>

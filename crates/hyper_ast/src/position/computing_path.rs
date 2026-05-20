@@ -13,7 +13,7 @@ pub fn resolve_range<'store, HAST>(
 where
     HAST: HyperAST,
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST::IdN: Copy,
 {
     let mut offset = 0;

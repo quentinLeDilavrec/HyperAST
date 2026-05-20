@@ -34,7 +34,7 @@ pub fn extract_position<'store, HAST>(
 where
     HAST: HyperAST,
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST::IdN: Copy,
 {
     if parents.is_empty() {
@@ -90,7 +90,7 @@ where
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = (HAST::IdN, usize)> + Into<It2>,
     It2: Iterator<Item = HAST::IdN>,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
 {
     let Some((p, o)) = it.next() else {
         return Position::default();
@@ -144,7 +144,7 @@ where
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = (HAST::IdN, HAST::Idx)> + Into<It2>,
     It2: Iterator<Item = HAST::IdN>,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
 {
     let x = Some(0);
     let Some(a) = x else { panic!() };

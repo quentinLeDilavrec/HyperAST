@@ -19,7 +19,7 @@ pub fn path_with_spaces<'store, HAST>(
 ) -> (Vec<HAST::Idx>, HAST::IdN)
 where
     HAST::IdN: Clone,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST: HyperAST,
     for<'t> types::LendT<'t, HAST>: WithSerialization,
 {
@@ -100,7 +100,7 @@ impl<'store, Idx: PrimInt, HAST>
     ) -> Filtered<Vec<It::Item>, node_filters::Full>
     where
         HAST::IdN: Clone,
-        HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: crate::types::UniformNodeId,
         HAST: HyperAST,
         for<'t> types::LendT<'t, HAST>: WithSerialization,
     {
@@ -153,7 +153,7 @@ pub fn compute_position_with_no_spaces<'store, HAST, It: Iterator>(
 where
     It::Item: Clone + PrimInt,
     HAST::IdN: Clone,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST: HyperAST,
     for<'t> types::LendT<'t, HAST>: WithSerialization,
 {
@@ -169,7 +169,7 @@ pub fn compute_position_and_nodes_with_no_spaces<'store, HAST, It>(
 ) -> (Position, Vec<HAST::IdN>, Vec<It::Item>)
 where
     HAST::IdN: Clone,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST: HyperAST,
     for<'t> types::LendT<'t, HAST>: WithSerialization,
     It: Iterator,
@@ -286,7 +286,7 @@ where
     ) -> (FileAndOffsetFull, SpFull<HAST::IdN, HAST::Idx>)
     where
         HAST::IdN: Clone,
-        HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: crate::types::UniformNodeId,
         for<'t> types::LendT<'t, HAST>: WithSerialization,
     {
         let stores = self.stores;
@@ -357,7 +357,7 @@ where
     ) -> (FileAndOffsetFull, SpFull<HAST::IdN, HAST::Idx>)
     where
         HAST::IdN: Clone,
-        HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: crate::types::UniformNodeId,
         for<'t> types::LendT<'t, HAST>: WithSerialization,
     {
         let stores = self.stores;
@@ -450,7 +450,7 @@ where
     fn compute_multi_position_with_no_spaces3<B>(&self) -> B::Prepared
     where
         HAST::IdN: Clone,
-        HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: crate::types::UniformNodeId,
         for<'t> types::LendT<'t, HAST>: WithSerialization,
         B: TopDownPosBuilder<HAST::IdN, HAST::Idx, usize, NoSpacePrepareParams<HAST::Idx>>
             + Default,
@@ -541,7 +541,7 @@ where
     pub fn compute_no_spaces<O, B>(&self) -> O
     where
         HAST::IdN: Clone,
-        HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+        HAST::IdN: crate::types::UniformNodeId,
         HAST: HyperAST,
         for<'t> types::LendT<'t, HAST>: WithSerialization + WithChildren,
         // B: receivers_traits::top_down::ReceiveDir2<HAST::IdN, HAST::Idx, usize, O>

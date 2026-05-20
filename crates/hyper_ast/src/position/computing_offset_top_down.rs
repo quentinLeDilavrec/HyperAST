@@ -19,7 +19,7 @@ pub fn compute_range<'store, It, HAST>(
 where
     HAST: HyperAST,
     HAST::IdN: Copy,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator,
     It::Item: PrimInt,
@@ -56,7 +56,7 @@ pub fn compute_position<HAST, It>(
 where
     It::Item: Clone,
     HAST::IdN: Clone,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST: HyperAST,
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = HAST::Idx>,
@@ -109,7 +109,7 @@ pub fn compute_position_and_nodes<'store, HAST, It: Iterator>(
 where
     It::Item: crate::types::PrimInt,
     HAST::IdN: Clone,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: crate::types::UniformNodeId,
     HAST: HyperAST,
     for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
 {
@@ -174,7 +174,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
     where
         HAST: HyperAST<IdN = IdN, Idx = Idx>,
         for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
-        IdN: crate::types::NodeId<IdN = IdN>,
+        IdN: crate::types::UniformNodeId,
     {
         if cfg!(debug_assertions) {
             self.check(stores)
@@ -277,7 +277,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
     where
         HAST: HyperAST<IdN = IdN, Idx = Idx>,
         for<'t> crate::types::LendT<'t, HAST>: WithStats + WithSerialization,
-        IdN: crate::types::NodeId<IdN = IdN>,
+        IdN: crate::types::UniformNodeId,
     {
         if cfg!(debug_assertions) {
             self.check(stores)

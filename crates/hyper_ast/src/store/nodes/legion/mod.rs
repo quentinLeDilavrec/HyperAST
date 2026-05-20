@@ -3,7 +3,6 @@ use std::hash::Hash;
 use std::marker::{Send, Sync};
 use std::ops::Deref;
 
-use hashbrown::hash_map::DefaultHashBuilder;
 use legion::storage::{Component, IntoComponentSource};
 use legion::{EntityStore, World};
 
@@ -32,7 +31,7 @@ pub struct NodeStoreInner {
     // dedup: hashbrown::HashMap<NodeIdentifier, (), ()>,
     internal: legion::World,
     // TODO intern lists of [`NodeIdentifier`]s, e.g. children, no space children, ...
-    // hasher: DefaultHashBuilder,
+    // hasher: hashbrown::hash_map::DefaultHashBuilder,
     //fasthash::city::Hash64,//fasthash::RandomState<fasthash::>,
 
     // internal: VecMapStore<HashedNode, NodeIdentifier, legion::World>,
@@ -68,21 +67,18 @@ pub struct PendingInsert<'a>(
 impl<'a> PendingInsert<'a> {
     pub fn occupied_id(&self) -> Option<NodeIdentifier> {
         match &self.0 {
-            hashbrown::hash_map::RawEntryMut::Occupied(occupied) => Some(*occupied.key()),
+            crate::compat::hash_map::RawEntryMut::Occupied(occupied) => Some(*occupied.key()),
             _ => None,
         }
     }
     pub fn resolve<T>(&self, id: NodeIdentifier) -> HashedNodeRef<'_, T> {
-        self.1
-            .1
-            .internal
-            .entry_ref(id)
+        (self.1.1.internal.entry_ref(id))
             .map(|x| HashedNodeRef::new(x))
             .unwrap()
     }
     pub fn occupied(&'a self) -> Option<(NodeIdentifier, (u64, &'a NodeStoreInner))> {
         match &self.0 {
-            hashbrown::hash_map::RawEntryMut::Occupied(occupied) => {
+            crate::compat::hash_map::RawEntryMut::Occupied(occupied) => {
                 Some((*occupied.key(), (self.1.0, self.1.1)))
             }
             _ => None,
@@ -96,7 +92,7 @@ impl<'a> PendingInsert<'a> {
         (u64, &'a mut NodeStoreInner),
     ) {
         match self.0 {
-            hashbrown::hash_map::RawEntryMut::Vacant(occupied) => (occupied, self.1),
+            crate::compat::hash_map::RawEntryMut::Vacant(occupied) => (occupied, self.1),
             _ => panic!(),
         }
     }

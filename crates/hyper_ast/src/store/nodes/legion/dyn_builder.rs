@@ -86,11 +86,10 @@
 //! ```
 
 use crate::compat::hash_map;
-// use std::collections::hash_map;
 
+use hash_map::DefaultHashBuilder;
 use hash_map::HashMap;
 
-// use std::collections::HashMap;
 use std::alloc::{Layout, alloc, dealloc};
 use std::any::TypeId;
 use std::hash::{BuildHasher, BuildHasherDefault, Hasher};

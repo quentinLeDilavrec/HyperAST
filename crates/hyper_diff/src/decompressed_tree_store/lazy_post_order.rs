@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use num_traits::{ToPrimitive, cast, one, zero};
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::WithStats;
 use hyperast::types::{Children as _, Childrn as _, WithChildren as _};
 use hyperast::types::{HyperAST, LendT};
@@ -58,7 +58,7 @@ impl<IdN: Clone, IdD: Clone> Clone for LazyPostOrder<IdN, IdD> {
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub(super) fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
         let p = self.parent(c)?;
@@ -79,14 +79,13 @@ where
 
 mod impl_ref {
     use super::super::Iter;
-    use hyperast::types::NodeId;
 
     use super::*;
 
     impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
         for Decompressible<HAST, &LazyPostOrder<HAST::IdN, IdD>>
     where
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
+        HAST::IdN: UniformNodeId,
     {
         fn len(&self) -> usize {
             self._len()
@@ -158,7 +157,7 @@ mod impl_ref {
     impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         for Decompressible<HAST, &LazyPostOrder<HAST::IdN, IdD>>
     where
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
+        HAST::IdN: UniformNodeId,
     {
         fn parent(&self, id: &IdD) -> Option<IdD> {
             if id == &ShallowDecompressedTreeStore::root(self) {
@@ -207,7 +206,7 @@ mod impl_ref {
     impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
         for Decompressible<HAST, &LazyPostOrder<HAST::IdN, IdD>>
     where
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
+        HAST::IdN: UniformNodeId,
     {
         fn descendants(&self, x: &IdD) -> Vec<IdD> {
             (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
@@ -231,7 +230,7 @@ mod impl_ref {
     impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
         for Decompressible<HAST, &LazyPostOrder<HAST::IdN, IdD>>
     where
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
+        HAST::IdN: UniformNodeId,
     {
         fn lld(&self, i: &IdD) -> IdD {
             self.llds[(*i).to_usize().unwrap()]
@@ -249,7 +248,7 @@ mod impl_ref {
     impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> PostOrderIterable<HAST, IdD>
         for Decompressible<HAST, &LazyPostOrder<HAST::IdN, IdD>>
     where
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
+        HAST::IdN: UniformNodeId,
     {
         type It = Iter<IdD>;
         fn iter_df_post<const ROOT: bool>(&self) -> Iter<IdD> {
@@ -275,7 +274,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecompressedParentsLending<'a, IdD
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn parent(&self, id: &IdD) -> Option<IdD> {
         if id == &ShallowDecompressedTreeStore::root(self) {
@@ -340,7 +339,7 @@ impl<IdN, IdD: PrimInt> LazyPostOrder<IdN, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithSiblings<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn lsib(&self, x: &IdD) -> Option<IdD> {
         let p = self.parent(x)?;
@@ -386,7 +385,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdS>, IdS>
 impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn lld(&self, i: &IdD) -> IdD {
         self.llds[(*i).to_usize().unwrap()]
@@ -448,8 +447,8 @@ impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
         store: HAST,
     ) -> SimplePostOrder<IdN, IdD>
     where
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
         HAST::IdN: Debug,
+        HAST::IdN: UniformNodeId,
         for<'t> LendT<'t, HAST>: WithStats,
     {
         let mut dec = Decompressible {
@@ -471,8 +470,8 @@ impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::IdN: Debug,
+    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithStats,
 {
     fn continuous_aux(&mut self, x: &IdD) -> Option<Vec<HAST::IdN>> {
@@ -507,16 +506,6 @@ where
                 // Termination: go down the last child, finish when no more remains
                 let rem = self.continuous_aux(&c);
                 // let ran = self.first_descendant(&c).to_usize().unwrap()..=c.to_usize().unwrap();
-                // println!(
-                //     "{}",
-                //     ran.clone()
-                //         .collect::<Vec<_>>()
-                //         .iter()
-                //         .zip(self.id_parent[ran.clone()].iter())
-                //         .zip(self.llds[ran.clone()].iter())
-                //         .map(|((x1, x2), x3)| (x1, x2, x3))
-                //         .fold(" i, p, l".to_string(), |s, x| format!("{s}\n{:?}", x))
-                // );
                 let Some(rem) = rem else {
                     if c > zero() {
                         c -= one();
@@ -582,14 +571,9 @@ where
             self.parent(x).is_none_or(|p| p != zero()),
             "x is not initialized"
         );
-        // self.decompress_descendants_continuous(store, &x);
-        // // self.go_through_descendants(store, &x);
         let first = self.first_descendant(x);
         let mut i = *x;
         while i > first {
-            // dbg!(i);
-            // dbg!(self.parent(&i));
-            // dbg!(self.lld(&i));
             if self.id_parent[i.to_usize().unwrap() - 1] != zero() {
                 i -= one();
             } else {
@@ -613,7 +597,6 @@ impl<HAST, IdD> hyperast::types::DecompressedFrom<HAST> for LazyPostOrder<HAST::
 where
     IdD: PrimInt + Debug,
     HAST: HyperAST + Copy,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
     for<'t> LendT<'t, HAST>: WithStats,
 {
     type Out = Self;
@@ -668,7 +651,7 @@ pub(super) fn init_boxed_slice<T: Clone>(value: T, pred_len: usize) -> Box<[T]> 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn len(&self) -> usize {
         self._len()
@@ -743,7 +726,7 @@ impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
     ) -> IdD
     where
         HAST: HyperAST<IdN = IdN> + Copy,
-        HAST::IdN: NodeId<IdN = HAST::IdN>,
+        HAST::IdN: UniformNodeId,
         for<'t> LendT<'t, HAST>: WithStats,
     {
         let mut r = *x;
@@ -773,7 +756,7 @@ impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithStats,
 {
     pub fn child_decompressed(&mut self, x: &IdD, p: impl Iterator<Item = HAST::Idx>) -> IdD {
@@ -803,7 +786,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
     LazyDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithStats,
 {
     fn starter(&self) -> Self::IdD {
@@ -904,7 +887,7 @@ impl<IdN, IdD: PrimInt> LazyPostOrder<IdN, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn descendants(&self, x: &IdD) -> Vec<IdD> {
         (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
@@ -934,7 +917,7 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> DecendantsLending<'a>
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ContiguousDescendants<HAST, IdD, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn descendants_range(&self, x: &IdD) -> std::ops::Range<IdD> {
         self.first_descendant(x)..*x
@@ -950,7 +933,7 @@ where
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub(super) fn slice_range(&self, x: &IdD) -> std::ops::RangeInclusive<usize> {
         self.first_descendant(x).to_usize().unwrap()..=x.to_usize().unwrap()
@@ -960,7 +943,7 @@ where
 impl<'a, HAST: HyperAST + Copy, IdD: PrimInt> LazyPOSliceLending<'a, HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     type SlicePo = Decompressible<HAST, CompletePOSlice<'a, HAST::IdN, IdD, bitvec::boxed::BitBox>>;
 }
@@ -968,7 +951,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug> LazyPOBorrowSlice<HAST, IdD, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     HAST::IdN: Debug,
     for<'t> LendT<'t, HAST>: WithStats,
 {
@@ -998,7 +981,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> PostOrderIterable<HAST, IdD>
     for Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     type It = super::Iter<IdD>;
     fn iter_df_post<const ROOT: bool>(&self) -> super::Iter<IdD> {
@@ -1017,7 +1000,7 @@ where
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     pub fn lsib(&self, c: &IdD, p_lld: &IdD) -> Option<IdD> {
         assert!(p_lld <= c, "{:?}<={:?}", p_lld.to_usize(), c.to_usize());
@@ -1033,12 +1016,12 @@ where
 
 impl<IdN, IdD: PrimInt> LazyPostOrder<IdN, IdD>
 where
-    IdN: NodeId<IdN = IdN>,
+    IdN: UniformNodeId,
 {
     fn size2<HAST: HyperAST<IdN = IdN> + Copy>(&self, store: HAST, x: &IdN) -> usize {
         fn size<HAST: HyperAST + Copy>(store: HAST, x: &HAST::IdN) -> usize
         where
-            HAST::IdN: NodeId<IdN = HAST::IdN>,
+            HAST::IdN: UniformNodeId,
         {
             let tmp = store.resolve(x);
             let Some(cs) = tmp.children() else {

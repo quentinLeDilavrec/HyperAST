@@ -11,7 +11,7 @@ use bitvec::slice::BitSlice;
 use num_traits::{ToPrimitive, Zero, cast, zero};
 
 use hyperast::PrimInt;
-use hyperast::types::NodeId;
+use hyperast::types::UniformNodeId;
 use hyperast::types::WithStats;
 use hyperast::types::{HyperAST, LendT};
 
@@ -467,15 +467,15 @@ impl<
 impl<
     HAST: HyperAST + Copy,
     IdD: PrimInt + Debug,
-    DTS, //DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
+    DTS,
     M: Borrow<Vec<IdD>>,
     R: Borrow<BTreeMap<IdD, IdD>>,
     D: BorrowMut<DTS>,
 > super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, SimpleHiddingMapper<'_, IdD, DTS, M, R, D>>
 where
+    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithStats,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     type Out = Decompressible<HAST, LazyPostOrder<HAST::IdN, IdD>>;
 
@@ -725,7 +725,7 @@ impl<
     D: BorrowMut<DTS>,
 > LazyDecompressedTreeStore<HAST, IdS> for SimpleHiddingMapper<'_, IdD, DTS, M, R, D>
 where
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
     Self: DecompressedTreeStore<HAST, IdD, IdS>,
 {
     fn starter(&self) -> Self::IdD {
@@ -759,7 +759,7 @@ impl<
 > SimpleHiddingMapper<'a, IdD, Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>>, M, R, D>
 where
     for<'t> LendT<'t, HAST>: WithStats,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    HAST::IdN: UniformNodeId,
 {
     fn decompress_visible_descendants(&mut self, x: &IdD) {
         let mut q: Vec<IdD> =
@@ -820,9 +820,9 @@ impl<
         D,
     >
 where
+    HAST::IdN: UniformNodeId,
     IdD: Shallow<IdD> + Debug,
     for<'t> LendT<'t, HAST>: WithStats,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
 {
     fn slice_po(&mut self, x: &IdD) -> <Self as LazyPOSliceLending<'_, HAST, IdD>>::SlicePo {
         self.decompress_visible_descendants(x);

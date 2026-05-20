@@ -657,7 +657,7 @@ impl<S: Hash> Hash for Arch<S> {
 impl SimplePackedBuilder {
     pub fn add<'store, HAST: crate::types::HyperAST>(&mut self, store: &'store HAST, id: &HAST::IdN)
     where
-        for<'t> <HAST as crate::types::AstLending<'t>>::RT: crate::types::WithStats,
+        for<'t> crate::types::LendT<'t, HAST>: crate::types::WithStats,
         HAST::IdN: Into<NodeIdentifier> + Copy,
         HAST::IdN: NodeId<IdN = HAST::IdN>,
         HAST::Label: Into<LabelIdentifier> + Clone,

@@ -59,8 +59,6 @@ impl NodeId for NodeIdentifier {
     }
 }
 
-impl crate::types::UniformNodeId for NodeIdentifier {}
-
 impl TypedNodeId for NodeIdentifier {
     type Ty = crate::types::AnyType;
     type TyErazed = crate::types::AnyType;

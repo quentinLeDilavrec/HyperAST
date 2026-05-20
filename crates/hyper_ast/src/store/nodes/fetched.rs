@@ -96,7 +96,6 @@ impl From<LabelIdentifier> for u32 {
 #[repr(transparent)]
 pub struct NodeIdentifier(std::num::NonZeroU32);
 
-impl UniformNodeId for NodeIdentifier {}
 impl NodeId for NodeIdentifier {
     type IdN = Self;
     fn as_id(&self) -> &Self::IdN {

@@ -818,6 +818,8 @@ pub trait NodeId: Eq + Clone + 'static {
 
 pub trait UniformNodeId: NodeId<IdN = Self> {}
 
+impl<T: NodeId<IdN = T>> UniformNodeId for T {}
+
 impl NodeId for u16 {
     type IdN = u16;
     fn as_id(&self) -> &Self::IdN {
@@ -831,8 +833,6 @@ impl NodeId for u16 {
         id
     }
 }
-
-impl UniformNodeId for u16 {}
 
 pub trait TypedNodeId: NodeId {
     type Ty: HyperType + Hash + Copy + Eq + Send + Sync;

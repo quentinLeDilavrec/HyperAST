@@ -508,58 +508,36 @@ impl<Id: TypedNodeId<IdN = NodeIdentifier>> crate::types::Stored for HashedNode<
     type TreeId = Id::IdN;
 }
 
-impl<T: crate::types::NodeId<IdN = NodeIdentifier>> HashedNodeRef<'_, T> {
-    pub fn cs(&self) -> Result<crate::types::LendC<'_, Self, u16, NodeIdentifier>, ComponentError> {
-        // let scount = self.0.get_component::<CSStaticCount>().ok();
-        // if let Some(CSStaticCount(scount)) = scount {
-        // if *scount == 1 {
-        //     self.0
-        //         .get_component::<CS0<NodeIdentifier, 1>>()
-        //         .map(|x| x.into())
-        //     } else if *scount == 2 {
-        //         self.0
-        //             .get_component::<CS0<NodeIdentifier, 2>>()
-        //             .map(|x| x.into())
-        //     } else
-        // if *scount == 3 {
-        //     self.0
-        //         .get_component::<CS0<NodeIdentifier, 3>>()
-        //         .map(|x| x.into())
-        // } else {
-        //     panic!()
-        // }
-        // } else {
-        let r = self
-            .0
-            .get_component::<CS<NodeIdentifier>>()
-            .map(|x| (*x.0).into())
-            .or_else(|_| {
-                self.0
-                    .get_component::<compo::CS0<NodeIdentifier, 1>>()
-                    .map(|x| (&x.0).into())
-            })
-            .or_else(|_| {
-                self.0
-                    .get_component::<compo::CS0<NodeIdentifier, 2>>()
-                    .map(|x| (&x.0).into())
-            });
-        r
-        // }
+impl<T: crate::types::NodeId> HashedNodeRef<'_, T>
+where
+    <T as crate::types::NodeId>::IdN: Send + Sync,
+{
+    pub fn cs(&self) -> Result<crate::types::LendC<'_, Self, u16, T::IdN>, ComponentError> {
+        macro_rules! C {
+            (* $t:ty) => {
+                self.0.get_component::<$t>().map(|x| (*x.0).into())
+            };
+            ($t:ty) => {
+                self.0.get_component::<$t>().map(|x| (&x.0).into())
+            };
+        }
+        C!(* CS<T::IdN>)
+            .or_else(|_| C!(compo::CS0<T::IdN, 1>))
+            .or_else(|_| C!(compo::CS0<T::IdN, 2>))
     }
+
     pub fn no_spaces(&self) -> Result<crate::types::LendC<'_, Self, u16, T::IdN>, ComponentError> {
-        self.0
-            .get_component::<NoSpacesCS<NodeIdentifier>>()
-            .map(|x| (*x.0).into())
-            .or_else(|_| {
-                self.0
-                    .get_component::<compo::NoSpacesCS0<NodeIdentifier, 1>>()
-                    .map(|x| (&x.0).into())
-            })
-            .or_else(|_| {
-                self.0
-                    .get_component::<compo::NoSpacesCS0<NodeIdentifier, 2>>()
-                    .map(|x| (&x.0).into())
-            })
+        macro_rules! C {
+            (* $t:ty) => {
+                self.0.get_component::<$t>().map(|x| (*x.0).into())
+            };
+            ($t:ty) => {
+                self.0.get_component::<$t>().map(|x| (&x.0).into())
+            };
+        }
+        C!(*NoSpacesCS<T::IdN>)
+            .or_else(|_| C!(compo::NoSpacesCS0<T::IdN, 1>))
+            .or_else(|_| C!(compo::NoSpacesCS0<T::IdN, 2>))
             .or_else(|_| self.cs())
     }
 }
@@ -568,8 +546,9 @@ impl<'a, T: crate::types::NodeId> crate::types::CLending<'a, u16, T::IdN> for Ha
     type Children = crate::types::ChildrenSlice<'a, T::IdN>;
 }
 
-impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
-    for HashedNodeRef<'_, T>
+impl<T: crate::types::NodeId> crate::types::WithChildren for HashedNodeRef<'_, T>
+where
+    <T as crate::types::NodeId>::IdN: Send + Sync + Copy,
 {
     type ChildIdx = u16;
 
@@ -583,12 +562,12 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
             .expect("too much children")
     }
 
-    fn child(&self, idx: &Self::ChildIdx) -> Option<NodeIdentifier> {
+    fn child(&self, idx: &Self::ChildIdx) -> Option<T::IdN> {
         let cs = self.cs().ok()?;
         cs.0.get(idx.to_usize().unwrap()).copied()
     }
 
-    fn child_rev(&self, idx: &Self::ChildIdx) -> Option<NodeIdentifier> {
+    fn child_rev(&self, idx: &Self::ChildIdx) -> Option<T::IdN> {
         let v = self.cs().ok()?;
         // .unwrap_or_else(|x| {
         //     log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
@@ -600,22 +579,6 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
         v.get(c).cloned()
     }
 
-    // unsafe fn children_unchecked<'b>(&'b self) -> &'b [Self::TreeId] {
-    //     let cs = self.cs().unwrap_or_else(|x| {
-    //         log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-    //         panic!("{}", x)
-    //     });
-    //     cs
-    // }
-
-    // fn get_children_cpy<'b>(&'b self) -> Vec<Self::TreeId> {
-    //     let cs = self.cs().unwrap_or_else(|x| {
-    //         log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-    //         panic!("{}", x)
-    //     });
-    //     cs.to_vec()
-    // }
-
     fn children(
         &self,
     ) -> Option<crate::types::LendC<'_, Self, Self::ChildIdx, <Self::TreeId as NodeId>::IdN>> {
@@ -623,8 +586,9 @@ impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithChildren
     }
 }
 
-impl<T: crate::types::NodeId<IdN = NodeIdentifier>> crate::types::WithRoles
-    for HashedNodeRef<'_, T>
+impl<T: crate::types::NodeId> crate::types::WithRoles for HashedNodeRef<'_, T>
+where
+    <T as crate::types::NodeId>::IdN: Send + Sync + Copy,
 {
     /// Actually `at` works as a structural offset when hidden children can hold fields.
     /// NOTE cannot easily go in children to make it a proper offset then.

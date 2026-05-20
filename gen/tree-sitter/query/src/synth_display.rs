@@ -50,7 +50,7 @@ details details {
 impl<HAST: HyperAST, Q, P> Display for GroupedLatticesFmt<'_, '_, HAST, Q, P>
 where
     HAST::IdN: std::fmt::Debug + Copy,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
     Q: Clone + std::borrow::Borrow<IdNQ> + PQ,
     P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy + Eq,
@@ -206,7 +206,7 @@ fn print_patterns<HAST: HyperAST, Q, P>(
 ) -> Result<(), std::fmt::Error>
 where
     HAST::IdN: std::fmt::Debug + Copy,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
     Q: Clone + std::borrow::Borrow<IdNQ> + PQ,
     P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy + Eq,
@@ -376,7 +376,7 @@ impl<HAST: HyperAST> PPP for (&HAST, hyperast::store::nodes::legion::NodeIdentif
 impl<HAST: HyperAST> PPP for (&HAST, &StructuralPosition<HAST::IdN, HAST::Idx>)
 where
     HAST::IdN: std::fmt::Debug + Copy,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
 {
     fn pp(&self) -> impl Display {
@@ -408,7 +408,7 @@ pub(crate) fn pp_inits<HAST: HyperAST, P>(
 ) -> std::fmt::Result
 where
     HAST::IdN: std::fmt::Debug + Copy,
-    HAST::IdN: hyperast::types::NodeId<IdN = HAST::IdN>,
+    HAST::IdN: hyperast::types::UniformNodeId,
     for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
     P: hyperast::position::position_accessors::SolvedPosition<HAST::IdN> + Copy,
     for<'t> (&'t HAST, P): PPP,

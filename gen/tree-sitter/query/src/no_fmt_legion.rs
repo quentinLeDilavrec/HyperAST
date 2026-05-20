@@ -483,7 +483,7 @@ pub struct PP<IdN, HAST, const SPC: bool = false> {
 
 impl<IdN, HAST, const SPC: bool> std::fmt::Display for PP<IdN, HAST, SPC>
 where
-    IdN: hyperast::types::NodeId<IdN = IdN>,
+    IdN: hyperast::types::UniformNodeId,
     HAST: hyperast::types::HyperAST<IdN = IdN>,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
@@ -526,7 +526,7 @@ where
 
 impl<IdN, HAST, const SPC: bool> PP<IdN, HAST, SPC>
 where
-    IdN: hyperast::types::NodeId<IdN = IdN>,
+    IdN: hyperast::types::UniformNodeId,
     HAST: hyperast::types::HyperAST<IdN = IdN>,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
     for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,

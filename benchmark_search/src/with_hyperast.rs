@@ -136,7 +136,7 @@ where
     HAST::TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
     <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
     HAST::IdN: Copy + Debug,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+    for<'t> hyperast::types::LendT<'t, HAST>:
         WithPrecompQueries + WithRoles + WithStats + WithHashs,
     HAST::IdN: hyperast::types::UniformNodeId,
 {
@@ -173,7 +173,7 @@ where
     HAST::TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
     <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
     HAST::IdN: Copy + Debug,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+    for<'t> hyperast::types::LendT<'t, HAST>:
         WithPrecompQueries + WithRoles + WithStats + WithHashs,
     HAST::IdN: hyperast::types::UniformNodeId,
 {

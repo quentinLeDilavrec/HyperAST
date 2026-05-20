@@ -32,7 +32,7 @@ pub fn print_mappings_no_ranges<
     mappings: &M,
 )
 where
-// for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: 'store + Tree<TreeId = IdN, Label = LS::I>,
+// for<'t> hyperast::types::LendT<'t, HAST>: 'store + Tree<TreeId = IdN, Label = LS::I>,
 // <HAST::T as types::Typed>::Type: Debug + Copy + Send + Sync,
 {
     let mut mapped = vec![false; dst_arena.len()];
@@ -109,7 +109,7 @@ pub fn print_mappings_no_ranges_label<
     mappings: &M,
 )
 where
-// for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: 'store + Tree<TreeId = IdN, Label = LS::I>,
+// for<'t> hyperast::types::LendT<'t, HAST>: 'store + Tree<TreeId = IdN, Label = LS::I>,
 // <HAST::T as types::Typed>::Type: Debug + Copy + Send + Sync,
 {
     let mut mapped = vec![false; dst_arena.len()];

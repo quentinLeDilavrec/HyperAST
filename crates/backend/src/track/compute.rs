@@ -42,7 +42,7 @@ impl<'store, HAST> MappingTracker<'store, HAST> {
     fn size(&self, other_tr: &HAST::IdN, current_tr: &HAST::IdN) -> usize
     where
         HAST: HyperAST,
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithStats,
+        for<'t> hyperast::types::LendT<'t, HAST>: types::WithStats,
     {
         let node_store = self.stores.node_store();
         let src_size: usize = node_store.resolve(other_tr).size();

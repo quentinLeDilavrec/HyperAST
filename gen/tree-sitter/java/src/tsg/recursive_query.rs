@@ -38,7 +38,7 @@ impl<'tree, HAST, P: Clone> Clone for Node<'tree, HAST, P> {
 
 impl<'tree, HAST, P> tree_sitter_graph::graph::SyntaxNode for Node<'tree, HAST, P>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+    for<'t> hyperast::types::LendT<'t, HAST>:
         hyperast::types::WithSerialization + hyperast::types::WithStats,
     HAST: HyperAST<'tree, IdN = NodeIdentifier>,
     P: Clone
@@ -116,7 +116,7 @@ where
 
 impl<'tree, HAST, P> tree_sitter_graph::graph::SyntaxNodeExt for Node<'tree, HAST, P>
 where
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT:
+    for<'t> hyperast::types::LendT<'t, HAST>:
         hyperast::types::WithSerialization + hyperast::types::WithStats,
     HAST: HyperAST<'tree, IdN = NodeIdentifier>,
     P: Clone

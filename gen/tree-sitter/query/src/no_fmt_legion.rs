@@ -485,8 +485,8 @@ impl<IdN, HAST, const SPC: bool> std::fmt::Display for PP<IdN, HAST, SPC>
 where
     IdN: hyperast::types::UniformNodeId,
     HAST: hyperast::types::HyperAST<IdN = IdN>,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
+    for<'t> hyperast::types::LendT<'t, HAST>: hyperast::types::WithSerialization,
+    for<'t> hyperast::types::LendT<'t, HAST>: hyperast::types::WithStats,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use hyperast::types::WithChildren;
@@ -528,8 +528,8 @@ impl<IdN, HAST, const SPC: bool> PP<IdN, HAST, SPC>
 where
     IdN: hyperast::types::UniformNodeId,
     HAST: hyperast::types::HyperAST<IdN = IdN>,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithSerialization,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: hyperast::types::WithStats,
+    for<'t> hyperast::types::LendT<'t, HAST>: hyperast::types::WithSerialization,
+    for<'t> hyperast::types::LendT<'t, HAST>: hyperast::types::WithStats,
 {
     pub fn new(stores: HAST, root: IdN) -> Self {
         Self {

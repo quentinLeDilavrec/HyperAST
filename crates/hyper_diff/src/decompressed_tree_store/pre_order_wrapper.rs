@@ -96,7 +96,7 @@ impl<'store: 'a, 'a: 'b, 'b, IdD: PrimInt, HAST, D> Display
     for DisplaySimplePreOrderMapper<'store, 'a, 'b, IdD, HAST, D>
 where
     HAST: HyperAST + Copy,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithSerialization,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithSerialization,
     D: PostOrder<HAST, IdD>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

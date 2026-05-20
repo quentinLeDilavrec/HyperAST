@@ -49,8 +49,8 @@ impl<
 where
     HAST::IdN: Debug + Copy,
     HAST::TS: hyperast::types::RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithPrecompQueries,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
     <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -69,8 +69,8 @@ impl<
 where
     HAST::IdN: Debug + Copy,
     HAST::TS: hyperast::types::RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithPrecompQueries,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
     <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
 {
     fn serialize(

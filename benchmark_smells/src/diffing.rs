@@ -22,7 +22,7 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
     HAST::Idx: Debug,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    for<'t> hyperast::types::LendT<'t, HAST>: types::WithHashs + types::WithStats,
 {
     let mm =
         LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<DefaultMultiMappingStore<_>>(mapper);
@@ -39,7 +39,7 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
     HAST::Idx: Debug,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    for<'t> hyperast::types::LendT<'t, HAST>: types::WithHashs + types::WithStats,
 {
     let mappings = VecStore::<u32>::default();
     let src_arena = Decompressible {

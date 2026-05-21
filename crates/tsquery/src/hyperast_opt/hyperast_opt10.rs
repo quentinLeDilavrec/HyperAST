@@ -116,7 +116,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type NR = super::hyperast_opt4::NodeRef<'a, 'hast, HAST>;
 }
@@ -134,7 +133,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Node = super::hyperast_opt4::Node<'hast, HAST>;
 
@@ -287,7 +285,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use crate::Cursor;
     let mut field_id = Default::default();
@@ -470,7 +467,6 @@ fn goto_first_child_internal<'hast, HAST: HyperAST>(
 ) -> bool
 where
     HAST::IdN: Copy,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use hyperast::types::{Children, NodeStore, WithChildren};
     let mut o = num::zero();

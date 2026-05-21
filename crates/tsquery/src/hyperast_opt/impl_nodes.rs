@@ -158,7 +158,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn eq(&self, other: &Self) -> bool {
         self.pos == other.pos
@@ -170,7 +169,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn symbol(&self) -> Symbol {
         let t = self.kind;
@@ -246,7 +244,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn eq(&self, other: &Self) -> bool {
         self.pos == other.pos
@@ -268,7 +265,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn symbol(&self) -> Symbol {
         super::cursor_utils::symbol(self.stores, &self.pos)
@@ -323,7 +319,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn eq(&self, other: &Self) -> bool {
         self.pos == other.pos
@@ -335,7 +330,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn symbol(&self) -> Symbol {
         super::cursor_utils::symbol(self.stores, &self.pos)

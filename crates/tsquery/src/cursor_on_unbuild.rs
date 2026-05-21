@@ -121,7 +121,6 @@ where
     HAST::IdN: Copy,
     Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
     &'acc Acc: tree_gen::WithLabel,
-    HAST::IdN: types::UniformNodeId,
 {
     type NR = self::Node<HAST, &'acc Acc>;
 }
@@ -134,7 +133,6 @@ where
     HAST::IdN: Copy,
     Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
     &'acc Acc: tree_gen::WithLabel,
-    HAST::IdN: types::UniformNodeId,
 {
     type Status = CursorStatus<IdF>;
 }
@@ -147,7 +145,6 @@ where
     HAST::IdN: Copy,
     Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
     &'acc Acc: tree_gen::WithLabel,
-    HAST::IdN: types::UniformNodeId,
 {
     type Node = self::Node<HAST, &'acc Acc>;
     // type NodeRef<'a>
@@ -362,7 +359,6 @@ where
     HAST::IdN: Copy,
     Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
     &'acc Acc: tree_gen::WithLabel,
-    HAST::IdN: types::UniformNodeId,
 {
     fn role(&self) -> Option<Role> {
         if let Some(p) = self.pos.parent() {
@@ -460,7 +456,6 @@ where
     HAST::IdN: Copy,
     Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
     &'acc Acc: tree_gen::WithLabel,
-    HAST::IdN: types::UniformNodeId,
 {
     fn symbol(&self) -> Symbol {
         let id = HAST::TS::ts_symbol(self.kind());
@@ -588,7 +583,6 @@ where
     HAST::IdN: Copy,
     Acc: tree_gen::WithChildren<HAST::IdN> + tree_gen::WithRole<Role> + types::Typed,
     &'acc Acc: tree_gen::WithLabel,
-    HAST::IdN: types::UniformNodeId,
 {
     fn child_by_role(&mut self, role: Role) -> Option<()> {
         // TODO what about multiple children with same role?

@@ -73,7 +73,6 @@ pub(super) fn goto_first_child_internal<HAST: HyperAST>(
 ) -> TreeCursorStep
 where
     HAST::IdN: Copy,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use hyperast::types::NodeStore;
     let n = stores.node_store().resolve(&pos.node());
@@ -102,7 +101,6 @@ pub(super) fn child_by_role<'hast, HAST: HyperAST>(
 where
     <HAST as HyperAST>::TS: RoleStore,
     <HAST as HyperASTShared>::IdN: Copy,
-    HAST::IdN: hyperast::types::UniformNodeId,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
 {

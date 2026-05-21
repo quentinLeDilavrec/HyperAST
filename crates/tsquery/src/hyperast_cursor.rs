@@ -101,7 +101,6 @@ where
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
     for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type NR = self::Node<'hast, HAST>;
 }
@@ -112,7 +111,6 @@ where
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
     for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
 }
@@ -123,7 +121,6 @@ where
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
     for<'t> hyperast::types::LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Node = self::Node<'hast, HAST>;
     // type NodeRef<'a>
@@ -245,7 +242,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn _goto_first_child_internal(&mut self) -> TreeCursorStep {
         use hyperast::types::NodeStore;
@@ -302,7 +298,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn role(&self) -> Option<<HAST::TS as RoleStore>::Role> {
         use hyperast::types::NodeStore;
@@ -370,7 +365,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn symbol(&self) -> Symbol {
         // TODO make something more efficient
@@ -452,7 +446,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn child_by_role(&mut self, role: <HAST::TS as RoleStore>::Role) -> Option<()> {
         // TODO what about multiple children with same role?

@@ -127,7 +127,6 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type NR = super::NodeRefKNoRef<'a, HAST>;
 }
@@ -145,7 +144,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type Node = super::NodeNoRef<HAST, PersistedNode<HAST::IdN, HAST::Idx>>;
 
@@ -294,7 +292,6 @@ where
     HAST::TS: RoleStore,
     for<'t> LendT<'t, HAST>: WithRoles,
     for<'t> LendT<'t, HAST>: WithPrecompQueries,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use crate::Cursor;
     let mut field_id = Default::default();
@@ -515,7 +512,6 @@ fn goto_first_child_internal<HAST: HyperAST>(
 ) -> bool
 where
     HAST::IdN: Copy,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     use hyperast::types::{Children, NodeStore, WithChildren};
     let mut o = num::zero();

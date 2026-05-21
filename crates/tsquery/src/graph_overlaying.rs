@@ -41,7 +41,6 @@ where
     HAST::TS: types::RoleStore<IdF = u16, Role = types::Role>,
     Acc: tree_gen::WithRole<types::Role> + tree_gen::WithChildren<HAST::IdN> + types::Typed,
     for<'acc> &'acc Acc: tree_gen::WithLabel<L = &'acc str>,
-    HAST::IdN: types::UniformNodeId,
 {
     type Acc = Acc;
 
@@ -99,7 +98,6 @@ where
     HAST::TS: types::RoleStore<IdF = u16, Role = types::Role>,
     Acc: tree_gen::WithRole<types::Role> + tree_gen::WithChildren<HAST::IdN> + types::Typed,
     for<'acc> &'acc Acc: tree_gen::WithLabel<L = &'acc str>,
-    HAST::IdN: types::UniformNodeId,
 {
     const USING: bool = false;
     type Scope = hyperast::scripting::Acc;
@@ -137,7 +135,6 @@ where
         + tree_gen::WithChildren<HAST::IdN>
         + types::Typed,
     for<'acc> &'acc Acc: tree_gen::WithLabel<L = &'acc str>,
-    HAST::IdN: types::UniformNodeId,
 {
     const GRAPHING: bool = true;
     // TODO remove the 'static and other contraints, they add unnecessary unsafes

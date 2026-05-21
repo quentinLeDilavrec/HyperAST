@@ -78,6 +78,10 @@ fn bottomup_group(c: &mut Criterion) {
         bench_lazy_stable::<100>(&mut group, &mut repositories, p);
         bench_lazy_stable::<200>(&mut group, &mut repositories, p);
         bench_lazy_stable::<400>(&mut group, &mut repositories, p);
+        bench_lazy_stable_simple(&mut group, &mut repositories, p);
+        bench_lazy_stable_hybrid::<100>(&mut group, &mut repositories, p);
+        bench_lazy_stable_hybrid::<200>(&mut group, &mut repositories, p);
+        bench_lazy_stable_hybrid::<400>(&mut group, &mut repositories, p);
     }
     group.finish();
 
@@ -320,6 +324,76 @@ fn bench_stable<const MAX_SIZE: usize>(
     );
 }
 
+fn bench_lazy_stable_simple(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    repositories: &mut PreProcessedRepositories,
+    p: &Input,
+) {
+    use hyper_diff::matchers::heuristic::gt;
+    prep_gt_subtree_and_bench(
+        group,
+        repositories,
+        p,
+        BenchmarkId::new("LazyStableSimple", p.repo.name()),
+        |b, (repositories, (owned, mappings))| {
+            let hyperast = &repositories.processor.main_stores;
+            b.iter_batched(
+                || hyper_diff::matchers::Mapper::prep(hyperast, mappings.clone(), owned.clone()),
+                |mut mapper| {
+                    let mapper = Mapper::new(
+                        hyperast,
+                        mapper.mapping.mappings,
+                        (
+                            mapper.mapping.src_arena.as_mut(),
+                            mapper.mapping.dst_arena.as_mut(),
+                        ),
+                    );
+                    use gt::lazy_simple_marriage_bottom_up_matcher::LazySimpleMarriageBottomUpMatcher;
+                    let mapper_bottom_up =
+                        LazySimpleMarriageBottomUpMatcher::<_>::match_it(mapper);
+                    black_box(mapper_bottom_up);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
+fn bench_lazy_stable_hybrid<const MAX_SIZE: usize>(
+    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    repositories: &mut PreProcessedRepositories,
+    p: &Input,
+) {
+    use hyper_diff::matchers::heuristic::gt;
+    prep_gt_subtree_and_bench(
+        group,
+        repositories,
+        p,
+        BenchmarkId::new(format!("LazyStableHybrid_{}", MAX_SIZE), p.repo.name()),
+        |b, (repositories, (owned, mappings))| {
+            let hyperast = &repositories.processor.main_stores;
+            b.iter_batched(
+                || hyper_diff::matchers::Mapper::prep(hyperast, mappings.clone(), owned.clone()),
+                |mut mapper| {
+                    let mapper = Mapper::new(
+                        hyperast,
+                        mapper.mapping.mappings,
+                        (
+                            mapper.mapping.src_arena.as_mut(),
+                            mapper.mapping.dst_arena.as_mut(),
+                        ),
+                    );
+                    use gt::lazy_hybrid_marriage_bottom_up_matcher::LazyHybridMarriageBottomUpMatcher;
+                    let mapper_bottom_up =
+                        LazyHybridMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
+                    black_box(mapper_bottom_up);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
 fn bench_lazy_stable<const MAX_SIZE: usize>(
     group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
     repositories: &mut PreProcessedRepositories,
@@ -429,7 +503,7 @@ fn bench_cd<const MAX_SIZE: usize>(
         group,
         repositories,
         p,
-        BenchmarkId::new("Baseline", p.repo.name()),
+        BenchmarkId::new(format!("Baseline {}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
             b.iter_batched(
@@ -461,7 +535,7 @@ fn bench_lazy_cd<const MAX_SIZE: usize>(
         group,
         repositories,
         p,
-        BenchmarkId::new("Lazy", p.repo.name()),
+        BenchmarkId::new(format!("Lazy {}", MAX_SIZE), p.repo.name()),
         |b, (repositories, (owned, mappings))| {
             let hyperast = &repositories.processor.main_stores;
             b.iter_batched(

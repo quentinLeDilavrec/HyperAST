@@ -1279,7 +1279,7 @@ pub trait NStoreRefAssoc {
 pub trait NodeStorage<IdN> {}
 
 pub trait HyperASTShared {
-    type IdN: NodeId;
+    type IdN: UniformNodeId;
     type Idx: PrimInt;
     type Label;
 }

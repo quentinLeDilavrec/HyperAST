@@ -129,6 +129,32 @@ impl<HAST, Dsrc, Ddst, M> WithMappings for Mapper<HAST, Dsrc, Ddst, M> {
     type M = M;
 }
 
+impl<HAST: Copy, Dsrc, Ddst, M>
+    Mapper<HAST, Decompressible<HAST, Dsrc>, Decompressible<HAST, Ddst>, M>
+{
+    pub fn mut_decompressible(
+        &mut self,
+    ) -> Mapper<HAST, Decompressible<HAST, &mut Dsrc>, Decompressible<HAST, &mut Ddst>, &mut M>
+    {
+        let hyperast = self.hyperast;
+        let mapping = &mut self.mapping;
+        Mapper {
+            hyperast,
+            mapping: Mapping {
+                src_arena: Decompressible {
+                    hyperast,
+                    decomp: &mut mapping.src_arena,
+                },
+                dst_arena: Decompressible {
+                    hyperast,
+                    decomp: &mut mapping.dst_arena,
+                },
+                mappings: &mut mapping.mappings,
+            },
+        }
+    }
+}
+
 impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
     pub fn split_mut(
         &mut self,

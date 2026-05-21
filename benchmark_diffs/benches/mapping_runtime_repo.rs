@@ -5,7 +5,7 @@ use std::hint::black_box;
 
 use hyper_diff::decompressed_tree_store::{CompletePostOrder, lazy_post_order::LazyPostOrder};
 use hyper_diff::mappings::VecStore;
-use hyper_diff::matchers::Decompressible;
+use hyper_diff::matchers::{Decompressible, Mapper};
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::types::{HyperAST as _, HyperASTShared, WithStats as _};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
@@ -96,8 +96,7 @@ fn no_size_threshold(
                 // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
                 let hyperast = &repositories.processor.main_stores;
                 let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper =
-                    hyper_diff::matchers::Mapper::new(hyperast, VecStore::default(), mapper_owned);
+                let mapper = Mapper::new(hyperast, VecStore::default(), mapper_owned);
 
                 use gt::greedy_subtree_matcher::GreedySubtreeMatcher;
                 let mapper = GreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -116,15 +115,12 @@ fn no_size_threshold(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
                 let mapper = mapper.map(
                     |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                     |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
@@ -144,7 +140,7 @@ fn no_size_threshold(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
+                let mapper = Mapper::with_mut_decompressible(
                     &mut mapper_owned,
                     M::default(),
                 );
@@ -178,15 +174,12 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
                 let mapper = mapper.map(
                     |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                     |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
@@ -206,10 +199,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -241,15 +231,12 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
                 let mapper = mapper.map(
                     |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                     |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
@@ -269,10 +256,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -305,8 +289,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
                 // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
                 let hyperast = &repositories.processor.main_stores;
                 let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper =
-                    hyper_diff::matchers::Mapper::new(hyperast, VecStore::default(), mapper_owned);
+                let mapper = Mapper::new(hyperast, VecStore::default(), mapper_owned);
 
                 use gt::greedy_subtree_matcher::GreedySubtreeMatcher;
                 let mapper = GreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -329,15 +312,12 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
                 let mapper = mapper.map(
                     |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                     |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
@@ -361,10 +341,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -388,15 +365,12 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
                 let mapper = mapper.map(
                     |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                     |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
@@ -419,10 +393,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
 
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
@@ -462,8 +433,7 @@ fn with_second_sim_threshold<
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mapper_owned: (CDS<_>, CDS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper =
-                    hyper_diff::matchers::Mapper::new(hyperast, VecStore::default(), mapper_owned);
+                let mapper = Mapper::new(hyperast, VecStore::default(), mapper_owned);
 
                 use cd::leaves_matcher::LeavesMatcher;
                 let mapper = LeavesMatcher::<_>::match_it(mapper);
@@ -489,14 +459,11 @@ fn with_second_sim_threshold<
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
                 use cd::lazy_leaves_matcher::LazyLeavesMatcher;
                 let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = hyper_diff::matchers::Mapper::prep(hyperast, mappings, mapper_owned);
+                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
                 let mapper = mapper.map(
                     |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
                     |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
@@ -523,10 +490,7 @@ fn with_second_sim_threshold<
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
                 let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(src, dst).1;
-                let mapper = hyper_diff::matchers::Mapper::with_mut_decompressible(
-                    &mut mapper_owned,
-                    M::default(),
-                );
+                let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
                 use cd::lazy_leaves_matcher::LazyLeavesMatcher;
                 let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
 

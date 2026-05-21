@@ -42,7 +42,7 @@ where
     Ddst::IdD: PrimInt,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
+    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     HAST::Label: Eq,

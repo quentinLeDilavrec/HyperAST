@@ -4,7 +4,6 @@ use num_traits::{cast, zero};
 
 use hyperast::PrimInt;
 use hyperast::types::HyperAST;
-use hyperast::types::UniformNodeId;
 use hyperast::types::WithChildren as _;
 
 use super::{BreadthFirstContiguousSiblings, BreadthFirstIterable};
@@ -117,8 +116,6 @@ impl<IdD: PrimInt> Iterator for IterParents<'_, IdD> {
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
-where
-    HAST::IdN: UniformNodeId,
 {
     type Out = Self;
 

@@ -648,7 +648,6 @@ impl<
 > SimpleHiddingMapper<'a, IdD, Decompressible<HAST, &'a mut LazyPostOrder<HAST::IdN, IdD>>, M, R, D>
 where
     for<'t> LendT<'t, HAST>: WithStats,
-    HAST::IdN: UniformNodeId,
 {
     fn decompress_visible_descendants(&mut self, x: &IdD) {
         let mut q: Vec<IdD> =

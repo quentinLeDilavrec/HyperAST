@@ -2,7 +2,6 @@ use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::types::NodeStore as _;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, Tree, WithHashs};
 
 use crate::decompressed_tree_store::POBorrowSlice;
@@ -45,7 +44,6 @@ where
     M::Dst: PrimInt,
     HAST::Label: Eq,
     HAST::IdN: Debug,
-    HAST::IdN: UniformNodeId,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,

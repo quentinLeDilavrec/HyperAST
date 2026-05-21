@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
 use hyperast::types::HashKind;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, NodeStore as _};
 use hyperast::types::{WithHashs, WithMetaData};
 
@@ -40,7 +39,6 @@ where
     Ddst: PostOrderIterable<HAST, M::Dst> + PostOrder<HAST, M::Dst>,
     HAST::Label: Eq + Clone,
     HAST::IdN: Debug + Copy,
-    HAST::IdN: UniformNodeId,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,

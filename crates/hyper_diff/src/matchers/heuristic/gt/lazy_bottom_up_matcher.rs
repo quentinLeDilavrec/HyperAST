@@ -3,7 +3,6 @@ use num_traits::ToPrimitive;
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
 use hyperast::types::NodeStore as _;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
@@ -24,7 +23,6 @@ where
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
 {
     /// Returns true if *all* descendants in src are unmapped
     pub(super) fn are_srcs_unmapped_lazy(&self, src: &Dsrc::IdD) -> bool {
@@ -120,7 +118,6 @@ where
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
 {
     /// Matches all strictly isomorphic nodes in the descendants of src and dst (step 1 of simple recovery)
     fn lcs_equal_matching_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
@@ -208,7 +205,6 @@ where
         + DecompressedWithParent<HAST, Ddst::IdD>
         + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub fn last_chance_match_histogram_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
@@ -425,7 +421,6 @@ where
     Dsrc: LazyDecompressedTreeStore<HAST, M::Src>,
     Ddst: LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub(crate) fn apply_mappings_lazy<
@@ -475,7 +470,6 @@ where
     Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src>, // enable efficient similarity computation
     Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst>, // enable efficient similarity computation
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
 {
     #[inline(always)]
     pub fn bottom_up_with_similarity_threshold_and_recovery(
@@ -615,7 +609,6 @@ where
     Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src>, // enable efficient similarity computation
     Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst>, // enable efficient similarity computation
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
     Ddst: crate::decompressed_tree_store::RawContiguousDescendants<M::Dst, Ddst::IdD>,
     Dsrc: crate::decompressed_tree_store::RawContiguousDescendants<M::Src, Dsrc::IdD>,
     M::Src: Shallow<Dsrc::IdD>,

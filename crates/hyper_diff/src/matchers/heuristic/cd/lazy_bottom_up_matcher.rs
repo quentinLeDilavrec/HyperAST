@@ -3,7 +3,6 @@ use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, Tree};
 use hyperast::types::{WithHashs, WithMetaData, WithStats};
 
@@ -56,7 +55,6 @@ where
     M: MonoMappingStore,
     HAST::Label: Eq,
     HAST::IdN: Debug,
-    HAST::IdN: UniformNodeId,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,

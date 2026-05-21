@@ -1,5 +1,5 @@
+use hyperast::types::NodeId;
 use hyperast::types::{Childrn, LendT, NodeStore, WithChildren};
-use hyperast::types::{NodeId, UniformNodeId};
 
 use super::factorized_bounds;
 
@@ -68,7 +68,6 @@ where
     for<'t> LendT<'t, HAST>: hyperast::types::WithHashs,
     HAST::IdN: Clone + Eq,
     HAST::Label: Eq,
-    HAST::IdN: UniformNodeId,
 {
     use hyperast::types::HashKind;
     use hyperast::types::Labeled;

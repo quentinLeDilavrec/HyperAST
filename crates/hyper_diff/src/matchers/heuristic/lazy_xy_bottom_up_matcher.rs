@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use hyperast::PrimInt;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
 use crate::decompressed_tree_store::Shallow;
@@ -35,7 +34,6 @@ where
     M::Dst: PrimInt,
     HAST::Label: Eq,
     HAST::IdN: Debug,
-    HAST::IdN: UniformNodeId,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,

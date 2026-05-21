@@ -129,7 +129,7 @@ fn bench_xy(
 }
 
 fn bench_lazy_xy(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -163,7 +163,7 @@ fn bench_lazy_xy(
 }
 
 fn bench_lazy_greedy<const MAX_SIZE: usize>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -259,7 +259,7 @@ fn bench_hybrid<const MAX_SIZE: usize>(
 }
 
 fn bench_lazy_hybrid<const MAX_SIZE: usize>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -325,7 +325,7 @@ fn bench_stable<const MAX_SIZE: usize>(
 }
 
 fn bench_lazy_stable_simple(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -360,7 +360,7 @@ fn bench_lazy_stable_simple(
 }
 
 fn bench_lazy_stable_hybrid<const MAX_SIZE: usize>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -395,7 +395,7 @@ fn bench_lazy_stable_hybrid<const MAX_SIZE: usize>(
 }
 
 fn bench_lazy_stable<const MAX_SIZE: usize>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -460,7 +460,7 @@ fn bench_simple(
 }
 
 fn bench_lazy_simple(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {

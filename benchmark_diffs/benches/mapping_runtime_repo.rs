@@ -81,7 +81,7 @@ fn mapping_group(c: &mut Criterion) {
 }
 
 fn no_size_threshold(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -160,7 +160,7 @@ fn no_size_threshold(
 }
 
 fn no_sim_threshold<const MAX_SIZE: usize>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -224,7 +224,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
 }
 
 fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -286,7 +286,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
 }
 
 fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {
@@ -442,7 +442,7 @@ fn with_second_sim_threshold<
     const NUM2: u64,
     const DEN2: u64,
 >(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
+    group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
     p: &Input,
 ) {

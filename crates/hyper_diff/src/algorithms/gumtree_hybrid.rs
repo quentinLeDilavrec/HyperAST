@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use hyperast::PrimInt;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithHashs, WithStats};
 
@@ -26,7 +25,6 @@ pub fn diff<HAST: HyperAST + Copy>(
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: UniformNodeId,
     HAST::Label: Debug + Clone + Copy + Eq,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
@@ -47,7 +45,6 @@ pub fn diff_with_hyperparameters<
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: UniformNodeId,
     HAST::Label: Debug + Clone + Copy + Eq,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
@@ -104,7 +101,6 @@ pub fn diff_hybrid_minheight<HAST: HyperAST + Copy, const MIN_HEIGHT: usize>(
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: UniformNodeId,
     HAST::Label: Debug + Clone + Copy + Eq,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {

@@ -2,7 +2,6 @@ use std::fmt::Debug;
 
 use hyperast::PrimInt;
 use hyperast::types::TypeStore;
-use hyperast::types::UniformNodeId;
 use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithHashs, WithStats};
 
@@ -31,7 +30,6 @@ pub fn diff_with_hyperparameters<
 where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: UniformNodeId,
     HAST::Label: Clone + Copy + Eq + Debug,
     <HAST::TS as TypeStore>::Ty: Eq + Debug,
     for<'t> LendT<'t, HAST>: WithHashs + WithStats,

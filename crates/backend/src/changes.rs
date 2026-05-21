@@ -317,7 +317,6 @@ where
     for<'t> types::LendT<'t, HAST>: WithHashs + WithStats,
     HAST::IdN: Clone + Eq,
     HAST::Label: Clone + Eq,
-    HAST::IdN: types::UniformNodeId,
     M: MonoMappingStore + Clone + Default,
     MM: MultiMappingStore<Src = M::Src, Dst = M::Dst> + Default,
     M::Src: PrimInt + Shallow<M::Src>,

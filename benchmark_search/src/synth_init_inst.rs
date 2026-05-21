@@ -88,7 +88,6 @@ where
     HAST::IdN: Copy + Debug,
     for<'t> hyperast::types::LendT<'t, HAST>:
         WithPrecompQueries + WithRoles + WithStats + WithHashs,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type P<IdN, Idx> = CursorWithPersistence<IdN, Idx>;
     type R = HashesAccumulator;
@@ -103,7 +102,6 @@ where
         HAST::IdN: Copy + Debug,
         for<'t> hyperast::types::LendT<'t, HAST>:
             WithPrecompQueries + WithRoles + WithStats + WithHashs,
-        HAST::IdN: hyperast::types::UniformNodeId,
     {
         use hyperast_tsquery::hyperast_opt::TreeCursor;
         let cursor = TreeCursor::new(stores, pos);
@@ -133,7 +131,6 @@ where
     HAST::IdN: Copy + Debug,
     for<'t> hyperast::types::LendT<'t, HAST>:
         WithPrecompQueries + WithRoles + WithStats + WithHashs,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn can_skip<N: WithPrecompQueries>(&self, n: &N) -> bool {
         let used_precomputed = self.query.used_precomputed;
@@ -232,7 +229,6 @@ where
     HAST::IdN: Copy + Debug,
     for<'t> hyperast::types::LendT<'t, HAST>:
         WithPrecompQueries + WithRoles + WithStats + WithHashs,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     type P<IdN, Idx> = CursorWithPersistence<IdN, Idx>;
     type R = HashInstAccumulator<HAST::IdN>;
@@ -276,7 +272,6 @@ where
     HAST::IdN: Copy + Debug,
     for<'t> hyperast::types::LendT<'t, HAST>:
         WithPrecompQueries + WithRoles + WithStats + WithHashs,
-    HAST::IdN: hyperast::types::UniformNodeId,
 {
     fn can_skip<N: WithPrecompQueries>(&self, n: &N) -> bool {
         let used_precomputed = self.query.used_precomputed;

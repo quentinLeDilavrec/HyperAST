@@ -1,7 +1,6 @@
 use criterion::measurement::Measurement;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use criterion::{criterion_group, criterion_main};
-use std::hint::black_box;
 
 use hyper_diff::decompressed_tree_store::CompletePostOrder;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
@@ -116,10 +115,9 @@ fn bench_xy(
                 |mapper| {
                     let mapper = mapper.map(CDS::from, CDS::from);
                     use xy_bottom_up_matcher::XYBottomUpMatcher;
-                    let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    XYBottomUpMatcher::<_>::match_it(mapper)
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -141,12 +139,12 @@ fn bench_lazy_xy(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use lazy_xy_bottom_up_matcher::LazyXYBottomUpMatcher;
-                    let mapper_bottom_up = LazyXYBottomUpMatcher::<_>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr = LazyXYBottomUpMatcher::<_>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -168,13 +166,12 @@ fn bench_lazy_greedy<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazyGreedyBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr = LazyGreedyBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -198,10 +195,10 @@ fn bench_greedy<const MAX_SIZE: usize>(
                 |mapper| {
                     let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
-                    let mapper_bottom_up = GreedyBottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let mapper = GreedyBottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -225,11 +222,10 @@ fn bench_hybrid<const MAX_SIZE: usize>(
                 |mapper| {
                     let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
-                    let mapper_bottom_up =
-                        HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let mapper = HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -251,13 +247,12 @@ fn bench_lazy_hybrid<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazyHybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr = LazyHybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -281,11 +276,10 @@ fn bench_stable<const MAX_SIZE: usize>(
                 |mapper| {
                     let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
-                    let mapper_bottom_up =
-                        MarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let mapper = MarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -307,13 +301,13 @@ fn bench_lazy_stable_simple(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use gt::lazy_simple_marriage_bottom_up_matcher::LazySimpleMarriageBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazySimpleMarriageBottomUpMatcher::<_>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr =
+                        LazySimpleMarriageBottomUpMatcher::<_>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -335,13 +329,13 @@ fn bench_lazy_stable_hybrid<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use gt::lazy_hybrid_marriage_bottom_up_matcher::LazyHybridMarriageBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazyHybridMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr =
+                        LazyHybridMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -363,13 +357,12 @@ fn bench_lazy_stable<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;
-                    let mapper_bottom_up =
-                        LazyMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr = LazyMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -393,10 +386,10 @@ fn bench_simple(
                 |mapper| {
                     let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
-                    let mapper_bottom_up = SimpleBottomUpMatcher::<_>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let mapper = SimpleBottomUpMatcher::<_>::match_it(mapper);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -418,12 +411,12 @@ fn bench_lazy_simple(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
-                    let mapper_bottom_up = LazySimpleBottomUpMatcher::<_>::match_it(mapper);
-                    black_box(mapper_bottom_up);
+                    let _mpr = LazySimpleBottomUpMatcher::<_>::match_it(mpr);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -450,9 +443,9 @@ fn bench_cd<const MAX_SIZE: usize>(
                     use cd::bottom_up_matcher::BottomUpMatcher;
                     let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
                     dbg!(mapper.mappings.len(), mapper.mappings.capacity());
-                    black_box(mapper);
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );
@@ -475,13 +468,13 @@ fn bench_lazy_cd<const MAX_SIZE: usize>(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mut mapper| {
                     dbg!(mapper.mappings.len());
-                    let mapper = mapper.mut_decompressible();
+                    let mpr = mapper.mut_decompressible();
                     use cd::lazy_bottom_up_matcher::BottomUpMatcher;
-                    let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
-                    dbg!(mapper.mappings.len(), mapper.mappings.capacity());
-                    black_box(mapper);
+                    let mpr = BottomUpMatcher::<_, MAX_SIZE>::match_it(mpr);
+                    dbg!(mpr.mappings.len(), mpr.mappings.capacity());
+                    mapper
                 },
-                BatchSize::SmallInput,
+                BatchSize::LargeInput,
             );
         },
     );

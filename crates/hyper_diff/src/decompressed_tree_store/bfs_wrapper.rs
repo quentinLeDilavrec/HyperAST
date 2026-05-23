@@ -44,7 +44,15 @@ impl<IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'_, IdD, DTS, D> {
             phantom: std::marker::PhantomData,
         }
     }
-    pub fn with_store<HAST>(_store: HAST, back: D) -> Self
+    pub fn from<D2, HAST>(d: D2) -> Self
+    where
+        D: From<D2>,
+        HAST: HyperAST + Copy,
+        DTS: PostOrder<HAST, IdD>,
+    {
+        Self::make(d.into())
+    }
+    pub fn make<HAST>(back: D) -> Self
     where
         HAST: HyperAST + Copy,
         DTS: PostOrder<HAST, IdD>,

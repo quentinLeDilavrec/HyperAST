@@ -46,10 +46,7 @@ where
 
     let measure = measure.stop_then_prepare();
 
-    let mapper = mapper.map_dst(
-        // the dst side has to be traversed in bfs for chawathe
-        |dst_arena| SimpleBfsMapper::with_store(hyperast, dst_arena),
-    );
+    let mapper = mapper.map_dst(SimpleBfsMapper::make);
 
     let measure = measure.start();
 

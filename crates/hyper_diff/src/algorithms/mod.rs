@@ -16,6 +16,7 @@ use crate::actions::script_generator2::SimpleAction;
 use crate::decompressed_tree_store;
 use crate::decompressed_tree_store::CompletePostOrder;
 use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
+use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use crate::mappings::VecStore;
 use crate::matchers::Decompressible;
@@ -481,6 +482,10 @@ type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u3
 #[allow(type_alias_bounds)]
 #[allow(clippy::upper_case_acronyms)]
 type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
+
+#[allow(type_alias_bounds)]
+#[allow(clippy::upper_case_acronyms)]
+type BFS<'a, HAST: HyperASTShared> = SimpleBfsMapper<'a, u32, CDS<HAST>>;
 
 fn check_oneshot_decompressed_against_lazy<HAST: HyperAST + Copy>(
     hyperast: HAST,

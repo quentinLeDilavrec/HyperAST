@@ -114,10 +114,7 @@ fn bench_xy(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mapper| {
-                    let mapper = mapper.map(
-                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                    );
+                    let mapper = mapper.map(CDS::from, CDS::from);
                     use xy_bottom_up_matcher::XYBottomUpMatcher;
                     let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
@@ -199,10 +196,7 @@ fn bench_greedy<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mapper| {
-                    let mapper = mapper.map(
-                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                    );
+                    let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
                     let mapper_bottom_up = GreedyBottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
                     black_box(mapper_bottom_up);
@@ -229,10 +223,7 @@ fn bench_hybrid<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mapper| {
-                    let mapper = mapper.map(
-                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                    );
+                    let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
                     let mapper_bottom_up =
                         HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
@@ -288,10 +279,7 @@ fn bench_stable<const MAX_SIZE: usize>(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mapper| {
-                    let mapper = mapper.map(
-                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                    );
+                    let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
                     let mapper_bottom_up =
                         MarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
@@ -403,10 +391,7 @@ fn bench_simple(
             b.iter_batched(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mapper| {
-                    let mapper = mapper.map(
-                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                    );
+                    let mapper = mapper.map(CDS::from, CDS::from);
                     use gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
                     let mapper_bottom_up = SimpleBottomUpMatcher::<_>::match_it(mapper);
                     black_box(mapper_bottom_up);
@@ -461,10 +446,7 @@ fn bench_cd<const MAX_SIZE: usize>(
                 || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
                 |mapper| {
                     dbg!(mapper.mappings.len());
-                    let mapper = mapper.map(
-                        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-                        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-                    );
+                    let mapper = mapper.map(CDS::from, CDS::from);
                     use cd::bottom_up_matcher::BottomUpMatcher;
                     let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
                     dbg!(mapper.mappings.len(), mapper.mappings.capacity());

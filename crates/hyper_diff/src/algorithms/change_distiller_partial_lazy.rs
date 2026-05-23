@@ -43,10 +43,7 @@ where
 
     // Must fully decompress the subtrees to compute the non-lazy bottomup
     let mapper = Mapper::new(hyperast, mapper.mapping.mappings, mapper_owned);
-    let mapper = mapper.map(
-        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-        |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast))),
-    );
+    let mapper = mapper.map(CDS::from, CDS::from);
 
     let measure = measure.start();
 
@@ -57,10 +54,7 @@ where
 
     let measure = measure.stop_then_prepare();
 
-    let mapper = mapper.map_dst(
-        // the dst side has to be traversed in bfs for chawathe
-        |dst_arena| SimpleBfsMapper::with_store(hyperast, dst_arena),
-    );
+    let mapper = mapper.map_dst(SimpleBfsMapper::make);
     let measure = measure.start();
 
     let actions = ScriptGenerator::compute_actions(mapper.hyperast, &mapper.mapping).ok();

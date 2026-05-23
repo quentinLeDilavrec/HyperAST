@@ -6,8 +6,8 @@ use crate::actions::action_vec::{TestActions, apply_actions};
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
-use crate::matchers::Decompressible;
 use crate::mappings::{DefaultMappingStore, MappingStore};
+use crate::matchers::Decompressible;
 use crate::tree::tree_path::CompressedTreePath;
 
 use crate::tests::action_generator2_tests::Fmt;
@@ -86,7 +86,7 @@ fn test_no_actions() {
         })
     );
 
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions: ActionsVec<_> =
         ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
@@ -158,7 +158,7 @@ fn test_delete_actions_1() {
             write!(f, "")
         })
     );
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions = ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
     println!("{:?}", actions);
@@ -238,7 +238,7 @@ fn test_insert_actions_1() {
             write!(f, "")
         })
     );
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions = ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
     println!("{:?}", actions);
@@ -322,7 +322,7 @@ fn test_rename_actions_1() {
         })
     );
 
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions = ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
     println!("{:?}", actions);
@@ -408,7 +408,7 @@ fn test_move_actions_1() {
         })
     );
 
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions = ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
     println!("{:?}", actions);
@@ -487,7 +487,7 @@ fn test_subdelete_actions_1() {
             write!(f, "")
         })
     );
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions = ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
     println!("{:?}", actions);
@@ -567,7 +567,7 @@ fn test_subdelete_actions_2() {
             write!(f, "")
         })
     );
-    let dst_arena: Mpr<_> = SimpleBfsMapper::with_store(&stores, &dst_arena);
+    let dst_arena: Mpr<_> = SimpleBfsMapper::make(&dst_arena);
     let actions = ScriptGenerator::_compute_actions(&stores, &src_arena, &dst_arena, &ms).unwrap();
 
     println!("{:?}", actions);

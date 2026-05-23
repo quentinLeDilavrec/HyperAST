@@ -5,8 +5,8 @@ use hyperast::types::{DecompressedFrom, LabelStore, Labeled, NodeStore};
 use crate::actions::script_generator::{self, Actions, SimpleAction, TestActions};
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
-use crate::matchers::Decompressible;
 use crate::mappings::{DefaultMappingStore, MappingStore};
+use crate::matchers::Decompressible;
 use crate::tests::examples::{example_action, example_gt_java_code};
 use crate::tree::simple_tree::{DisplayTree, vpair_to_stores};
 
@@ -86,7 +86,7 @@ fn test_with_action_example() {
     );
 
     // Decompressible<_, CompletePostOrder<_, IdD>>
-    let dst_arena = SimpleBfsMapper::<u16, _, _>::with_store(&stores, dst_arena);
+    let dst_arena = SimpleBfsMapper::<u16, _, _>::make(dst_arena);
     let from_dst = |path: &[u8]| dst_arena.child(dst, path);
 
     // let actions = script_generator::ScriptGenerator::<
@@ -303,7 +303,7 @@ fn test_with_zs_custom_example() {
     ms.link(from_src(&[1, 2]), from_dst(&[0, 1, 2]));
     ms.link(from_src(&[1, 3]), from_dst(&[0, 1, 3]));
 
-    let dst_arena = SimpleBfsMapper::<u16, _, _>::with_store(&stores, dst_arena);
+    let dst_arena = SimpleBfsMapper::<u16, _, _>::make(dst_arena);
     let from_dst = |path: &[u8]| dst_arena.child(dst, path);
     // let actions = script_generator::ScriptGenerator::<
     //     _,

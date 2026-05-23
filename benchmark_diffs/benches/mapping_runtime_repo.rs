@@ -120,11 +120,8 @@ fn no_size_threshold(
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
-                let mapper = mapper.map(
-                    |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
-                    |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
-                );
+                let mapper = Mapper::new(hyperast, mappings, mapper_owned);
+                let mapper = mapper.map(CDS::from, CDS::from);
                 use hyper_diff::matchers::heuristic::xy_bottom_up_matcher::XYBottomUpMatcher;
                 let mapper_bottom_up = XYBottomUpMatcher::<_>::match_it(mapper);
                 black_box(mapper_bottom_up);
@@ -179,11 +176,8 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
-                let mapper = mapper.map(
-                    |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
-                    |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
-                );
+                let mapper = Mapper::new(hyperast, mappings, mapper_owned);
+                let mapper = mapper.map(CDS::from, CDS::from);
                 use gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
                 let mapper_bottom_up = HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
                 black_box(mapper_bottom_up);
@@ -236,11 +230,8 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
-                let mapper = mapper.map(
-                    |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
-                    |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
-                );
+                let mapper = Mapper::new(hyperast, mappings, mapper_owned);
+                let mapper = mapper.map(CDS::from, CDS::from);
                 use gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
                 let mapper_bottom_up = SimpleBottomUpMatcher::<_, NUM, DEN>::match_it(mapper);
                 black_box(mapper_bottom_up);
@@ -317,11 +308,8 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
-                let mapper = mapper.map(
-                    |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
-                    |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
-                );
+                let mapper = Mapper::new(hyperast, mappings, mapper_owned);
+                let mapper = mapper.map(CDS::from, CDS::from);
                 use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
                 let mapper_bottom_up =
                     GreedyBottomUpMatcher::<_, MAX_SIZE, NUM, DEN>::match_it(mapper);
@@ -370,11 +358,8 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
                 use gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
                 let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
-                let mapper = mapper.map(
-                    |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
-                    |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
-                );
+                let mapper = Mapper::new(hyperast, mappings, mapper_owned);
+                let mapper = mapper.map(CDS::from, CDS::from);
                 use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
                 let mapper_bottom_up = MarriageBottomUpMatcher::<_, M, 200>::match_it(mapper);
                 black_box(mapper_bottom_up);
@@ -463,11 +448,8 @@ fn with_second_sim_threshold<
                 use cd::lazy_leaves_matcher::LazyLeavesMatcher;
                 let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
                 let mappings = mapper.mapping.mappings;
-                let mapper = Mapper::prep(hyperast, mappings, mapper_owned);
-                let mapper = mapper.map(
-                    |src_arena| CDS::<_>::from(src_arena.map(|x| x.decomp.complete(hyperast))),
-                    |dst_arena| CDS::<_>::from(dst_arena.map(|x| x.decomp.complete(hyperast))),
-                );
+                let mapper = Mapper::new(hyperast, mappings, mapper_owned);
+                let mapper = mapper.map(CDS::from, CDS::from);
                 use cd::bottom_up_matcher::BottomUpMatcher;
                 let mapper_bottom_up =
                     BottomUpMatcher::<_, MAX_SIZE, NUM, DEN, NUM2, DEN2>::match_it(mapper);

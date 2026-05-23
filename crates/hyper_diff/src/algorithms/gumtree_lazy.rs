@@ -4,9 +4,8 @@ use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithHashs, WithStats};
 
-use super::{CDS, DS, DiffRes, DiffResult, tr};
+use super::{BFS, CDS, DS, DiffRes, DiffResult, tr};
 use crate::actions::script_generator2::ScriptGenerator;
-use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
 use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use crate::matchers::Mapper;
 use crate::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
@@ -46,16 +45,9 @@ where
 
     let measure = measure.stop_then_prepare();
 
-    // Must fully decompress the subtrees to compute default chawathe
+    // Must fully decompress the subtrees to compute default Chawathe algorithm
     let mapper = Mapper::new(hyperast, mapper.mapping.mappings, mapper_owned);
-    let mapper = mapper.map(
-        |src_arena| CDS::<_>::from(src_arena.map(|x| x.complete(hyperast))),
-        |dst_arena| {
-            let complete = CDS::<_>::from(dst_arena.map(|x| x.complete(hyperast)));
-            // the dst side has to be traversed in bfs for chawathe
-            SimpleBfsMapper::with_store(hyperast, complete)
-        },
-    );
+    let mapper = mapper.map(CDS::from, BFS::from);
     let measure = measure.start();
 
     let actions = ScriptGenerator::compute_actions(mapper.hyperast, &mapper.mapping).ok();

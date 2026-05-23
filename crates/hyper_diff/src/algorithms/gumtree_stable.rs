@@ -42,7 +42,7 @@ where
 
     let measure = measure.stop_then_prepare();
 
-    let mapper = mapper.map_dst(|dst_arena| SimpleBfsMapper::with_store(hyperast, dst_arena));
+    let mapper = mapper.map_dst(SimpleBfsMapper::make);
     let measure = measure.start();
     let actions = ScriptGenerator::compute_actions(hyperast, &mapper.mapping).ok();
     let mapper = mapper.map_dst(|dst_arena| dst_arena.back);

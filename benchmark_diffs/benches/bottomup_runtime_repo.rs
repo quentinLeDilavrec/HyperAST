@@ -64,27 +64,17 @@ fn bottomup_group(c: &mut Criterion) {
     for i in inputs.iter() {
         p.i = i;
         bench_xy(&mut p);
-        bench_lazy_xy(&mut p);
         bench_greedy::<100>(&mut p);
         bench_greedy::<200>(&mut p);
         bench_greedy::<400>(&mut p);
-        bench_lazy_greedy::<100>(&mut p);
-        bench_lazy_greedy::<200>(&mut p);
-        bench_lazy_greedy::<400>(&mut p);
         bench_simple(&mut p);
         bench_lazy_simple(&mut p);
         bench_hybrid::<100>(&mut p);
         bench_hybrid::<200>(&mut p);
         bench_hybrid::<400>(&mut p);
-        bench_lazy_hybrid::<100>(&mut p);
-        bench_lazy_hybrid::<200>(&mut p);
-        bench_lazy_hybrid::<400>(&mut p);
         bench_stable::<100>(&mut p);
         bench_stable::<200>(&mut p);
         bench_stable::<400>(&mut p);
-        bench_lazy_stable::<100>(&mut p);
-        bench_lazy_stable::<200>(&mut p);
-        bench_lazy_stable::<400>(&mut p);
         bench_lazy_stable_simple(&mut p);
         bench_lazy_stable_hybrid::<100>(&mut p);
         bench_lazy_stable_hybrid::<200>(&mut p);
@@ -107,9 +97,6 @@ fn bottomup_group(c: &mut Criterion) {
         bench_cd::<100>(&mut p);
         bench_cd::<200>(&mut p);
         bench_cd::<400>(&mut p);
-        bench_lazy_cd::<100>(&mut p);
-        bench_lazy_cd::<200>(&mut p);
-        bench_lazy_cd::<400>(&mut p);
     }
     group.finish();
 }
@@ -122,26 +109,12 @@ fn bench_xy(p: &mut impl Runner) {
         use xy_bottom_up_matcher::XYBottomUpMatcher;
         XYBottomUpMatcher::<_>::match_it(mapper)
     });
-}
-
-fn bench_lazy_xy(p: &mut impl Runner) {
     use hyper_diff::matchers::heuristic::lazy_xy_bottom_up_matcher;
     let name = format!("LazyXY");
     p.name(name).prep(Prep::GT).routine(|mut mapper| {
         let mpr = mapper.mut_decompressible();
         use lazy_xy_bottom_up_matcher::LazyXYBottomUpMatcher;
         let _mpr = LazyXYBottomUpMatcher::<_>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_lazy_greedy<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("LazyGreedy_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
-        let _mpr = LazyGreedyBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
         mapper
     });
 }
@@ -155,6 +128,13 @@ fn bench_greedy<const MAX_SIZE: usize>(p: &mut impl Runner) {
         let mapper = GreedyBottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
         mapper
     });
+    let name = format!("LazyGreedy_{}", MAX_SIZE);
+    p.name(name).prep(Prep::GT).routine(|mut mapper| {
+        let mpr = mapper.mut_decompressible();
+        use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
+        let _mpr = LazyGreedyBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
+        mapper
+    });
 }
 
 fn bench_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
@@ -166,10 +146,6 @@ fn bench_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
         let mapper = HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
         mapper
     });
-}
-
-fn bench_lazy_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
     let name = format!("LazyHybrid_{}", MAX_SIZE);
     p.name(name).prep(Prep::GT).routine(|mut mapper| {
         let mpr = mapper.mut_decompressible();
@@ -186,6 +162,13 @@ fn bench_stable<const MAX_SIZE: usize>(p: &mut impl Runner) {
         let mapper = mapper.map(CDS::from, CDS::from);
         use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
         let mapper = MarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
+        mapper
+    });
+    let name = format!("LazyStable_{}", MAX_SIZE);
+    p.name(name).prep(Prep::GT).routine(|mut mapper| {
+        let mpr = mapper.mut_decompressible();
+        use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;
+        let _mpr = LazyMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
         mapper
     });
 }
@@ -208,17 +191,6 @@ fn bench_lazy_stable_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
         let mpr = mapper.mut_decompressible();
         use gt::lazy_hybrid_marriage_bottom_up_matcher::LazyHybridMarriageBottomUpMatcher;
         let _mpr = LazyHybridMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_lazy_stable<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("LazyStable_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;
-        let _mpr = LazyMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
         mapper
     });
 }
@@ -254,10 +226,6 @@ fn bench_cd<const MAX_SIZE: usize>(p: &mut impl Runner) {
         let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
         mapper
     });
-}
-
-fn bench_lazy_cd<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::cd;
     let name = format!("Lazy {}", MAX_SIZE);
     p.name(name).prep(Prep::CD).routine(|mut mapper| {
         dbg!(mapper.mappings.len());

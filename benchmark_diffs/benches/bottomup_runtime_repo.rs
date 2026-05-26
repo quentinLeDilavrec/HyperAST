@@ -68,17 +68,16 @@ fn bottomup_group(c: &mut Criterion) {
         bench_greedy::<200>(&mut p);
         bench_greedy::<400>(&mut p);
         bench_simple(&mut p);
-        bench_lazy_simple(&mut p);
         bench_hybrid::<100>(&mut p);
         bench_hybrid::<200>(&mut p);
         bench_hybrid::<400>(&mut p);
         bench_stable::<100>(&mut p);
         bench_stable::<200>(&mut p);
         bench_stable::<400>(&mut p);
-        bench_lazy_stable_simple(&mut p);
-        bench_lazy_stable_hybrid::<100>(&mut p);
-        bench_lazy_stable_hybrid::<200>(&mut p);
-        bench_lazy_stable_hybrid::<400>(&mut p);
+        bench_stable_simple(&mut p);
+        bench_stable_hybrid::<100>(&mut p);
+        bench_stable_hybrid::<200>(&mut p);
+        bench_stable_hybrid::<400>(&mut p);
     }
     group.finish();
 
@@ -173,8 +172,18 @@ fn bench_stable<const MAX_SIZE: usize>(p: &mut impl Runner) {
     });
 }
 
-fn bench_lazy_stable_simple(p: &mut impl Runner) {
+fn bench_stable_simple(p: &mut impl Runner) {
     use hyper_diff::matchers::heuristic::gt;
+    let name = format!("StableSimple");
+    p.name(name).prep(Prep::GT).routine(|mapper| {
+        let mut mapper = mapper.map(CDS::from, CDS::from);
+        mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
+            |_, _, _| 1 as f64 / 2 as f64,
+            hyper_diff::similarity_metrics::SimilarityMeasure::chawathe,
+            Mapper::last_chance_match_histogram,
+        );
+        mapper
+    });
     let name = format!("LazyStableSimple");
     p.name(name).prep(Prep::GT).routine(|mut mapper| {
         let mpr = mapper.mut_decompressible();
@@ -184,8 +193,18 @@ fn bench_lazy_stable_simple(p: &mut impl Runner) {
     });
 }
 
-fn bench_lazy_stable_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
+fn bench_stable_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
     use hyper_diff::matchers::heuristic::gt;
+    let name = format!("StableHybrid_{}", MAX_SIZE);
+    p.name(name).prep(Prep::GT).routine(|mapper| {
+        let mut mapper = mapper.map(CDS::from, CDS::from);
+        mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
+            Mapper::adaptive_threshold,
+            hyper_diff::similarity_metrics::SimilarityMeasure::chawathe,
+            Mapper::last_chance_match_hybrid::<M, MAX_SIZE>,
+        );
+        mapper
+    });
     let name = format!("LazyStableHybrid_{}", MAX_SIZE);
     p.name(name).prep(Prep::GT).routine(|mut mapper| {
         let mpr = mapper.mut_decompressible();
@@ -204,10 +223,6 @@ fn bench_simple(p: &mut impl Runner) {
         let mapper = SimpleBottomUpMatcher::<_>::match_it(mapper);
         mapper
     });
-}
-
-fn bench_lazy_simple(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
     let name = format!("LazySimple");
     p.name(name).prep(Prep::GT).routine(|mut mapper| {
         let mpr = mapper.mut_decompressible();

@@ -72,6 +72,20 @@ shallow_impl! {u32}
 shallow_impl! {u16}
 shallow_impl! {u8}
 
+/// Core trait of lazy decompression distinguishing between shallow ids (IdS) and decompressed ids (IdD)
+///
+/// more specifically,
+///     `IdS` are ids over nodes that are possibly not yet decompressed
+/// and `IdD` are ids over nodes that are definitely decompressed
+///
+/// This is a compile-time trick
+/// that forbids invalid access to decompressed nodes at no runtime cost.
+/// Consequently, the challenge lies in representing `IdS` and `IdD` at the type level,
+/// when implementing usages of lazy decompression.
+///
+/// Note 1.1: by construction, IdS can point to an already decompressed node
+/// Note 1.2: and IdD can always be converted to an IdS (see `Shallow`)
+/// Note 2: when implemented, `IdS` and `IdD` should be the same concrete type (at the very least have the same size)
 pub trait LazyDecompressed<IdS> {
     type IdD: Shallow<IdS>;
 }

@@ -137,50 +137,24 @@ where
     }
 
     pub fn get_dst_candidates_multimap_lazily(&mut self, src: &Dsrc::IdD) -> Vec<Ddst::IdD> {
-        let mut seeds = vec![];
-        for c in self.mapping.src_arena.descendants(src) {
-            for m in self.mapping.mappings.get_dsts(&c) {
-                let m = self.mapping.dst_arena.decompress_to(m);
-                seeds.push(m);
-            }
-        }
-        let s = &self.mapping.src_arena.original(src);
-        if cfg!(debug_assertions) {
-            // let mut _r = candidates_aux(&seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
-            //     self.mapping.mappings.is_dst(x)
-            // });
-            // _r.sort();
-            let r = candidates_aux2(seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
-                self.mapping.mappings.is_dst(x)
-            });
-            // assert_eq!(r, _r);
-            return r;
-        }
+        let seeds = (self.src_arena.descendants(src))
+            .into_iter()
+            .flat_map(|c| self.mapping.mappings.get_dsts(&c))
+            .map(|m| self.mapping.dst_arena.decompress_to(m))
+            .collect::<Vec<_>>();
+        let s = &self.src_arena.original(src);
         candidates_aux2(seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
             self.mapping.mappings.is_dst(x)
         })
     }
 
     pub fn get_src_candidates_multimap_lazily(&mut self, dst: &Ddst::IdD) -> Vec<Dsrc::IdD> {
-        let mut seeds = vec![];
-        for c in self.mapping.dst_arena.descendants(dst) {
-            for m in self.mapping.mappings.get_srcs(&c) {
-                let m = self.mapping.src_arena.decompress_to(m);
-                seeds.push(m);
-            }
-        }
-        let s = &self.mapping.dst_arena.original(dst);
-        if cfg!(debug_assertions) {
-            // let mut _r = candidates_aux(&seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
-            //     self.mapping.mappings.is_src(x)
-            // });
-            // _r.sort();
-            let r = candidates_aux2(seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
-                self.mapping.mappings.is_src(x)
-            });
-            // assert_eq!(r, _r);
-            return r;
-        }
+        let seeds = (self.dst_arena.descendants(dst))
+            .into_iter()
+            .flat_map(|c| self.mapping.mappings.get_srcs(&c))
+            .map(|m| self.mapping.src_arena.decompress_to(&m))
+            .collect::<Vec<_>>();
+        let s = &self.dst_arena.original(dst);
         candidates_aux2(seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
             self.mapping.mappings.is_src(x)
         })

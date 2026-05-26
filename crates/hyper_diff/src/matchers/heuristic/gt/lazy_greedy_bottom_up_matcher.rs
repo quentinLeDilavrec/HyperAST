@@ -176,14 +176,13 @@ where
     Ddst::IdD: PrimInt,
 {
     pub(super) fn get_src_candidates_lazily(&mut self, dst: &Ddst::IdD) -> Vec<Dsrc::IdD> {
-        let mut seeds = vec![];
-        for c in self.mapping.dst_arena.descendants(dst) {
-            if let Some(m) = self.mapping.mappings.get_src(&c) {
-                let m = self.mapping.src_arena.decompress_to(&m);
-                seeds.push(m);
-            }
-        }
-        let s = &self.mapping.dst_arena.original(dst);
+        let seeds = (self.dst_arena.descendants(dst))
+            .into_iter()
+            .filter_map(|c| self.mapping.mappings.get_src(&c))
+            .map(|m| self.mapping.src_arena.decompress_to(&m))
+            .collect::<Vec<_>>();
+        let s = &self.dst_arena.original(dst);
+
         candidates_aux(&seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
             self.mapping.mappings.is_src(x)
         })
@@ -193,14 +192,12 @@ where
         &mut self,
         src: &Dsrc::IdD,
     ) -> Vec<Ddst::IdD> {
-        let mut seeds = vec![];
-        for c in self.mapping.src_arena.descendants(src) {
-            if let Some(m) = self.mapping.mappings.get_dst(&c) {
-                let m = self.mapping.dst_arena.decompress_to(&m);
-                seeds.push(m);
-            }
-        }
-        let s = &self.mapping.src_arena.original(src);
+        let seeds = (self.src_arena.descendants(src))
+            .into_iter()
+            .filter_map(|c| self.mapping.mappings.get_dst(&c))
+            .map(|m| self.mapping.dst_arena.decompress_to(&m))
+            .collect::<Vec<_>>();
+        let s = &self.src_arena.original(src);
         candidates_aux(&seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
             self.mapping.mappings.is_dst(x)
         })

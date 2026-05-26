@@ -17,14 +17,11 @@ where
     M::Dst: PrimInt,
 {
     pub(in crate::matchers) fn get_dst_candidates(&self, src: &M::Src) -> Vec<M::Dst> {
-        let mut seeds = vec![];
+        let seeds = (self.src_arena.descendants(src))
+            .into_iter()
+            .filter_map(|c| self.mappings.get_dst(&c))
+            .collect::<Vec<_>>();
         let s = &self.src_arena.original(src);
-        for c in self.src_arena.descendants(src) {
-            if self.mappings.is_src(&c) {
-                let m = self.mappings.get_dst_unchecked(&c);
-                seeds.push(m);
-            }
-        }
         candidates_aux(&seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
             self.mapping.mappings.is_dst(x)
         })

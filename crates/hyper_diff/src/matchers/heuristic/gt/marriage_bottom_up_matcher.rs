@@ -79,14 +79,11 @@ where
     M::Dst: PrimInt,
 {
     pub(super) fn get_src_candidates(&self, dst: &M::Dst) -> Vec<M::Src> {
-        let mut seeds = vec![];
+        let seeds = (self.dst_arena.descendants(dst))
+            .into_iter()
+            .filter_map(|c| self.mappings.get_src(&c))
+            .collect::<Vec<_>>();
         let s = &self.dst_arena.original(dst);
-        for c in self.dst_arena.descendants(dst) {
-            if self.mappings.is_dst(&c) {
-                let m = self.mappings.get_src_unchecked(&c);
-                seeds.push(m);
-            }
-        }
         candidates_aux(&seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
             self.mapping.mappings.is_src(x)
         })

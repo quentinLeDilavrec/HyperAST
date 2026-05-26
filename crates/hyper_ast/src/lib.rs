@@ -29,6 +29,45 @@ pub trait PrimInt: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {
         // If it does not fit a usize you are caller is doing something wrong.
         num::cast(*self).unwrap()
     }
+
+    /// allows to iterator over a PrimInt range
+    ///
+    /// Indeed, `std::ops::Range` does not implement `Iterator` for `PrimInt` or similar traits.
+    fn step_until(
+        &self,
+        to: Self,
+    ) -> impl Iterator<Item = Self> + Sized + DoubleEndedIterator + '_ {
+        struct Iter<T>(T, T);
+        impl<T> Iterator for Iter<T>
+        where
+            T: PrimInt,
+        {
+            type Item = T;
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.0 > self.1 {
+                    return None;
+                }
+                let result = self.0;
+                self.0 += T::one();
+                Some(result)
+            }
+        }
+        impl<T> DoubleEndedIterator for Iter<T>
+        where
+            T: PrimInt,
+        {
+            fn next_back(&mut self) -> Option<Self::Item> {
+                if self.0 > self.1 {
+                    return None;
+                }
+                let result = self.1;
+                self.1 -= T::one();
+                Some(result)
+            }
+        }
+
+        Iter(*self, to)
+    }
 }
 impl<T> PrimInt for T where T: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {}
 

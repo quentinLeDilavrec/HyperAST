@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
-use crate::mappings::{MappingStore, MonoMappingStore};
+use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
 

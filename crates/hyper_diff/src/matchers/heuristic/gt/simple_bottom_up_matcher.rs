@@ -4,7 +4,6 @@
 //! Jean-Remy Falleri, Matias Martinez
 //! in "Fine-grained, accurate and scalable source differencing", 2024
 use std::fmt::Debug;
-use std::hash::Hash;
 
 use hyperast::PrimInt;
 use hyperast::compat::HashMap;
@@ -70,7 +69,6 @@ impl<
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
 where
-    <HAST::TS as TypeStore>::Ty: Copy + Send + Sync + Eq + Hash,
     M::Src: PrimInt,
     M::Dst: PrimInt,
 {
@@ -178,7 +176,6 @@ impl<
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
 where
-    <HAST::TS as TypeStore>::Ty: Copy + Send + Sync + Eq + Hash,
     M::Src: PrimInt,
     M::Dst: PrimInt,
     for<'t> LendT<'t, HAST>: WithHashs,

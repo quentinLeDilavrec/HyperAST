@@ -1,8 +1,5 @@
-use std::hash::Hash;
-
 use hyperast::PrimInt;
 use hyperast::types::NodeStore as _;
-use hyperast::types::TypeStore;
 use hyperast::types::{HyperAST, Tree};
 
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
@@ -75,7 +72,6 @@ impl<
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
 where
-    <HAST::TS as TypeStore>::Ty: Copy + Send + Sync + Eq + Hash,
     M::Src: PrimInt,
     M::Dst: PrimInt,
 {

@@ -60,7 +60,7 @@ where
         mapper.bottom_up_stable_lazy_with_similarity_threshold_and_recovery(
             |_, _, _| SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64,
             SimilarityMeasure::chawathe,
-            Mapper::last_chance_match_histogram_lazy,
+            Mapper::match_subtree_histogram_lazy,
         );
     }
 }

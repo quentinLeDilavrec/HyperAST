@@ -185,6 +185,10 @@ where
     HAST::Label: Eq,
 {
     pub fn last_chance_match_histogram(&mut self, src: M::Src, dst: M::Dst) {
+        self.match_subtree_histogram(src, dst);
+    }
+
+    pub fn match_subtree_histogram(&mut self, src: M::Src, dst: M::Dst) {
         self.lcs_equal_matching(&src, &dst);
         self.lcs_structure_matching(&src, &dst);
 
@@ -246,7 +250,7 @@ where
         super::isomorphic::<_, true, STRUCTURAL>(self.hyperast, &src, &dst)
     }
 
-    pub fn last_chance_match_histogram2(&mut self, src: &M::Src, dst: &M::Dst) {
+    pub fn match_subtree_histogram2(&mut self, src: &M::Src, dst: &M::Dst) {
         self.lcs_equal_matching(src, dst);
         self.lcs_structure_matching(src, dst);
 

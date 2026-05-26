@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
-use crate::mappings::MonoMappingStore;
+use crate::mappings::{MappingStore, MonoMappingStore};
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
 
@@ -49,25 +49,51 @@ where
         mapper.bottom_up_lazy_with_similarity_threshold_and_recovery(
             Mapper::adaptive_threshold,
             SimilarityMeasure::chawathe,
-            Self::last_chance_match_hybrid,
+            Mapper::last_chance_match_hybrid_lazy::<MZs, SIZE_THRESHOLD>,
         );
     }
+}
 
+impl<
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore,
+    Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
+    Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
+> Mapper<HAST, Dsrc, Ddst, M>
+where
+    for<'t> LendT<'t, HAST>: WithHashs,
+    M::Src: PrimInt,
+    M::Dst: PrimInt,
+    Dsrc::IdD: PrimInt,
+    Ddst::IdD: PrimInt,
+    HAST::Label: Eq,
+    HAST::IdN: Debug,
+{
     /// Hybrid recovery, leveraging advantages of different techniques.
     ///
     /// Uses ZS (optimal) (from Greedy) if the number of descendants is below SIZE_THRESHOLD,
     /// uses histogram matching (from Simple) otherwise.
-    pub fn last_chance_match_hybrid(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+    pub fn last_chance_match_hybrid_lazy<MZs, const SIZE: usize>(
+        &mut self,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
-    ) {
-        let src_s = mapper.src_arena.descendants_count(&src);
-        let dst_s = mapper.dst_arena.descendants_count(&dst);
-        if src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD {
-            mapper.last_chance_match_zs_lazy_slice::<MZs>(src, dst);
+    ) where
+        MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
+    {
+        self.match_subtree_hybrid_lazy::<MZs>(src, dst, SIZE);
+    }
+
+    /// see [`Mapper::last_chance_match_hybrid_lazy`]
+    pub fn match_subtree_hybrid_lazy<MZs>(&mut self, src: Dsrc::IdD, dst: Ddst::IdD, size: usize)
+    where
+        MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
+    {
+        let src_s = self.src_arena.descendants_count(&src);
+        let dst_s = self.dst_arena.descendants_count(&dst);
+        if src_s < size || dst_s < size {
+            self.match_subtree_zs_lazy_slice::<MZs>(src, dst);
         } else {
-            mapper.last_chance_match_histogram_lazy(src, dst);
+            self.match_subtree_histogram_lazy(src, dst);
         }
     }
 }

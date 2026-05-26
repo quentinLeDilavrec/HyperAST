@@ -64,7 +64,7 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        Self::with_recovery(mapper, Self::last_chance_match_zs);
+        Self::with_recovery(mapper, Mapper::last_chance_match_zs::<M, SIZE_THRESHOLD>);
     }
 
     pub fn with_recovery(
@@ -76,19 +76,6 @@ where
             SimilarityMeasure::dice,
             recovery,
         );
-    }
-
-    pub(crate) fn last_chance_match_zs(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
-        src: M::Src,
-        dst: M::Dst,
-    ) {
-        let src_s = mapper.src_arena.descendants_count(&src);
-        let dst_s = mapper.dst_arena.descendants_count(&dst);
-        if !(src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD) {
-            return;
-        }
-        mapper.last_chance_match_zs::<M>(src, dst);
     }
 }
 
@@ -168,8 +155,24 @@ where
     HAST::Label: Eq,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
+    pub(crate) fn last_chance_match_zs<
+        MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
+        const SIZE: usize,
+    >(
+        &mut self,
+        src: M::Src,
+        dst: M::Dst,
+    ) {
+        let src_s = self.src_arena.descendants_count(&src);
+        let dst_s = self.dst_arena.descendants_count(&dst);
+        if !(src_s < SIZE || dst_s < SIZE) {
+            return;
+        }
+        self.match_subtree_zs::<MZs>(src, dst);
+    }
+
     /// matching taking place during the recovery phase, using the (optimal) ZS algorithm [`crate::matchers::optimal::zs`]
-    pub(crate) fn last_chance_match_zs<MZs>(&mut self, src: M::Src, dst: M::Dst)
+    pub(crate) fn match_subtree_zs<MZs>(&mut self, src: M::Src, dst: M::Dst)
     where
         MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
     {
@@ -197,8 +200,8 @@ where
     }
 
     /// Considers a contiguous slice for each already allocated post order tree,
-    /// while `last_chance_match_zs` has to allocate new trees.
-    pub(crate) fn last_chance_match_zs_slice<MZs>(&mut self, src: M::Src, dst: M::Dst)
+    /// while `match_subtree_zs` has to allocate new trees.
+    pub(crate) fn match_subtree_zs_slice<MZs>(&mut self, src: M::Src, dst: M::Dst)
     where
         Dsrc: POBorrowSlice<HAST, M::Src>,
         Ddst: POBorrowSlice<HAST, M::Dst>,

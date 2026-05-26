@@ -69,30 +69,42 @@ where
     }
 }
 
-impl<HAST: HyperAST + Copy, M, Dsrc, Ddst> Mapper<HAST, Dsrc, Ddst, M> {
-    /// Hybrid recovery, leveraging advantages of different techniques.
-    pub fn last_chance_match_hybrid<MZs, const SIZE_THRESHOLD: usize>(
-        &mut self,
-        src: M::Src,
-        dst: M::Dst,
-    ) where
-        M: MonoMappingStore + Default,
+impl<
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore + Default,
+    Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
+    Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
+> Mapper<HAST, Dsrc, Ddst, M>
+where
+    for<'t> LendT<'t, HAST>: WithHashs,
+    M::Src: PrimInt,
+    M::Dst: PrimInt,
+    HAST::Label: Eq,
+{
+    /// Hybrid recovery, leveraging advantages of zs and histogram matching based on tree size
+    pub fn last_chance_match_hybrid<MZs, const SIZE: usize>(&mut self, src: M::Src, dst: M::Dst)
+    where
         MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
-        Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
-        Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
-        for<'t> LendT<'t, HAST>: WithHashs,
-        M::Src: PrimInt,
-        M::Dst: PrimInt,
-        HAST::Label: Eq,
     {
-        if self.src_arena.descendants_count(&src) < SIZE_THRESHOLD
-            && self.dst_arena.descendants_count(&dst) < SIZE_THRESHOLD
-        {
-            self.last_chance_match_zs_slice::<MZs>(src, dst);
+        self.match_subtree_hybrid::<MZs>(src, dst, SIZE);
+    }
+
+    /// see [`match_subtree_hybrid`]
+    pub fn match_subtree_hybrid<MZs>(&mut self, src: M::Src, dst: M::Dst, size: usize)
+    where
+        MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
+    {
+        let src_s = self.src_arena.descendants_count(&src);
+        let dst_s = self.dst_arena.descendants_count(&dst);
+        if src_s < size && dst_s < size {
+            self.match_subtree_zs_slice::<MZs>(src, dst);
         } else {
-            self.last_chance_match_histogram(src, dst);
+            self.match_subtree_histogram(src, dst);
         }
     }
+}
+
+impl<HAST: HyperAST + Copy, M, Dsrc, Ddst> Mapper<HAST, Dsrc, Ddst, M> {
     pub fn adaptive_threshold<SrcIdS, DstIdS, SrcIdD, DstIdD>(&self, a: SrcIdD, cand: DstIdD) -> f64
     where
         Dsrc: ContiguousDescendants<HAST, SrcIdD, SrcIdS>,

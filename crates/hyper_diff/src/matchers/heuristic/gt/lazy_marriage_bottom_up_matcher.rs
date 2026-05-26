@@ -68,7 +68,7 @@ where
             let src_s = mapper.src_arena.descendants_count(&src);
             let dst_s = mapper.dst_arena.descendants_count(&dst);
             if src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD {
-                mapper.last_chance_match_zs_lazy_slice::<MZs>(src, dst);
+                mapper.match_subtree_zs_lazy_slice::<MZs>(src, dst);
             }
         };
         mapper.bottom_up_stable_lazy_with_similarity_threshold_and_recovery(

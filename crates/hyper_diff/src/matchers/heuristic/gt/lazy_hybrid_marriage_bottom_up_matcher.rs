@@ -51,11 +51,7 @@ where
         mapper.bottom_up_stable_lazy_with_similarity_threshold_and_recovery(
             Mapper::adaptive_threshold,
             SimilarityMeasure::chawathe,
-            super::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher::<
-                _,
-                MZs,
-                SIZE_THRESHOLD,
-            >::last_chance_match_hybrid,
+            Mapper::last_chance_match_hybrid_lazy::<MZs, SIZE_THRESHOLD>,
         );
     }
 }

@@ -4,7 +4,6 @@ use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
 use super::bottom_up_matcher::candidates_aux;
-use super::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
 use crate::decompressed_tree_store::{
     DecompressedTreeStore, DecompressedWithParent, POBorrowSlice,
 };
@@ -64,7 +63,7 @@ where
         mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
             |_, _, _| SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64,
             |sim| sim.chawathe(),
-            GreedyBottomUpMatcher::<_,SIZE_THRESHOLD,SIM_THRESHOLD_NUM,SIM_THRESHOLD_DEN>::last_chance_match_zs,
+            Mapper::last_chance_match_zs::<MZs, SIZE_THRESHOLD>,
         );
     }
 }

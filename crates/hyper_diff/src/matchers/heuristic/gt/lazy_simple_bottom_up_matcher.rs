@@ -121,6 +121,10 @@ where
     for<'t> LendT<'t, HAST>: WithHashs,
 {
     pub fn last_chance_match_histogram_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
+        self.match_subtree_histogram_lazy(src, dst);
+    }
+
+    pub fn match_subtree_histogram_lazy(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
         self.lcs_equal_matching_lazy(src, dst);
         self.lcs_structure_matching_lazy(src, dst);
 
@@ -142,7 +146,7 @@ where
             {
                 self.mappings
                     .link_if_both_unmapped(src.to_shallow(), dst.to_shallow());
-                self.last_chance_match_histogram_lazy(src, dst);
+                self.match_subtree_histogram_lazy(src, dst);
             }
         }
     }
@@ -217,7 +221,7 @@ where
     }
 
     /// Extend [`last_chance_match_histogram_lazy`] with a more aggressive matching strategy for leafs
-    pub fn last_chance_match_histogram_lazy2(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
+    pub fn match_subtree_histogram_lazy2(&mut self, src: Dsrc::IdD, dst: Ddst::IdD) {
         self.lcs_equal_matching_lazy(src, dst);
         self.lcs_structure_matching_lazy(src, dst);
 
@@ -238,7 +242,7 @@ where
                 let dst = dst_histogram[0];
                 self.mappings
                     .link_if_both_unmapped(src.to_shallow(), dst.to_shallow());
-                self.last_chance_match_histogram_lazy2(src, dst);
+                self.match_subtree_histogram_lazy2(src, dst);
                 continue;
             }
             self.more_histogram_matching_lazy(src_histogram, dst_histogram);
@@ -246,7 +250,7 @@ where
     }
 
     /// Optimal ZS recovery algorithm (finds mappings between src and dst descendants)
-    pub fn last_chance_match_zs_lazy<
+    pub fn match_subtree_zs_lazy<
         MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     >(
         &mut self,
@@ -286,7 +290,7 @@ where
 
     /// Optimal ZS recovery algorithm (finds mappings between src and dst descendants)
     /// This slicing variant directly uses a slice in each existing decompressed tree.
-    pub fn last_chance_match_zs_lazy_slice<
+    pub fn match_subtree_zs_lazy_slice<
         MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     >(
         &mut self,

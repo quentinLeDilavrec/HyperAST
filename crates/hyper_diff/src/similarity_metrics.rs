@@ -13,9 +13,9 @@ pub struct SimilarityMeasure {
 }
 
 impl SimilarityMeasure {
-    pub fn new<Id: PrimInt, Store: MonoMappingStore<Src = Id, Dst = Id>>(
-        src: &[Id],
-        dst: &[Id],
+    pub fn new<Id1: PrimInt, Id2: PrimInt, Store: MonoMappingStore<Src = Id1, Dst = Id2>>(
+        src: &[Id1],
+        dst: &[Id2],
         mappings: &Store,
     ) -> Self {
         Self {

@@ -341,11 +341,12 @@ where
     fn similarity(mapper: &Mapper<HAST, Dsrc, Ddst, M>, src: &M::Src, dst: &M::Dst) -> f64 {
         let p_src = mapper.src_arena.parent(src).unwrap();
         let p_dst = mapper.dst_arena.parent(dst).unwrap();
-        let jaccard = crate::similarity_metrics::jaccard_similarity(
+        let jaccard = SimilarityMeasure::new(
             &mapper.src_arena.descendants(&p_src),
             &mapper.dst_arena.descendants(&p_dst),
             &mapper.mappings,
-        );
+        )
+        .jaccard();
         let pos_src = if mapper.src_arena.has_parent(src) {
             zero()
         } else {

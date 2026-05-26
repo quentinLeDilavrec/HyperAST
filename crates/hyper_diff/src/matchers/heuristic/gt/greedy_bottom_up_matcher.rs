@@ -1,3 +1,8 @@
+//! Greedy bottom-up matcher
+//!
+//! introduced by:
+//! Jean-Rémy Falleri, Floréal Morandat, Xavier Blanc, Matias Martinez, Martin Monperrus
+//! in "Fine-grained and accurate source code differencing", 2014
 use num_traits::{cast, one};
 use std::fmt::Debug;
 
@@ -9,7 +14,7 @@ use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
 use crate::mappings::MonoMappingStore;
 use crate::matchers::optimal::zs::ZsMatcher;
 use crate::matchers::{Decompressible, Mapper};
-use crate::similarity_metrics;
+use crate::similarity_metrics::SimilarityMeasure;
 
 use super::factorized_bounds::DecompTreeBounds;
 
@@ -49,9 +54,7 @@ where
     HAST::Label: Eq,
     HAST::IdN: Debug,
 {
-    pub fn match_it(
-        mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
-    ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
+    pub fn match_it(mut mapper: Mapper<HAST, Dsrc, Ddst, M>) -> Mapper<HAST, Dsrc, Ddst, M> {
         mapper.mapping.mappings.topit(
             mapper.mapping.src_arena.len(),
             mapper.mapping.dst_arena.len(),
@@ -61,57 +64,95 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        let recovery = |mapper: &mut Mapper<HAST, Dsrc, Ddst, M>, src, dst| {
-            let src_s = mapper.src_arena.descendants_count(&src);
-            let dst_s = mapper.dst_arena.descendants_count(&dst);
-            if src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD {
-                mapper.last_chance_match_zs::<M>(src, dst);
-            }
-        };
-        Self::with_recovery(mapper, recovery);
+        Self::with_recovery(mapper, Self::last_chance_match_zs);
     }
 
     pub fn with_recovery(
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         recovery: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, M::Src, M::Dst),
     ) {
+        mapper.bottom_up_with_similarity_threshold_and_recovery(
+            |_, _, _| SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64,
+            SimilarityMeasure::dice,
+            recovery,
+        );
+    }
+
+    pub(crate) fn last_chance_match_zs(
+        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
+        src: M::Src,
+        dst: M::Dst,
+    ) {
+        let src_s = mapper.src_arena.descendants_count(&src);
+        let dst_s = mapper.dst_arena.descendants_count(&dst);
+        if !(src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD) {
+            return;
+        }
+        mapper.last_chance_match_zs::<M>(src, dst);
+    }
+}
+
+impl<
+    HAST: HyperAST + Copy,
+    Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
+    Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
+    M: MonoMappingStore,
+> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
+where
+    M::Src: PrimInt,
+    M::Dst: PrimInt,
+{
+    pub fn bottom_up_with_similarity_threshold_and_recovery(
+        &mut self,
+        threshold: impl Fn(&Mapper<HAST, Dsrc, Ddst, M>, M::Src, M::Dst) -> f64,
+        similarity: impl Fn(&SimilarityMeasure) -> f64,
+        recovery: impl Fn(&mut Self, M::Src, M::Dst),
+    ) {
         assert_eq!(
             // TODO move it inside the arena ...
-            mapper.src_arena.root(),
-            cast::<_, M::Src>(mapper.src_arena.len()).unwrap() - one()
+            self.src_arena.root(),
+            cast::<_, M::Src>(self.src_arena.len()).unwrap() - one()
         );
-        assert!(mapper.src_arena.len() > 0);
-        for src in mapper.src_arena.iter_df_post::<false>() {
-            if mapper.mappings.is_src(&src) || !mapper.src_has_children(src) {
+        assert!(self.src_arena.len() > 0);
+        for src in self.src_arena.iter_df_post::<false>() {
+            if self.mappings.is_src(&src) || !self.src_has_children(src) {
                 continue;
             }
-            let candidates = mapper.get_dst_candidates(&src);
-            let mut best = None;
-            let mut max: f64 = -1.;
-            for cand in candidates {
-                let sim = similarity_metrics::SimilarityMeasure::range(
-                    &mapper.src_arena.descendants_range(&src),
-                    &mapper.dst_arena.descendants_range(&cand),
-                    &mapper.mappings,
-                )
-                .dice();
-                if sim > max && sim >= SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64 {
-                    max = sim;
-                    best = Some(cand);
-                }
-            }
-
-            if let Some(dst) = best {
-                recovery(mapper, src, dst);
-                mapper.mappings.link(src, dst);
+            if let Some(dst) = self.best_dst_candidate(&threshold, &similarity, src) {
+                recovery(self, src, dst);
+                self.mappings.link(src, dst);
             }
         }
 
         // for root
-        let src = mapper.mapping.src_arena.root();
-        let dst = mapper.mapping.dst_arena.root();
-        mapper.mapping.mappings.link(src, dst);
-        recovery(mapper, src, dst);
+        let src = self.mapping.src_arena.root();
+        let dst = self.mapping.dst_arena.root();
+        self.mapping.mappings.link(src, dst);
+        recovery(self, src, dst);
+    }
+
+    pub(crate) fn best_dst_candidate(
+        &mut self,
+        threshold: &impl Fn(&Self, M::Src, M::Dst) -> f64,
+        similarity: &impl Fn(&SimilarityMeasure) -> f64,
+        src: M::Src,
+    ) -> Option<M::Dst> {
+        let candidates = self.get_dst_candidates(&src);
+        let mut best = None;
+        let mut max: f64 = -1.;
+        for cand in candidates {
+            let sim = SimilarityMeasure::range(
+                &self.src_arena.descendants_range(&src),
+                &self.dst_arena.descendants_range(&cand),
+                &self.mappings,
+            );
+            let sim = similarity(&sim);
+            if sim > max && sim >= threshold(self, src, cand) {
+                max = sim;
+                best = Some(cand);
+            }
+        }
+        best
     }
 }
 
@@ -127,13 +168,11 @@ where
     HAST::Label: Eq,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
-    pub(crate) fn last_chance_match_zs<
+    /// matching taking place during the recovery phase, using the (optimal) ZS algorithm [`crate::matchers::optimal::zs`]
+    pub(crate) fn last_chance_match_zs<MZs>(&mut self, src: M::Src, dst: M::Dst)
+    where
         MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
-    >(
-        &mut self,
-        src: M::Src,
-        dst: M::Dst,
-    ) {
+    {
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
         use hyperast::types::DecompressedFrom as _;
 
@@ -157,15 +196,13 @@ where
         self.apply_mappings(src_offset, dst_offset, mappings);
     }
 
-    pub(crate) fn last_chance_match_zs_slice<
+    /// Considers a contiguous slice for each already allocated post order tree,
+    /// while `last_chance_match_zs` has to allocate new trees.
+    pub(crate) fn last_chance_match_zs_slice<MZs>(&mut self, src: M::Src, dst: M::Dst)
+    where
+        Dsrc: POBorrowSlice<HAST, M::Src>,
+        Ddst: POBorrowSlice<HAST, M::Dst>,
         MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
-    >(
-        &mut self,
-        src: M::Src,
-        dst: M::Dst,
-    ) where
-        Dsrc: crate::decompressed_tree_store::POBorrowSlice<HAST, M::Src>,
-        Ddst: crate::decompressed_tree_store::POBorrowSlice<HAST, M::Dst>,
     {
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
         let src_arena = self.mapping.src_arena.slice_po(&src);

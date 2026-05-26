@@ -1,16 +1,13 @@
-use num_traits::ToPrimitive;
 use std::hash::Hash;
-
-use hyperast::compat::HashMap;
 
 use hyperast::PrimInt;
 use hyperast::types::NodeStore as _;
-use hyperast::types::{HyperAST, LendT, Tree, TypeStore, WithHashs};
+use hyperast::types::TypeStore;
+use hyperast::types::{HyperAST, Tree};
 
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 impl<
     Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
@@ -31,61 +28,44 @@ where
                 seeds.push(m);
             }
         }
-        let mut candidates = vec![];
-        let mut visited = bitvec::bitbox![0;self.dst_arena.len()];
-
-        let t = self.hyperast.resolve_type(s);
-        for mut seed in seeds {
-            while let Some(parent) = self.dst_arena.parent(&seed) {
-                if visited[parent.index()] {
-                    break;
-                }
-                visited.set(parent.index(), true);
-
-                let p = &self.dst_arena.original(&parent);
-                if self.hyperast.resolve_type(p) == t
-                    && !self.mappings.is_dst(&parent)
-                    && parent != self.dst_arena.root()
-                {
-                    candidates.push(parent);
-                }
-                seed = parent;
-            }
-        }
-        candidates
+        candidates_aux(&seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
+            self.mapping.mappings.is_dst(x)
+        })
     }
+}
 
-    pub(super) fn get_src_candidates(&self, dst: &M::Dst) -> Vec<M::Src> {
-        let mut seeds = vec![];
-        let s = &self.dst_arena.original(dst);
-        for c in self.dst_arena.descendants(dst) {
-            if self.mappings.is_dst(&c) {
-                let m = self.mappings.get_src_unchecked(&c);
-                seeds.push(m);
+pub(super) fn candidates_aux<HAST: HyperAST + Copy, D, IdD>(
+    seeds: &[IdD],
+    s: &HAST::IdN,
+    arena: &D,
+    hyperast: HAST,
+    is_mapped: impl Fn(&IdD) -> bool,
+) -> Vec<IdD>
+where
+    D: DecompressedWithParent<HAST, IdD>,
+    D: DecompressedTreeStore<HAST, IdD>,
+    IdD: PrimInt + Eq,
+{
+    let mut candidates = vec![];
+    let mut visited = bitvec::bitbox![0;arena.len()];
+    let t = hyperast.resolve_type(s);
+    for mut seed in seeds.iter().copied() {
+        while let Some(parent) = arena.parent(&seed) {
+            // If visited break, otherwise mark as visited
+            if visited[parent.index()] {
+                break;
             }
-        }
-        let mut candidates = vec![];
-        let mut visited = bitvec::bitbox![0;self.src_arena.len()];
+            visited.set(parent.index(), true);
 
-        let t = self.hyperast.resolve_type(s);
-        for seed in seeds {
-            while let Some(parent) = self.src_arena.parent(&seed) {
-                if visited[parent.index()] {
-                    break;
-                }
-                visited.set(parent.to_usize().unwrap(), true);
-
-                let p = &self.src_arena.original(&parent);
-                if self.hyperast.resolve_type(p) == t
-                    && !self.mappings.is_src(&parent)
-                    && parent != self.src_arena.root()
-                {
-                    candidates.push(parent);
-                }
+            let p = &arena.original(&parent);
+            let p_type = hyperast.resolve_type(p);
+            if p_type == t && !is_mapped(&parent) && parent != arena.root() {
+                candidates.push(parent);
             }
+            seed = parent;
         }
-        candidates
     }
+    candidates
 }
 
 impl<
@@ -98,91 +78,36 @@ where
     <HAST::TS as TypeStore>::Ty: Copy + Send + Sync + Eq + Hash,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    for<'t> LendT<'t, HAST>: WithHashs,
-    HAST::Label: Eq,
 {
-    pub fn last_chance_match_histogram(&mut self, src: M::Src, dst: M::Dst) {
-        self.lcs_equal_matching(&src, &dst);
-        self.lcs_structure_matching(&src, &dst);
-
-        let src_type = (self.src_arena.parent(&src))
-            .map(|p| self.src_arena.original(&p))
-            .map(|p| self.hyperast.resolve_type(&p));
-        let dst_type = (self.dst_arena.parent(&dst))
-            .map(|p| self.dst_arena.original(&p))
-            .map(|p| self.hyperast.resolve_type(&p));
-        if src_type != dst_type {
-            return;
-        }
-
-        let it = self.prep_histogram_matching(&src, &dst);
-        for (_t, (src_histogram, dst_histogram)) in it {
-            if let Some(src) = src_histogram
-                && let Some(dst) = dst_histogram
-            {
-                self.mappings.link_if_both_unmapped(src, dst);
-                self.last_chance_match_histogram(src, dst);
-            }
-        }
-    }
-
+    /// look at all src descendants in mappings
     pub(super) fn are_srcs_unmapped(&self, src: &M::Src) -> bool {
-        // look at all src descendants in mappings
         self.src_arena
             .descendants(src)
             .iter()
             .all(|x| !self.mappings.is_src(x))
     }
+    /// look at all dst descendants in mappings
     pub(super) fn are_dsts_unmapped(&self, dst: &M::Dst) -> bool {
-        // look at all dst descendants in mappings
         self.dst_arena
             .descendants(dst)
             .iter()
             .all(|x| !self.mappings.is_dst(x))
     }
 
+    /// look at any src descendants in mappings
     pub(super) fn has_unmapped_src_children(&self, src: &M::Src) -> bool {
-        // look at any src descendants in mappings
         self.src_arena
             .descendants(src)
             .iter()
             .any(|x| !self.mappings.is_src(x))
     }
 
+    /// look at any dst descendants in mappings
     pub(super) fn has_unmapped_dst_children(&self, dst: &M::Dst) -> bool {
-        // look at any dst descendants in mappings
         self.dst_arena
             .descendants(dst)
             .iter()
             .any(|x| !self.mappings.is_dst(x))
-    }
-
-    pub(super) fn lcs_matching<F: Fn(&Self, &M::Src, &M::Dst) -> bool>(
-        &mut self,
-        src: &M::Src,
-        dst: &M::Dst,
-        cmp: F,
-    ) {
-        let src_children = (self.src_arena.children(src))
-            .into_iter()
-            .filter(|x| !self.mappings.is_src(x))
-            .collect::<Vec<_>>();
-        let dst_children = (self.dst_arena.children(dst))
-            .into_iter()
-            .filter(|x| !self.mappings.is_dst(x))
-            .collect::<Vec<_>>();
-
-        let lcs: Vec<(usize, usize)> =
-            longest_common_subsequence(&src_children, &dst_children, |src, dst| {
-                cmp(self, src, dst)
-            });
-        for x in lcs {
-            let t1 = &src_children[x.0];
-            let t2 = &dst_children[x.1];
-            if self.are_srcs_unmapped(t1) && self.are_dsts_unmapped(t2) {
-                self.add_mapping_recursively(t1, t2);
-            }
-        }
     }
 
     pub(crate) fn add_mapping_recursively(&mut self, src: &M::Src, dst: &M::Dst) {
@@ -200,136 +125,7 @@ where
             .has_children()
     }
 
-    // Matches all strictly isomorphic nodes in the descendants of src and dst (step 1 of simple recovery)
-    pub(super) fn lcs_equal_matching(&mut self, src: &M::Src, dst: &M::Dst) {
-        self.lcs_matching(src, dst, move |s, src, dst| s.isomorphic::<false>(src, dst))
-        // NOTE the following impl would not be resilent to collisions
-        // self.lcs_matching(src, dst, move |s, src, dst| {
-        //     let a = s.hyperast.node_store().resolve(&s.src_arena.original(src));
-        //     let b = s.hyperast.node_store().resolve(&s.dst_arena.original(dst));
-
-        //     let a = WithHashs::hash(&a, &HashKind::label());
-        //     let b = WithHashs::hash(&b, &HashKind::label());
-        //     a == b
-        // })
-    }
-
-    // Matches all structurally isomorphic nodes in the descendants of src and dst (step 2 of simple recovery)
-    pub(super) fn lcs_structure_matching(&mut self, src: &M::Src, dst: &M::Dst) {
-        self.lcs_matching(src, dst, move |s, src, dst| s.isomorphic::<true>(src, dst))
-        // NOTE the following impl would not be resilent to collisions
-        // self.lcs_matching(src, dst, move |s, src, dst| {
-        //     let a = s.hyperast.node_store().resolve(&s.src_arena.original(src));
-        //     let b = s.hyperast.node_store().resolve(&s.dst_arena.original(dst));
-
-        //     let a = WithHashs::hash(&a, &HashKind::structural());
-        //     let b = WithHashs::hash(&b, &HashKind::structural());
-        //     a == b
-        // })
-    }
-
-    pub(crate) fn isomorphic<const STRUCTURAL: bool>(&self, src: &M::Src, dst: &M::Dst) -> bool {
-        let src = self.src_arena.original(src);
-        let dst = self.dst_arena.original(dst);
-        super::isomorphic::<_, true, STRUCTURAL>(self.hyperast, &src, &dst)
-    }
-
-    pub(crate) fn prep_histogram_matching<Src: Extendable<M::Src>, Dst: Extendable<M::Dst>>(
-        &mut self,
-        src: &M::Src,
-        dst: &M::Dst,
-    ) -> impl Iterator<Item = (<HAST::TS as hyperast::types::TypeStore>::Ty, (Src, Dst))>
-    + use<HAST, Dsrc, Ddst, Src, Dst, M> {
-        use hyperast::compat::hash_map::Entry;
-        // both src and dst -histogram have type Map<Type, List<ITree>>
-        let src_histogram = (self.src_arena.children(src))
-            .into_iter()
-            .filter(|child| !self.mappings.is_src(child))
-            .fold(HashMap::<_, Src>::new(), |mut acc, child| {
-                let t = self.hyperast.resolve_type(&self.src_arena.original(&child));
-                match acc.entry(t) {
-                    Entry::Occupied(mut v) => {
-                        v.get_mut().push(child);
-                    }
-                    Entry::Vacant(v) => {
-                        v.insert(Extendable::first(child));
-                    }
-                }
-                acc
-            });
-
-        let mut dst_histogram = (self.dst_arena.children(dst))
-            .into_iter()
-            .filter(|child| !self.mappings.is_dst(child))
-            .fold(HashMap::<_, Dst>::new(), |mut acc, child| {
-                let t = self.hyperast.resolve_type(&self.dst_arena.original(&child));
-                match acc.entry(t) {
-                    Entry::Occupied(mut v) => {
-                        v.get_mut().push(child);
-                    }
-                    Entry::Vacant(v) => {
-                        v.insert(Extendable::first(child));
-                    }
-                }
-                acc
-            });
-
-        src_histogram.into_iter().filter_map(move |(t, src_hist)| {
-            dst_histogram
-                .remove(&t)
-                .map(|dst_hist| (t, (src_hist, dst_hist)))
-        })
-    }
-
-    /// Matches more pairs of leafs
-    fn more_histogram_matching(&mut self, src_histogram: Vec<M::Src>, dst_histogram: Vec<M::Dst>) {
-        let mut v: Vec<_> = src_histogram
-            .iter()
-            .filter(|x| self.mapping.src_arena.descendants_count(x) == 0)
-            .flat_map(|x| {
-                dst_histogram
-                    .iter()
-                    .filter(|y| self.mapping.dst_arena.descendants_count(y) == 0)
-                    .map(|y| (*x, *y))
-            })
-            .collect();
-        v.sort_by(|alink, blink| {
-            (alink.0.index().abs_diff(alink.1.index()))
-                .cmp(&blink.0.index().abs_diff(blink.1.index()))
-        });
-        for (t1, t2) in v {
-            self.mappings.link_if_both_unmapped(t1, t2);
-        }
-    }
-
-    pub fn last_chance_match_histogram2(&mut self, src: &M::Src, dst: &M::Dst) {
-        self.lcs_equal_matching(src, dst);
-        self.lcs_structure_matching(src, dst);
-
-        let src_type = (self.src_arena.parent(&src))
-            .map(|p| self.src_arena.original(&p))
-            .map(|p| self.hyperast.resolve_type(&p));
-        let dst_type = (self.dst_arena.parent(&dst))
-            .map(|p| self.dst_arena.original(&p))
-            .map(|p| self.hyperast.resolve_type(&p));
-        if src_type != dst_type {
-            return;
-        }
-
-        let it = self.prep_histogram_matching::<Vec<_>, Vec<_>>(src, dst);
-        for (_t, (src_histogram, dst_histogram)) in it {
-            if src_histogram.len() == 1 && dst_histogram.len() == 1 {
-                let src = src_histogram[0];
-                let dst = dst_histogram[0];
-                self.mappings.link_if_both_unmapped(src, dst);
-                self.last_chance_match_histogram(src, dst);
-                continue;
-            }
-            self.more_histogram_matching(src_histogram, dst_histogram);
-        }
-    }
-
-    pub(crate) fn apply_mappings<MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default>(
+    pub(crate) fn apply_mappings<MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst>>(
         &mut self,
         src_offset: M::Src,
         dst_offset: M::Dst,
@@ -349,28 +145,5 @@ where
                 }
             }
         }
-    }
-}
-
-pub(crate) trait Extendable<T> {
-    fn first(value: T) -> Self;
-    fn push(&mut self, value: T);
-}
-
-impl<T> Extendable<T> for Vec<T> {
-    fn first(value: T) -> Self {
-        vec![value]
-    }
-    fn push(&mut self, value: T) {
-        self.push(value);
-    }
-}
-
-impl<T> Extendable<T> for Option<T> {
-    fn first(value: T) -> Self {
-        Some(value)
-    }
-    fn push(&mut self, _value: T) {
-        *self = None;
     }
 }

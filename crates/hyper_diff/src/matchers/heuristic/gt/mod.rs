@@ -21,6 +21,8 @@ pub mod lazy_simple_bottom_up_matcher;
 pub mod lazy_simple_marriage_bottom_up_matcher;
 //pub mod lazy_xy_bottom_up_matcher;
 
+pub mod multimap;
+
 pub fn size<'a, IdC: Clone + NodeId<IdN = IdC>, S>(store: &'a S, x: &IdC) -> usize
 where
     S: NodeStore<IdC>,
@@ -123,5 +125,28 @@ where
             }
         }
         _ => false,
+    }
+}
+
+pub(crate) trait Extendable<T> {
+    fn first(value: T) -> Self;
+    fn push(&mut self, value: T);
+}
+
+impl<T> Extendable<T> for Vec<T> {
+    fn first(value: T) -> Self {
+        vec![value]
+    }
+    fn push(&mut self, value: T) {
+        self.push(value);
+    }
+}
+
+impl<T> Extendable<T> for Option<T> {
+    fn first(value: T) -> Self {
+        Some(value)
+    }
+    fn push(&mut self, _value: T) {
+        *self = None;
     }
 }

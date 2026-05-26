@@ -48,7 +48,7 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
+        mapper.bottom_up_stable_lazy_with_similarity_threshold_and_recovery(
             Mapper::adaptive_threshold,
             SimilarityMeasure::chawathe,
             super::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher::<

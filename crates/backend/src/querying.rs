@@ -982,7 +982,7 @@ pub fn differential(
                 1,
             >::filter_mappings(&mut mapper, &subtree_mappings);
 
-            Mapper::bottom_up_stable_with_similarity_threshold_and_recovery(
+            Mapper::bottom_up_stable_lazy_with_similarity_threshold_and_recovery(
                 &mut mapper,
                 Mapper::adaptive_threshold,
                 SimilarityMeasure::chawathe,

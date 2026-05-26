@@ -7,9 +7,14 @@ use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, Tree};
 use hyperast::types::{WithHashs, WithStats};
 
+use crate::decompressed_tree_store::LazyDecompressedTreeStore;
+use crate::decompressed_tree_store::Shallow;
+use crate::decompressed_tree_store::{ContiguousDescendants, DecompressedWithParent};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::similarity_metrics;
+use crate::matchers::heuristic::factorized_bounds::LazyDecompTreeBounds;
+use crate::matchers::heuristic::gt::lazy_bottom_up_matcher::candidates_aux;
+use crate::similarity_metrics::SimilarityMeasure;
 
 use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
@@ -51,7 +56,6 @@ where
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     HAST::Label: Eq,
-    HAST::IdN: Debug,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
@@ -72,10 +76,133 @@ where
                 mapper.last_chance_match_zs_lazy_slice::<MZs>(src, dst);
             }
         };
-        mapper.bottom_up_with_similarity_threshold_and_recovery(
+        mapper.bottom_up_lazy_with_similarity_threshold_and_recovery(
             |_, _, _| SIM_THRESHOLD_NUM as f64 / SIM_THRESHOLD_DEN as f64,
-            similarity_metrics::SimilarityMeasure::dice,
+            SimilarityMeasure::dice,
             recovery,
         );
+    }
+}
+
+impl<
+    Dsrc: LazyDecompTreeBounds<HAST, M::Src>,
+    Ddst: LazyDecompTreeBounds<HAST, M::Dst>,
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore,
+> Mapper<HAST, Dsrc, Ddst, M>
+where
+    M::Src: PrimInt,
+    M::Dst: PrimInt,
+    Dsrc::IdD: PrimInt,
+    Ddst::IdD: PrimInt,
+    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src>, // enable efficient similarity computation
+    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst>, // enable efficient similarity computation
+    HAST::Label: Eq,
+{
+    #[inline(always)]
+    pub fn bottom_up_lazy_with_similarity_threshold_and_recovery(
+        &mut self,
+        threshold: impl Fn(&Self, Dsrc::IdD, Ddst::IdD) -> f64,
+        similarity: impl Fn(&SimilarityMeasure) -> f64,
+        recovery: impl Fn(&mut Self, Dsrc::IdD, Ddst::IdD),
+    ) {
+        assert!(self.src_arena.len() > 0);
+        for src in self.src_arena.iter_df_post::<false>() {
+            if self.mappings.is_src(&src) {
+                continue;
+            }
+            let src_ = self.mapping.src_arena.decompress_to(&src);
+            if self.src_has_children_lazy(src_) {
+                let Some(dst) = self.best_dst_candidate_lazy(&threshold, &similarity, src_) else {
+                    continue;
+                };
+                recovery(self, src_, dst);
+                self.mappings.link(*src_.shallow(), *dst.shallow());
+            } else if self.has_unmapped_src_descendants_lazy(&src_)
+                && let Some(dst) = self.mappings.get_dst(&src)
+            {
+                let dst = self.dst_arena.decompress_to(&dst);
+                if self.has_unmapped_dst_descendants_lazy(&dst) {
+                    recovery(self, src_, dst);
+                }
+            }
+        }
+        // for root
+        (self.mapping.mappings).link(
+            self.src_arena.root().to_shallow(),
+            self.dst_arena.root().to_shallow(),
+        );
+        let src = self.src_arena.starter();
+        let dst = self.dst_arena.starter();
+        recovery(self, src, dst);
+    }
+
+    #[inline(always)]
+    pub(super) fn best_dst_candidate_lazy(
+        &mut self,
+        threshold: &impl Fn(&Self, Dsrc::IdD, Ddst::IdD) -> f64,
+        similarity: &impl Fn(&SimilarityMeasure) -> f64,
+        src: Dsrc::IdD,
+    ) -> Option<Ddst::IdD> {
+        let candidates = self.get_dst_candidates_lazily(&src);
+        let mut best = None;
+        let mut max: f64 = -1.;
+        for cand in candidates {
+            let sim = SimilarityMeasure::range(
+                &self.src_arena.descendants_range(&src),
+                &self.dst_arena.descendants_range(&cand),
+                &self.mappings,
+            );
+            let sim = similarity(&sim);
+            if sim > max && sim >= threshold(self, src, cand) {
+                max = sim;
+                best = Some(cand);
+            }
+        }
+        best
+    }
+}
+
+impl<
+    HAST: HyperAST + Copy,
+    Dsrc: DecompressedWithParent<HAST, Dsrc::IdD> + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: DecompressedWithParent<HAST, Ddst::IdD> + LazyDecompressedTreeStore<HAST, M::Dst>,
+    M: MonoMappingStore,
+> crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
+where
+    M::Src: PrimInt,
+    M::Dst: PrimInt,
+    Dsrc::IdD: PrimInt,
+    Ddst::IdD: PrimInt,
+{
+    pub(super) fn get_src_candidates_lazily(&mut self, dst: &Ddst::IdD) -> Vec<Dsrc::IdD> {
+        let mut seeds = vec![];
+        for c in self.mapping.dst_arena.descendants(dst) {
+            if let Some(m) = self.mapping.mappings.get_src(&c) {
+                let m = self.mapping.src_arena.decompress_to(&m);
+                seeds.push(m);
+            }
+        }
+        let s = &self.mapping.dst_arena.original(dst);
+        candidates_aux(&seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
+            self.mapping.mappings.is_src(x)
+        })
+    }
+
+    pub(in crate::matchers) fn get_dst_candidates_lazily(
+        &mut self,
+        src: &Dsrc::IdD,
+    ) -> Vec<Ddst::IdD> {
+        let mut seeds = vec![];
+        for c in self.mapping.src_arena.descendants(src) {
+            if let Some(m) = self.mapping.mappings.get_dst(&c) {
+                let m = self.mapping.dst_arena.decompress_to(&m);
+                seeds.push(m);
+            }
+        }
+        let s = &self.mapping.src_arena.original(src);
+        candidates_aux(&seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
+            self.mapping.mappings.is_dst(x)
+        })
     }
 }

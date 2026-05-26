@@ -1,13 +1,14 @@
 //! Zhang and Shasha edit distance algorithm for labeled trees, 1989
 //!
-//! implementation originally inspired by Gumtree
+//! implementation originally inspired by implementation in Gumtree repository
+use num_traits::{ToPrimitive, cast, one, zero};
+use str_distance::DistanceMetric;
+
+use hyperast::PrimInt;
+use hyperast::types::{DecompressedFrom, HyperAST, LabelStore, Labeled, NodeStore};
 
 use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrderKeyRoots};
 use crate::mappings::MonoMappingStore;
-use hyperast::PrimInt;
-use hyperast::types::{DecompressedFrom, HyperAST, LabelStore, Labeled, NodeStore};
-use num_traits::{ToPrimitive, cast, one, zero};
-use str_distance::DistanceMetric;
 
 // TODO use the Mapping struct
 pub struct ZsMatcher<M, SD, DD = SD> {
@@ -485,8 +486,8 @@ mod tests {
     use super::*;
     use crate::decompressed_tree_store::{ShallowDecompressedTreeStore, SimpleZsTree as ZsTree};
 
-    use crate::matchers::Decompressible;
     use crate::mappings::DefaultMappingStore;
+    use crate::matchers::Decompressible;
     use crate::tests::examples::example_zs_paper;
     use crate::tree::simple_tree::TStore;
     use hyperast::test_utils::simple_tree::vpair_to_stores;

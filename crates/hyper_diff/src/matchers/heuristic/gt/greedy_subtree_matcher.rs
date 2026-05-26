@@ -1,3 +1,8 @@
+//! Greedy subtree matcher
+//!
+//! introduced by:
+//! Jean-Rémy Falleri, Floréal Morandat, Xavier Blanc, Matias Martinez, Martin Monperrus
+//! in "Fine-grained and accurate source code differencing", 2014
 use num_traits::{ToPrimitive, one, zero};
 use std::hash::Hash;
 
@@ -11,7 +16,7 @@ use crate::decompressed_tree_store::ContiguousDescendants;
 use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
 use crate::mappings::{MonoMappingStore, MultiMappingStore};
 use crate::matchers::Mapper;
-use crate::similarity_metrics;
+use crate::similarity_metrics::SimilarityMeasure;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 pub struct GreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
@@ -182,7 +187,7 @@ where
 
     fn coef_sib(&self, l: &(M::Src, M::Dst)) -> f64 {
         let (p_src, p_dst) = self.parents(l);
-        similarity_metrics::SimilarityMeasure::range(
+        SimilarityMeasure::range(
             &self.src_arena.descendants_range(&p_src), //descendants
             &self.dst_arena.descendants_range(&p_dst),
             &self.mappings,
@@ -336,7 +341,7 @@ where
     fn similarity(mapper: &Mapper<HAST, Dsrc, Ddst, M>, src: &M::Src, dst: &M::Dst) -> f64 {
         let p_src = mapper.src_arena.parent(src).unwrap();
         let p_dst = mapper.dst_arena.parent(dst).unwrap();
-        let jaccard = similarity_metrics::jaccard_similarity(
+        let jaccard = crate::similarity_metrics::jaccard_similarity(
             &mapper.src_arena.descendants(&p_src),
             &mapper.dst_arena.descendants(&p_dst),
             &mapper.mappings,

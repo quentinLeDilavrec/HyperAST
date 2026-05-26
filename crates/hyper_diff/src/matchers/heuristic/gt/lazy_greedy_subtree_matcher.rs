@@ -13,7 +13,7 @@ use crate::decompressed_tree_store::{ContiguousDescendants, DecompressedWithPare
 use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
 use crate::mappings::{MonoMappingStore, MultiMappingStore};
 use crate::matchers::Mapper;
-use crate::similarity_metrics;
+use crate::similarity_metrics::SimilarityMeasure;
 use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 pub struct LazyGreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
@@ -212,7 +212,7 @@ where
 
     fn coef_sib(mapper: &Mapper<HAST, Dsrc, Ddst, M>, l: &(Dsrc::IdD, Ddst::IdD)) -> f64 {
         let (p_src, p_dst) = Self::parents(mapper, l);
-        similarity_metrics::SimilarityMeasure::range(
+        SimilarityMeasure::range(
             &mapper.src_arena.descendants_range(&p_src),
             &mapper.dst_arena.descendants_range(&p_dst),
             &mapper.mappings,

@@ -320,8 +320,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
-{
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>> {
     pub(super) fn slice_range(&self, x: &IdD) -> std::ops::RangeInclusive<usize> {
         self.first_descendant(x).to_usize().unwrap()..=x.to_usize().unwrap()
     }
@@ -349,7 +348,8 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ContiguousDescendants<HAST, IdD>
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
+    Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 {
     pub fn lsib(&self, c: &IdD, p_lld: &IdD) -> Option<IdD> {
         assert!(p_lld <= c, "{:?}<={:?}", p_lld.to_usize(), c.to_usize());

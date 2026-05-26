@@ -46,25 +46,25 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        mapper.bottom_up_with_similarity_threshold_and_recovery(
+        mapper.bottom_up_lazy_with_similarity_threshold_and_recovery(
             Mapper::adaptive_threshold,
             SimilarityMeasure::chawathe,
             Self::last_chance_match_hybrid,
         );
     }
 
-    /// Hybrid recovery algorithm (finds mappings between src and dst descendants)
+    /// Hybrid recovery, leveraging advantages of different techniques.
     ///
-    /// Uses ZS (optimal) if the number of descendants is below SIZE_THRESHOLD,
-    /// Uses simple recovery otherwise.
+    /// Uses ZS (optimal) (from Greedy) if the number of descendants is below SIZE_THRESHOLD,
+    /// uses histogram matching (from Simple) otherwise.
     pub fn last_chance_match_hybrid(
         mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
     ) {
-        if mapper.mapping.src_arena.descendants_count(&src) < SIZE_THRESHOLD
-            && mapper.mapping.dst_arena.descendants_count(&dst) < SIZE_THRESHOLD
-        {
+        let src_s = mapper.src_arena.descendants_count(&src);
+        let dst_s = mapper.dst_arena.descendants_count(&dst);
+        if src_s < SIZE_THRESHOLD || dst_s < SIZE_THRESHOLD {
             mapper.last_chance_match_zs_lazy_slice::<MZs>(src, dst);
         } else {
             mapper.last_chance_match_histogram_lazy(src, dst);

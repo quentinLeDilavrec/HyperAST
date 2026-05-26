@@ -3,10 +3,11 @@ use std::fmt::Debug;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
+use crate::decompressed_tree_store::ContiguousDescendants;
 use crate::decompressed_tree_store::POBorrowSlice;
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
-use crate::similarity_metrics;
+use crate::similarity_metrics::SimilarityMeasure;
 
 use super::factorized_bounds::DecompTreeBounds;
 
@@ -60,77 +61,45 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        Self::with_recovery(mapper, Self::last_chance_match_hybrid);
-    }
-
-    pub fn with_recovery(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
-        recovery: impl Fn(&mut Mapper<HAST, Dsrc, Ddst, M>, M::Src, M::Dst),
-    ) {
-        for src in mapper.mapping.src_arena.iter_df_post::<false>() {
-            if !mapper.mappings.is_src(&src) && mapper.src_has_children(src) {
-                let candidates = mapper.get_dst_candidates(&src);
-                let mut best = None;
-                let mut max_sim = -1f64;
-                for cand in candidates {
-                    let sim = similarity_metrics::SimilarityMeasure::range(
-                        &mapper.src_arena.descendants_range(&src),
-                        &mapper.dst_arena.descendants_range(&cand),
-                        &mapper.mappings,
-                    )
-                    .chawathe();
-                    let threshold = Mapper::adaptive_threshold(mapper, src, cand);
-                    if sim > max_sim && sim >= threshold {
-                        max_sim = sim;
-                        best = Some(cand);
-                    }
-                }
-                if let Some(dst) = best {
-                    recovery(mapper, src, dst);
-                    mapper.mappings.link(src, dst);
-                }
-            } else if mapper.mappings.is_src(&src)
-                && mapper.has_unmapped_src_children(&src)
-                && let Some(dst) = mapper.mappings.get_dst(&src)
-                && mapper.has_unmapped_dst_children(&dst)
-            {
-                recovery(mapper, src, dst);
-            }
-        }
-        // for root
-        let src = mapper.mapping.src_arena.root();
-        let dst = mapper.mapping.dst_arena.root();
-        mapper.mapping.mappings.link(src, dst);
-        Self::last_chance_match_hybrid(mapper, src, dst);
-    }
-
-    fn last_chance_match_hybrid(
-        mapper: &mut Mapper<HAST, Dsrc, Ddst, M>,
-        src: M::Src,
-        dst: M::Dst,
-    ) {
-        if mapper.src_arena.descendants_count(&src) < SIZE_THRESHOLD
-            && mapper.dst_arena.descendants_count(&dst) < SIZE_THRESHOLD
-        {
-            mapper.last_chance_match_zs_slice::<MZs>(src, dst);
-        } else {
-            mapper.last_chance_match_histogram(src, dst);
-        }
+        mapper.bottom_up_with_similarity_threshold_and_recovery(
+            Mapper::adaptive_threshold,
+            SimilarityMeasure::chawathe,
+            Mapper::last_chance_match_hybrid::<MZs, SIZE_THRESHOLD>,
+        );
     }
 }
 
 impl<HAST: HyperAST + Copy, M, Dsrc, Ddst> Mapper<HAST, Dsrc, Ddst, M> {
-    pub fn adaptive_threshold<SrcIdS, DstIdS, SrcIdD, DstIdD>(
-        mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-        a: SrcIdD,
-        cand: DstIdD,
-    ) -> f64
-    where
-        Dsrc: crate::decompressed_tree_store::ContiguousDescendants<HAST, SrcIdD, SrcIdS>,
-        Ddst: crate::decompressed_tree_store::ContiguousDescendants<HAST, DstIdD, DstIdS>,
+    /// Hybrid recovery, leveraging advantages of different techniques.
+    pub fn last_chance_match_hybrid<MZs, const SIZE_THRESHOLD: usize>(
+        &mut self,
+        src: M::Src,
+        dst: M::Dst,
+    ) where
+        M: MonoMappingStore + Default,
+        MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
+        Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
+        Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
+        for<'t> LendT<'t, HAST>: WithHashs,
+        M::Src: PrimInt,
+        M::Dst: PrimInt,
+        HAST::Label: Eq,
     {
-        let a = mapper.mapping.src_arena.descendants_count(&a) as f64;
-        let cand = mapper.mapping.dst_arena.descendants_count(&cand) as f64;
+        if self.src_arena.descendants_count(&src) < SIZE_THRESHOLD
+            && self.dst_arena.descendants_count(&dst) < SIZE_THRESHOLD
+        {
+            self.last_chance_match_zs_slice::<MZs>(src, dst);
+        } else {
+            self.last_chance_match_histogram(src, dst);
+        }
+    }
+    pub fn adaptive_threshold<SrcIdS, DstIdS, SrcIdD, DstIdD>(&self, a: SrcIdD, cand: DstIdD) -> f64
+    where
+        Dsrc: ContiguousDescendants<HAST, SrcIdD, SrcIdS>,
+        Ddst: ContiguousDescendants<HAST, DstIdD, DstIdS>,
+    {
+        let a = self.mapping.src_arena.descendants_count(&a) as f64;
+        let cand = self.mapping.dst_arena.descendants_count(&cand) as f64;
         1f64 / (1f64 + (a + cand).ln())
     }
 }

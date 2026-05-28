@@ -1,11 +1,10 @@
 use hyperast::types::{LabelStore, Labeled};
 use hyperast::{test_utils::simple_tree::vpair_to_stores, types::DecompressedFrom as _};
 
-use crate::decompressed_tree_store::{
-    CompletePostOrder, DecompressedTreeStore, ShallowDecompressedTreeStore,
-};
-use crate::matchers::heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
+use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
+use crate::decompressed_tree_store::{CompletePostOrder, FullyDecompressedTreeStore};
 use crate::mappings::{MappingStore, VecStore};
+use crate::matchers::heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
 use crate::matchers::{Decompressible, Mapper};
 use crate::tests::examples::example_unstable;
 
@@ -25,10 +24,7 @@ fn test_unstable_greedy() {
             mappings,
         },
     };
-    mapper.mapping.mappings.topit(
-        mapper.mapping.src_arena.len(),
-        mapper.mapping.dst_arena.len(),
-    );
+    mapper.reserve_mappings();
     let src_arena = &mapper.src_arena;
     let dst_arena = &mapper.dst_arena;
     let src = &src_arena.root();
@@ -98,7 +94,7 @@ fn test_unstable_greedy() {
 
 fn child_at_path<HAST: hyperast::types::HyperAST + Copy, IdD>(
     hyperast: HAST,
-    arena: &impl ShallowDecompressedTreeStore<HAST, IdD>,
+    arena: &impl ShallowDecompressedTreeStore<HAST, IdD, IdD = IdD>,
     root: &IdD,
     p: &[HAST::Idx],
 ) -> IdD
@@ -122,7 +118,7 @@ fn print_label<HAST: hyperast::types::HyperAST>(hyperast: &HAST, i: HAST::IdN) {
 
 fn child_by_label<HAST: hyperast::types::HyperAST + Copy, IdD>(
     hyperast: HAST,
-    arena: &impl DecompressedTreeStore<HAST, IdD>,
+    arena: &impl FullyDecompressedTreeStore<HAST, IdD>,
     root: &IdD,
     label: &str,
 ) -> IdD

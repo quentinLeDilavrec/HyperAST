@@ -26,8 +26,8 @@ pub struct BottomUpMatcher<
 }
 
 impl<
-    Dsrc: LazyDecompTreeBounds<HAST, M::Src> + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>,
-    Ddst: LazyDecompTreeBounds<HAST, M::Dst> + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>,
+    Dsrc: LazyDecompTreeBounds<HAST, M::Src> + ContiguousDescendants<HAST, M::Src>,
+    Ddst: LazyDecompTreeBounds<HAST, M::Dst> + ContiguousDescendants<HAST, M::Dst>,
     HAST,
     M,
     const SIZE_THRESHOLD: usize,   // = 1000,
@@ -63,10 +63,7 @@ where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
         for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, leaf_count);
         mapper
     }

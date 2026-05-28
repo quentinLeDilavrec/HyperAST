@@ -332,10 +332,7 @@ where
         mapper.dst_arena.original(&mapper.dst_arena.root()),
     )) {
         Entry::Occupied(mut entry) => {
-            mapper.mapping.mappings.topit(
-                mapper.mapping.src_arena.len(),
-                mapper.mapping.dst_arena.len(),
-            );
+            mapper.reserve_mappings();
             let mm = if entry.get().0 == MappingStage::Bottomup {
                 return entry.into_ref().downgrade();
             } else if let Some(mm) = partial {
@@ -373,10 +370,7 @@ where
             entry.into_ref().downgrade()
         }
         Entry::Vacant(entry) => {
-            mapper.mapping.mappings.topit(
-                mapper.mapping.src_arena.len(),
-                mapper.mapping.dst_arena.len(),
-            );
+            mapper.reserve_mappings();
             let mm = if let Some(mm) = partial {
                 mm
             } else {

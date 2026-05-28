@@ -1,14 +1,17 @@
-use num_traits::{ToPrimitive, cast, one, zero};
+use num_traits::{cast, one, zero};
 use std::fmt::Debug;
 
-use hyperast::PrimInt;
+use hyperast::PrimInt as _;
 use hyperast::types::HyperAST;
 use hyperast::types::UniformNodeId;
 use hyperast::types::WithChildren;
 use hyperast::types::{Children as _, Childrn as _};
 
+use super::Decompressed;
+use super::PrimInt;
+use super::Shallow;
 use super::ShallowDecompressedTreeStore;
-use super::{ContiguousDescendants, DecendantsLending, DecompressedTreeStore};
+use super::{ContiguousDescendants, DecendantsLending, DeepDecompressedTreeStore};
 use super::{PostOrder, PostOrderIterable};
 use crate::matchers::Decompressible;
 
@@ -69,11 +72,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
     for Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 {
     fn lld(&self, i: &IdD) -> IdD {
-        self.llds[(*i).to_usize().unwrap()]
+        self.llds[(*i).index()]
     }
 
     fn tree(&self, id: &IdD) -> HAST::IdN {
-        self.id_compressed[id.to_usize().unwrap()].clone()
+        self.id_compressed[id.index()].clone()
     }
 
     fn has_children(&self, id: &IdD) -> bool {
@@ -101,7 +104,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrderIterable<HAST, IdD>
 
 impl<T, IdD: PrimInt> BasicPostOrder<T, IdD> {
     pub(crate) fn size(&self, i: &IdD) -> IdD {
-        *i - self.llds[(*i).to_usize().unwrap()] + one()
+        *i - self.llds[(*i).index()] + one()
     }
 }
 
@@ -121,7 +124,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
 
 impl<HAST, IdD> hyperast::types::DecompressedFrom<HAST> for BasicPostOrder<HAST::IdN, IdD>
 where
-    IdD: PrimInt + Debug,
+    IdD: PrimInt,
     HAST: HyperAST + Copy,
 {
     type Out = Self;
@@ -138,9 +141,9 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPOSlice<'_, 
         let mut kr = Vec::with_capacity(node_count);
         let mut visited = bitvec::bitvec![0; node_count];
         for i in (1..node_count).rev() {
-            if !visited[self._lld(i).to_usize().unwrap()] {
+            if !visited[self._lld(i).index()] {
                 kr.push(cast(i).unwrap());
-                visited.set(self._lld(i).to_usize().unwrap(), true);
+                visited.set(self._lld(i).index(), true);
             }
         }
         kr.into_boxed_slice()
@@ -156,10 +159,10 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPOSlice<'_, 
         // let mut kr = Vec::with_capacity(node_count);
         let mut visited = bitvec::bitbox!(0; node_count);
         for i in (1..node_count).rev() {
-            if !visited[self._lld(i).to_usize().unwrap()] {
+            if !visited[self._lld(i).index()] {
                 kr.set(i, true);
                 // kr.push(cast(i + 1).unwrap());
-                visited.set(self._lld(i).to_usize().unwrap(), true);
+                visited.set(self._lld(i).index(), true);
             }
         }
         // kr.into_boxed_slice()
@@ -237,22 +240,28 @@ impl<IdN, IdD: PrimInt> BasicPostOrder<IdN, IdD> {
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> Decompressed<IdD>
+    for Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
+{
+    type IdD = IdD;
+}
+
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 {
     fn len(&self) -> usize {
         self.id_compressed.len()
     }
 
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.id_compressed[id.to_usize().unwrap()].clone()
-    }
-
     fn root(&self) -> IdD {
         cast(self.len() - 1).unwrap()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.id_compressed[id.index()].clone()
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         let mut r = *x;
         for d in p {
             let a = self.original(&r);
@@ -276,7 +285,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
     fn children(&self, x: &IdD) -> Vec<IdD> {
         let a = self.original(x);
         let node = self.hyperast.resolve(&a);
-        let cs_len = node.child_count().to_usize().unwrap();
+        let cs_len = node.child_count().index();
         if cs_len == 0 {
             return vec![];
         }
@@ -290,29 +299,24 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
             c -= s;
             r[i] = c;
         }
-        assert_eq!(
-            self.lld(x).to_usize().unwrap(),
-            self.lld(&c).to_usize().unwrap()
-        );
+        assert_eq!(self.lld(x), self.lld(&c));
         r
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
-            .map(|x| cast(x).unwrap())
-            .collect()
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.first_descendant(&x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
-        self.llds[(*i).to_usize().unwrap()] // TODO use ldd
+        self.llds[(*i).index()] // TODO use ldd
     }
 
     fn descendants_count(&self, x: &IdD) -> usize {
-        (*x - self.first_descendant(x) + one()).to_usize().unwrap()
+        (*x - self.first_descendant(x) + one()).index()
     }
 
     fn is_descendant(&self, desc: &IdD, of: &IdD) -> bool {
@@ -321,8 +325,14 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
 }
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>> {
+    pub(crate) fn iter_descendants(&self, x: &IdD) -> hyperast::primint_it::Iter<IdD> {
+        self.first_descendant(&x).step_until(*x)
+    }
+}
+
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>> {
     pub(super) fn slice_range(&self, x: &IdD) -> std::ops::RangeInclusive<usize> {
-        self.first_descendant(x).to_usize().unwrap()..=x.to_usize().unwrap()
+        self.first_descendant(x).index()..=x.index()
     }
 }
 
@@ -399,27 +409,33 @@ impl<IdN, IdD> Copy for BasicPOSlice<'_, IdN, IdD> {}
 
 impl<IdN, IdD: PrimInt> BasicPOSlice<'_, IdN, IdD> {
     pub(crate) fn size(&self, i: &IdD) -> IdD {
-        *i - self.llds[(*i).to_usize().unwrap()] + one()
+        *i - self.llds[(*i).index()] + one()
     }
     fn _lld(&self, i: usize) -> IdD {
         self.llds[i] - self.llds[0]
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> PostOrder<HAST, IdD>
     for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
 {
     fn lld(&self, i: &IdD) -> IdD {
-        self._lld(i.to_usize().unwrap())
+        self._lld(i.index())
     }
 
     fn tree(&self, id: &IdD) -> HAST::IdN {
-        self.id_compressed[id.to_usize().unwrap()].clone()
+        self.id_compressed[id.index()].clone()
     }
 
     fn has_children(&self, id: &IdD) -> bool {
         self.lld(id) != *id
     }
+}
+
+impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> Decompressed<IdD>
+    for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
+{
+    type IdD = IdD;
 }
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
@@ -429,15 +445,15 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
         self.id_compressed.len()
     }
 
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.id_compressed[id.to_usize().unwrap()].clone()
-    }
-
     fn root(&self) -> IdD {
         cast(self.len() - 1).unwrap()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.id_compressed[id.index()].clone()
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         let mut r = *x;
         for d in p {
             let a = self.original(&r);
@@ -462,7 +478,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
 
     fn children(&self, x: &IdD) -> Vec<IdD> {
         let a = self.original(x);
-        let cs_len = self.hyperast.resolve(&a).child_count().to_usize().unwrap();
+        let cs_len = self.hyperast.resolve(&a).child_count().index();
         if cs_len == 0 {
             return vec![];
         }
@@ -476,21 +492,16 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
             c -= s;
             r[i] = c;
         }
-        assert_eq!(
-            self.lld(x).to_usize().unwrap(),
-            self.lld(&c).to_usize().unwrap()
-        );
+        assert_eq!(self.lld(x), self.lld(&c));
         r
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
-            .map(|x| cast(x).unwrap())
-            .collect()
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.first_descendant(&x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
@@ -498,10 +509,16 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     }
 
     fn descendants_count(&self, x: &IdD) -> usize {
-        (*x - self.first_descendant(x) + one()).to_usize().unwrap()
+        (*x - self.first_descendant(x) + one()).index()
     }
 
     fn is_descendant(&self, desc: &IdD, of: &IdD) -> bool {
         desc < of && &self.first_descendant(of) <= desc
+    }
+}
+
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>> {
+    pub(crate) fn iter_descendants(&self, x: &IdD) -> hyperast::primint_it::Iter<IdD> {
+        self.first_descendant(&x).step_until(*x)
     }
 }

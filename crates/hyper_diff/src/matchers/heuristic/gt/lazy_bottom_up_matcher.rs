@@ -2,15 +2,15 @@ use hyperast::PrimInt;
 use hyperast::types::NodeStore as _;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
-use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
-use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
+use crate::decompressed_tree_store::LazyDecompressedTreeStore;
+use crate::decompressed_tree_store::{DecompressedWithParent, DeepDecompressedTreeStore};
 use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
 use crate::mappings::{MappingStore, MonoMappingStore};
 use crate::matchers::Mapper;
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
+    Dsrc: DeepDecompressedTreeStore<HAST, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: DeepDecompressedTreeStore<HAST, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
@@ -24,33 +24,29 @@ where
     /// Returns true if *all* descendants in src are unmapped
     pub(super) fn are_srcs_unmapped_lazy(&self, src: &Dsrc::IdD) -> bool {
         self.src_arena
-            .descendants(src)
-            .iter()
-            .all(|x| !self.mappings.is_src(x))
+            .it_descendants(src)
+            .all(|x| !self.mappings.is_src(&x))
     }
 
     /// Returns true if *all* descendants in dst are unmapped
     pub(super) fn are_dsts_unmapped_lazy(&self, dst: &Ddst::IdD) -> bool {
         self.dst_arena
-            .descendants(dst)
-            .iter()
-            .all(|x| !self.mappings.is_dst(x))
+            .it_descendants(dst)
+            .all(|x| !self.mappings.is_dst(&x))
     }
 
     /// Returns true if *any* descendants in src are unmapped
     pub(super) fn has_unmapped_src_descendants_lazy(&self, src: &Dsrc::IdD) -> bool {
         self.src_arena
-            .descendants(src)
-            .iter()
-            .any(|x| !self.mappings.is_src(x))
+            .it_descendants(src)
+            .any(|x| !self.mappings.is_src(&x))
     }
 
     /// Returns true if *any* descendants in dst are unmapped
     pub(super) fn has_unmapped_dst_descendants_lazy(&self, dst: &Ddst::IdD) -> bool {
         self.dst_arena
-            .descendants(dst)
-            .iter()
-            .any(|x| !self.mappings.is_dst(x))
+            .it_descendants(dst)
+            .any(|x| !self.mappings.is_dst(&x))
     }
 
     pub fn src_has_children_lazy(&mut self, src: Dsrc::IdD) -> bool {
@@ -63,19 +59,18 @@ where
 
     pub(crate) fn add_mapping_recursively_lazy(&mut self, src: &Dsrc::IdD, dst: &Ddst::IdD) {
         self.mappings.link(src.to_shallow(), dst.to_shallow());
-        // TODO try using `descendants_range` instead of allocating a vector
-        let src = self.src_arena.descendants(src);
-        let dst = self.dst_arena.descendants(dst);
-        src.iter()
-            .zip(dst.iter())
-            .for_each(|(src, dst)| self.mappings.link(*src, *dst));
+
+        let src = self.mapping.src_arena.it_descendants(src);
+        let dst = self.mapping.dst_arena.it_descendants(dst);
+        src.zip(dst)
+            .for_each(|(src, dst)| self.mapping.mappings.link(src, dst));
     }
 }
 
 impl<
     HAST: HyperAST + Copy,
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: LazyDecompressedTreeStore<HAST, M::Dst>,
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
 where
@@ -83,8 +78,6 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST::Label: Eq,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
@@ -118,23 +111,25 @@ where
 }
 
 /// shared between sides of candidates selection
-pub(super) fn candidates_aux<HAST: HyperAST + Copy, D, IdD, IdS>(
-    seeds: &[IdD],
+pub(super) fn candidates_aux<HAST: HyperAST + Copy, D, IdS>(
+    seeds: impl Iterator<Item = IdS>,
     s: &HAST::IdN,
-    arena: &D,
+    arena: &mut D, // need mutable access to call decompress_to
     hyperast: HAST,
     is_mapped: impl Fn(&IdS) -> bool,
-) -> Vec<IdD>
+) -> Vec<D::IdD>
 where
-    D: DecompressedWithParent<HAST, IdD>,
-    D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
-    IdD: PrimInt + Shallow<IdS>,
+    D: DecompressedWithParent<HAST, D::IdD>,
+    D: ShallowDecompressedTreeStore<HAST, IdS>,
+    D: LazyDecompressedTreeStore<HAST, IdS>,
+    D::IdD: PrimInt + Shallow<IdS>,
     IdS: Eq,
 {
     let mut candidates = vec![];
     let mut visited = bitvec::bitbox![0;arena.len()];
     let t = hyperast.resolve_type(s);
-    for mut seed in seeds.iter().copied() {
+    for seed in seeds {
+        let mut seed = arena.decompress_to(&seed);
         while let Some(parent) = arena.parent(&seed) {
             // If visited break, otherwise mark as visited
             if visited[parent.index()] {

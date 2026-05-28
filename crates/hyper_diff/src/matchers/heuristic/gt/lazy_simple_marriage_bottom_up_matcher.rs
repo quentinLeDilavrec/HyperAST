@@ -13,11 +13,10 @@ use super::factorized_bounds::LazyDecompTreeBorrowBounds;
 
 pub struct LazySimpleMarriageBottomUpMatcher<
     Mpr: crate::matchers::WithMappings,
-    MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: PhantomData<*const (Mpr, MZs)>,
+    _phantom: PhantomData<*const Mpr>,
 }
 
 impl<
@@ -25,13 +24,11 @@ impl<
     Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
     HAST,
     M,
-    MZs,
     const SIM_THRESHOLD_NUM: u64,
     const SIM_THRESHOLD_DEN: u64,
 >
     LazySimpleMarriageBottomUpMatcher<
         Mapper<HAST, Dsrc, Ddst, M>,
-        MZs,
         SIM_THRESHOLD_NUM,
         SIM_THRESHOLD_DEN,
     >
@@ -42,7 +39,6 @@ where
     Ddst::IdD: PrimInt,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     HAST::Label: Eq,
@@ -51,7 +47,7 @@ where
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        (mapper.mapping.mappings).topit(mapper.src_arena.len(), mapper.dst_arena.len());
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }

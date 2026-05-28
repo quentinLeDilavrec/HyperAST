@@ -33,43 +33,53 @@ pub trait PrimInt: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {
     /// allows to iterator over a PrimInt range
     ///
     /// Indeed, `std::ops::Range` does not implement `Iterator` for `PrimInt` or similar traits.
-    fn step_until(
-        &self,
-        to: Self,
-    ) -> impl Iterator<Item = Self> + Sized + DoubleEndedIterator + '_ {
-        struct Iter<T>(T, T);
-        impl<T> Iterator for Iter<T>
-        where
-            T: PrimInt,
-        {
-            type Item = T;
-            fn next(&mut self) -> Option<Self::Item> {
-                if self.0 > self.1 {
-                    return None;
-                }
-                let result = self.0;
-                self.0 += T::one();
-                Some(result)
-            }
-        }
-        impl<T> DoubleEndedIterator for Iter<T>
-        where
-            T: PrimInt,
-        {
-            fn next_back(&mut self) -> Option<Self::Item> {
-                if self.0 > self.1 {
-                    return None;
-                }
-                let result = self.1;
-                self.1 -= T::one();
-                Some(result)
-            }
-        }
-
-        Iter(*self, to)
+    fn step_until(&self, to: Self) -> primint_it::Iter<Self> {
+        (*self, to).into()
     }
 }
 impl<T> PrimInt for T where T: num::PrimInt + num::traits::NumAssign + std::fmt::Debug {}
+
+pub mod primint_it {
+    use super::PrimInt;
+    pub struct Iter<T>(T, T);
+    impl<T: PrimInt> From<(T, T)> for Iter<T> {
+        fn from((start, end): (T, T)) -> Self {
+            Iter(start, end)
+        }
+    }
+    impl<T: PrimInt> From<std::ops::Range<T>> for Iter<T> {
+        fn from(range: std::ops::Range<T>) -> Self {
+            Iter(range.start, range.end)
+        }
+    }
+    impl<T> Iterator for Iter<T>
+    where
+        T: PrimInt,
+    {
+        type Item = T;
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.0 > self.1 {
+                return None;
+            }
+            let result = self.0;
+            self.0 += T::one();
+            Some(result)
+        }
+    }
+    impl<T> DoubleEndedIterator for Iter<T>
+    where
+        T: PrimInt,
+    {
+        fn next_back(&mut self) -> Option<Self::Item> {
+            if self.0 > self.1 {
+                return None;
+            }
+            let result = self.1;
+            self.1 -= T::one();
+            Some(result)
+        }
+    }
+}
 
 mod slice_interning;
 

@@ -55,10 +55,7 @@ where
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -90,8 +87,8 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src>, // enable efficient similarity computation
-    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst>, // enable efficient similarity computation
+    Dsrc: ContiguousDescendants<HAST, M::Src>, // enable efficient similarity computation
+    Ddst: ContiguousDescendants<HAST, M::Dst>, // enable efficient similarity computation
     HAST::Label: Eq,
 {
     #[inline(always)]

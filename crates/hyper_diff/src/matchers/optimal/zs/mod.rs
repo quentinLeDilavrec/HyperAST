@@ -1,13 +1,13 @@
 //! Zhang and Shasha edit distance algorithm for labeled trees, 1989
 //!
 //! implementation originally inspired by implementation in Gumtree repository
-use num_traits::{ToPrimitive, cast, one, zero};
+use num_traits::{cast, one, zero};
 use str_distance::DistanceMetric;
 
 use hyperast::PrimInt;
 use hyperast::types::{DecompressedFrom, HyperAST, LabelStore, Labeled, NodeStore};
 
-use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrderKeyRoots};
+use crate::decompressed_tree_store::{DeepDecompressedTreeStore, PostOrderKeyRoots};
 use crate::mappings::MonoMappingStore;
 
 // TODO use the Mapping struct
@@ -17,13 +17,19 @@ pub struct ZsMatcher<M, SD, DD = SD> {
     pub dst_arena: DD,
 }
 
+pub trait POKeyRoots<HAST: HyperAST + Copy, IdD>: PostOrderKeyRoots<HAST, IdD, IdD = IdD> {}
+impl<HAST: HyperAST + Copy, IdD, T: PostOrderKeyRoots<HAST, IdD, IdD = IdD>> POKeyRoots<HAST, IdD>
+    for T
+{
+}
+
 impl<SD, DD, M: MonoMappingStore + Default> ZsMatcher<M, SD, DD> {
     pub fn matchh<HAST>(stores: HAST, src: HAST::IdN, dst: HAST::IdN) -> Self
     where
         M::Src: PrimInt,
         M::Dst: PrimInt,
-        SD: PostOrderKeyRoots<HAST, M::Src> + DecompressedFrom<HAST, Out = SD>,
-        DD: PostOrderKeyRoots<HAST, M::Dst> + DecompressedFrom<HAST, Out = DD>,
+        SD: POKeyRoots<HAST, M::Src> + DecompressedFrom<HAST, Out = SD>,
+        DD: POKeyRoots<HAST, M::Dst> + DecompressedFrom<HAST, Out = DD>,
         HAST: HyperAST + Copy,
         HAST::Label: Eq,
     {
@@ -32,10 +38,7 @@ impl<SD, DD, M: MonoMappingStore + Default> ZsMatcher<M, SD, DD> {
         // let mappings = ZsMatcher::<M, SD, DD>::match_with(stores.node_store(), label_store, &src_arena, &dst_arena);
         let mappings = {
             let mut mappings = M::default();
-            mappings.topit(
-                src_arena.len().to_usize().unwrap(),
-                dst_arena.len().to_usize().unwrap(),
-            );
+            mappings.topit(src_arena.len(), dst_arena.len());
             let base = MatcherImpl::<SD, DD, HAST, M> {
                 stores,
                 src_arena: &src_arena,
@@ -57,16 +60,13 @@ impl<SD, DD, M: MonoMappingStore + Default> ZsMatcher<M, SD, DD> {
     where
         M::Src: PrimInt,
         M::Dst: PrimInt,
-        SD: PostOrderKeyRoots<HAST, M::Src>,
-        DD: PostOrderKeyRoots<HAST, M::Dst>,
+        SD: POKeyRoots<HAST, M::Src>,
+        DD: POKeyRoots<HAST, M::Dst>,
         HAST: HyperAST + Copy,
         HAST::Label: Eq,
     {
         let mut mappings = M::default();
-        mappings.topit(
-            src_arena.len().to_usize().unwrap() + 1,
-            dst_arena.len().to_usize().unwrap() + 1,
-        );
+        mappings.topit(src_arena.len() + 1, dst_arena.len() + 1);
         let base = MatcherImpl::<_, _, HAST, M> {
             stores,
             src_arena: &src_arena,
@@ -183,13 +183,13 @@ pub struct ZsMatcherDist {
 // TODO make a fully typed interface to each dist
 impl ZsMatcherDist {
     fn f_dist<IdD1: PrimInt, IdD2: PrimInt>(&self, row: IdD1, col: IdD2) -> f64 {
-        self.forest[row.to_usize().unwrap()][col.to_usize().unwrap()]
+        self.forest[row.index()][col.index()]
     }
 }
 
 impl<
-    SD: DecompressedTreeStore<HAST, M::Src> + PostOrderKeyRoots<HAST, M::Src>,
-    DD: DecompressedTreeStore<HAST, M::Dst> + PostOrderKeyRoots<HAST, M::Dst>,
+    SD: DeepDecompressedTreeStore<HAST, M::Src> + POKeyRoots<HAST, M::Src>,
+    DD: DeepDecompressedTreeStore<HAST, M::Dst> + POKeyRoots<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
 > MatcherImpl<'_, '_, SD, DD, HAST, M>
@@ -223,16 +223,16 @@ where
         let sa = self.src_arena;
         let da = self.dst_arena;
         // println!("i:{:?} j:{:?}", i, j);
-        let lldsrc = sa.lld(i).to_usize().unwrap();
-        let llddst = da.lld(j).to_usize().unwrap();
+        let lldsrc = sa.lld(i).index();
+        let llddst = da.lld(j).index();
         dist.forest[lldsrc][llddst] = 0.0;
-        for di in lldsrc..=i.to_usize().unwrap() {
+        for di in lldsrc..=i.index() {
             let odi = cast(di).unwrap();
             let srctree = sa.tree(&odi);
             let lldsrc2 = sa.lld(&odi);
             let cost_del = self.get_deletion_cost(&srctree);
             dist.forest[di + 1][llddst] = dist.forest[di][llddst] + cost_del;
-            for dj in llddst..=j.to_usize().unwrap() {
+            for dj in llddst..=j.index() {
                 let odj = cast(dj).unwrap();
                 let dsttree = da.tree(&odj);
                 let llddst2 = da.lld(&odj);
@@ -484,7 +484,8 @@ pub mod str_distance_patched {
 mod tests {
 
     use super::*;
-    use crate::decompressed_tree_store::{ShallowDecompressedTreeStore, SimpleZsTree as ZsTree};
+    use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
+    use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
 
     use crate::mappings::DefaultMappingStore;
     use crate::matchers::Decompressible;

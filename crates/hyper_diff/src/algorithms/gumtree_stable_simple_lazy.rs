@@ -36,7 +36,7 @@ where
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = LazySimpleMarriageBottomUpMatcher::<_, M, 1, 10>::match_it(mapper);
+    let mapper = LazySimpleMarriageBottomUpMatcher::<_, 1, 10>::match_it(mapper);
     let bottomup_mappings_s = mapper.mappings().len();
     tr!(bottomup_mappings_s);
 

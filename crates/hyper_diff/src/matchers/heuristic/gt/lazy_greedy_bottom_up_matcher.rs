@@ -31,9 +31,9 @@ pub struct LazyGreedyBottomUpMatcher<
 impl<
     Dsrc: LazyDecompTreeBorrowBounds<HAST, M::Src>,
     Ddst: LazyDecompTreeBorrowBounds<HAST, M::Dst>,
-    HAST,
-    M,
-    MZs,
+    HAST: HyperAST + Copy,
+    M: MonoMappingStore,
+    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     const SIZE_THRESHOLD: usize,
     const SIM_THRESHOLD_NUM: u64,
     const SIM_THRESHOLD_DEN: u64,
@@ -52,18 +52,12 @@ where
     Ddst::IdD: PrimInt,
     M::Src: PrimInt,
     M::Dst: PrimInt,
-    MZs: MonoMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
-    HAST: HyperAST + Copy,
-    M: MonoMappingStore,
     HAST::Label: Eq,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -95,8 +89,8 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src>, // enable efficient similarity computation
-    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst>, // enable efficient similarity computation
+    Dsrc: ContiguousDescendants<HAST, M::Src>, // enable efficient similarity computation
+    Ddst: ContiguousDescendants<HAST, M::Dst>, // enable efficient similarity computation
     HAST::Label: Eq,
 {
     #[inline(always)]
@@ -176,14 +170,11 @@ where
     Ddst::IdD: PrimInt,
 {
     pub(super) fn get_src_candidates_lazily(&mut self, dst: &Ddst::IdD) -> Vec<Dsrc::IdD> {
-        let seeds = (self.dst_arena.descendants(dst))
-            .into_iter()
-            .filter_map(|c| self.mapping.mappings.get_src(&c))
-            .map(|m| self.mapping.src_arena.decompress_to(&m))
-            .collect::<Vec<_>>();
         let s = &self.dst_arena.original(dst);
+        let seeds = (self.mapping.dst_arena.it_descendants(dst))
+            .filter_map(|c| self.mapping.mappings.get_src(&c));
 
-        candidates_aux(&seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
+        candidates_aux(seeds, s, &mut self.mapping.src_arena, self.hyperast, |x| {
             self.mapping.mappings.is_src(x)
         })
     }
@@ -192,13 +183,10 @@ where
         &mut self,
         src: &Dsrc::IdD,
     ) -> Vec<Ddst::IdD> {
-        let seeds = (self.src_arena.descendants(src))
-            .into_iter()
-            .filter_map(|c| self.mapping.mappings.get_dst(&c))
-            .map(|m| self.mapping.dst_arena.decompress_to(&m))
-            .collect::<Vec<_>>();
         let s = &self.src_arena.original(src);
-        candidates_aux(&seeds, s, &self.mapping.dst_arena, self.hyperast, |x| {
+        let seeds = (self.mapping.src_arena.it_descendants(src))
+            .filter_map(|c| self.mapping.mappings.get_dst(&c));
+        candidates_aux(seeds, s, &mut self.mapping.dst_arena, self.hyperast, |x| {
             self.mapping.mappings.is_dst(x)
         })
     }

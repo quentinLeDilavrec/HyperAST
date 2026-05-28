@@ -13,11 +13,11 @@ use hyperast::types::NodeId;
 use hyperast::types::{HyperAST, HyperASTShared, LabelStore, NodeStore};
 use hyperast::types::{LendT, Tree, WithSerialization};
 
-use hyper_diff::decompressed_tree_store::FullyDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::PostOrder;
 use hyper_diff::decompressed_tree_store::complete_post_order;
 use hyper_diff::decompressed_tree_store::pre_order_wrapper;
 use hyper_diff::decompressed_tree_store::{DecompressedWithSiblings, ShallowDecompressedTreeStore};
+use hyper_diff::decompressed_tree_store::{FullyDecompressedTreeStore, Shallow};
 
 use complete_post_order::RecCachedProcessor;
 use pre_order_wrapper::{DisplaySimplePreOrderMapper, SimplePreOrderMapper};
@@ -122,10 +122,10 @@ pub mod compressed_bf_post_process {
             HAST: HyperAST + Copy,
             HAST::IdN: Clone + Debug + Eq,
             SD: ShallowDecompressedTreeStore<HAST, u32>
-                + PostOrder<HAST, u32>
+                + PostOrder<HAST, u32, IdD = u32>
                 + DecompressedWithSiblings<HAST, u32>,
             DD: ShallowDecompressedTreeStore<HAST, u32>
-                + PostOrder<HAST, u32>
+                + PostOrder<HAST, u32, IdD = u32>
                 + DecompressedWithSiblings<HAST, u32>,
         {
             let hyperast = mapper.hyperast;
@@ -157,10 +157,10 @@ pub mod compressed_bf_post_process {
             HAST::IdN: Clone + Debug + Eq,
             for<'t> LendT<'t, HAST>: Tree,
             SD: ShallowDecompressedTreeStore<HAST, u32>
-                + PostOrder<HAST, u32>
+                + PostOrder<HAST, u32, IdD = u32>
                 + DecompressedWithSiblings<HAST, u32>,
             DD: ShallowDecompressedTreeStore<HAST, u32>
-                + PostOrder<HAST, u32>
+                + PostOrder<HAST, u32, IdD = u32>
                 + DecompressedWithSiblings<HAST, u32>,
         {
             use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
@@ -454,10 +454,10 @@ impl SimpleJsonPostProcess {
         HAST::IdN: Clone + Debug + Eq,
         for<'t> LendT<'t, HAST>: Tree + WithSerialization,
         SD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
         DD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
     {
         let hyperast = mapper.hyperast;
@@ -490,10 +490,10 @@ impl SimpleJsonPostProcess {
         HAST::IdN: Clone + Debug,
         for<'t> LendT<'t, HAST>: WithSerialization,
         SD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
         DD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
     {
         use hyperast::types::Labeled;
@@ -588,10 +588,10 @@ impl PathJsonPostProcess {
         HAST::IdN: Clone + Debug + Eq,
         for<'t> LendT<'t, HAST>: Tree,
         SD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
         DD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
     {
         let mapping = &mapper.mapping;
@@ -614,10 +614,10 @@ impl PathJsonPostProcess {
         HAST: HyperAST + Copy,
         HAST::IdN: Clone + Debug,
         SD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
         DD: ShallowDecompressedTreeStore<HAST, u32>
-            + PostOrder<HAST, u32>
+            + PostOrder<HAST, u32, IdD = u32>
             + DecompressedWithSiblings<HAST, u32>,
     {
         type CP<Idx> = Option<(CompressedTreePath<Idx>, Idx)>;
@@ -697,7 +697,7 @@ impl<HAST, D, U: Clone + Default, F, G> FormatCached<'_, HAST, D, U, F, G>
 where
     HAST: HyperAST + Copy,
     HAST::IdN: Debug,
-    D: ShallowDecompressedTreeStore<HAST, u32>
+    D: ShallowDecompressedTreeStore<HAST, u32, IdD = u32>
         + PostOrder<HAST, u32>
         + DecompressedWithSiblings<HAST, u32>,
     F: Fn(U, HAST::IdN) -> U,
@@ -733,7 +733,7 @@ where
 {
     fn format<HAST: HyperAST<IdN = IdN> + Copy>(&mut self, x: u32) -> (U, IdN)
     where
-        D: ShallowDecompressedTreeStore<HAST, u32>
+        D: ShallowDecompressedTreeStore<HAST, u32, IdD = u32>
             + PostOrder<HAST, u32>
             + DecompressedWithSiblings<HAST, u32>,
     {
@@ -743,7 +743,7 @@ where
 
 pub fn print_mappings<
     'a,
-    IdD: 'a + PrimInt + Debug,
+    IdD: 'a + PrimInt + Debug + hyper_diff::decompressed_tree_store::Shallow<IdD>,
     M: MonoMappingStore<Src = IdD, Dst = IdD> + Debug,
     HAST: HyperAST + Copy,
     SD,
@@ -755,11 +755,10 @@ pub fn print_mappings<
     mappings: &M,
 ) where
     for<'t> LendT<'t, HAST>: WithSerialization,
-    SD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD>,
-    DD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD>,
+    SD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD, IdD = IdD>,
+    DD: FullyDecompressedTreeStore<HAST, IdD> + PostOrder<HAST, IdD, IdD = IdD>,
 {
     use complete_post_order::DisplayCompletePostOrder;
-
     let mut mapped = vec![false; dst_arena.len()];
     let src_arena = SimplePreOrderMapper::from(src_arena);
     let disp = DisplayCompletePostOrder::<IdD, _, _>::new(stores, dst_arena);
@@ -818,11 +817,11 @@ fn max_line_len(x: &String) -> usize {
 
 pub fn print_mappings_no_ranges<
     'a,
-    IdD: 'a + PrimInt + Debug,
+    IdD: 'a + PrimInt + Debug + Shallow<IdD>,
     M: MonoMappingStore<Src = IdD, Dst = IdD>,
     HAST: HyperAST + Copy,
-    DD: PostOrder<HAST, IdD> + FullyDecompressedTreeStore<HAST, IdD>,
-    SD: PostOrder<HAST, IdD> + FullyDecompressedTreeStore<HAST, IdD>,
+    DD: PostOrder<HAST, IdD> + FullyDecompressedTreeStore<HAST, IdD, IdD = IdD>,
+    SD: PostOrder<HAST, IdD> + FullyDecompressedTreeStore<HAST, IdD, IdD = IdD>,
 >(
     dst_arena: &'a DD,
     src_arena: &'a SD,

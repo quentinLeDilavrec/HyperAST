@@ -10,7 +10,7 @@ use hyperast::compat::HashMap;
 use hyperast::types::{HyperAST, LendT, TypeStore, WithHashs};
 
 use crate::decompressed_tree_store::POBorrowSlice;
-use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::decompressed_tree_store::{DecompressedWithParent, FullyDecompressedTreeStore};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
@@ -45,10 +45,7 @@ where
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -63,8 +60,8 @@ where
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
+    Dsrc: FullyDecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
+    Ddst: FullyDecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
@@ -170,8 +167,8 @@ where
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
+    Dsrc: FullyDecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
+    Ddst: FullyDecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>

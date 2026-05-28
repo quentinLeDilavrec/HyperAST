@@ -2,16 +2,17 @@ use std::{fmt::Debug, ops::Deref};
 
 use num_traits::{cast, one, zero};
 
-use hyperast::PrimInt;
 use hyperast::types::UniformNodeId;
 use hyperast::types::WithStats;
 use hyperast::types::{Children as _, Childrn as _, WithChildren as _};
 use hyperast::types::{HyperAST, LendT};
 
+use super::Decompressed;
+use super::PrimInt;
 use super::ShallowDecompressedTreeStore;
 use super::basic_post_order::BasicPostOrder;
 use super::simple_post_order::SimplePostOrder;
-use super::{CompletePostOrder, DecompressedTreeStore, InitializableWithStats};
+use super::{CompletePostOrder, DeepDecompressedTreeStore, InitializableWithStats};
 use super::{PostOrdKeyRoots, PostOrder, PostOrderIterable, PostOrderKeyRoots};
 use crate::matchers::Decompressible;
 
@@ -21,7 +22,7 @@ use crate::matchers::Decompressible;
 ///
 /// Compared to simple and complete post order it does not have parents
 pub struct SimpleZsTree<IdN, IdD> {
-    basic: BasicPostOrder<IdN, IdD>,
+    pub basic: BasicPostOrder<IdN, IdD>,
     /// LR_keyroots(T) = {k | there exists no k’> k such that l(k)=l(k’)}.
     pub(crate) kr: bitvec::boxed::BitBox,
 }
@@ -106,7 +107,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrderKeyRoots<HAST, IdD>
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> super::DecompressedSubtree<HAST::IdN>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     for Decompressible<HAST, SimpleZsTree<HAST::IdN, IdD>>
 {
     type Out = Self;
@@ -126,7 +127,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> super::DecompressedSubtree<HAS
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt + Debug> hyperast::types::DecompressedFrom<HAST>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> hyperast::types::DecompressedFrom<HAST>
     for SimpleZsTree<HAST::IdN, IdD>
 {
     type Out = Self;
@@ -221,6 +222,12 @@ where
     }
 }
 
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressed<IdD>
+    for Decompressible<HAST, SimpleZsTree<HAST::IdN, IdD>>
+{
+    type IdD = IdD;
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, SimpleZsTree<HAST::IdN, IdD>>
 {
@@ -228,15 +235,15 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
         self.as_basic().len()
     }
 
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.as_basic().original(id)
-    }
-
     fn root(&self) -> IdD {
         self.as_basic().root()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.as_basic().original(id)
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         self.as_basic().child(x, p)
     }
 
@@ -245,11 +252,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, SimpleZsTree<HAST::IdN, IdD>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        self.as_basic().descendants(x)
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.as_basic().iter_descendants(x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {

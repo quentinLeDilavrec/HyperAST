@@ -5,7 +5,7 @@ use hyperast::store::nodes::compo;
 use hyperast::types::{HyperAST, LendT, WithChildren, WithMetaData};
 use hyperast::types::{HyperType as _, LabelStore as _, Labeled as _, NodeStore as _};
 
-use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
+use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
 use crate::matchers::optimal::zs::str_distance_patched::QGram;
 
 // pub(self) use super::factorized_bounds;
@@ -128,20 +128,20 @@ where
     }
 }
 
-pub fn is_leaf_file<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf_file<HAST, D, IdS>(stores: HAST, arena: &D, idd: D::IdD) -> bool
 where
     HAST: HyperAST + Copy,
-    D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
+    D: ShallowDecompressedTreeStore<HAST, IdS>,
 {
     let id = arena.original(&idd);
     let t = stores.resolve_type(&id);
     t.is_file()
 }
 
-pub fn is_leaf_sub_file<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf_sub_file<HAST, D, IdS>(stores: HAST, arena: &D, idd: D::IdD) -> bool
 where
     HAST: HyperAST + Copy,
-    D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
+    D: ShallowDecompressedTreeStore<HAST, IdS>,
     for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
 {
     let id = arena.original(&idd);
@@ -149,23 +149,22 @@ where
     n.get_metadata().is_some_and(|x| x.0 == 1)
 }
 
-pub fn is_leaf_stmt<HAST, D, IdS, IdD>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf_stmt<HAST, D, IdS>(stores: HAST, arena: &D, idd: D::IdD) -> bool
 where
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
-    D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
+    D: ShallowDecompressedTreeStore<HAST, IdS>,
 {
     let id = arena.original(&idd);
     let n = stores.node_store().resolve(&id);
     n.get_metadata().is_some_and(|x| x.0 == 1)
 }
 
-pub fn is_leaf<HAST, D, IdD, IdS>(stores: HAST, arena: &D, idd: IdD) -> bool
+pub fn is_leaf<HAST, D, IdS>(stores: HAST, arena: &D, idd: D::IdD) -> bool
 where
     HAST: HyperAST + Copy,
     IdS: Eq,
-    IdD: Shallow<IdS>,
-    D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
+    D: ShallowDecompressedTreeStore<HAST, IdS>,
 {
     let o = arena.original(&idd);
     stores.node_store().resolve(&o).child_count() == num_traits::zero()

@@ -5,7 +5,7 @@ use hyperast::PrimInt;
 use hyperast::store::nodes::compo;
 use hyperast::types::{HyperAST, LendT, WithHashs, WithMetaData};
 
-use crate::decompressed_tree_store::DecompressedTreeStore;
+use crate::decompressed_tree_store::FullyDecompressedTreeStore;
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
 use crate::matchers::heuristic::factorized_bounds::DecompTreeBounds;
@@ -57,10 +57,7 @@ where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
         for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, leaf_count);
         mapper
     }
@@ -206,7 +203,7 @@ pub(super) struct PostIter<'a, HAST, D, IdD> {
 impl<'a, HAST, D, IdD> PostIter<'a, HAST, D, IdD>
 where
     HAST: HyperAST + Copy,
-    D: DecompressedTreeStore<HAST, IdD>,
+    D: FullyDecompressedTreeStore<HAST, IdD>,
     IdD: Copy,
 {
     pub fn new(stores: HAST, arena: &'a D) -> Self {
@@ -224,7 +221,7 @@ where
 impl<HAST, D, IdD> Iterator for PostIter<'_, HAST, D, IdD>
 where
     HAST: HyperAST + Copy,
-    D: DecompressedTreeStore<HAST, IdD>,
+    D: FullyDecompressedTreeStore<HAST, IdD>,
     IdD: Copy,
 {
     type Item = IdD;
@@ -236,7 +233,7 @@ where
 impl<HAST, D, IdD> PostIter<'_, HAST, D, IdD>
 where
     HAST: HyperAST + Copy,
-    D: DecompressedTreeStore<HAST, IdD>,
+    D: FullyDecompressedTreeStore<HAST, IdD>,
     IdD: Copy,
 {
     pub fn next_mappable(&mut self, skip: impl Fn(IdD) -> bool) -> Option<IdD> {

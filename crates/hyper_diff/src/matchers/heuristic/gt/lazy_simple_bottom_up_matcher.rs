@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
-use crate::decompressed_tree_store::Shallow;
-use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
-use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
+use crate::decompressed_tree_store::{Decompressed, LazyDecompressedTreeStore};
+use crate::decompressed_tree_store::{DecompressedWithParent, DeepDecompressedTreeStore};
+use crate::decompressed_tree_store::{LazyPOBorrowSlice, Shallow};
 use crate::mappings::{MappingStore, MonoMappingStore};
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
@@ -41,7 +41,7 @@ where
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        (mapper.mapping.mappings).topit(mapper.src_arena.len(), mapper.dst_arena.len());
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -56,8 +56,8 @@ where
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
+    Dsrc: DeepDecompressedTreeStore<HAST, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: DeepDecompressedTreeStore<HAST, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
@@ -102,8 +102,8 @@ where
 
 impl<
     HAST: HyperAST + Copy,
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: Decompressed<M::Src>,
+    Ddst: Decompressed<M::Dst>,
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
 where
@@ -111,10 +111,10 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
+    Dsrc: DeepDecompressedTreeStore<HAST, M::Src>
         + DecompressedWithParent<HAST, Dsrc::IdD>
         + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
+    Ddst: DeepDecompressedTreeStore<HAST, M::Dst>
         + DecompressedWithParent<HAST, Ddst::IdD>
         + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST::Label: Eq,
@@ -176,8 +176,8 @@ where
 
 impl<
     HAST: HyperAST + Copy,
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: LazyDecompressedTreeStore<HAST, M::Dst>,
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
 where
@@ -185,12 +185,8 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
-        + DecompressedWithParent<HAST, Dsrc::IdD>
-        + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
-        + DecompressedWithParent<HAST, Ddst::IdD>
-        + LazyDecompressedTreeStore<HAST, M::Dst>,
+    Dsrc: DeepDecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, Dsrc::IdD>,
+    Ddst: DeepDecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, Ddst::IdD>,
     HAST::Label: Eq,
     for<'t> LendT<'t, HAST>: WithHashs,
 {
@@ -256,7 +252,10 @@ where
         &mut self,
         src: Dsrc::IdD,
         dst: Ddst::IdD,
-    ) {
+    ) where
+        Dsrc::IdD: Shallow<Dsrc::IdD>,
+        Ddst::IdD: Shallow<Ddst::IdD>,
+    {
         let stores = self.hyperast;
         let mapping = &mut self.mapping;
         let src_arena = &mut mapping.src_arena;
@@ -297,8 +296,8 @@ where
         src: Dsrc::IdD,
         dst: Ddst::IdD,
     ) where
-        Dsrc: crate::decompressed_tree_store::LazyPOBorrowSlice<HAST, Dsrc::IdD, M::Src>,
-        Ddst: crate::decompressed_tree_store::LazyPOBorrowSlice<HAST, Ddst::IdD, M::Dst>,
+        Dsrc: LazyPOBorrowSlice<HAST, M::Src>,
+        Ddst: LazyPOBorrowSlice<HAST, M::Dst>,
     {
         let mapping = &mut self.mapping;
         let src_arena = &mut mapping.src_arena;

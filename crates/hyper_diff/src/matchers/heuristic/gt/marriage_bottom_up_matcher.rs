@@ -4,9 +4,8 @@ use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
 use super::bottom_up_matcher::candidates_aux;
-use crate::decompressed_tree_store::{
-    DecompressedTreeStore, DecompressedWithParent, POBorrowSlice,
-};
+use crate::decompressed_tree_store::FullyDecompressedTreeStore;
+use crate::decompressed_tree_store::{DecompressedWithParent, POBorrowSlice, Shallow};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
@@ -42,18 +41,15 @@ impl<
     >
 where
     for<'t> LendT<'t, HAST>: WithHashs,
-    M::Src: PrimInt,
-    M::Dst: PrimInt,
+    M::Src: PrimInt + Shallow<M::Src>,
+    M::Dst: PrimInt + Shallow<M::Dst>,
     HAST::Label: Eq,
     HAST::IdN: Debug,
 {
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -69,8 +65,8 @@ where
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
+    Dsrc: FullyDecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
+    Ddst: FullyDecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
 > Mapper<HAST, Dsrc, Ddst, M>
@@ -79,12 +75,11 @@ where
     M::Dst: PrimInt,
 {
     pub(super) fn get_src_candidates(&self, dst: &M::Dst) -> Vec<M::Src> {
-        let seeds = (self.dst_arena.descendants(dst))
-            .into_iter()
-            .filter_map(|c| self.mappings.get_src(&c))
-            .collect::<Vec<_>>();
+        let seeds = (self.mapping.dst_arena)
+            .it_descendants(dst)
+            .filter_map(|c| self.mapping.mappings.get_src(&c));
         let s = &self.dst_arena.original(dst);
-        candidates_aux(&seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
+        candidates_aux(seeds, s, &self.mapping.src_arena, self.hyperast, |x| {
             self.mapping.mappings.is_src(x)
         })
     }

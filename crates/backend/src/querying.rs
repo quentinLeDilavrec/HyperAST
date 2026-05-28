@@ -974,10 +974,7 @@ pub fn differential(
         )
     } else {
         if !only_top_down {
-            mapper
-                .mapping
-                .mappings
-                .topit(mapper.src_arena.len(), mapper.dst_arena.len());
+            mapper.reserve_mappings();
             hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher::<_,
                 1,
             >::filter_mappings(&mut mapper, &subtree_mappings);

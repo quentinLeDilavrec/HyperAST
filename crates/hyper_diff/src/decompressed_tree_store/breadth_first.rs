@@ -2,17 +2,19 @@ use std::marker::PhantomData;
 
 use num_traits::{cast, zero};
 
-use hyperast::PrimInt;
 use hyperast::types::HyperAST;
 use hyperast::types::WithChildren as _;
 
+use super::Decompressed;
+use super::PrimInt;
+use super::ShallowDecompressedTreeStore;
 use super::{BreadthFirstContiguousSiblings, BreadthFirstIterable};
-use super::{BreadthFirstIt, DecompressedTreeStore, ShallowDecompressedTreeStore};
+use super::{BreadthFirstIt, DeepDecompressedTreeStore};
 use super::{DecompressedParentsLending, DecompressedWithParent};
 use crate::matchers::Decompressible;
 
 /// Decompressed subtree of an HyperAST layed out in breadth-first ie. contiguous siblings
-pub struct BreadthFirst<IdN, IdD: PrimInt> {
+pub struct BreadthFirst<IdN, IdD> {
     id_compressed: Vec<IdN>,
     id_parent: Vec<IdD>,
     id_first_child: Vec<IdD>,
@@ -75,7 +77,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         self.parent(id).is_some()
     }
 
-    fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
+    fn position_in_parent<Idx: hyperast::PrimInt>(&self, c: &IdD) -> Option<Idx> {
         let p = self.parent(c)?;
         Some(cast(*c - self.first_child(&p).unwrap()).unwrap())
     }
@@ -87,7 +89,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         }
     }
 
-    fn path<Idx: PrimInt>(&self, _parent: &IdD, _descendant: &IdD) -> Vec<Idx> {
+    fn path<Idx: hyperast::PrimInt>(&self, _parent: &IdD, _descendant: &IdD) -> Vec<Idx> {
         todo!()
     }
 
@@ -155,13 +157,15 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> super::DecompressedSubtree<HAST::IdN>
     }
 }
 
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressed<IdD>
+    for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
+{
+    type IdD = IdD;
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 {
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.id_compressed[id.to_usize().unwrap()].clone()
-    }
-
     fn len(&self) -> usize {
         self.id_compressed.len()
     }
@@ -170,7 +174,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
         zero()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.id_compressed[id.to_usize().unwrap()].clone()
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         let store = self.hyperast;
         let mut r = *x;
         for d in p {
@@ -201,9 +209,13 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BreadthFirst<HAST::IdN, IdD>>
 {
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.descendants(x).into_iter()
+    }
+
     fn descendants(&self, x: &IdD) -> Vec<IdD> {
         let store = self.hyperast;
         // TODO possible opti by also making descendants contiguous in arena

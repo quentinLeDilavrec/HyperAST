@@ -279,7 +279,7 @@ where
     P: position_accessors::SolvedPosition<IdN>
         + position_accessors::RootedPosition<IdN>
         + position_accessors::WithPreOrderOffsets<Idx = super::Idx>,
-    M::Src: PrimInt,
+    M::Src: PrimInt + Shallow<M::Src>,
     M::Dst: PrimInt + Shallow<M::Dst>,
 {
     let mapped_node = mapper.dst_arena.original(&mapped);
@@ -367,7 +367,7 @@ fn trig_parent<M: MappingStore>(
     mapped: M::Dst,
 ) -> bool
 where
-    M::Src: PrimInt,
+    M::Src: PrimInt + Shallow<M::Src>,
     M::Dst: PrimInt + Shallow<M::Dst>,
 {
     let target_parent = mapper.src_arena.parent(&mapping_target);

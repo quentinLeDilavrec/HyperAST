@@ -351,9 +351,9 @@ mod test {
 
     use hyper_diff::decompressed_tree_store::CompletePostOrder;
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+    use hyper_diff::mappings::{DefaultMultiMappingStore, VecStore};
     use hyper_diff::matchers::Decompressible;
     use hyper_diff::matchers::heuristic::gt::greedy_subtree_matcher::GreedySubtreeMatcher;
-    use hyper_diff::mappings::{DefaultMultiMappingStore, VecStore};
     use hyperast::types::{HyperASTShared, WithChildren};
     use hyperast_vcs_git::preprocessed::child_by_name;
 
@@ -716,10 +716,7 @@ mod test {
         dbg!();
         use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
         use hyper_diff::mappings::MappingStore;
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         dbg!();
         let mm = LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<DefaultMultiMappingStore<_>>(
             &mut mapper,

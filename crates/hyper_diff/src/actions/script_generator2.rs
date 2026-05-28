@@ -14,8 +14,9 @@ use hyperast::types::{HyperAST, Labeled};
 use super::Actions;
 use super::action_vec::ActionsVec;
 
+use crate::decompressed_tree_store::FullyDecompressedTreeStore;
 use crate::decompressed_tree_store::{BreadthFirstIterable, PostOrder, PostOrderIterable};
-use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::decompressed_tree_store::{DecompressedWithParent, DeepDecompressedTreeStore};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::Mapping;
 use crate::tree::tree_path::TreePath;
@@ -244,12 +245,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -277,12 +278,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: DeepDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: DeepDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -319,12 +320,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -377,12 +378,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,

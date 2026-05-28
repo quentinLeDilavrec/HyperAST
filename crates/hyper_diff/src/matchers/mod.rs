@@ -33,6 +33,7 @@ use std::ops::{Deref, DerefMut};
 
 use hyperast::types::{DecompressedFrom, HyperAST, HyperASTShared};
 
+use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
 use crate::mappings::{MappingStore, VecStore};
 
 pub struct Decompressible<HAST, D> {
@@ -225,6 +226,18 @@ impl<HAST: Copy, Dsrc, Ddst, M> Mapper<HAST, Dsrc, Ddst, M> {
                 mappings,
             },
         }
+    }
+
+    pub fn reserve_mappings(&mut self)
+    where
+        HAST: HyperAST,
+        Dsrc: ShallowDecompressedTreeStore<HAST, M::Src>,
+        Ddst: ShallowDecompressedTreeStore<HAST, M::Dst>,
+        M: MappingStore,
+    {
+        let src_len = self.mapping.src_arena.len();
+        let dst_len = self.mapping.dst_arena.len();
+        self.mapping.mappings.topit(src_len, dst_len);
     }
 }
 impl<HAST: Copy, Dsrc, Ddst, IdD> Mapper<HAST, Dsrc, Ddst, VecStore<IdD>> {

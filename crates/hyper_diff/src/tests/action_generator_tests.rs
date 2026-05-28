@@ -3,8 +3,9 @@ use std::fmt;
 use hyperast::types::{DecompressedFrom, LabelStore, Labeled, NodeStore};
 
 use crate::actions::script_generator::{self, Actions, SimpleAction, TestActions};
+use crate::decompressed_tree_store::CompletePostOrder;
+use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use crate::decompressed_tree_store::{CompletePostOrder, ShallowDecompressedTreeStore};
 use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::matchers::Decompressible;
 use crate::tests::examples::{example_action, example_gt_java_code};

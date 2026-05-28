@@ -27,8 +27,8 @@ pub struct LazyLeavesMatcher<
 }
 
 impl<
-    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
+    Dsrc: ContiguousDescendants<HAST, M::Src> + LazyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: ContiguousDescendants<HAST, M::Dst> + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore + Debug,
     S: Similarity<HAST, IdN = HAST::IdN>,
@@ -51,10 +51,7 @@ where
         for<'t> LendT<'t, HAST>:
             WithMetaData<compo::StmtCount> + WithMetaData<compo::MemberImportCount>,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute_variants(&mut mapper);
         mapper
     }
@@ -76,20 +73,14 @@ where
     where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, is_leaf_stmt, is_leaf_stmt);
         mapper
     }
     pub fn match_all(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
 
         Self::execute(&mut mapper, is_leaf, is_leaf);
         mapper
@@ -97,10 +88,7 @@ where
     pub fn match_files(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, is_leaf_file, is_leaf_file);
         mapper
     }
@@ -110,10 +98,7 @@ where
     where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::MemberImportCount>,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, is_leaf_sub_file, is_leaf_sub_file);
         mapper
     }

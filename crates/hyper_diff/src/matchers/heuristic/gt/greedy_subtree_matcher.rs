@@ -12,8 +12,8 @@ use hyperast::types::{HyperAST, NodeStore as _};
 use hyperast::types::{Labeled, LendT};
 use hyperast::types::{WithChildren, WithHashs};
 
-use crate::decompressed_tree_store::ContiguousDescendants;
-use crate::decompressed_tree_store::{DecompressedTreeStore, DecompressedWithParent};
+use crate::decompressed_tree_store::{ContiguousDescendants, ShallowDecompressedTreeStore};
+use crate::decompressed_tree_store::{DecompressedWithParent, FullyDecompressedTreeStore};
 use crate::mappings::{MonoMappingStore, MultiMappingStore};
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
@@ -24,8 +24,8 @@ pub struct GreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
 }
 
 impl<
-    Dsrc: DecompressedWithParent<HAST, M::Src> + ContiguousDescendants<HAST, M::Src>,
-    Ddst: DecompressedWithParent<HAST, M::Dst> + ContiguousDescendants<HAST, M::Dst>,
+    Dsrc: DecompressedWithParent<HAST, M::Src> + ContiguousDescendants<HAST, M::Src, IdD = M::Src>,
+    Ddst: DecompressedWithParent<HAST, M::Dst> + ContiguousDescendants<HAST, M::Dst, IdD = M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
@@ -148,10 +148,10 @@ where
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src>
+    Dsrc: FullyDecompressedTreeStore<HAST, M::Src>
         + DecompressedWithParent<HAST, M::Src>
         + ContiguousDescendants<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst>
+    Ddst: FullyDecompressedTreeStore<HAST, M::Dst>
         + DecompressedWithParent<HAST, M::Dst>
         + ContiguousDescendants<HAST, M::Dst>,
     HAST: HyperAST + Copy,
@@ -241,8 +241,7 @@ where
 
 fn positions<D, I, HAST: HyperAST + Copy>(arena: &D, x: I) -> impl Iterator<Item = f64>
 where
-    D: crate::decompressed_tree_store::ShallowDecompressedTreeStore<HAST, I>
-        + DecompressedWithParent<HAST, I>,
+    D: ShallowDecompressedTreeStore<HAST, I, IdD = I> + DecompressedWithParent<HAST, I>,
     I: PrimInt,
 {
     Some(x).into_iter().chain(arena.parents(x)).filter_map(|x| {
@@ -259,8 +258,8 @@ pub struct SubtreeMatcher<Mpr, const MIN_HEIGHT: usize> {
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
+    Dsrc: FullyDecompressedTreeStore<HAST, M::Src> + DecompressedWithParent<HAST, M::Src>,
+    Ddst: FullyDecompressedTreeStore<HAST, M::Dst> + DecompressedWithParent<HAST, M::Dst>,
     HAST,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize,
@@ -347,16 +346,15 @@ where
             &mapper.mappings,
         )
         .jaccard();
-        let pos_src = if mapper.src_arena.has_parent(src) {
-            zero()
-        } else {
-            mapper.src_arena.position_in_parent::<usize>(src).unwrap()
-        };
-        let pos_dst = if mapper.dst_arena.has_parent(dst) {
-            zero()
-        } else {
-            mapper.dst_arena.position_in_parent(dst).unwrap()
-        };
+
+        let pos_src = mapper
+            .src_arena
+            .position_in_parent::<usize>(src)
+            .unwrap_or(zero());
+        let pos_dst = mapper
+            .dst_arena
+            .position_in_parent::<usize>(dst)
+            .unwrap_or(zero());
 
         let max_src_pos = if mapper.src_arena.has_parent(src) {
             one()
@@ -405,7 +403,7 @@ struct PriorityTreeList<'b, D, IdD, HAST, const MIN_HEIGHT: usize> {
 
 impl<
     'a,
-    D: DecompressedTreeStore<HAST, IdD>,
+    D: FullyDecompressedTreeStore<HAST, IdD>,
     IdD: PrimInt,
     HAST: HyperAST + Copy,
     const MIN_HEIGHT: usize,

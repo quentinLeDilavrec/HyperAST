@@ -9,7 +9,7 @@ use hyperast::types::{WithHashs, WithMetaData};
 
 use super::{Similarity, TextSimilarity};
 use super::{is_leaf, is_leaf_file, is_leaf_stmt, is_leaf_sub_file};
-use crate::decompressed_tree_store::{DecompressedTreeStore, PostOrder, PostOrderIterable};
+use crate::decompressed_tree_store::{FullyDecompressedTreeStore, PostOrder, PostOrderIterable};
 use crate::decompressed_tree_store::{Shallow, ShallowDecompressedTreeStore};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::{Mapper, Mapping};
@@ -24,8 +24,8 @@ pub struct LeavesMatcher<
 }
 
 impl<
-    Dsrc: DecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, M::Dst>,
+    Dsrc: FullyDecompressedTreeStore<HAST, M::Src>,
+    Ddst: FullyDecompressedTreeStore<HAST, M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     S: Similarity<HAST, IdN = HAST::IdN>,
@@ -50,10 +50,7 @@ where
         M::Src: Shallow<M::Src>,
         M::Dst: Shallow<M::Dst>,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute_variants(&mut mapper);
         mapper
     }
@@ -78,10 +75,7 @@ where
     where
         for<'t> LendT<'t, HAST>: WithHashs,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, is_leaf_file, is_leaf_file);
         mapper
     }
@@ -93,10 +87,7 @@ where
         for<'t> LendT<'t, HAST>: WithMetaData<compo::StmtCount>,
         for<'t> LendT<'t, HAST>: WithHashs,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, is_leaf_stmt, is_leaf_stmt);
         mapper
     }
@@ -108,10 +99,7 @@ where
         M::Dst: Shallow<M::Dst>,
         for<'t> LendT<'t, HAST>: WithHashs,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper, is_leaf, is_leaf);
         mapper
     }
@@ -188,11 +176,19 @@ where
 
     fn link(mappings: &mut M, src_arena: &Dsrc, dst_arena: &Ddst, src: M::Src, dst: M::Dst) {
         if mappings.link_if_both_unmapped(src, dst) {
-            let src = src_arena.descendants(&src);
-            let dst = dst_arena.descendants(&dst);
-            assert_eq!(src.len(), dst.len());
-            for (src, dst) in src.iter().zip(dst.iter()) {
-                mappings.link(*src, *dst)
+            if cfg!(debug_assertions) {
+                let src = src_arena.descendants(&src);
+                let dst = dst_arena.descendants(&dst);
+                assert_eq!(src.len(), dst.len());
+                for (src, dst) in src.iter().zip(dst.iter()) {
+                    mappings.link(*src, *dst)
+                }
+            } else {
+                let src = src_arena.it_descendants(&src);
+                let dst = dst_arena.it_descendants(&dst);
+                for (src, dst) in src.zip(dst) {
+                    mappings.link(src, dst)
+                }
             }
         }
     }
@@ -216,7 +212,7 @@ pub(super) struct LeafIter<'a, HAST, D, IdD> {
 impl<'a, HAST, D, IdD> LeafIter<'a, HAST, D, IdD>
 where
     HAST: HyperAST + Copy,
-    D: ShallowDecompressedTreeStore<HAST, IdD>,
+    D: ShallowDecompressedTreeStore<HAST, IdD, IdD = IdD>,
     IdD: Copy,
 {
     pub fn new(stores: HAST, arena: &'a D, is_leaf: fn(HAST, &D, IdD) -> bool) -> Self {
@@ -234,7 +230,7 @@ where
 impl<HAST, D, IdD> Iterator for LeafIter<'_, HAST, D, IdD>
 where
     HAST: HyperAST + Copy,
-    D: DecompressedTreeStore<HAST, IdD>,
+    D: FullyDecompressedTreeStore<HAST, IdD>,
     IdD: Copy,
 {
     type Item = IdD;
@@ -246,7 +242,7 @@ where
 impl<HAST, D, IdD> LeafIter<'_, HAST, D, IdD>
 where
     HAST: HyperAST + Copy,
-    D: DecompressedTreeStore<HAST, IdD>,
+    D: FullyDecompressedTreeStore<HAST, IdD>,
     IdD: Copy,
 {
     pub fn next_mappable(&mut self, skip: impl Fn(IdD) -> bool) -> Option<IdD> {

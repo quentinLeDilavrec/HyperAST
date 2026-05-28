@@ -7,7 +7,7 @@ use hyperast::types::{HyperAST, HyperASTShared, Labeled, NodeStore as _};
 use num_traits::{PrimInt, cast};
 
 use crate::decompressed_tree_store::{
-    BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
+    BreadthFirstIterable, DecompressedWithParent, FullyDecompressedTreeStore, PostOrder,
     PostOrderIterable,
 };
 use crate::mappings::{DefaultMappingStore, MappingStore, MonoMappingStore};
@@ -152,11 +152,11 @@ impl<
     IdD: PrimInt + Debug,
     // T: Stored,
     //  + Typed + Labeled + WithChildren,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + PostOrder<HAST, IdD>,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy, //:'a + NodeStore2<HAST::IdN, R<'a> = T>, //NodeStore<'a, HAST::IdN, T>,

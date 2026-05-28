@@ -24,8 +24,8 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: ContiguousDescendants<HAST, Dsrc::IdD, M::Src>, // enable efficient similarity computation
-    Ddst: ContiguousDescendants<HAST, Ddst::IdD, M::Dst>, // enable efficient similarity computation
+    Dsrc: ContiguousDescendants<HAST, M::Src>, // enable efficient similarity computation
+    Ddst: ContiguousDescendants<HAST, M::Dst>, // enable efficient similarity computation
     HAST::Label: Eq,
     Ddst: RawContiguousDescendants<M::Dst, Ddst::IdD>,
     Dsrc: RawContiguousDescendants<M::Src, Dsrc::IdD>,
@@ -162,19 +162,19 @@ where
 }
 
 /// take advantage of post order layout
-fn candidates_aux2<HAST: HyperAST + Copy, D, IdD, IdS>(
-    mut seeds: Vec<IdD>,
+fn candidates_aux2<HAST: HyperAST + Copy, D, IdS>(
+    mut seeds: Vec<D::IdD>,
     s: &HAST::IdN,
     arena: &D,
     hyperast: HAST,
     is_mapped: impl Fn(&IdS) -> bool,
-) -> Vec<IdD>
+) -> Vec<D::IdD>
 where
-    D: DecompressedWithParent<HAST, IdD>,
-    D: ShallowDecompressedTreeStore<HAST, IdD, IdS>,
-    D: PostOrder<HAST, IdD, IdS>,
-    IdD: PrimInt + Shallow<IdS>,
+    D: DecompressedWithParent<HAST, D::IdD>,
+    D: ShallowDecompressedTreeStore<HAST, IdS>,
+    D: PostOrder<HAST, IdS>,
     IdS: Eq,
+    D::IdD: Ord + Copy,
 {
     // We consider all seeds and their ancestors exactly once.
     // The post order traversal gives the opportunity to guarantee that cheaply.

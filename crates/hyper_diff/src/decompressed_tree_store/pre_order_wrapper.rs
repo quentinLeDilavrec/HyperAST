@@ -43,7 +43,7 @@ impl<'store: 'a, 'a: 'b, 'b, IdD: PrimInt, HAST, D> Display
 where
     HAST: HyperAST + Copy,
     for<'t> hyperast::types::LendT<'t, HAST>: WithSerialization,
-    D: PostOrder<HAST, IdD>,
+    D: PostOrder<HAST, IdD, IdD = IdD>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut pos = 0;
@@ -72,7 +72,7 @@ impl<'store: 'a, 'a: 'b, 'b, IdD: PrimInt, HAST, D> Debug
     for DisplaySimplePreOrderMapper<'store, 'a, 'b, IdD, HAST, D>
 where
     HAST: HyperAST + Copy,
-    D: PostOrder<HAST, IdD>,
+    D: PostOrder<HAST, IdD, IdD = IdD>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {

@@ -1,10 +1,10 @@
+use hyperast::test_utils::simple_tree::{DisplayTree, vpair_to_stores};
+use hyperast::types::LabelStore;
+
 use crate::decompressed_tree_store::{ShallowDecompressedTreeStore, SimpleZsTree};
 use crate::mappings::{DefaultMappingStore, MappingStore};
 use crate::matchers::{Decompressible, optimal::zs::ZsMatcher};
 use crate::tests::examples::{example_gt_java_code, example_gt_slides, example_zs_paper};
-
-use hyperast::test_utils::simple_tree::{DisplayTree, vpair_to_stores};
-use hyperast::types::LabelStore;
 
 #[test]
 fn test_zs_paper_for_initial_layout() {

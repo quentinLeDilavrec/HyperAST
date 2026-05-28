@@ -1,16 +1,12 @@
+use hyperast::store::SimpleStores;
 use hyperast::test_utils::simple_tree::{DisplayTree, LS, SimpleTree, TStore};
-use hyperast::{store::SimpleStores, types::DecompressedFrom};
+use hyperast::types::DecompressedFrom;
 
-use crate::decompressed_tree_store::{
-    CompletePostOrder, ShallowDecompressedTreeStore, lazy_post_order::LazyPostOrder,
-};
-use crate::matchers::heuristic::gt::{
-    greedy_bottom_up_matcher::GreedyBottomUpMatcher,
-    lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher,
-    lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher,
-    marriage_bottom_up_matcher::MarriageBottomUpMatcher,
-};
+use crate::decompressed_tree_store::CompletePostOrder;
+use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
+use crate::decompressed_tree_store::lazy_post_order::LazyPostOrder;
 use crate::mappings::{DefaultMappingStore, MappingStore, VecStore};
+use crate::matchers::heuristic::gt;
 use crate::matchers::{Decompressible, Mapper, Mapping};
 use crate::tests::examples::*;
 use crate::tree::simple_tree::{NS, Tree, vpair_to_stores};
@@ -102,6 +98,8 @@ fn test_with_mappings(
                 mappings,
             },
         };
+        use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
+        use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
         match variant {
             GumtreeVariant::Stable => {
                 MarriageBottomUpMatcher::<_, VecStore<_>>::execute(&mut mapper)
@@ -159,6 +157,8 @@ fn test_with_mappings(
             },
         };
 
+        use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
+        use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;
         let mapping = match variant {
             GumtreeVariant::GreedyLazy => {
                 LazyGreedyBottomUpMatcher::<_, VecStore<_>>::match_it(mapper).mapping

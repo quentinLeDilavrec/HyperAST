@@ -2,12 +2,15 @@ use std::{borrow::Borrow, fmt::Debug};
 
 use num_traits::{cast, zero};
 
-use hyperast::PrimInt;
 use hyperast::types::HyperAST;
 
+use super::Decompressed;
+use super::FullyDecompressedTreeStore;
 use super::PostOrder;
+use super::PrimInt;
+use super::Shallow;
 use super::ShallowDecompressedTreeStore;
-use super::{BreadthFirstIt, BreadthFirstIterable, DecompressedTreeStore};
+use super::{BreadthFirstIt, BreadthFirstIterable, DeepDecompressedTreeStore};
 use super::{DecompressedParentsLending, DecompressedWithParent};
 
 /// Wrap or just map a decompressed tree in breadth-first eg. post-order,
@@ -48,14 +51,14 @@ impl<IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'_, IdD, DTS, D> {
     where
         D: From<D2>,
         HAST: HyperAST + Copy,
-        DTS: PostOrder<HAST, IdD>,
+        DTS: PostOrder<HAST, IdD, IdD = IdD>,
     {
         Self::make(d.into())
     }
     pub fn make<HAST>(back: D) -> Self
     where
         HAST: HyperAST + Copy,
-        DTS: PostOrder<HAST, IdD>,
+        DTS: PostOrder<HAST, IdD, IdD = IdD>,
     {
         let x: &DTS = back.borrow();
         let mut map = Vec::with_capacity(x.len());
@@ -77,7 +80,7 @@ impl<IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'_, IdD, DTS, D> {
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD>, D: Borrow<DTS>>
+impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD, IdD = IdD>, D: Borrow<DTS>>
     From<(&'a HAST, D)> for SimpleBfsMapper<'a, IdD, DTS, D>
 {
     fn from((_store, back): (&'a HAST, D)) -> Self {
@@ -85,13 +88,13 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD>, D: Borr
         let mut map = Vec::with_capacity(x.len());
         let mut rev = vec![num_traits::zero(); x.len()];
         let mut i = 0;
-        rev[x.root().to_usize().unwrap()] = cast(i).unwrap();
+        rev[x.root().index()] = cast(i).unwrap();
         map.push(x.root());
 
         while map.len() < x.len() {
             let curr = &map[i];
             let cs = x.children(curr);
-            rev[(*curr).to_usize().unwrap()] = cast(i).unwrap();
+            rev[(*curr).index()] = cast(i).unwrap();
             map.extend(cs);
             i += 1;
         }
@@ -101,22 +104,32 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD>, D: Borr
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD, DTS: DecompressedTreeStore<HAST, IdD>, D: Borrow<DTS>>
-    ShallowDecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
+impl<IdD: Shallow<IdD>, DTS: Decompressed<IdD, IdD = IdD>, D: Borrow<DTS>> Decompressed<IdD>
+    for SimpleBfsMapper<'_, IdD, DTS, D>
+{
+    type IdD = IdD;
+}
+
+impl<
+    HAST: HyperAST + Copy,
+    IdD: Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
+    D: Borrow<DTS>,
+> ShallowDecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
     fn len(&self) -> usize {
         self.map.len()
-    }
-
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.back.borrow().original(id)
     }
 
     fn root(&self) -> IdD {
         self.back.borrow().root()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.back.borrow().original(id)
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         let b: &DTS = self.back.borrow();
         b.child(x, p)
     }
@@ -127,12 +140,18 @@ impl<HAST: HyperAST + Copy, IdD, DTS: DecompressedTreeStore<HAST, IdD>, D: Borro
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD, DTS: DecompressedTreeStore<HAST, IdD>, D: Borrow<DTS>>
-    DecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
+impl<
+    HAST: HyperAST + Copy,
+    IdD: Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
+    D: Borrow<DTS>,
+> DeepDecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD>
-where {
+    fn descendants(&self, x: &IdD) -> Vec<IdD> {
         self.back.borrow().descendants(x)
+    }
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.back.borrow().descendants(x).into_iter()
     }
 
     fn descendants_count(&self, x: &IdD) -> usize {
@@ -157,7 +176,7 @@ impl<'a, IdD: PrimInt, DTS: DecompressedParentsLending<'a, IdD>, D: Borrow<DTS>>
 impl<
     HAST: HyperAST + Copy,
     IdD: PrimInt,
-    DTS: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
+    DTS: DeepDecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
     D: Borrow<DTS>,
 > DecompressedWithParent<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
@@ -169,7 +188,7 @@ impl<
         self.back.borrow().parent(id)
     }
 
-    fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
+    fn position_in_parent<Idx: hyperast::PrimInt>(&self, c: &IdD) -> Option<Idx> {
         self.back.borrow().position_in_parent(c)
     }
 
@@ -177,7 +196,7 @@ impl<
         self.back.borrow().parents(id)
     }
 
-    fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
+    fn path<Idx: hyperast::PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
         self.back.borrow().path(parent, descendant)
     }
 
@@ -188,8 +207,8 @@ impl<
 
 impl<
     HAST: HyperAST + Copy,
-    IdD: 'static + Clone,
-    DTS: DecompressedTreeStore<HAST, IdD>,
+    IdD: 'static + Clone + Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
     D: Borrow<DTS>,
 > BreadthFirstIt<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
@@ -198,8 +217,8 @@ impl<
 
 impl<
     HAST: HyperAST + Copy,
-    IdD: 'static + Clone,
-    DTS: DecompressedTreeStore<HAST, IdD>,
+    IdD: 'static + Clone + Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
     D: Borrow<DTS>,
 > BreadthFirstIterable<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {

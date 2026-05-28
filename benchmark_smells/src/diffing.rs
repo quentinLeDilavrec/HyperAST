@@ -1,9 +1,8 @@
-use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 use hyper_diff::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
+use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
-use hyperast::types::{self, HyperAST, NodeId};
+use hyperast::types::{HyperAST, LendT, NodeId, WithHashs, WithStats};
 use std::fmt::Debug;
 
 type IdD = u32;
@@ -22,7 +21,7 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
     HAST::Idx: Debug,
-    for<'t> hyperast::types::LendT<'t, HAST>: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let mm =
         LazyGreedySubtreeMatcher::<_>::compute_multi_mapping::<DefaultMultiMappingStore<_>>(mapper);
@@ -39,9 +38,9 @@ where
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::Label: Clone + Copy + Eq + Debug,
     HAST::Idx: Debug,
-    for<'t> hyperast::types::LendT<'t, HAST>: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
-    let mappings = VecStore::<u32>::default();
+    let mut mappings = VecStore::<u32>::default();
     let src_arena = Decompressible {
         hyperast,
         decomp: src_arena,
@@ -50,6 +49,7 @@ where
         hyperast,
         decomp: dst_arena,
     };
+    mappings.topit(src_arena.len(), dst_arena.len());
     let mut mapper = Mapper {
         hyperast,
         mapping: Mapping {
@@ -58,10 +58,6 @@ where
             mappings,
         },
     };
-    mapper.mapping.mappings.topit(
-        mapper.mapping.src_arena.len(),
-        mapper.mapping.dst_arena.len(),
-    );
     _top_down(&mut mapper);
     mapper
 }

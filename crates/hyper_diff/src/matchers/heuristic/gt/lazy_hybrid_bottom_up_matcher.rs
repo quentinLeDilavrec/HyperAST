@@ -40,7 +40,7 @@ where
     HAST::IdN: Debug,
 {
     pub fn match_it(mut mapper: Mapper<HAST, Dsrc, Ddst, M>) -> Mapper<HAST, Dsrc, Ddst, M> {
-        (mapper.mapping.mappings).topit(mapper.src_arena.len(), mapper.dst_arena.len());
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }

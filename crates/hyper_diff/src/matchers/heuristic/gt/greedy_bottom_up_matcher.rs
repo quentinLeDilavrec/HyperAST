@@ -9,8 +9,8 @@ use std::fmt::Debug;
 use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
-use crate::decompressed_tree_store::POBorrowSlice;
 use crate::decompressed_tree_store::SimpleZsTree as ZsTree;
+use crate::decompressed_tree_store::{POBorrowSlice, Shallow};
 use crate::mappings::MonoMappingStore;
 use crate::matchers::optimal::zs::ZsMatcher;
 use crate::matchers::{Decompressible, Mapper};
@@ -49,16 +49,13 @@ impl<
     >
 where
     for<'t> LendT<'t, HAST>: WithHashs,
-    M::Src: PrimInt,
-    M::Dst: PrimInt,
+    M::Src: PrimInt + Shallow<M::Src>,
+    M::Dst: PrimInt + Shallow<M::Dst>,
     HAST::Label: Eq,
     HAST::IdN: Debug,
 {
     pub fn match_it(mut mapper: Mapper<HAST, Dsrc, Ddst, M>) -> Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -162,7 +159,10 @@ where
         &mut self,
         src: M::Src,
         dst: M::Dst,
-    ) {
+    ) where
+        M::Src: Shallow<M::Src>,
+        M::Dst: Shallow<M::Dst>,
+    {
         let src_s = self.src_arena.descendants_count(&src);
         let dst_s = self.dst_arena.descendants_count(&dst);
         if !(src_s < SIZE || dst_s < SIZE) {
@@ -175,6 +175,8 @@ where
     pub(crate) fn match_subtree_zs<MZs>(&mut self, src: M::Src, dst: M::Dst)
     where
         MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
+        M::Src: Shallow<M::Src>,
+        M::Dst: Shallow<M::Dst>,
     {
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;
         use hyperast::types::DecompressedFrom as _;
@@ -182,7 +184,7 @@ where
         let stores = self.hyperast;
         let o_src = self.mapping.src_arena.original(&src);
         let o_dst = self.mapping.dst_arena.original(&dst);
-        let src_arena = ZsTree::<HAST::IdN, M::Src>::decompress(stores, &o_src);
+        let src_arena = ZsTree::<HAST::IdN, Dsrc::IdD>::decompress(stores, &o_src);
         let src_arena = Decompressible {
             hyperast: stores,
             decomp: src_arena,
@@ -203,8 +205,8 @@ where
     /// while `match_subtree_zs` has to allocate new trees.
     pub(crate) fn match_subtree_zs_slice<MZs>(&mut self, src: M::Src, dst: M::Dst)
     where
-        Dsrc: POBorrowSlice<HAST, M::Src>,
-        Ddst: POBorrowSlice<HAST, M::Dst>,
+        Dsrc: POBorrowSlice<HAST, M::Src, IdD = M::Src>,
+        Ddst: POBorrowSlice<HAST, M::Dst, IdD = M::Dst>,
         MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
     {
         use crate::decompressed_tree_store::ShallowDecompressedTreeStore;

@@ -9,15 +9,17 @@ use bitvec::slice::BitSlice;
 use logging_timer::time;
 use num_traits::{ToPrimitive, Zero, cast};
 
-use hyperast::PrimInt;
 use hyperast::position::Position;
 use hyperast::types::UniformNodeId;
 use hyperast::types::WithSerialization;
 use hyperast::types::{HyperAST, LendT};
 
+use super::Decompressed;
+use super::DeepDecompressedTreeStore;
+use super::PrimInt;
 use super::lazy_post_order::LazyPostOrder;
 use super::{DecompressedParentsLending, DecompressedWithParent, DecompressedWithSiblings};
-use super::{DecompressedTreeStore, FullyDecompressedTreeStore, ShallowDecompressedTreeStore};
+use super::{FullyDecompressedTreeStore, ShallowDecompressedTreeStore};
 use super::{PostOrdKeyRoots, PostOrder, PostOrderIterable, PostOrderKeyRoots};
 use crate::matchers::Decompressible;
 
@@ -128,7 +130,7 @@ impl<'store: 'a, 'a, IdD: PrimInt, HAST, D> Display
 where
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithSerialization,
-    D: DecompressedTreeStore<HAST, IdD>
+    D: DeepDecompressedTreeStore<HAST, IdD>
         + PostOrder<HAST, IdD>
         + FullyDecompressedTreeStore<HAST, IdD>,
 {
@@ -149,7 +151,7 @@ impl<'store: 'a, 'a, IdD: PrimInt, HAST, D> Debug
     for DisplayCompletePostOrder<'store, 'a, IdD, HAST, D>
 where
     HAST: HyperAST + Copy,
-    D: DecompressedTreeStore<HAST, IdD>
+    D: DeepDecompressedTreeStore<HAST, IdD>
         + PostOrder<HAST, IdD>
         + FullyDecompressedTreeStore<HAST, IdD>,
 {
@@ -181,7 +183,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         self.as_lazy().has_parent(id)
     }
 
-    fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
+    fn position_in_parent<Idx: hyperast::PrimInt>(&self, c: &IdD) -> Option<Idx> {
         self.as_lazy().position_in_parent(c)
     }
 
@@ -196,7 +198,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         self.as_lazy().lca(a, b)
     }
 
-    fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
+    fn path<Idx: hyperast::PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
         self.as_lazy().path(parent, descendant)
     }
 }
@@ -268,6 +270,12 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrderKeyRoots<HAST, IdD>
     }
 }
 
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressed<IdD>
+    for Decompressible<HAST, CompletePostOrder<'_, HAST::IdN, IdD>>
+{
+    type IdD = IdD;
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, CompletePostOrder<'_, HAST::IdN, IdD>>
 {
@@ -275,15 +283,15 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
         self.as_lazy().len()
     }
 
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.as_lazy().original(id)
-    }
-
     fn root(&self) -> IdD {
         cast(self.len() - 1).unwrap()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.as_lazy().original(id)
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         self.as_lazy().child(x, p)
     }
 
@@ -292,11 +300,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, CompletePostOrder<'_, HAST::IdN, IdD>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        self.as_lazy().descendants(x)
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.first_descendant(&x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
@@ -312,10 +320,10 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> FullyDecompressedTreeStore<HAST, IdD>
-    for Decompressible<HAST, CompletePostOrder<'_, HAST::IdN, IdD>>
-{
-}
+// impl<HAST: HyperAST + Copy, IdD: PrimInt> FullyDecompressedTreeStore<HAST, IdD>
+//     for Decompressible<HAST, CompletePostOrder<'_, HAST::IdN, IdD>>
+// {
+// }
 
 #[allow(unused)]
 pub struct RecCachedPositionProcessor<'a, IdN, IdD: Hash + Eq> {
@@ -368,9 +376,9 @@ where
 {
     pub fn position<HAST: HyperAST<IdN = IdN> + Copy>(&mut self, store: HAST, c: &IdD) -> &U
     where
-        D: DecompressedTreeStore<HAST, IdD>
+        D: DeepDecompressedTreeStore<HAST, IdD>
             + DecompressedWithSiblings<HAST, IdD>
-            + PostOrder<HAST, IdD>,
+            + PostOrder<HAST, IdD, IdD = IdD>,
     {
         use hyperast::types::HyperType;
         if self.cache.contains_key(c) {
@@ -424,7 +432,7 @@ where
     where
         D: DecompressedWithParent<HAST, IdD>
             + DecompressedWithSiblings<HAST, IdD>
-            + ShallowDecompressedTreeStore<HAST, IdD>,
+            + ShallowDecompressedTreeStore<HAST, IdD, IdD = IdD>,
     {
         if self.cache.contains_key(c) {
             self.cache.get(c).unwrap()
@@ -504,6 +512,12 @@ impl<'a, HAST: HyperAST + Copy, IdD, Kr: Borrow<BitSlice>>
     }
 }
 
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressed<IdD>
+    for Decompressible<HAST, LazyPOSlice<'_, HAST::IdN, IdD>>
+{
+    type IdD = IdD;
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, LazyPOSlice<'_, HAST::IdN, IdD>>
 {
@@ -511,15 +525,14 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
         self.id_compressed.len()
     }
 
+    fn root(&self) -> IdD {
+        cast(self.len() - 1).unwrap()
+    }
     fn original(&self, id: &IdD) -> HAST::IdN {
         self.id_compressed[id.to_usize().unwrap()].clone()
     }
 
-    fn root(&self) -> IdD {
-        cast(self.len() - 1).unwrap()
-    }
-
-    fn child(&self, _x: &IdD, _p: &[impl PrimInt]) -> IdD {
+    fn child(&self, _x: &IdD, _p: &[impl hyperast::PrimInt]) -> IdD {
         todo!()
     }
 
@@ -528,13 +541,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, LazyPOSlice<'_, HAST::IdN, IdD>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
-            .map(|x| cast(x).unwrap())
-            .collect()
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.first_descendant(x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
@@ -547,6 +558,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
 
     fn is_descendant(&self, desc: &IdD, of: &IdD) -> bool {
         desc < of && &self.first_descendant(of) <= desc
+    }
+}
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, LazyPOSlice<'_, HAST::IdN, IdD>> {
+    pub(crate) fn iter_descendants(&self, x: &IdD) -> hyperast::primint_it::Iter<IdD> {
+        self.first_descendant(&x).step_until(*x)
     }
 }
 
@@ -566,6 +582,12 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> PostOrder<HAST, IdD>
     }
 }
 
+impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> Decompressed<IdD>
+    for Decompressible<HAST, CompletePOSlice<'_, HAST::IdN, IdD, Kr>>
+{
+    type IdD = IdD;
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
     ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, CompletePOSlice<'_, HAST::IdN, IdD, Kr>>
@@ -574,15 +596,14 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
         self.as_simple().len()
     }
 
+    fn root(&self) -> IdD {
+        cast(self.len() - 1).unwrap()
+    }
     fn original(&self, id: &IdD) -> HAST::IdN {
         self.as_simple().original(id)
     }
 
-    fn root(&self) -> IdD {
-        cast(self.len() - 1).unwrap()
-    }
-
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         self.as_simple().child(x, p)
     }
 
@@ -591,11 +612,11 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>>
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt, Kr: Borrow<BitSlice>> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, CompletePOSlice<'_, HAST::IdN, IdD, Kr>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        self.as_simple().descendants(x)
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.as_simple().iter_descendants(x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {

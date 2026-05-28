@@ -136,10 +136,7 @@ fn lazy_subtree_mapping<'a>(
     let mappings = M::default();
     let owned = (decompress_src.value_mut(), decompress_dst.value_mut());
     let mut mapper = Mapper::prep(hyperast, mappings, owned);
-    mapper.mapping.mappings.topit(
-        mapper.mapping.src_arena.len(),
-        mapper.mapping.dst_arena.len(),
-    );
+    mapper.reserve_mappings();
     dbg!();
 
     let mm = SubtreeMatcher::<_>::compute_multi_mapping::<MM<_>>(&mut mapper);

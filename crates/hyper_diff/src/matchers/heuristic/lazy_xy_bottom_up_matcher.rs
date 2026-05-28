@@ -5,7 +5,7 @@ use hyperast::compat::HashMap;
 use hyperast::types::{HyperAST, LendT, WithHashs};
 
 use crate::decompressed_tree_store::{
-    DecompressedTreeStore, DecompressedWithParent, LazyDecompressed, LazyDecompressedTreeStore,
+    Decompressed, DecompressedWithParent, DeepDecompressedTreeStore, LazyDecompressedTreeStore,
     Shallow,
 };
 use crate::mappings::MonoMappingStore;
@@ -43,10 +43,7 @@ where
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -76,8 +73,8 @@ where
 
 impl<
     HAST: HyperAST + Copy,
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: Decompressed<M::Src>,
+    Ddst: Decompressed<M::Dst>,
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>
 where
@@ -85,10 +82,10 @@ where
     M::Dst: PrimInt,
     Dsrc::IdD: PrimInt,
     Ddst::IdD: PrimInt,
-    Dsrc: DecompressedTreeStore<HAST, Dsrc::IdD, M::Src>
+    Dsrc: DeepDecompressedTreeStore<HAST, M::Src>
         + DecompressedWithParent<HAST, Dsrc::IdD>
         + LazyDecompressedTreeStore<HAST, M::Src>,
-    Ddst: DecompressedTreeStore<HAST, Ddst::IdD, M::Dst>
+    Ddst: DeepDecompressedTreeStore<HAST, M::Dst>
         + DecompressedWithParent<HAST, Ddst::IdD>
         + LazyDecompressedTreeStore<HAST, M::Dst>,
     HAST::Label: Eq,

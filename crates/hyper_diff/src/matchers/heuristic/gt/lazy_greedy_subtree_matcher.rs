@@ -10,7 +10,7 @@ use hyperast::types::{WithHashs, WithStats};
 
 use crate::decompressed_tree_store::Shallow;
 use crate::decompressed_tree_store::{ContiguousDescendants, DecompressedWithParent};
-use crate::decompressed_tree_store::{LazyDecompressed, LazyDecompressedTreeStore};
+use crate::decompressed_tree_store::{Decompressed, LazyDecompressedTreeStore};
 use crate::mappings::{MonoMappingStore, MultiMappingStore};
 use crate::matchers::Mapper;
 use crate::similarity_metrics::SimilarityMeasure;
@@ -21,8 +21,8 @@ pub struct LazyGreedySubtreeMatcher<Mpr, const MIN_HEIGHT: usize = 1> {
 }
 
 impl<
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: Decompressed<M::Src>,
+    Ddst: Decompressed<M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
@@ -36,10 +36,10 @@ where
     M::Src: PrimInt + Hash,
     M::Dst: PrimInt + Hash,
     Dsrc: DecompressedWithParent<HAST, Dsrc::IdD>
-        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
+        + ContiguousDescendants<HAST, M::Src>
         + LazyDecompressedTreeStore<HAST, M::Src>,
     Ddst: DecompressedWithParent<HAST, Ddst::IdD>
-        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
+        + ContiguousDescendants<HAST, M::Dst>
         + LazyDecompressedTreeStore<HAST, M::Dst>,
 {
     pub fn match_it<MM>(
@@ -48,10 +48,7 @@ where
     where
         MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD> + Default,
     {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute::<MM>(&mut mapper);
         mapper
     }
@@ -81,8 +78,8 @@ where
 }
 
 impl<
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: Decompressed<M::Src>,
+    Ddst: Decompressed<M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
     const MIN_HEIGHT: usize, // = 2
@@ -96,10 +93,10 @@ where
     M::Src: PrimInt + Hash,
     M::Dst: PrimInt + Hash,
     Dsrc: DecompressedWithParent<HAST, Dsrc::IdD>
-        + ContiguousDescendants<HAST, Dsrc::IdD, M::Src>
+        + ContiguousDescendants<HAST, M::Src>
         + LazyDecompressedTreeStore<HAST, M::Src>,
     Ddst: DecompressedWithParent<HAST, Ddst::IdD>
-        + ContiguousDescendants<HAST, Ddst::IdD, M::Dst>
+        + ContiguousDescendants<HAST, M::Dst>
         + LazyDecompressedTreeStore<HAST, M::Dst>,
 {
     pub fn filter_mappings<MM: MultiMappingStore<Src = Dsrc::IdD, Dst = Ddst::IdD>>(
@@ -301,8 +298,8 @@ where
 }
 
 impl<
-    Dsrc: LazyDecompressed<M::Src>,
-    Ddst: LazyDecompressed<M::Dst>,
+    Dsrc: Decompressed<M::Src>,
+    Ddst: Decompressed<M::Dst>,
     HAST: HyperAST + Copy,
     M: MonoMappingStore,
 > crate::matchers::Mapper<HAST, Dsrc, Ddst, M>

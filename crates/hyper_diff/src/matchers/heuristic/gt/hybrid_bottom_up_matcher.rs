@@ -52,10 +52,7 @@ where
     pub fn match_it(
         mut mapper: crate::matchers::Mapper<HAST, Dsrc, Ddst, M>,
     ) -> crate::matchers::Mapper<HAST, Dsrc, Ddst, M> {
-        mapper.mapping.mappings.topit(
-            mapper.mapping.src_arena.len(),
-            mapper.mapping.dst_arena.len(),
-        );
+        mapper.reserve_mappings();
         Self::execute(&mut mapper);
         mapper
     }
@@ -107,8 +104,8 @@ where
 impl<HAST: HyperAST + Copy, M, Dsrc, Ddst> Mapper<HAST, Dsrc, Ddst, M> {
     pub fn adaptive_threshold<SrcIdS, DstIdS, SrcIdD, DstIdD>(&self, a: SrcIdD, cand: DstIdD) -> f64
     where
-        Dsrc: ContiguousDescendants<HAST, SrcIdD, SrcIdS>,
-        Ddst: ContiguousDescendants<HAST, DstIdD, DstIdS>,
+        Dsrc: ContiguousDescendants<HAST, SrcIdS, IdD = SrcIdD>,
+        Ddst: ContiguousDescendants<HAST, DstIdS, IdD = DstIdD>,
     {
         let a = self.mapping.src_arena.descendants_count(&a) as f64;
         let cand = self.mapping.dst_arena.descendants_count(&cand) as f64;

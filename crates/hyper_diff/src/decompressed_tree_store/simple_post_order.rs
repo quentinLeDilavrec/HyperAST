@@ -2,7 +2,6 @@ use std::{collections::HashMap, fmt::Debug, hash::Hash, ops::Deref};
 
 use num_traits::{ToPrimitive, Zero, cast, one, zero};
 
-use hyperast::PrimInt;
 use hyperast::position::Position;
 
 use hyperast::types::HyperType;
@@ -12,11 +11,14 @@ use hyperast::types::{HyperAST, HyperASTShared, LendT};
 use hyperast::types::{LabelStore, NodeStore};
 use hyperast::types::{Labeled, WithSerialization};
 
+use super::Decompressed;
+use super::DeepDecompressedTreeStore;
 use super::PostOrder;
+use super::PrimInt;
+use super::ShallowDecompressedTreeStore;
 use super::basic_post_order::{BasicPOSlice, BasicPostOrder};
 use super::{ContiguousDescendants, DecendantsLending};
 use super::{DecompressedParentsLending, DecompressedWithParent, DecompressedWithSiblings};
-use super::{DecompressedTreeStore, FullyDecompressedTreeStore, ShallowDecompressedTreeStore};
 use crate::matchers::Decompressible;
 
 #[derive(Clone)]
@@ -83,8 +85,7 @@ impl<'a, HAST: HyperAST + Copy, IdD> Decompressible<HAST, SimplePOSlice<'a, HAST
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
-{
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>> {
     fn _position_in_parent(&self, c: &IdD, p: &IdD) -> HAST::Idx {
         let mut r = 0;
         let mut c = *c;
@@ -128,7 +129,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         self.parent(id).is_some()
     }
 
-    fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
+    fn position_in_parent<Idx: hyperast::PrimInt>(&self, c: &IdD) -> Option<Idx> {
         let p = self.parent(c)?;
         let p = self._position_in_parent(c, &p);
         Some(cast(p).expect("no integer overflow, Idx is too small"))
@@ -141,7 +142,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedWithParent<HAST, IdD>
         }
     }
 
-    fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
+    fn path<Idx: hyperast::PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
         let this = self;
         let mut idxs = vec![];
         let mut curr = *descendant;
@@ -324,6 +325,12 @@ struct Element<IdC, Idx, IdD> {
     children: Vec<IdD>,
 }
 
+impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressed<IdD>
+    for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
+{
+    type IdD = IdD;
+}
+
 impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 {
@@ -331,15 +338,15 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
         self.id_compressed.len()
     }
 
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.id_compressed[id.to_usize().unwrap()].clone()
-    }
-
     fn root(&self) -> IdD {
         cast(self.len() - 1).unwrap()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.id_compressed[id.to_usize().unwrap()].clone()
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         use hyperast::types::Childrn as _;
         let mut r = *x;
         for d in p {
@@ -385,10 +392,10 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> ShallowDecompressedTreeStore<HAST, IdD
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> FullyDecompressedTreeStore<HAST, IdD>
-    for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
-{
-}
+// impl<HAST: HyperAST + Copy, IdD: PrimInt> FullyDecompressedTreeStore<HAST, IdD>
+//     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
+// {
+// }
 
 impl<IdN, IdD: PrimInt> SimplePostOrder<IdN, IdD> {
     pub(crate) fn _first_descendant(&self, i: &IdD) -> IdD {
@@ -396,13 +403,11 @@ impl<IdN, IdD: PrimInt> SimplePostOrder<IdN, IdD> {
     }
 }
 
-impl<HAST: HyperAST + Copy, IdD: PrimInt> DecompressedTreeStore<HAST, IdD>
+impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, &SimplePostOrder<HAST::IdN, IdD>>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD> {
-        (self.first_descendant(x).to_usize().unwrap()..x.to_usize().unwrap())
-            .map(|x| cast(x).unwrap())
-            .collect()
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.first_descendant(x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
@@ -473,8 +478,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Eq>
     }
 }
 
-fn size2<HAST: HyperAST + Copy>(store: HAST, x: &HAST::IdN) -> usize
-{
+fn size2<HAST: HyperAST + Copy>(store: HAST, x: &HAST::IdN) -> usize {
     use hyperast::types::Childrn as _;
     let tmp = store.resolve(x);
     let Some(cs) = tmp.children() else {

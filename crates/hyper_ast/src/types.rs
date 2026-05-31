@@ -808,7 +808,7 @@ pub trait NodeStoreLife<'store, IdN> {
     fn resolve(&'store self, id: &IdN) -> Self::R<'store>;
 }
 
-pub trait NodeId: Eq + Clone + 'static {
+pub trait NodeId: Debug + Eq + Clone + 'static {
     type IdN: Eq + UniformNodeId;
     fn as_id(&self) -> &Self::IdN;
     // fn as_ty(&self) -> &Self::Ty;

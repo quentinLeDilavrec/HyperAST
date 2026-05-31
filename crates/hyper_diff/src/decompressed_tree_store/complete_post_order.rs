@@ -87,7 +87,6 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt>
     From<Decompressible<HAST, super::lazy_post_order::LazyPostOrder<HAST::IdN, IdD>>>
     for Decompressible<HAST, CompletePostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: Debug,
     IdD: PrimInt + super::Shallow<IdD> + Debug,
     for<'t> LendT<'t, HAST>: WithStats,
 {

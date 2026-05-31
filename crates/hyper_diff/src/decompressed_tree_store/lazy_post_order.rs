@@ -431,7 +431,6 @@ impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
         store: HAST,
     ) -> SimplePostOrder<IdN, IdD>
     where
-        HAST::IdN: Debug,
         HAST::IdN: UniformNodeId,
         for<'t> LendT<'t, HAST>: WithStats,
     {

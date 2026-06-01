@@ -86,7 +86,7 @@ where
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = GreedyBottomUpMatcher::<_, 100>::match_it(mapper);
+    let mapper = GreedyBottomUpMatcher::<_, M, 100>::match_it(mapper);
 
     let measure = measure.stop_then_prepare();
 

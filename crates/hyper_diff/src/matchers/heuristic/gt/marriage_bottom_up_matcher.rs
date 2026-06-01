@@ -26,7 +26,7 @@ impl<
     Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
     Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
     HAST: HyperAST + Copy,
-    M: MonoMappingStore + Default,
+    M: MonoMappingStore,
     MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
     const SIZE_THRESHOLD: usize,
     const SIM_THRESHOLD_NUM: u64,

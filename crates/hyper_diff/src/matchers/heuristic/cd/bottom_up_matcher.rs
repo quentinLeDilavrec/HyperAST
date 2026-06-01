@@ -28,7 +28,7 @@ impl<
     Dsrc: DecompTreeBounds<HAST, M::Src>,
     Ddst: DecompTreeBounds<HAST, M::Dst>,
     HAST: HyperAST + Copy,
-    M: MonoMappingStore + Default,
+    M: MonoMappingStore,
     const SIZE_THRESHOLD: usize,   // = 1000,
     const SIM_THRESHOLD_NUM: u64,  // = 6,
     const SIM_THRESHOLD_DEN: u64,  // = 10,

@@ -31,7 +31,7 @@ impl<
     Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
     Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
     HAST: HyperAST + Copy,
-    M: MonoMappingStore + Default,
+    M: MonoMappingStore,
     const SIM_THRESHOLD_NUM: u64, // 1
     const SIM_THRESHOLD_DEN: u64, // 2
 > SimpleBottomUpMatcher<Mapper<HAST, Dsrc, Ddst, M>, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>

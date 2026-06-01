@@ -286,7 +286,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
                 let mapper = GreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
                 use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
                 let mapper_bottom_up =
-                    GreedyBottomUpMatcher::<_, MAX_SIZE, NUM, DEN>::match_it(mapper);
+                    GreedyBottomUpMatcher::<_, M, MAX_SIZE, NUM, DEN>::match_it(mapper);
                 black_box(mapper_bottom_up);
             });
         },
@@ -312,7 +312,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
                 let mapper = mapper.map(CDS::from, CDS::from);
                 use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
                 let mapper_bottom_up =
-                    GreedyBottomUpMatcher::<_, MAX_SIZE, NUM, DEN>::match_it(mapper);
+                    GreedyBottomUpMatcher::<_, M, MAX_SIZE, NUM, DEN>::match_it(mapper);
                 black_box(mapper_bottom_up);
             });
         },

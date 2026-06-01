@@ -24,11 +24,12 @@ use super::factorized_bounds::DecompTreeBounds;
 /// ie. make the different threshold neater
 pub struct GreedyBottomUpMatcher<
     Mpr,
+    MZs = <Mpr as crate::matchers::WithMappings>::M,
     const SIZE_THRESHOLD: usize = 1000,
     const SIM_THRESHOLD_NUM: u64 = 1,
     const SIM_THRESHOLD_DEN: u64 = 2,
 > {
-    _phantom: std::marker::PhantomData<*const Mpr>,
+    _phantom: std::marker::PhantomData<*const (Mpr, MZs)>,
 }
 
 /// TODO PostOrder might not be necessary
@@ -36,13 +37,15 @@ impl<
     Dsrc: DecompTreeBounds<HAST, M::Src> + POBorrowSlice<HAST, M::Src>,
     Ddst: DecompTreeBounds<HAST, M::Dst> + POBorrowSlice<HAST, M::Dst>,
     HAST: HyperAST + Copy,
-    M: MonoMappingStore + Default,
+    M: MonoMappingStore,
+    MZs: MonoMappingStore<Src = M::Src, Dst = M::Dst> + Default,
     const SIZE_THRESHOLD: usize,
     const SIM_THRESHOLD_NUM: u64,
     const SIM_THRESHOLD_DEN: u64,
 >
     GreedyBottomUpMatcher<
         Mapper<Dsrc, Ddst, HAST, M>,
+        MZs,
         SIZE_THRESHOLD,
         SIM_THRESHOLD_NUM,
         SIM_THRESHOLD_DEN,
@@ -61,7 +64,7 @@ where
     }
 
     pub fn execute(mapper: &mut Mapper<HAST, Dsrc, Ddst, M>) {
-        Self::with_recovery(mapper, Mapper::last_chance_match_zs::<M, SIZE_THRESHOLD>);
+        Self::with_recovery(mapper, Mapper::last_chance_match_zs::<MZs, SIZE_THRESHOLD>);
     }
 
     pub fn with_recovery(

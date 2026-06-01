@@ -39,6 +39,8 @@ pub mod gumtree_stable_lazy;
 pub mod gumtree_stable_simple_lazy;
 pub mod xy;
 
+type IdD = u32;
+
 type DefaultMetric = <LatMem as RuntimeMeasurement>::M;
 type DefaultMetricSetup = Phased<Prepared<DefaultMetric>>;
 
@@ -409,7 +411,7 @@ pub struct DiffResult<A, M, MD> {
 #[allow(type_alias_bounds)]
 type DiffRes<HAST: HyperASTShared> = DiffResult<
     SimpleAction<HAST::Label, CompressedTreePath<HAST::Idx>, HAST::IdN>,
-    Mapper<HAST, CDS<HAST>, CDS<HAST>, VecStore<u32>>,
+    Mapper<HAST, CDS<HAST>, CDS<HAST>, VecStore<IdD>>,
     PreparedPhased3<LatMem>,
 >;
 
@@ -424,7 +426,7 @@ pub struct ResultsSummary<MD> {
     // pub gen_t: D,
 }
 
-impl<A, MD: Clone, HAST, DS, DD> DiffResult<A, Mapper<HAST, DS, DD, VecStore<u32>>, MD> {
+impl<A, MD: Clone, HAST, DS, DD> DiffResult<A, Mapper<HAST, DS, DD, VecStore<IdD>>, MD> {
     pub fn summarize(&self) -> ResultsSummary<MD> {
         use crate::actions::Actions;
         use crate::mappings::MappingStore;
@@ -457,8 +459,8 @@ impl<HAST, Dsrc, Ddst, M, MD> Display
         MD,
     >
 where
-    Dsrc: ShallowDecompressedTreeStore<HAST, u32>,
-    Ddst: ShallowDecompressedTreeStore<HAST, u32>,
+    Dsrc: ShallowDecompressedTreeStore<HAST, IdD>,
+    Ddst: ShallowDecompressedTreeStore<HAST, IdD>,
     HAST: HyperAST + Copy,
     for<'t> LendT<'t, HAST>: WithStats + WithSerialization,
     HAST::IdN: Copy + Debug,
@@ -477,21 +479,21 @@ where
 }
 
 #[allow(type_alias_bounds)]
-type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
+type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, IdD>>;
 
 #[allow(type_alias_bounds)]
 #[allow(clippy::upper_case_acronyms)]
-type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
+type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, IdD>>;
 
 #[allow(type_alias_bounds)]
 #[allow(clippy::upper_case_acronyms)]
-type BFS<'a, HAST: HyperASTShared> = SimpleBfsMapper<'a, u32, CDS<HAST>>;
+type BFS<'a, HAST: HyperASTShared> = SimpleBfsMapper<'a, IdD, CDS<HAST>>;
 
 fn check_oneshot_decompressed_against_lazy<HAST: HyperAST + Copy>(
     hyperast: HAST,
     src: &HAST::IdN,
     dst: &HAST::IdN,
-    mapper: &Mapper<HAST, CDS<HAST>, CDS<HAST>, VecStore<u32>>,
+    mapper: &Mapper<HAST, CDS<HAST>, CDS<HAST>, VecStore<IdD>>,
 ) where
     HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
@@ -508,10 +510,9 @@ fn check_oneshot_decompressed_against_lazy<HAST: HyperAST + Copy>(
         "naive:\t{:?}",
         &mapper.llds.iter().take(20).collect::<Vec<_>>()
     );
-    #[allow(type_alias_bounds)]
-    type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
+
     let _mapper: (HAST, (DS<HAST>, DS<HAST>)) = hyperast.decompress_pair(src, dst);
-    let mut _mapper_owned: Mapper<_, DS<HAST>, DS<HAST>, VecStore<u32>> = _mapper.into();
+    let mut _mapper_owned: Mapper<_, DS<HAST>, DS<HAST>, VecStore<IdD>> = _mapper.into();
     let _mapper = Mapper {
         hyperast,
         mapping: crate::matchers::Mapping {

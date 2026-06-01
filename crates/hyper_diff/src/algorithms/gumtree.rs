@@ -4,7 +4,7 @@ use hyperast::PrimInt;
 use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithHashs, WithStats};
 
-use super::{CDS, DiffRes, DiffResult, tr};
+use super::{CDS, DiffRes, DiffResult, IdD, tr};
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::algorithms::check_oneshot_decompressed_against_lazy;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
@@ -13,7 +13,8 @@ use crate::matchers::Mapper;
 use crate::matchers::heuristic::gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
 use crate::matchers::heuristic::gt::greedy_subtree_matcher::GreedySubtreeMatcher;
 
-type MM = DefaultMultiMappingStore<u32>;
+type M = VecStore<IdD>;
+type MM = DefaultMultiMappingStore<IdD>;
 
 pub fn diff<HAST: HyperAST + Copy>(
     hyperast: HAST,

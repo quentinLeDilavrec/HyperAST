@@ -2236,13 +2236,13 @@ dependencies = [
 [[package]]
 name = "criterion"
 version = "0.6.0"
-source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=0301588ad4e88e7911330a77c4bc1edee6677c27#0301588ad4e88e7911330a77c4bc1edee6677c27"
+source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d#b806383aafddd0435b10ba9d9aae828a3e3cdc8d"
 dependencies = [
  "anes",
  "cast",
  "ciborium",
  "clap 4.5.32",
- "criterion-plot 0.5.0 (git+https://github.com/quentinLeDilavrec/criterion.rs?rev=0301588ad4e88e7911330a77c4bc1edee6677c27)",
+ "criterion-plot 0.5.0 (git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d)",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -2278,7 +2278,7 @@ dependencies = [
 [[package]]
 name = "criterion-plot"
 version = "0.5.0"
-source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=0301588ad4e88e7911330a77c4bc1edee6677c27#0301588ad4e88e7911330a77c4bc1edee6677c27"
+source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d#b806383aafddd0435b10ba9d9aae828a3e3cdc8d"
 dependencies = [
  "cast",
  "itertools 0.13.0",
@@ -4396,7 +4396,7 @@ dependencies = [
  "byteorder",
  "cfg-if",
  "const-chunks",
- "criterion 0.6.0 (git+https://github.com/quentinLeDilavrec/criterion.rs?rev=0301588ad4e88e7911330a77c4bc1edee6677c27)",
+ "criterion 0.6.0 (git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d)",
  "criterion-perf-events",
  "env_logger 0.11.5",
  "hashbrown 0.13.2",

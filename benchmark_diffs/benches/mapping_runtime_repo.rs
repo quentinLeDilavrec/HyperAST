@@ -1,3 +1,5 @@
+//! benchmarks for the whole matching process, including the subtree matcher
+
 use criterion::measurement::Measurement;
 use criterion::{BenchmarkId, Criterion, Throughput};
 use criterion::{criterion_group, criterion_main};
@@ -10,7 +12,7 @@ use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::types::{HyperAST as _, HyperASTShared, WithStats as _};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 
-use hyperast_benchmark_diffs::{Input, prep_commits};
+use hyperast_benchmark_diffs::{InputRepo, prep_commit_pair};
 
 #[allow(type_alias_bounds)]
 type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -21,56 +23,11 @@ type MM = hyper_diff::mappings::DefaultMultiMappingStore<u32>;
 
 fn mapping_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("Mapping_runtime");
+    let inputs = hyperast_benchmark_diffs::REPOSITORIES;
 
-    let inputs: &[Input] = &[
-        // Input {
-        //     repo: hyperast_vcs_git::git::Forge::Github.repo("chromium", "chromium"),
-        //     commit: "f461f9752e5918c5c87f2e3767bcb24945ee0fa0",
-        //     config: hyperast_vcs_git::processing::RepoConfig::CppMake,
-        //     fetch: false,
-        // },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("apache", "maven"),
-            commit: "c3cf29438e3d65d6ee5c5726f8611af99d9a649a",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("INRIA", "spoon"),
-            commit: "56e12a0c0e0e69ea70863011b4f4ca3305e0542b",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("javaparser", "javaparser"),
-            commit: "046bf8be251189452ad6b25bf9107a1a2167ce6f",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("apache", "dubbo"),
-            commit: "e831b464837ae5d2afac9841559420aeaef6c52b",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("netty", "netty"),
-            commit: "c2b846750dd2131d65aa25c8cf66bf3649b248f9",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("apache", "hadoop"),
-            commit: "d5e97fe4d6baf43a5576cbd1700c22b788dba01e",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-    ];
-    let mut repositories = PreProcessedRepositories::default();
     for p in inputs.iter() {
-        repositories.register_config(p.repo.clone(), p.config);
-    }
-    for p in inputs.iter() {
+        let mut repositories = PreProcessedRepositories::default();
+        repositories.register_config(p.gh(), p.config);
         no_size_threshold(&mut group, &mut repositories, p);
         no_sim_threshold::<200>(&mut group, &mut repositories, p);
         no_size_threshold_with_sim_threshold::<1, 2>(&mut group, &mut repositories, p);
@@ -83,14 +40,14 @@ fn mapping_group(c: &mut Criterion) {
 fn no_size_threshold(
     group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
-    p: &Input,
+    p: &InputRepo,
 ) {
     use hyper_diff::matchers::heuristic::gt;
     prep_and_bench(
         group,
         repositories,
         p,
-        BenchmarkId::new("Xy", p.repo.name()),
+        BenchmarkId::new("Xy", p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
@@ -110,7 +67,7 @@ fn no_size_threshold(
         group,
         repositories,
         p,
-        BenchmarkId::new("PartialLazyXy", p.repo.name()),
+        BenchmarkId::new("PartialLazyXy", p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -132,7 +89,7 @@ fn no_size_threshold(
         group,
         repositories,
         p,
-        BenchmarkId::new("LazyXy", p.repo.name()),
+        BenchmarkId::new("LazyXy", p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -155,7 +112,7 @@ fn no_size_threshold(
 fn no_sim_threshold<const MAX_SIZE: usize>(
     group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
-    p: &Input,
+    p: &InputRepo,
 ) {
     use hyper_diff::matchers::heuristic::gt;
 
@@ -163,10 +120,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
         group,
         repositories,
         p,
-        BenchmarkId::new(
-            format!("PartialLazyHybridGumtree {}", MAX_SIZE),
-            p.repo.name(),
-        ),
+        BenchmarkId::new(format!("PartialLazyHybridGumtree {}", MAX_SIZE), p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -188,7 +142,7 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
         group,
         repositories,
         p,
-        BenchmarkId::new(format!("LazyHybridGumtree {}", MAX_SIZE), p.repo.name()),
+        BenchmarkId::new(format!("LazyHybridGumtree {}", MAX_SIZE), p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -210,17 +164,14 @@ fn no_sim_threshold<const MAX_SIZE: usize>(
 fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
     group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
-    p: &Input,
+    p: &InputRepo,
 ) {
     use hyper_diff::matchers::heuristic::gt;
     prep_and_bench(
         group,
         repositories,
         p,
-        BenchmarkId::new(
-            format!("PartialLazySimpleGumtree {}/{}", NUM, DEN),
-            p.repo.name(),
-        ),
+        BenchmarkId::new(format!("PartialLazySimpleGumtree {}/{}", NUM, DEN), p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -242,7 +193,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
         group,
         repositories,
         p,
-        BenchmarkId::new(format!("LazySimpleGumtree {}/{}", NUM, DEN), p.repo.name()),
+        BenchmarkId::new(format!("LazySimpleGumtree {}/{}", NUM, DEN), p.name),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
                 let hyperast = &repositories.processor.main_stores;
@@ -263,7 +214,7 @@ fn no_size_threshold_with_sim_threshold<const NUM: u64, const DEN: u64>(
 fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
     group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
-    p: &Input,
+    p: &InputRepo,
 ) {
     use hyper_diff::matchers::heuristic::gt;
 
@@ -273,7 +224,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         p,
         BenchmarkId::new(
             format!("GreedyGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -297,7 +248,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         p,
         BenchmarkId::new(
             format!("PartialLazyGreedyGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -323,7 +274,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         p,
         BenchmarkId::new(
             format!("LazyGreedyGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -347,7 +298,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         p,
         BenchmarkId::new(
             format!("PartialLazyStableGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -372,7 +323,7 @@ fn with_sim_threshold<const MAX_SIZE: usize, const NUM: u64, const DEN: u64>(
         p,
         BenchmarkId::new(
             format!("LazyStableGumtree {} {}/{}", MAX_SIZE, NUM, DEN),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -400,7 +351,7 @@ fn with_second_sim_threshold<
 >(
     group: &mut criterion::BenchmarkGroup<'_, impl Measurement>,
     repositories: &mut PreProcessedRepositories,
-    p: &Input,
+    p: &InputRepo,
 ) {
     use hyper_diff::matchers::heuristic::cd;
     prep_and_bench(
@@ -412,7 +363,7 @@ fn with_second_sim_threshold<
                 "ChangeDistiller {} {}/{} {}/{}",
                 MAX_SIZE, NUM, DEN, NUM2, DEN2
             ),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -438,7 +389,7 @@ fn with_second_sim_threshold<
                 "PartialLazyChangeDistiller {} {}/{} {}/{}",
                 MAX_SIZE, NUM, DEN, NUM2, DEN2
             ),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -466,7 +417,7 @@ fn with_second_sim_threshold<
                 "LazyChangeDistiller {} {}/{} {}/{}",
                 MAX_SIZE, NUM, DEN, NUM2, DEN2
             ),
-            p.repo.name(),
+            p.name,
         ),
         |b, (repositories, (src, dst))| {
             b.iter(|| {
@@ -488,7 +439,7 @@ fn with_second_sim_threshold<
 fn prep_and_bench<Mea: Measurement>(
     group: &mut criterion::BenchmarkGroup<'_, Mea>,
     repositories: &mut PreProcessedRepositories,
-    p: &Input,
+    p: &InputRepo,
     bid: BenchmarkId,
     f: impl FnMut(
         &mut criterion::Bencher<'_, Mea>,
@@ -499,7 +450,7 @@ fn prep_and_bench<Mea: Measurement>(
         bid,
         repositories,
         |group, repositories| {
-            let (src, dst) = prep_commits(p, repositories);
+            let (src, dst) = prep_commit_pair(p, repositories);
             let hyperast = &repositories.processor.main_stores;
             group.throughput(Throughput::Elements(
                 (hyperast.node_store().resolve(src).size()

@@ -1,400 +1,160 @@
-use criterion::measurement::Measurement;
+//! Benchmarks for bottom-up runtime over multiple repositories, only one commit per repository.
+
+use criterion::measurement::{Measurement, WallTime};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use criterion::{criterion_group, criterion_main};
 
-use hyper_diff::decompressed_tree_store::CompletePostOrder;
-use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use hyper_diff::mappings::MappingStore;
-use hyper_diff::mappings::VecStore;
-use hyper_diff::matchers::{Decompressible, Mapper};
-use hyperast::store::nodes::legion::NodeIdentifier;
-use hyperast::types::{HyperAST as _, HyperASTShared, WithStats as _};
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 
-use hyperast_benchmark_diffs::{Input, prep_commits};
+use hyperast_benchmark_diffs::bottom_up_routines::WithSetup;
+use hyperast_benchmark_diffs::{Input, OwnedLazyMapping, Prep, ThroughputKind};
+use hyperast_benchmark_diffs::{initial_lazy_mapping, prep_commit_pair};
 
-#[allow(type_alias_bounds)]
-type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
-#[allow(type_alias_bounds)]
-type CDS<HAST: HyperASTShared> = Decompressible<HAST, CompletePostOrder<HAST::IdN, u32>>;
-type M = hyper_diff::mappings::VecStore<u32>;
-type MM = hyper_diff::mappings::DefaultMultiMappingStore<u32>;
+#[repr(transparent)]
+struct B<'b, Mea: Measurement>(criterion::Bencher<'b, Mea>);
+
+impl<'b, Mea: Measurement> WithSetup for B<'b, Mea> {
+    fn run<I, O, S: FnMut() -> I, R: FnMut(I) -> O>(&mut self, s: S, r: R) {
+        self.0.iter_batched(s, r, BatchSize::LargeInput);
+    }
+}
 
 fn bottomup_group(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Gumtree_BottomUp_runtime");
+    let only_summarize = c.resummarize;
+    let Ok(throughput_kind) = c.throughput.parse();
+    let mut group = c.benchmark_group("BottomUp_runtime_repo");
+    // some filtering to avoid cluttering summary
+    let take_inputs = 4; // make it large if need be
+    let take_routines = ["Simple", "Hybrid_100"]; // the empty list accepts all routines
+    let take_repo_config = Some(hyperast_vcs_git::processing::RepoConfig::JavaMaven); // None accepts all configs
 
-    let inputs: &[Input] = &[
-        // Input {
-        //     repo: hyperast_vcs_git::git::Forge::Github.repo("chromium", "chromium"),
-        //     commit: "f461f9752e5918c5c87f2e3767bcb24945ee0fa0",
-        //     config: hyperast_vcs_git::processing::RepoConfig::CppMake,
-        //     fetch: false,
-        // },
-        //
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("apache", "maven"),
-            commit: "c3cf29438e3d65d6ee5c5726f8611af99d9a649a",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("INRIA", "spoon"),
-            commit: "56e12a0c0e0e69ea70863011b4f4ca3305e0542b",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-        Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("apache", "hadoop"),
-            commit: "b69ede7154d44538a4a66824c34f7ba143deef25",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
-            fetch: true,
-        },
-    ];
-    let mut repositories = PreProcessedRepositories::default();
-    for p in inputs.iter() {
-        repositories.register_config(p.repo.clone(), p.config);
-    }
+    let inputs = hyperast_benchmark_diffs::REPOSITORIES;
+
+    let inputs = (inputs.iter().cloned().enumerate())
+        .filter(|x| take_repo_config.map_or(true, |y| x.1.config == y))
+        .take(take_inputs)
+        .map(|(i, x)| x.with(i, 1))
+        .collect::<Vec<_>>();
+    let alt_name = format!(
+        "{}_{throughput_kind}_{}",
+        take_routines.join("_"),
+        inputs.len()
+    );
+    let inputs = inputs
+        .into_iter()
+        .filter_map(|i| i.try_fetch())
+        .collect::<Vec<_>>();
     let mut p = Bench {
         group: &mut group,
-        repositories: &mut repositories,
-        i: inputs.iter().next().unwrap(),
+        repositories: PreProcessedRepositories::default(),
+        i: inputs.iter().next().expect("need at least one input"),
         name: None,
         prep: Prep::None,
+        throughput_kind,
     };
     for i in inputs.iter() {
+        let mut repositories = PreProcessedRepositories::default();
+        repositories.register_config(i.gh(), i.config);
+        p.repositories = repositories;
         p.i = i;
-        bench_xy(&mut p);
-        bench_greedy::<100>(&mut p);
-        bench_greedy::<200>(&mut p);
-        bench_greedy::<400>(&mut p);
-        bench_simple(&mut p);
-        bench_hybrid::<100>(&mut p);
-        bench_hybrid::<200>(&mut p);
-        bench_hybrid::<400>(&mut p);
-        bench_stable::<100>(&mut p);
-        bench_stable::<200>(&mut p);
-        bench_stable::<400>(&mut p);
-        bench_stable_simple(&mut p);
-        bench_stable_hybrid::<100>(&mut p);
-        bench_stable_hybrid::<200>(&mut p);
-        bench_stable_hybrid::<400>(&mut p);
+        use hyperast_benchmark_diffs::bottom_up_routines::Routines;
+        let routines = Routines::lazy_to_lazy::<0, 2>()
+            .chain(Routines::lazy_to_lazy::<100, 2>())
+            .chain(Routines::lazy_to_lazy::<200, 2>())
+            .chain(Routines::lazy_to_lazy::<400, 2>())
+            .chain(Routines::lazy_to_complete::<0, 2>())
+            .chain(Routines::lazy_to_complete::<100, 2>())
+            .chain(Routines::lazy_to_complete::<200, 2>())
+            .chain(Routines::lazy_to_complete::<400, 2>());
+        for r in routines {
+            if !take_routines.is_empty()
+                && !take_routines
+                    .iter()
+                    .any(|p| r.name.matches(p).next().is_some())
+            {
+                continue;
+            }
+            p.name = Some(r.name.clone());
+            p.prep = r.prep;
+            (match p.prep {
+                Prep::None => todo!(),
+                _ if only_summarize => only_set_throughput,
+                _ => prep_subtree_and_bench,
+            })(&mut p, |b, (repositories, (owned, mappings))| {
+                // let h = &hyperast_vcs_git::no_space::as_nospaces(&repositories.processor.main_stores);
+                let h = &repositories.processor.main_stores;
+                // SAFETY: transparent wrapper
+                // NOTE: it was needed to avoid issues with invariant lifetimes occurring with `B<'a,'b, Mea>(&mut Bencher<'b`
+                let b: &mut B<WallTime> = unsafe { std::mem::transmute(b) };
+                (r.routine)(b, h, (owned.clone(), mappings.clone()));
+            });
+        }
     }
-    group.finish();
-
-    let mut group = c.benchmark_group("ChangDistiller_BottomUp_runtime");
-
-    let mut p = Bench {
-        group: &mut group,
-        repositories: &mut repositories,
-        i: inputs.iter().next().unwrap(),
-        name: None,
-        prep: Prep::None,
-    };
-
-    for i in inputs.iter() {
-        p.i = i;
-        bench_cd::<100>(&mut p);
-        bench_cd::<200>(&mut p);
-        bench_cd::<400>(&mut p);
-    }
-    group.finish();
-}
-
-fn bench_xy(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::xy_bottom_up_matcher;
-    let name = format!("Xy");
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mapper = mapper.map(CDS::from, CDS::from);
-        use xy_bottom_up_matcher::XYBottomUpMatcher;
-        XYBottomUpMatcher::<_>::match_it(mapper)
-    });
-    use hyper_diff::matchers::heuristic::lazy_xy_bottom_up_matcher;
-    let name = format!("LazyXY");
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use lazy_xy_bottom_up_matcher::LazyXYBottomUpMatcher;
-        let _mpr = LazyXYBottomUpMatcher::<_>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_greedy<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("Greedy_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mapper = mapper.map(CDS::from, CDS::from);
-        use gt::greedy_bottom_up_matcher::GreedyBottomUpMatcher;
-        let mapper = GreedyBottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
-        mapper
-    });
-    let name = format!("LazyGreedy_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
-        let _mpr = LazyGreedyBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("Hybrid_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mapper = mapper.map(CDS::from, CDS::from);
-        use gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
-        let mapper = HybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-        mapper
-    });
-    let name = format!("LazyHybrid_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
-        let _mpr = LazyHybridBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_stable<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("Stable_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mapper = mapper.map(CDS::from, CDS::from);
-        use gt::marriage_bottom_up_matcher::MarriageBottomUpMatcher;
-        let mapper = MarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mapper);
-        mapper
-    });
-    let name = format!("LazyStable_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_marriage_bottom_up_matcher::LazyMarriageBottomUpMatcher;
-        let _mpr = LazyMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_stable_simple(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("StableSimple");
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mut mapper = mapper.map(CDS::from, CDS::from);
-        mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
-            |_, _, _| 1 as f64 / 2 as f64,
-            hyper_diff::similarity_metrics::SimilarityMeasure::chawathe,
-            Mapper::last_chance_match_histogram,
-        );
-        mapper
-    });
-    let name = format!("LazyStableSimple");
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_simple_marriage_bottom_up_matcher::LazySimpleMarriageBottomUpMatcher;
-        let _mpr = LazySimpleMarriageBottomUpMatcher::<_>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_stable_hybrid<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("StableHybrid_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mut mapper = mapper.map(CDS::from, CDS::from);
-        mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
-            Mapper::adaptive_threshold,
-            hyper_diff::similarity_metrics::SimilarityMeasure::chawathe,
-            Mapper::last_chance_match_hybrid::<M, MAX_SIZE>,
-        );
-        mapper
-    });
-    let name = format!("LazyStableHybrid_{}", MAX_SIZE);
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_hybrid_marriage_bottom_up_matcher::LazyHybridMarriageBottomUpMatcher;
-        let _mpr = LazyHybridMarriageBottomUpMatcher::<_, M, MAX_SIZE>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_simple(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::gt;
-    let name = format!("Simple");
-    p.name(name).prep(Prep::GT).routine(|mapper| {
-        let mapper = mapper.map(CDS::from, CDS::from);
-        use gt::simple_bottom_up_matcher::SimpleBottomUpMatcher;
-        let mapper = SimpleBottomUpMatcher::<_>::match_it(mapper);
-        mapper
-    });
-    let name = format!("LazySimple");
-    p.name(name).prep(Prep::GT).routine(|mut mapper| {
-        let mpr = mapper.mut_decompressible();
-        use gt::lazy_simple_bottom_up_matcher::LazySimpleBottomUpMatcher;
-        let _mpr = LazySimpleBottomUpMatcher::<_>::match_it(mpr);
-        mapper
-    });
-}
-
-fn bench_cd<const MAX_SIZE: usize>(p: &mut impl Runner) {
-    use hyper_diff::matchers::heuristic::cd;
-    let name = format!("Baseline {}", MAX_SIZE);
-    p.name(name).prep(Prep::CD).routine(|mapper| {
-        let mapper = mapper.map(CDS::from, CDS::from);
-        use cd::bottom_up_matcher::BottomUpMatcher;
-        let mapper = BottomUpMatcher::<_, MAX_SIZE>::match_it(mapper);
-        mapper
-    });
-    let name = format!("Lazy {}", MAX_SIZE);
-    p.name(name).prep(Prep::CD).routine(|mut mapper| {
-        dbg!(mapper.mappings.len());
-        let mpr = mapper.mut_decompressible();
-        use cd::lazy_bottom_up_matcher::BottomUpMatcher;
-        let mpr = BottomUpMatcher::<_, MAX_SIZE>::match_it(mpr);
-        dbg!(mpr.mappings.len(), mpr.mappings.capacity());
-        mapper
-    });
-}
-
-trait Runner {
-    fn name(&mut self, name: String) -> &mut Self;
-    fn prep(&mut self, prep: Prep) -> &mut Self;
-    type Output;
-    fn routine<D1, D2>(
-        &mut self,
-        f: impl for<'a> FnMut(Mpr<&'a HAST>) -> Mpr<&'a HAST, D1, D2> + Clone,
-    ) -> Self::Output;
-}
-
-enum Prep {
-    None,
-    GT,
-    CD,
+    group.finish_with_alt_summary_save(&alt_name);
 }
 
 struct Bench<'a, G> {
     group: &'a mut G,
-    repositories: &'a mut PreProcessedRepositories,
+    repositories: PreProcessedRepositories,
     i: &'a Input,
     name: Option<String>,
     prep: Prep,
+    throughput_kind: ThroughputKind,
 }
 
-impl<Mea: Measurement> Runner for Bench<'_, criterion::BenchmarkGroup<'_, Mea>> {
-    fn name(&mut self, name: String) -> &mut Self {
-        self.name = Some(name);
-        self
-    }
-
-    fn prep(&mut self, prep: Prep) -> &mut Self {
-        self.prep = prep;
-        self
-    }
-
-    type Output = ();
-
-    fn routine<D1, D2>(
-        &mut self,
-        f: impl for<'a> FnMut(Mpr<&'a HAST>) -> Mpr<&'a HAST, D1, D2> + Clone,
-    ) -> Self::Output {
-        match self.prep {
-            Prep::None => todo!(),
-            Prep::GT => prep_gt_subtree_and_bench_batched(self, f),
-            Prep::CD => prep_cd_subtree_and_bench_batched(self, f),
-        }
-    }
-}
-
-type OwnedLazyMapping = (
-    (
-        LazyPostOrder<NodeIdentifier, u32>,
-        LazyPostOrder<NodeIdentifier, u32>,
-    ),
-    VecStore<u32>,
-);
-
-/// Note: Inline if you want to control mapper preparation in the setup phase
-fn prep_gt_subtree_and_bench_batched<Mea: Measurement, D1, D2>(
+fn only_set_throughput<Mea: Measurement>(
     p: &mut Bench<'_, criterion::BenchmarkGroup<'_, Mea>>,
-    f: impl for<'a> FnMut(Mpr<&'a HAST>) -> Mpr<&'a HAST, D1, D2> + Clone,
+    _: impl FnMut(&mut criterion::Bencher<'_, Mea>, &(&PreProcessedRepositories, &OwnedLazyMapping))
+    + Clone,
 ) {
-    prep_gt_subtree_and_bench(p, move |b, (repositories, (owned, mappings))| {
-        let hyperast = &repositories.processor.main_stores;
-        b.iter_batched(
-            || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
-            f.clone(),
-            BatchSize::LargeInput,
-        );
-    });
+    let (src, dst) = prep_commit_pair(&p.i.repo, &mut p.repositories);
+    // let hyperast = hyperast_vcs_git::no_space::as_nospaces(&p.repositories.processor.main_stores);
+    let hyperast = &p.repositories.processor.main_stores;
+
+    use ThroughputKind::*;
+    let throughput = match p.throughput_kind {
+        SnapshotSize => ThroughputKind::size(hyperast, src, dst),
+        UnmappedNodesGiven => {
+            let owned = initial_lazy_mapping(hyperast, src, dst, &p.prep);
+            ThroughputKind::unmapped_nodes_given(&owned.1[0])
+        }
+        MappedNodes => todo!(),
+    };
+
+    eprintln!(
+        "set throughput of {}/{} at {}",
+        p.i.user, p.i.name, throughput
+    );
+    p.group.throughput(Throughput::Elements(throughput));
+    p.group
+        .only_resumarize(BenchmarkId::new(&p.name.clone().unwrap(), p.i.name));
 }
 
 /// Note: Inline if you want to control HyperAST construction and preparatory mapping computation
-fn prep_gt_subtree_and_bench<Mea: Measurement>(
+fn prep_subtree_and_bench<Mea: Measurement>(
     p: &mut Bench<'_, criterion::BenchmarkGroup<'_, Mea>>,
-    f: impl FnMut(&mut criterion::Bencher<'_, Mea>, &(&PreProcessedRepositories, &OwnedLazyMapping)),
+    f: impl FnMut(&mut criterion::Bencher<'_, Mea>, &(&PreProcessedRepositories, &OwnedLazyMapping))
+    + Clone,
 ) {
     p.group.bench_with_input_prepared(
-        BenchmarkId::new(&p.name.clone().unwrap(), p.i.repo.name()),
-        p.repositories,
+        BenchmarkId::new(&p.name.clone().unwrap(), p.i.name),
+        &mut p.repositories,
         |group, repositories| {
-            let (src, dst) = prep_commits(p.i, repositories);
-            // let hyperast = hyperast_vcs_git::no_space::as_nospaces2(&repositories.processor.main_stores);
+            let (src, dst) = prep_commit_pair(&p.i.repo, repositories);
+            // let hyperast = hyperast_vcs_git::no_space::as_nospaces(&repositories.processor.main_stores);
             let hyperast = &repositories.processor.main_stores;
-            group.throughput(Throughput::Elements(
-                (hyperast.node_store().resolve(src).size()
-                    + hyperast.node_store().resolve(dst).size())
-                .div_ceil(2) as u64,
-            ));
-            let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
-            let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
-            use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
-            let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<MM>(mapper);
-            let mappings = mapper.mapping.mappings.clone();
-            ((mapper_owned.0.decomp, mapper_owned.1.decomp), mappings)
+            let owned = initial_lazy_mapping(hyperast, src, dst, &p.prep);
+            use ThroughputKind::*;
+            if let SnapshotSize = p.throughput_kind {
+                let throughput = ThroughputKind::size(hyperast, src, dst);
+                group.throughput(Throughput::Elements(throughput));
+            } else if let UnmappedNodesGiven = p.throughput_kind {
+                let throughput = ThroughputKind::unmapped_nodes_given(&owned.1[0]);
+                group.throughput(Throughput::Elements(throughput));
+            }
+            owned
         },
-        f
-    );
-}
-
-type HAST = hyperast::store::SimpleStores<hyperast_vcs_git::TStore>;
-type Mpr<HAST, D1 = LazyPostOrder<NodeIdentifier, u32>, D2 = LazyPostOrder<NodeIdentifier, u32>> =
-    Mapper<HAST, Decompressible<HAST, D1>, Decompressible<HAST, D2>, VecStore<u32>>;
-
-fn prep_cd_subtree_and_bench_batched<Mea: Measurement, D1, D2>(
-    p: &mut Bench<'_, criterion::BenchmarkGroup<'_, Mea>>,
-    f: impl for<'a> FnMut(Mpr<&'a HAST>) -> Mpr<&'a HAST, D1, D2> + Clone,
-) {
-    prep_cd_subtree_and_bench(p, move |b, (repositories, (owned, mappings))| {
-        let hyperast = &repositories.processor.main_stores;
-        b.iter_batched(
-            || Mapper::prep(hyperast, mappings.clone(), owned.clone()),
-            f.clone(),
-            BatchSize::LargeInput,
-        );
-    });
-}
-
-fn prep_cd_subtree_and_bench<Mea: Measurement>(
-    p: &mut Bench<'_, criterion::BenchmarkGroup<'_, Mea>>,
-    f: impl FnMut(&mut criterion::Bencher<'_, Mea>, &(&PreProcessedRepositories, &OwnedLazyMapping)),
-) {
-    p.group.bench_with_input_prepared(
-        BenchmarkId::new(&p.name.clone().unwrap(), p.i.repo.name()),
-        p.repositories,
-        |group, repositories| {
-            let (src, dst) = prep_commits(p.i, repositories);
-            let hyperast = &repositories.processor.main_stores;
-            group.throughput(Throughput::Elements(
-                (hyperast.node_store().resolve(src).size()
-                    + hyperast.node_store().resolve(dst).size())
-                .div_ceil(2) as u64,
-            ));
-            let mut mapper_owned: (DS<_>, DS<_>) = hyperast.decompress_pair(&src, &dst).1;
-            let mapper = Mapper::with_mut_decompressible(&mut mapper_owned, M::default());
-
-            use cd::lazy_leaves_matcher::LazyLeavesMatcher;
-            use hyper_diff::matchers::heuristic::cd;
-            let mapper = LazyLeavesMatcher::<_>::match_it(mapper);
-            let mappings = mapper.mapping.mappings;
-            ((mapper_owned.0.decomp, mapper_owned.1.decomp), mappings)
-        },
-        f,
+        f.clone(),
     );
 }
 
@@ -414,11 +174,11 @@ criterion_group!(
 );
 #[cfg(not(target_os = "linux"))]
 criterion_group!(
-    name = bottomup;
+    name = bottomup2;
     config = Criterion::default()
         .sample_size(10)
         .measurement_time(std::time::Duration::from_secs(10))
         .configure_from_args();
     targets = bottomup_group
 );
-criterion_main!(bottomup);
+criterion_main!(bottomup2);

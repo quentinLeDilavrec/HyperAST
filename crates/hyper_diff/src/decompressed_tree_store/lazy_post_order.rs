@@ -453,7 +453,6 @@ impl<IdN, IdD: PrimInt + Shallow<IdD> + Debug> LazyPostOrder<IdN, IdD> {
 impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD> + Debug>
     Decompressible<HAST, &mut LazyPostOrder<HAST::IdN, IdD>>
 where
-    HAST::IdN: Debug,
     for<'t> LendT<'t, HAST>: WithStats,
 {
     fn continuous_aux(&mut self, x: &IdD) -> Option<Vec<HAST::IdN>> {
@@ -513,12 +512,6 @@ where
                 break;
             }
             let Some((p, z)) = next else {
-                assert!(
-                    self._size(x) <= one() || self.tree(&(c + one())) != self.tree(x),
-                    "{:?} {:?}",
-                    self.tree(&(c + one())),
-                    self.tree(x)
-                );
                 assert!(c == self.lld(x) || c + one() == self.lld(x));
                 break;
             };

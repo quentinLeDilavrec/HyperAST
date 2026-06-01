@@ -47,12 +47,16 @@ jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.5.4" }
 
 [dev-dependencies]
 hyperast_gen_ts_java = { workspace = true }
-criterion = { git = "https://github.com/quentinLeDilavrec/criterion.rs", rev = "0301588ad4e88e7911330a77c4bc1edee6677c27", features = [
+
+[dev-dependencies.criterion]
+git = "https://github.com/quentinLeDilavrec/criterion.rs"
+rev = "b806383aafddd0435b10ba9d9aae828a3e3cdc8d"
+features = [
     "rayon",
     "plotters",
     "cargo_bench_support",
     "html_reports",
-] }
+]
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 iai-callgrind = "0.14.0"
@@ -73,4 +77,12 @@ harness = false
 
 [[bench]]
 name = "iai_gumtree_comparison"
+harness = false
+
+[[bench]]
+name = "bottomup_runtime_commits"
+harness = false
+
+[[bench]]
+name = "bottomup_runtime_ranges"
 harness = false

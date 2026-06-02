@@ -4,22 +4,22 @@ use re_ui::notifications::NotificationUi;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::usize;
 use strum::IntoEnumIterator;
 
-use egui_addon::{code_editor, egui_utils::radio_collapsing};
-
-use crate::app::types::CommitId;
-use crate::command::{CommandReceiver, CommandSender, UICommand, UICommandSender};
-use crate::command_palette::CommandPalette;
-use crate::utils_poll::{Buffered3, MultiBuffered2};
 use code_aspects::remote_fetch_node;
-use commit::{CommitSlice, SelectedProjects, fetch_commit};
+use commit::fetch_commit;
+use commit::{CommitSlice, SelectedProjects};
+use egui_addon::{code_editor, egui_utils::radio_collapsing};
 use querying::DetailsResults;
 use single_repo::ComputeConfigSingle;
 use tree_view::store::FetchedHyperAST;
 use types::{Commit, Repo, SelectedConfig};
 use utils_results_batched::ComputeResultsProm;
+
+use crate::app::types::CommitId;
+use crate::command::{CommandReceiver, CommandSender, UICommand, UICommandSender};
+use crate::command_palette::CommandPalette;
+use crate::utils_poll::{Buffered3, MultiBuffered2};
 
 pub use types::Languages;
 

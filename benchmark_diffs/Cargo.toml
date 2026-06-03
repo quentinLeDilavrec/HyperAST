@@ -47,16 +47,7 @@ jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.5.4" }
 
 [dev-dependencies]
 hyperast_gen_ts_java = { workspace = true }
-
-[dev-dependencies.criterion]
-git = "https://github.com/quentinLeDilavrec/criterion.rs"
-rev = "b806383aafddd0435b10ba9d9aae828a3e3cdc8d"
-features = [
-    "rayon",
-    "plotters",
-    "cargo_bench_support",
-    "html_reports",
-]
+criterion = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 iai-callgrind = "0.14.0"

@@ -2,14 +2,9 @@
   description = "HyperAST";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
+    rust-overlay.url = "github:oxalica/rust-overlay?ref=stable";
     nix-filter.url = "github:numtide/nix-filter";
   };
 
@@ -29,7 +24,7 @@
         filter = inputs.nix-filter.lib;
         hyperast-backend = pkgs.rustPlatform.buildRustPackage {
           pname = "HyperAST";
-          version = "0.1.0";
+          version = "0.5.0";
           src = filter {
             root = ./.;
             exclude = [
@@ -60,7 +55,7 @@
             cacert
 
             # Rust
-            (rust-bin.fromRustupToolchainFile ./rust-toolchain)
+            (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
           ];
           cargoLock = {
             lockFile = ./Cargo.lock;
@@ -84,7 +79,7 @@
 
           hyperast-dockerImage = pkgs.dockerTools.buildLayeredImage {
             name = "HyperAST";
-            tag = "0.2.0";
+            tag = "0.5.0";
             runAsRoot = ''
               ln -s  ${hyperast-backend}/bin/scripting /scripting
               ln -s  ${hyperast-backend}/bin/backend /backend
@@ -102,7 +97,7 @@
         devShell = pkgs.mkShell rec {
           buildInputs = with pkgs; [
             # Rust
-            (rust-bin.fromRustupToolchainFile ./rust-toolchain)
+            (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
             trunk
 
             # misc

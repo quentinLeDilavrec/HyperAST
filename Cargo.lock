@@ -2194,7 +2194,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap 4.5.32",
- "criterion-plot 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "criterion-plot 0.5.0",
  "is-terminal",
  "itertools 0.10.5",
  "num-traits",
@@ -2212,37 +2212,14 @@ dependencies = [
 
 [[package]]
 name = "criterion"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bf7af66b0989381bd0be551bd7cc91912a655a58c6918420c9527b1fd8b4679"
+version = "0.6.1"
+source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=4ad431f1893f4963f477f724620c543cff2835e9#4ad431f1893f4963f477f724620c543cff2835e9"
 dependencies = [
  "anes",
  "cast",
  "ciborium",
  "clap 4.5.32",
- "criterion-plot 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.13.0",
- "num-traits",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
-name = "criterion"
-version = "0.6.0"
-source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d#b806383aafddd0435b10ba9d9aae828a3e3cdc8d"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap 4.5.32",
- "criterion-plot 0.5.0 (git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d)",
+ "criterion-plot 0.5.1",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -2277,8 +2254,8 @@ dependencies = [
 
 [[package]]
 name = "criterion-plot"
-version = "0.5.0"
-source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d#b806383aafddd0435b10ba9d9aae828a3e3cdc8d"
+version = "0.5.1"
+source = "git+https://github.com/quentinLeDilavrec/criterion.rs?rev=4ad431f1893f4963f477f724620c543cff2835e9#4ad431f1893f4963f477f724620c543cff2835e9"
 dependencies = [
  "cast",
  "itertools 0.13.0",
@@ -2886,7 +2863,7 @@ dependencies = [
 [[package]]
 name = "egui_graphs"
 version = "0.28.0"
-source = "git+https://github.com/quentinLeDilavrec/egui_graphs?rev=9e83f82cb63f0733029de8c89950af27c8bac04f#9e83f82cb63f0733029de8c89950af27c8bac04f"
+source = "git+https://github.com/quentinLeDilavrec/egui_graphs?rev=dff8890ee4f50e57b0059a17fd8c7df940e35fe6#dff8890ee4f50e57b0059a17fd8c7df940e35fe6"
 dependencies = [
  "crossbeam",
  "egui",
@@ -4322,7 +4299,7 @@ name = "hyper_diff"
 version = "0.5.0"
 dependencies = [
  "bitvec",
- "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "criterion 0.6.1",
  "enum-map",
  "env_logger 0.11.5",
  "hungarian",
@@ -4396,7 +4373,7 @@ dependencies = [
  "byteorder",
  "cfg-if",
  "const-chunks",
- "criterion 0.6.0 (git+https://github.com/quentinLeDilavrec/criterion.rs?rev=b806383aafddd0435b10ba9d9aae828a3e3cdc8d)",
+ "criterion 0.6.1",
  "criterion-perf-events",
  "env_logger 0.11.5",
  "hashbrown 0.13.2",
@@ -4532,7 +4509,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "controlled-option",
- "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "criterion 0.6.1",
  "enumset",
  "env_logger 0.11.5",
  "hashbrown 0.14.5",
@@ -4587,7 +4564,7 @@ dependencies = [
  "bitvec",
  "cfg-if",
  "controlled-option",
- "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "criterion 0.6.1",
  "enumset",
  "env_logger 0.11.5",
  "hashbrown 0.14.5",
@@ -4646,7 +4623,7 @@ dependencies = [
 name = "hyperast_vcs_git"
 version = "0.5.0"
 dependencies = [
- "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "criterion 0.6.1",
  "enumset",
  "env_logger 0.11.5",
  "git2",

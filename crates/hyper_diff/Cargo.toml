@@ -20,12 +20,7 @@ jemallocator = { package = "tikv-jemallocator", version = "0.5.0" }
 jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.5.4" }
 
 [dev-dependencies]
-criterion = { version = "0.6.0", features = [
-    "rayon",
-    "plotters",
-    "cargo_bench_support",
-    "html_reports",
-] }
+criterion = { workspace = true }
 env_logger = "0.11.3"
 hungarian = "1.1.1"
 

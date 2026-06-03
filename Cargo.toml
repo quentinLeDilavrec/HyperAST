@@ -53,12 +53,20 @@ hyperast_gen_ts_tsquery = { path = "./gen/tree-sitter/query" }
 hyperast_gen_ts_ts = { path = "./gen/tree-sitter/ts" }
 
 legion = { version = "^0.4.0" }
+criterion = { version = "0.6.1", features = [
+    "rayon",
+    "plotters",
+    "cargo_bench_support",
+    "html_reports",
+] }
+
 
 [patch.crates-io]
 tree-sitter-graph = { git = "https://github.com/quentinLeDilavrec/tree-sitter-graph", rev = "0f56930d32dc232ced0e42a7593f813be4877f85", version = "0.13" }
 # tree-sitter-graph = { path = "../tree-sitter-graph", optional = true }
 legion = { git = "https://github.com/quentinLeDilavrec/legion", rev = "9929c5cdd1f0b844071a00725632c7c39b6fff39" }
 # legion = { path = "../legion" }
+criterion = { git = "https://github.com/quentinLeDilavrec/criterion.rs", rev = "4ad431f1893f4963f477f724620c543cff2835e9" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "allow" }

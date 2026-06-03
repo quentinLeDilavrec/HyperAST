@@ -1175,7 +1175,7 @@ checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
 name = "backend"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "automerge",
  "autosurgeon",
@@ -2769,7 +2769,7 @@ dependencies = [
 
 [[package]]
 name = "egui_addon"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "accesskit",
  "console_error_panic_hook",
@@ -4248,7 +4248,7 @@ dependencies = [
 
 [[package]]
 name = "hyper_app"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ahash 0.8.11",
  "async_executors",
@@ -4319,7 +4319,7 @@ dependencies = [
 
 [[package]]
 name = "hyper_diff"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bitvec",
  "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4341,7 +4341,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bevy_ecs",
  "bitvec",
@@ -4373,7 +4373,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "cfg-if",
  "env_logger 0.9.3",
@@ -4390,7 +4390,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark_diffs"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bitvec",
  "byteorder",
@@ -4422,7 +4422,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark_search"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clap 4.5.32",
  "env_logger 0.11.5",
@@ -4446,7 +4446,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_benchmark_smells"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "base16ct",
  "bitvec",
@@ -4476,7 +4476,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_c"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4499,7 +4499,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_cpp"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4525,7 +4525,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_java"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4558,7 +4558,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_ts"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4581,7 +4581,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_tsquery"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "atomic-counter",
  "bitvec",
@@ -4611,7 +4611,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_gen_ts_xml"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "hashbrown 0.14.5",
  "hyperast",
@@ -4627,7 +4627,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_tsquery"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "hyperast",
  "libtest-mimic",
@@ -4644,7 +4644,7 @@ dependencies = [
 
 [[package]]
 name = "hyperast_vcs_git"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "criterion 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enumset",
@@ -6995,7 +6995,7 @@ dependencies = [
 
 [[package]]
 name = "polyglote"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "derive_deref",
  "heck 0.5.0",

@@ -6,7 +6,7 @@
 [zenodo-link]:    https://doi.org/10.5281/zenodo.14810468
 [Rust badge]:     https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white
 
-<table class="tg"><thead><th>
+<table align="center"><thead><th>
   
 | [Book](https://hyperast.github.io/book/index.html) | [GUI](https://hyperast.github.io/gui/index.html) | [Rust doc](https://hyperast.github.io/doc/hyperast/index.html)  |
 |---|---|---|

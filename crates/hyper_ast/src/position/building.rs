@@ -362,9 +362,10 @@ mod impl_c_p_p_receivers2 {
             Self(self.0.transit(), self.1.transit())
         }
     }
-    // impl<A: Into<AA>, B: Into<BB>, AA, BB> Transition<(AA, BB)> for CompoundPositionPreparer<A, B> {
-    //     fn transit(self) -> (AA, BB) {
-    //         (self.0.into(), self.1.into())
-    //     }
-    // }
+
+    impl<A, B> Into<(A, B)> for CompoundPositionPreparer<A, B> {
+        fn into(self) -> (A, B) {
+            (self.0, self.1)
+        }
+    }
 }

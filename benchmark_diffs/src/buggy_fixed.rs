@@ -1,11 +1,17 @@
-use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess};
-use crate::preprocess::{JavaPreprocessFileSys, iter_dirs, parse_dir_pair, parse_string_pair};
-use crate::{other_tools, tempfile};
+use std::env;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use std::time::Instant;
+
 use hyper_diff::actions::Actions;
 use hyper_diff::algorithms;
 use hyper_diff::algorithms::{DiffResult, RuntimeMeasurement};
 use hyperast::store::{SimpleStores, labels::LabelStore, nodes::legion::NodeStore};
-use std::{env, fs::File, io::Write, path::Path, time::Instant};
+
+use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess};
+use crate::preprocess::{JavaPreprocessFileSys, iter_dirs, parse_dir_pair, parse_string_pair};
+use crate::{other_tools, tempfile};
 
 const DATASET_FORMAT: i32 = 1; // ok as of 33024da8de4c519bb1c1146b19d91d6cb4c81ea6
 // TODO find when format of dataset changed
@@ -14,7 +20,7 @@ pub fn buggy_fixed_dataset_roots(root: &Path, dataset: impl ToString) -> [std::p
     let datasets = root.parent().unwrap().join("datasets");
     assert!(
         datasets.exists(),
-        "you should clone the gumtree dataset:\n`cd ..; git clone git@github.com:GumTreeDiff/datasets.git gt_datasets; cd gt_datasets; git checkout 33024da8de4c519bb1c1146b19d91d6cb4c81ea6`"
+        "you should clone the gumtree dataset:\n`cd ..; git clone git@github.com:GumTreeDiff/datasets.git; cd datasets; git checkout 33024da8de4c519bb1c1146b19d91d6cb4c81ea6`"
     );
     let data_root = datasets.join(dataset.to_string());
     assert!(
@@ -186,7 +192,7 @@ fn test_increasing_ed() {
     let mut md_cache = Default::default();
     print!("{:?} len={}: ", buggy_path, buggy.len());
     let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, &fixed, &buggy);
-    let stores = hyperast_vcs_git::no_space::as_nospaces2(&stores);
+    let stores = hyperast_vcs_git::no_space::as_nospaces(&stores);
     let res = algorithms::gumtree::diff_100(
         &stores,
         &src_tr.local.compressed_node,
@@ -260,7 +266,7 @@ mod examples {
         let mut md_cache = Default::default();
         // let mut java_tree_gen = JavaTreeGen::new(&mut stores, &mut md_cache);
         print!("len={}: ", buggy.len());
-        let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, &buggy, &fixed);
+        let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, buggy, fixed);
         let len = algorithms::gumtree::diff(
             &stores,
             &src_tr.local.compressed_node,
@@ -272,7 +278,7 @@ mod examples {
         println!("{}", len);
     }
 
-    static CASE1: &'static str = r#"class A {
+    static CASE1: &str = r#"class A {
         {
             if (1) {
             } else if (2) {
@@ -285,7 +291,7 @@ mod examples {
         }
     }"#;
 
-    static CASE2: &'static str = r#"class A {
+    static CASE2: &str = r#"class A {
         {
             } else {
                 h(42, stopAtNonOption);
@@ -306,7 +312,7 @@ mod examples {
         };
         let mut md_cache = Default::default();
         print!("len={}: ", buggy.len());
-        let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, &buggy, &fixed);
+        let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, buggy, fixed);
         let len = algorithms::gumtree::diff(
             &stores,
             &src_tr.local.compressed_node,
@@ -318,7 +324,7 @@ mod examples {
         println!("{}", len);
     }
 
-    static CASE3: &'static str = r#"class A {
+    static CASE3: &str = r#"class A {
         {
             if (1) {
             } else if (2) {
@@ -337,7 +343,7 @@ mod examples {
         }
     }"#;
 
-    static CASE4: &'static str = r#"class A {
+    static CASE4: &str = r#"class A {
         {
             if (1) {
             } else if (2) {
@@ -354,12 +360,12 @@ mod examples {
         }
     }"#;
 
-    static CASE5: &'static str = r#"class A {
+    static CASE5: &str = r#"class A {
         {
             type.narrowBy(dst);
         }
     }"#;
-    pub static CASE6: &'static str = r#"class A {
+    pub static CASE6: &str = r#"class A {
         {
             config.getTypeFactory().constructSpecializedType(type, dst);
         }
@@ -390,8 +396,8 @@ mod examples {
         let mut md_cache = Default::default();
         let now = Instant::now();
 
-        println!("{} len={}", "buggy", buggy.len());
-        let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, &buggy, &fixed);
+        println!("buggy len={}", buggy.len());
+        let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, buggy, fixed);
         let len = algorithms::gumtree::diff(
             &stores,
             &src_tr.local.compressed_node,
@@ -420,7 +426,7 @@ mod examples {
 
         src_f
             .write_all(
-                (JsonSerializer::<_, _, true>::new(&stores, src_tr.local.compressed_node.clone())
+                (JsonSerializer::<_, _, true>::new(&stores, src_tr.local.compressed_node)
                     .to_string())
                 .as_bytes(),
             )
@@ -430,7 +436,7 @@ mod examples {
         // dbg!(&dst);
         dst_f
             .write_all(
-                (JsonSerializer::<_, _, true>::new(&stores, dst_tr.local.compressed_node.clone())
+                (JsonSerializer::<_, _, true>::new(&stores, dst_tr.local.compressed_node)
                     .to_string())
                 .as_bytes(),
             )
@@ -444,7 +450,7 @@ mod examples {
             .arg(src)
             .arg(dst)
             .arg("gumtree")
-            .arg(&"JSON")
+            .arg("JSON")
             .arg("Chawathe")
             .arg(&json)
             .stdin(std::process::Stdio::null())
@@ -471,35 +477,23 @@ mod examples {
 
 #[cfg(test)]
 mod test {
-    use hyperast::{
-        nodes::SyntaxWithIdsSerializer,
-        store::SimpleStores,
-        types::{DecompressedFrom, HyperASTShared, Typed},
-    };
+    use hyperast::types::{DecompressedFrom, HyperASTShared, Typed};
+    use hyperast::{nodes::SyntaxWithIdsSerializer, store::SimpleStores};
 
+    use hyperast_gen_ts_xml::legion::XmlTreeGen;
     use hyperast_gen_ts_xml::legion::tree_sitter_parse_xml as parse_xml;
-    use hyperast_gen_ts_xml::{legion::XmlTreeGen, types::TStore};
+    use hyperast_gen_ts_xml::types::TStore;
 
-    use hyper_diff::{
-        decompressed_tree_store::lazy_post_order::LazyPostOrder,
-        matchers::{
-            Decompressible,
-            Mapper,
-            Mapping,
-            heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher,
-            // heuristic::gt::greedy_subtree_matcher::{GreedySubtreeMatcher, SubtreeMatcher},
-            mapping_store::{DefaultMultiMappingStore, VecStore},
-        },
-    };
+    use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+    use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
+    use hyper_diff::mappings::{DefaultMultiMappingStore, VecStore};
+    use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
 
-    use crate::{
-        other_tools::gumtree::subprocess,
-        postprocess::{
-            CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess, print_mappings,
-            print_mappings_no_ranges,
-        },
-    };
-    static CASE7: &'static str = r#"<project>
+    use crate::other_tools::gumtree::subprocess;
+    use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess, SimpleJsonPostProcess};
+    use crate::postprocess::{print_mappings, print_mappings_no_ranges};
+
+    static CASE7: &str = r#"<project>
     <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
@@ -525,7 +519,7 @@ mod test {
         <scope>test</scope>
     </dependency>
 </project>"#;
-    pub static CASE8: &'static str = r#"<project>
+    pub static CASE8: &str = r#"<project>
     <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
@@ -591,7 +585,7 @@ mod test {
         let dst = dst_tr.local.compressed_node;
         // let dst = tree_gen.stores.node_store.resolve(dst).get_child(&0);
 
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
 
         // print_tree_syntax_with_ids(
         //     |id: &NodeIdentifier| -> _ {
@@ -631,13 +625,12 @@ mod test {
         let mapper = Mapper {
             hyperast: &stores,
             mapping: Mapping {
-                src_arena: src_arena,
-                dst_arena: dst_arena,
-                mappings: mappings,
+                src_arena,
+                dst_arena,
+                mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         // >(&stores, &src, &dst, mappings);
         let mappings = mapper.mapping.mappings;
         let src_arena = mapper.mapping.src_arena;
@@ -669,7 +662,7 @@ mod test {
         dbg!(valid.additional_mappings, valid.missing_mappings);
     }
 
-    static CASE_SIMPLE: &'static str = r#"<project></project>"#;
+    static CASE_SIMPLE: &str = r#"<project></project>"#;
 
     #[test]
     fn test_spoon_pom_bad_subtree_match_same_content() {
@@ -756,13 +749,12 @@ mod test {
         let mapper = Mapper {
             hyperast: stores,
             mapping: Mapping {
-                src_arena: src_arena,
-                dst_arena: dst_arena,
-                mappings: mappings,
+                src_arena,
+                dst_arena,
+                mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
         let src_arena = mapper.mapping.src_arena;
         let dst_arena = mapper.mapping.dst_arena;
@@ -835,7 +827,7 @@ mod test {
         // let label_store = &tree_gen.stores.label_store;
         // let node_store = &tree_gen.stores.node_store;
         // let node_store = &NoSpaceNodeStoreWrapper::from(node_store);
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
 
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -847,13 +839,12 @@ mod test {
         let mapper = Mapper {
             hyperast: &stores,
             mapping: Mapping {
-                src_arena: src_arena,
-                dst_arena: dst_arena,
-                mappings: mappings,
+                src_arena,
+                dst_arena,
+                mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
         // print_mappings(
         //     &dst_arena,
@@ -892,7 +883,7 @@ mod test {
         let valid = pp._validity_mappings(&stores, &src_arena, src, &dst_arena, dst, &mappings);
         dbg!(valid.additional_mappings, valid.missing_mappings);
     }
-    pub static CASE9: &'static str = r#"<project>
+    pub static CASE9: &str = r#"<project>
     <dependencies>
     </dependencies>
     <scm>
@@ -930,7 +921,7 @@ mod test {
 </project>
 "#;
 
-    static CASE10: &'static str = r#"<project>
+    static CASE10: &str = r#"<project>
     <dependencies>
     </dependencies>
     <scm>
@@ -1048,13 +1039,12 @@ mod test {
         let mapper = Mapper {
             hyperast: &stores,
             mapping: Mapping {
-                src_arena: src_arena,
-                dst_arena: dst_arena,
-                mappings: mappings,
+                src_arena,
+                dst_arena,
+                mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
 
         let src_arena = _src_arena.decomp.complete(&stores);
@@ -1090,7 +1080,7 @@ mod test {
         dbg!(valid.additional_mappings, valid.missing_mappings);
     }
 
-    pub static CASE11: &'static str = r#"<build>
+    pub static CASE11: &str = r#"<build>
     <plugins>
         <plugin>
             <version>3.3.0</version>
@@ -1101,7 +1091,7 @@ mod test {
 </build>
 "#;
 
-    static CASE12: &'static str = r#"<build>
+    static CASE12: &str = r#"<build>
     <plugins>
     </plugins>
     <pluginManagement>
@@ -1159,7 +1149,7 @@ mod test {
         // let label_store = &tree_gen.stores.label_store;
         // let node_store = &tree_gen.stores.node_store;
         // let node_store = &NoSpaceNodeStoreWrapper::from(node_store);
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
         let mappings = VecStore::default();
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -1170,13 +1160,12 @@ mod test {
         let mapper = Mapper {
             hyperast: &stores,
             mapping: Mapping {
-                src_arena: src_arena,
-                dst_arena: dst_arena,
-                mappings: mappings,
+                src_arena,
+                dst_arena,
+                mappings,
             },
         };
-        let mapper =
-            LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<DefaultMultiMappingStore<_>>(mapper);
+        let mapper = LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper);
         let mappings = mapper.mapping.mappings;
 
         let src_arena = _src_arena.decomp.complete(&stores);
@@ -1259,7 +1248,7 @@ mod test {
         // let label_store = &tree_gen.stores.label_store;
         // let node_store = &tree_gen.stores.node_store;
         // let node_store = &NoSpaceNodeStoreWrapper::from(node_store);
-        let stores = hyperast_vcs_git::no_space::as_nospaces2(tree_gen.stores);
+        let stores = hyperast_vcs_git::no_space::as_nospaces(tree_gen.stores);
         let mappings = VecStore::default();
         #[allow(type_alias_bounds)]
         type DS<HAST: HyperASTShared> = Decompressible<HAST, LazyPostOrder<HAST::IdN, u32>>;
@@ -1270,7 +1259,6 @@ mod test {
         let mut src_arena = DS::decompress(&stores, &src);
         let mut dst_arena = DS::decompress(&stores, &dst);
         let mapper = {
-            let mappings = mappings;
             let src_arena = src_arena.as_mut();
             let dst_arena = dst_arena.as_mut();
             // src_arena.decompress_descendants(node_store, &src_arena.root());
@@ -1280,19 +1268,17 @@ mod test {
             let mapper = Mapper {
                 hyperast: &stores,
                 mapping: Mapping {
-                    src_arena: src_arena,
-                    dst_arena: dst_arena,
-                    mappings: mappings,
+                    src_arena,
+                    dst_arena,
+                    mappings,
                 },
             };
-            let mapper = LazyGreedySubtreeMatcher::<_, _, _, _>::match_it::<
-                DefaultMultiMappingStore<_>,
-            >(mapper);
-            // let mut matcher = LazyGreedySubtreeMatcher::<_, _, _, _, _, 1>::new(
+
+            // let mut matcher = LazyGreedySubtreeMatcher::<_, _, 1>::new(
             //     &stores, src_arena, dst_arena, mappings,
             // );
             // LazyGreedySubtreeMatcher::execute::<DefaultMultiMappingStore<_>>(&mut matcher);
-            mapper
+            LazyGreedySubtreeMatcher::<_>::match_it::<DefaultMultiMappingStore<_>>(mapper)
         };
         // let SubtreeMatcher {
         //     src_arena,
@@ -1438,16 +1424,13 @@ pub fn bad_perfs() {
     .len();
     let processing_time = now.elapsed().as_secs_f64();
     println!("tt={} evos={}", processing_time, len);
-    match guard.report().build() {
-        Ok(report) => {
-            let mut file = File::create("profile.pb").unwrap();
-            let profile = report.pprof().unwrap();
-            use pprof::protos::Message;
-            let mut content = Vec::new();
-            profile.encode(&mut content).unwrap();
-            file.write_all(&content).unwrap();
-        }
-        Err(_) => {}
+    if let Ok(report) = guard.report().build() {
+        let mut file = File::create("profile.pb").unwrap();
+        let profile = report.pprof().unwrap();
+        use pprof::protos::Message;
+        let mut content = Vec::new();
+        profile.encode(&mut content).unwrap();
+        file.write_all(&content).unwrap();
     };
 
     // ./dist/build/install/gumtree/bin/gumtree textdiff /home/quentin/rusted_gumtree3/benchmark_diffs/src/C1.java.json /home/quentin/rusted_gumtree3/benchmark_diffs/src/C2.java.json -m gumtree -g java-hyperast
@@ -1490,18 +1473,15 @@ pub fn bad_perfs2() {
     .len();
     let processing_time = now.elapsed().as_secs_f64();
     println!("tt={} evos={}", processing_time, len);
-    match guard.report().build() {
-        Ok(report) => {
-            let file = File::create("flamegraph.svg").unwrap();
-            report.flamegraph(file).unwrap();
-            // let mut file = File::create("profile.pb").unwrap();
-            // let profile = report.pprof().unwrap();
-            // use pprof::protos::Message;
-            // let mut content = Vec::new();
-            // profile.encode(&mut content).unwrap();
-            // file.write_all(&content).unwrap();
-        }
-        Err(_) => {}
+    if let Ok(report) = guard.report().build() {
+        let file = File::create("flamegraph.svg").unwrap();
+        report.flamegraph(file).unwrap();
+        // let mut file = File::create("profile.pb").unwrap();
+        // let profile = report.pprof().unwrap();
+        // use pprof::protos::Message;
+        // let mut content = Vec::new();
+        // profile.encode(&mut content).unwrap();
+        // file.write_all(&content).unwrap();
     };
 
     // ./dist/build/install/gumtree/bin/gumtree textdiff /home/quentin/rusted_gumtree3/benchmark_diffs/src/C1.java.json /home/quentin/rusted_gumtree3/benchmark_diffs/src/C2.java.json -m gumtree -g java-hyperast
@@ -1588,7 +1568,7 @@ pub fn bad_perfs9() {
 }
 
 fn bad_perfs_helper(buggy_path: &Path, fixed_path: &Path) {
-    let buggy = std::fs::read_to_string(&buggy_path).expect("the buggy code");
+    let buggy = std::fs::read_to_string(buggy_path).expect("the buggy code");
     let fixed = std::fs::read_to_string(fixed_path).expect("the fixed code");
     let mut stores = SimpleStores {
         label_store: LabelStore::new(),
@@ -1619,18 +1599,15 @@ fn bad_perfs_helper(buggy_path: &Path, fixed_path: &Path) {
     );
     let actions = actions.unwrap();
     // let MappingDurations([subtree_matcher_t, bottomup_matcher_t]) = mapping_durations.into();
-    match guard.report().build() {
-        Ok(report) => {
-            let file = File::create("flamegraph.svg").unwrap();
-            report.flamegraph(file).unwrap();
-            let mut file = File::create("profile.pb").unwrap();
-            let profile = report.pprof().unwrap();
-            use pprof::protos::Message;
-            let mut content = Vec::new();
-            profile.encode(&mut content).unwrap();
-            file.write_all(&content).unwrap();
-        }
-        Err(_) => {}
+    if let Ok(report) = guard.report().build() {
+        let file = File::create("flamegraph.svg").unwrap();
+        report.flamegraph(file).unwrap();
+        let mut file = File::create("profile.pb").unwrap();
+        let profile = report.pprof().unwrap();
+        use pprof::protos::Message;
+        let mut content = Vec::new();
+        profile.encode(&mut content).unwrap();
+        file.write_all(&content).unwrap();
     };
     let hast_timings = algorithms::Phased::sum::<std::time::Duration>(&exec_data);
     // let hast_timings = [subtree_matcher_t, bottomup_matcher_t, gen_t + prepare_gen_t];
@@ -1651,7 +1628,7 @@ fn bad_perfs_helper(buggy_path: &Path, fixed_path: &Path) {
     let valid = pp.validity_mappings(&mapper);
     let processing_time = now.elapsed().as_secs_f64();
     dbg!(processing_time);
-    if valid.additional_mappings.len() > 0 || valid.missing_mappings.len() > 0 {
+    if !valid.additional_mappings.is_empty() || !valid.missing_mappings.is_empty() {
         dbg!(
             valid.additional_mappings,
             valid.missing_mappings,
@@ -1689,10 +1666,8 @@ fn test_all() {
         for buggy_case in iter_dirs(&buggy_project.path()) {
             let buggy_path = std::fs::read_dir(buggy_case.path())
                 .expect("should be a dir")
-                .into_iter()
                 .filter_map(|x| x.ok())
-                .filter(|x| x.file_type().unwrap().is_file())
-                .next()
+                .find(|x| x.file_type().unwrap().is_file())
                 .unwrap()
                 .path();
             let fixed_path = root_fixed.join(buggy_path.strip_prefix(&root_buggy).unwrap());
@@ -1718,9 +1693,7 @@ fn test_all() {
             .len();
             let processing_time = now.elapsed().as_secs_f64();
             println!("tt={} evos={}", processing_time, len);
-            break;
         }
-        break;
     }
     // match guard.report().build() {
     //     Ok(report) => {
@@ -1757,10 +1730,8 @@ pub fn all() {
         .map(|buggy_case| {
             std::fs::read_dir(buggy_case.path())
                 .expect("should be a dir")
-                .into_iter()
                 .filter_map(|x| x.ok())
-                .filter(|x| x.file_type().unwrap().is_file())
-                .next()
+                .find(|x| x.file_type().unwrap().is_file())
                 .unwrap()
                 .path()
         })
@@ -1771,7 +1742,9 @@ pub fn all() {
                  fixed_path,
                  name,
              }| {
-                run(&buggy_path, &fixed_path, &name).map(|x| writeln!(out_file, "{}", x).unwrap());
+                if let Some(x) = run(&buggy_path, &fixed_path, &name) {
+                    writeln!(out_file, "{}", x).unwrap()
+                }
             },
         );
     println!("wrote csv at {:?}", out_path);
@@ -1813,7 +1786,7 @@ fn find(buggy_path: std::path::PathBuf, root_buggy: &Path, root_fixed: &Path) ->
 }
 
 pub fn run(buggy_path: &Path, fixed_path: &Path, name: &Path) -> Option<String> {
-    let buggy = std::fs::read_to_string(&buggy_path).expect("the buggy code");
+    let buggy = std::fs::read_to_string(buggy_path).expect("the buggy code");
     let fixed = std::fs::read_to_string(fixed_path).expect("the fixed code");
     let mut stores = SimpleStores {
         label_store: LabelStore::new(),
@@ -1904,10 +1877,10 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
         java_md_cache: md_cache,
     };
     let now = Instant::now();
-    let (src_tr, dst_tr) = parse_dir_pair(&mut java_gen, &src, &dst);
+    let (src_tr, dst_tr) = parse_dir_pair(&mut java_gen, src, dst);
     let parse_t = now.elapsed().as_secs_f64();
 
-    let stores = hyperast_vcs_git::no_space::as_nospaces2(&java_gen.main_stores);
+    let stores = hyperast_vcs_git::no_space::as_nospaces(&java_gen.main_stores);
 
     dbg!(&parse_t);
     dbg!(&src_tr.metrics.size);
@@ -1922,7 +1895,8 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
         actions: hast_actions,
         exec_data,
     } = algorithms::gumtree::diff(&stores, &src_tr.compressed_node, &dst_tr.compressed_node);
-    let gt_out = other_tools::gumtree::subprocess(
+
+    let gt_out = other_tools::gumtree::subprocess_checked(
         &stores,
         src_tr.compressed_node,
         dst_tr.compressed_node,
@@ -1930,8 +1904,7 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
         "Chawathe",
         60 * 5,
         gt_out_format,
-    )
-    .unwrap();
+    );
 
     let timings = [
         exec_data.phase1().sum::<std::time::Duration>(),
@@ -1941,6 +1914,27 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
     .map(|x| x.unwrap());
 
     dbg!(&timings);
+    let gt_out = match gt_out {
+        Ok(gt_out) => gt_out,
+        Err(err) => {
+            eprintln!("error while trying to execute gumtree binary: {err}");
+            eprintln!(
+                "If you want to compare your results with the original gumtree implementation you need to fix the previous error,"
+            );
+            eprintln!("otherwise ignore this message.");
+            return Some(format!(
+                "{},{},{},{},,,,{},{},{},,,",
+                src.to_string_lossy(),
+                buggy_s,
+                fixed_s,
+                hast_actions.unwrap().len(),
+                &timings[0].as_secs_f64(),
+                &timings[1].as_secs_f64(),
+                &timings[2].as_secs_f64(),
+            ));
+        }
+    };
+
     let res = if gt_out_format == "COMPRESSED" {
         let pp = CompressedBfPostProcess::create(&gt_out);
         let (pp, counts) = pp.counts();

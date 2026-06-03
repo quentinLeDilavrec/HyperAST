@@ -1,32 +1,29 @@
+//! fully compress all subtrees from a cpp CST
 #![allow(unused)]
-use super::utils_ts::*;
-use crate::store::nodes::compo;
-use crate::store::{
-    SimpleStores,
-    nodes::{
-        DefaultNodeStore as NodeStore,
-        legion::{NodeIdentifier, dyn_builder, eq_node},
-    },
-};
-use crate::tree_gen::{
-    self, AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
-    PreResult, RoleAcc, SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData,
-    TotalBytesGlobalData as _, TreeGen, WithByteRange, ZippedTreeGen, compute_indentation,
-    get_spacing, has_final_space,
-    parser::{Node as _, TreeCursor},
-};
-use crate::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    types::{HyperType, LabelStore as _},
-};
+
 use legion::world::EntryRef;
 use num::ToPrimitive as _;
-
-///! fully compress all subtrees from a cpp CST
 use std::{collections::HashMap, fmt::Debug, vec};
+
+use crate::full::FullNode;
+use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use crate::store::SimpleStores;
+use crate::store::nodes::DefaultNodeStore as NodeStore;
+use crate::store::nodes::compo;
+use crate::store::nodes::legion::{NodeIdentifier, dyn_builder, eq_node};
+use crate::tree_gen::parser::{Node as _, TreeCursor};
+use crate::tree_gen::{
+    self, AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
+    PreResult, RoleAcc, SubTreeMetrics, TextedGlobalData, TotalBytesGlobalData as _, TreeGen,
+    WithByteRange, ZippedTreeGen,
+};
+use crate::tree_gen::{
+    SpacedGlobalData, Spaces, compute_indentation, get_spacing, has_final_space,
+};
+use crate::types::{HyperType, LabelStore as _};
+use crate::{filter::BloomSize, nodes::Space};
+
+use super::utils_ts::*;
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 
@@ -98,7 +95,7 @@ impl<T> Accumulator for Acc<T> {
 }
 
 impl<T> AccIndentation for Acc<T> {
-    fn indentation<'a>(&'a self) -> &'a Spaces {
+    fn indentation(&self) -> &Spaces {
         &self.indentation
     }
 }
@@ -154,7 +151,7 @@ impl<'acc, T> tree_gen::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
-impl<'store, 'cache, 's, TS: TsEnableTS>
+impl<'store, 'cache, TS: TsEnableTS>
     TsTreeGen<'store, 'cache, TS, tree_gen::NoOpMore<TS, Acc<TS::Ty2>>, true>
 where
     TS::Ty2: TsType,
@@ -173,7 +170,7 @@ pub trait TsEnableTS: crate::types::ETypeStore
 where
     Self::Ty2: TsType,
 {
-    fn obtain_type<'a, N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
+    fn obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
 }
 
 pub trait TsType: HyperType + Copy {
@@ -181,7 +178,7 @@ pub trait TsType: HyperType + Copy {
     fn is_repeat(&self) -> bool;
 }
 
-impl<'store, 'cache, TS, More> TsTreeGen<'store, 'cache, TS, More>
+impl<TS, More> TsTreeGen<'_, '_, TS, More>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -189,8 +186,7 @@ where
 {
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
-    for TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -202,7 +198,7 @@ where
     type TreeCursor<'b> = TTreeCursor<'b>;
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -242,20 +238,15 @@ where
     ) -> PreResult<<Self as TreeGen>::Acc> {
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
-        if HIDDEN_NODES {
-            if kind.is_hidden() || kind.is_repeat() {
-                // return PreResult::Ignore;
-            }
+        if HIDDEN_NODES && (kind.is_hidden() || kind.is_repeat()) {
+            // return PreResult::Ignore;
         }
         if node.0.is_missing() {
             return PreResult::Skip;
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
-        if !stack
-            .parent()
-            .map_or(false, |a| a.simple.kind.is_supertype())
-        {
+        if !stack.parent().is_some_and(|a| a.simple.kind.is_supertype()) {
             if let Some(r) = cursor.0.field_name() {
                 if let Ok(r) = r.try_into() {
                     acc.role.current = Some(r);
@@ -280,7 +271,7 @@ where
             text,
             node.start_byte(),
             global.sum_byte_length(),
-            &parent_indentation,
+            parent_indentation,
         );
         Acc {
             labeled: node.has_label(),
@@ -330,8 +321,7 @@ where
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -345,7 +335,7 @@ where
         let line_count = spacing
             .matches("\n")
             .count()
-            .to_u16()
+            .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
@@ -441,13 +431,13 @@ where
             }
         }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-        let full_node = self.make(&mut global, acc, label);
-        full_node
+
+        self.make(&mut global, acc, label)
     }
 }
 
-impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> TreeGen
-    for TsTreeGen<'store, 'cache, TS, More, HIDDEN_NODES>
+impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
+    for TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
@@ -464,7 +454,7 @@ where
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
         let own_line_count = label.as_ref().map_or(0, |l| {
-            l.matches("\n").count().to_u16().expect("too many newlines")
+            l.matches("\n").count().to_u32().expect("too many newlines")
         });
         let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
 
@@ -516,12 +506,7 @@ where
             let compressed_node =
                 NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
 
-            self.md_cache.insert(
-                compressed_node,
-                DD {
-                    metrics: metrics.clone(),
-                },
-            );
+            self.md_cache.insert(compressed_node, DD { metrics });
             Local {
                 compressed_node,
                 metrics,
@@ -529,10 +514,9 @@ where
             }
         };
 
-        let full_node = FullNode {
+        FullNode {
             global: global.simple(),
             local,
-        };
-        full_node
+        }
     }
 }

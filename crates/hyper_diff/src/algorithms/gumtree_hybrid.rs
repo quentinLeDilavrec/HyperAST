@@ -1,16 +1,15 @@
-use super::DiffResult;
-use super::tr;
 use std::fmt::Debug;
 
-use super::CDS;
-use super::DiffRes;
+use hyperast::PrimInt;
+use hyperast::types::{HyperAST, LendT};
+use hyperast::types::{WithHashs, WithStats};
+
+use super::{CDS, DiffRes, DiffResult, tr};
 use crate::actions::script_generator2::ScriptGenerator;
 use crate::algorithms::check_oneshot_decompressed_against_lazy;
 use crate::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
+use crate::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use crate::matchers::Mapper;
-use crate::matchers::mapping_store::{DefaultMultiMappingStore, MappingStore, VecStore};
-use hyperast::types::{self, HyperAST, NodeId};
-
 use crate::matchers::heuristic::gt::greedy_subtree_matcher::GreedySubtreeMatcher;
 use crate::matchers::heuristic::gt::hybrid_bottom_up_matcher::HybridBottomUpMatcher;
 
@@ -24,11 +23,10 @@ pub fn diff<HAST: HyperAST + Copy>(
     dst: &HAST::IdN,
 ) -> DiffRes<HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
-    HAST::Idx: hyperast::PrimInt,
     HAST::Label: Debug + Clone + Copy + Eq,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     diff_hybrid_minheight::<HAST, DEFAULT_MIN_HEIGHT>(hyperast, src, dst)
 }
@@ -45,11 +43,10 @@ pub fn diff_with_hyperparameters<
     dst: &HAST::IdN,
 ) -> DiffRes<HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
-    HAST::Idx: hyperast::PrimInt,
     HAST::Label: Debug + Clone + Copy + Eq,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     let measure = super::DefaultMetricSetup::prepare();
     let mapper: Mapper<_, CDS<HAST>, CDS<HAST>, VecStore<_>> =
@@ -59,25 +56,18 @@ where
     }
     let measure = measure.start();
 
-    let mapper = GreedySubtreeMatcher::<_, _, _, _, MIN_HEIGHT>::match_it::<
-        DefaultMultiMappingStore<_>,
-    >(mapper);
+    let mapper =
+        GreedySubtreeMatcher::<_, MIN_HEIGHT>::match_it::<DefaultMultiMappingStore<_>>(mapper);
     let subtree_mappings_s = mapper.mappings().len();
 
     tr!(subtree_mappings_s);
 
     let measure = measure.stop_then_skip_prepare();
 
-    let mapper = HybridBottomUpMatcher::<
-        _,
-        _,
-        _,
-        _,
-        M,
-        SIZE_THRESHOLD,
-        SIM_THRESHOLD_NUM,
-        SIM_THRESHOLD_DEN,
-    >::match_it(mapper);
+    let mapper =
+        HybridBottomUpMatcher::<_,M, SIZE_THRESHOLD, SIM_THRESHOLD_NUM, SIM_THRESHOLD_DEN>::match_it(
+            mapper,
+        );
 
     let bottomup_mappings_s = mapper.mappings().len();
 
@@ -85,15 +75,11 @@ where
 
     let measure = measure.stop_then_prepare();
 
-    let mapper = mapper.map(
-        |x| x,
-        // the dst side has to be traversed in bfs for chawathe
-        |dst_arena| SimpleBfsMapper::with_store(hyperast, dst_arena),
-    );
+    let mapper = mapper.map_dst(SimpleBfsMapper::make);
     let measure = measure.start();
     let actions = ScriptGenerator::compute_actions(hyperast, &mapper.mapping).ok();
 
-    let mapper = mapper.map(|x| x, |dst_arena| dst_arena.back);
+    let mapper = mapper.map_dst(|dst_arena| dst_arena.back);
 
     let exec_data = measure.stop();
 
@@ -110,11 +96,10 @@ pub fn diff_hybrid_minheight<HAST: HyperAST + Copy, const MIN_HEIGHT: usize>(
     dst: &HAST::IdN,
 ) -> DiffRes<HAST>
 where
+    HAST::Idx: PrimInt,
     HAST::IdN: Clone + Debug + Eq,
-    HAST::IdN: NodeId<IdN = HAST::IdN>,
-    HAST::Idx: hyperast::PrimInt,
     HAST::Label: Debug + Clone + Copy + Eq,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::WithHashs + types::WithStats,
+    for<'t> LendT<'t, HAST>: WithHashs + WithStats,
 {
     diff_with_hyperparameters::<HAST, MIN_HEIGHT, 100, 1, 2>(hyperast, src, dst)
 }

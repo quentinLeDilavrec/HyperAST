@@ -1,36 +1,29 @@
-use std::{
-    ops::DerefMut,
-    sync::{Arc, Mutex},
-};
-
 use poll_promise::Promise;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 
-use crate::app::{
-    types::EditorHolder,
-    utils_edition::{
-        show_available_remote_docs, show_locals_and_interact, show_shared_code_edition,
-    },
-    utils_results_batched::ComputeResults,
+use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
+
+use super::types::{CodeEditors, Commit, Config, SelectedConfig};
+use super::types::{EditorHolder, WithDesc};
+use super::utils_edition::{EditStatus, EditingContext};
+use super::utils_edition::{
+    show_available_remote_docs, show_interactions, show_locals_and_interact,
+    show_shared_code_edition, update_shared_editors,
 };
+use super::utils_results_batched::ComputeError;
+use super::utils_results_batched::{ComputeResults, ComputeResultsProm, show_long_result};
+use super::{Sharing, code_editor_automerge, show_repo_menu};
+use crate::utils_poll::Resource;
 
-use self::example_scripts::EXAMPLES;
-
-use egui_addon::{
-    code_editor::EditorInfo, interactive_split::interactive_splitter::InteractiveSplitter,
-};
-
-use super::{
-    Sharing, code_editor_automerge, show_repo_menu,
-    types::{CodeEditors, Commit, Config, Resource, SelectedConfig, WithDesc},
-    utils_edition::{self, EditStatus, EditingContext, show_interactions, update_shared_editors},
-    utils_results_batched,
-};
 mod example_scripts;
+
+use example_scripts::EXAMPLES;
 
 const INFO_INIT: EditorInfo<&'static str> = EditorInfo {
     title: "Init",
     short: "initializes the accumulator on the root node",
-    long: concat!("It will recieve the finally results of the entire computation."),
+    long: "It will recieve the finally results of the entire computation.",
 };
 const INFO_FILTER: EditorInfo<&'static str> = EditorInfo {
     title: "Filter",
@@ -63,13 +56,13 @@ where
     C: From<(EditorInfo<String>, String)> + egui_addon::code_editor::CodeHolder,
 {
     fn from(value: &example_scripts::Scripts) -> Self {
-        let mut description: C = (INFO_DESCRIPTION.copied(), value.description.into()).into();
+        let mut description: C = (INFO_DESCRIPTION.into(), value.description.into()).into();
         description.set_lang("md");
         Self {
             description, // TODO config with markdown, not js
-            init: (INFO_INIT.copied(), value.init.into()).into(),
-            filter: (INFO_FILTER.copied(), value.filter.into()).into(),
-            accumulate: (INFO_ACCUMULATE.copied(), value.accumulate.into()).into(),
+            init: (INFO_INIT.into(), value.init.into()).into(),
+            filter: (INFO_FILTER.into(), value.filter.into()).into(),
+            accumulate: (INFO_ACCUMULATE.into(), value.accumulate.into()).into(),
         }
     }
 }
@@ -124,7 +117,7 @@ impl Into<CodeEditors<super::code_editor_automerge::CodeEditor>> for CodeEditors
 }
 
 pub(super) type ScriptingContext =
-    utils_edition::EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>;
+    EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -152,15 +145,12 @@ impl Default for ComputeConfigSingle {
     }
 }
 
-// pub(super) type RemoteResult =
-//     Promise<ehttp::Result<Resource<Result<ComputeResults, ScriptingError>>>>;
-
 pub(super) fn remote_compute_single(
     ctx: &egui::Context,
     api_addr: &str,
     single: &mut ComputeConfigSingle,
     code_editors: &mut ScriptingContext,
-) -> Promise<Result<Resource<Result<ComputeResults, ScriptingError>>, String>> {
+) -> ComputeResultsProm<ScriptingError> {
     // TODO multi requests from client
     // if single.len > 1 {
     //     let parents = fetch_commit_parents(&ctx, &single.commit, single.len);
@@ -225,11 +215,7 @@ pub(super) fn show_single_repo(
     single: &mut Sharing<ComputeConfigSingle>,
     code_editors: &mut ScriptingContext,
     trigger_compute: &mut bool,
-    compute_single_result: &mut Option<
-        poll_promise::Promise<
-            Result<super::types::Resource<Result<ComputeResults, ScriptingError>>, String>,
-        >,
-    >,
+    compute_single_result: &mut Option<ComputeResultsProm<ScriptingError>>,
 ) {
     let api_endpoint = &format!("{}/sharing-scripts", api_addr);
     update_shared_editors(ui, single, api_endpoint, code_editors);
@@ -244,7 +230,7 @@ pub(super) fn show_single_repo(
                 single,
                 trigger_compute,
             );
-            utils_results_batched::show_long_result(&*compute_single_result, ui);
+            show_long_result(&*compute_single_result, ui);
         });
     } else {
         InteractiveSplitter::vertical()
@@ -261,7 +247,7 @@ pub(super) fn show_single_repo(
                     single,
                     trigger_compute,
                 );
-                utils_results_batched::show_long_result(&*compute_single_result, ui);
+                show_long_result(&*compute_single_result, ui);
             });
     }
 }
@@ -269,9 +255,7 @@ pub(super) fn show_single_repo(
 fn handle_interactions(
     ui: &mut egui::Ui,
     code_editors: &mut EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>,
-    compute_single_result: &mut Option<
-        Promise<Result<Resource<Result<ComputeResults, ScriptingError>>, String>>,
-    >,
+    compute_single_result: &mut Option<ComputeResultsProm<ScriptingError>>,
     single: &mut Sharing<ComputeConfigSingle>,
     trigger_compute: &mut bool,
 ) {
@@ -290,7 +274,7 @@ fn handle_interactions(
         code_editors.current = EditStatus::Sharing(content.clone());
         let mut content = content.lock().unwrap();
         let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_atempt(&single.rt, name, content.deref_mut());
+        db.create_doc_attempt(&single.rt, name, content.deref_mut());
     } else if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving script: {:#?}", content.clone());
@@ -338,8 +322,7 @@ fn show_examples(
     scripting_context: &mut ScriptingContext,
 ) {
     ui.horizontal_wrapped(|ui| {
-        let mut j = 0;
-        for ex in EXAMPLES {
+        for (j, ex) in EXAMPLES.iter().enumerate() {
             let mut text = egui::RichText::new(ex.name);
             if let EditStatus::Example { i, .. } = &scripting_context.current {
                 if &j == i {
@@ -357,12 +340,17 @@ fn show_examples(
                 };
             }
             if button.hovered() {
-                egui::show_tooltip(ui.ctx(), ui.layer_id(), button.id.with("tooltip"), |ui| {
+                egui::Tooltip::always_open(
+                    ui.ctx().clone(),
+                    ui.layer_id(),
+                    button.id.with("tooltip"),
+                    button,
+                )
+                .show(|ui| {
                     let desc = ex.scripts.description;
                     egui_demo_lib::easy_mark::easy_mark(ui, desc);
                 });
             }
-            j += 1;
         }
     });
 }
@@ -372,7 +360,6 @@ impl Resource<Result<ComputeResults, ScriptingError>> {
         _ctx: &egui::Context,
         response: ehttp::Response,
     ) -> Result<Self, String> {
-        wasm_rs_dbg::dbg!(&response);
         let content_type = response.content_type().unwrap_or_default();
         if !content_type.starts_with("application/json") {
             return Err(format!("Wrong content type: {}", content_type));
@@ -419,7 +406,7 @@ pub(crate) const WANTED: SelectedConfig = SelectedConfig::Single;
 pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigSingle>) {
     show_repo_menu(ui, &mut single.content.commit.repo);
     ui.push_id(ui.id().with("commit"), |ui| {
-        egui::TextEdit::singleline(&mut single.content.commit.id)
+        egui::TextEdit::singleline(&mut single.content.commit.id.tb())
             .clip_text(true)
             .desired_width(150.0)
             .desired_rows(1)
@@ -442,7 +429,7 @@ pub(crate) fn show_config(ui: &mut egui::Ui, single: &mut Sharing<ComputeConfigS
     selected.show_combo_box(ui, "Repo Config");
 }
 
-impl utils_results_batched::ComputeError for ScriptingError {
+impl ComputeError for ScriptingError {
     fn head(&self) -> &str {
         match self {
             ScriptingError::AtCompilation(_) => "Error at compilation:",

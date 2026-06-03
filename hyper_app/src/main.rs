@@ -1,6 +1,5 @@
-#![warn(clippy::all, rust_2018_idioms)]
+// #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-#![allow(unused)]
 
 const ADDR: &str = "127.0.0.1:8888";
 
@@ -18,7 +17,7 @@ fn main() -> eframe::Result<()> {
         .map_or(ADDR, |x| x)
         .to_string();
 
-    let languages = hyper_app::Languages::default();
+    let languages = hyper_app::Languages;
     static ICON: &[u8] = include_bytes!("coevolution.png");
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -50,9 +49,9 @@ fn main() -> eframe::Result<()> {
 // when compiling to web using trunk.
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    use egui_addon::Lang;
     use wasm_bindgen::prelude::*;
-    let api_addr = None;
+    // let api_addr = None;
+    let api_addr = Some(ADDR.into());
     // let api_addr = std::env::args()
     //     .collect::<Vec<_>>()
     //     .get(0)
@@ -75,7 +74,7 @@ fn main() {
             .await
             .map_err(JsValue::from)
             .unwrap();
-        let mut languages: hyper_app::Languages = Default::default();
+        let languages: hyper_app::Languages = Default::default();
         let document = web_sys::window()
             .expect("No window")
             .document()

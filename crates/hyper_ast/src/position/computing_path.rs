@@ -12,8 +12,7 @@ pub fn resolve_range<'store, HAST>(
 ) -> (HAST::IdN, Vec<usize>)
 where
     HAST: HyperAST,
-    for<'t> <HAST as crate::types::AstLending<'t>>::RT: WithSerialization,
-    HAST::IdN: crate::types::NodeId<IdN = HAST::IdN>,
+    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
     HAST::IdN: Copy,
 {
     let mut offset = 0;
@@ -28,7 +27,7 @@ where
                 let len = b.try_bytes_len().unwrap_or(0).to_usize().unwrap();
                 if offset + len < start {
                     // not yet reached something
-                } else if end.map_or(true, |end| offset + len <= end) {
+                } else if end.is_none_or(|end| offset + len <= end) {
                     break 'main;
                 } else {
                     offsets.push(y);

@@ -1,16 +1,12 @@
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    hash::Hash,
-};
-
-use super::{
-    element::{ExplorableRef, Nodes, RawLabelPtr, RefPtr},
-    label_value::LabelValue,
-    reference::DisplayRef,
-};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
 
 use hyperast::types::LabelStore;
+
+use super::element::{ExplorableRef, Nodes, RawLabelPtr, RefPtr};
+use super::label_value::LabelValue;
+use super::reference::DisplayRef;
 
 pub struct ExplorableDecl<'a> {
     decl: (&'a Declarator<RefPtr>, &'a DeclType<RefPtr>),

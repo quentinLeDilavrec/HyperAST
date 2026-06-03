@@ -1,10 +1,11 @@
-use super::{Cursor, Status, Symbol, TextLending, TreeCursorStep};
 use hyperast::position::TreePath;
-use hyperast::types::{HyperASTShared, HyperType, LabelStore, Labeled, NodeId, RoleStore, Tree, WithRoles};
-use hyperast::{
-    position::TreePathMut,
-    types::{HyperAST, TypeStore},
-};
+use hyperast::position::TreePathMut;
+use hyperast::types::{HyperAST, TypeStore};
+use hyperast::types::{HyperASTShared, HyperType, NodeId, Tree};
+use hyperast::types::{LabelStore, Labeled, RoleStore, Tree};
+
+use super::{Cursor, Status, Symbol, TextLending, TreeCursorStep};
+
 pub type TreeCursor<'hast, HAST> = Node<'hast, HAST>;
 
 pub struct Node<'hast, HAST: HyperASTShared> {
@@ -77,7 +78,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::TS: RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
 {
     type Node = self::Node<'hast, HAST>;
 
@@ -153,7 +154,7 @@ where
     type Status = CursorStatus<<<HAST as HyperAST>::TS as RoleStore>::IdF>;
 
     #[inline]
-    fn current_status(&self) -> Self::Status {
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status {
         let (role, field_id) = self.compute_current_role();
         let mut has_later_siblings = false;
         let mut has_later_named_siblings = false;
@@ -199,7 +200,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::TS: RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
 {
     fn role(&self) -> Option<<HAST::TS as RoleStore>::Role> {
         use hyperast::types::NodeStore;
@@ -267,7 +268,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::TS: RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
 {
     fn symbol(&self) -> Symbol {
         // TODO make something more efficient
@@ -367,7 +368,7 @@ where
     HAST::IdN: std::fmt::Debug + Copy,
     HAST::IdN: NodeId<IdN = HAST::IdN>,
     HAST::TS: RoleStore,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: WithRoles,
+    for<'t> hyperast::types::LendT<'t, HAST>: WithRoles,
 {
     fn child_by_role(&mut self, role: <HAST::TS as RoleStore>::Role) -> Option<()> {
         // TODO what about multiple children with same role?

@@ -1,9 +1,9 @@
 use std::borrow::Borrow;
-use std::fmt::Debug;
-use std::fmt::Display;
+use std::cmp::PartialEq;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::marker::{Send, Sync};
 use std::ops::Deref;
-use std::str::FromStr;
 
 use num::ToPrimitive;
 use strum_macros::AsRefStr;
@@ -12,9 +12,10 @@ use strum_macros::EnumCount;
 use strum_macros::EnumIter;
 use strum_macros::EnumString;
 
-use crate::PrimInt;
+pub use crate::PrimInt;
+use crate::store::nodes::PolyglotHolder;
 
-pub trait HashKind: Copy + std::ops::Deref {
+pub trait HashKind: Copy + Deref {
     fn structural() -> Self;
     fn label() -> Self;
 }
@@ -25,8 +26,19 @@ macro_rules! role_impl {
         $( $t:ident => $s:expr, )+
     ) => {
         #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+        #[repr(u8)]
         pub enum Role {
             $( $t, )+
+        }
+        impl Role {
+            pub const fn len() -> usize {
+                Self::End as usize + 1
+            }
+        }
+        impl Into<u8> for Role {
+            fn into(self) -> u8 {
+                self as u8
+            }
         }
 
         impl<'a> TryFrom<&'a str> for Role {
@@ -153,7 +165,7 @@ role_impl!(
     Modules => "modules",
 
     // // Cpp
-    // Size => "size",
+    Size => "size",
     Label => "label",
     Member => "member",
     Function => "function",
@@ -178,7 +190,6 @@ role_impl!(
     Placement => "placement",
     // Scope => "scope",
     // Update => "update",
-    End => "end",
     // Type => "type",
     // Body => "body",
     DefaultValue => "default_value",
@@ -203,328 +214,13 @@ role_impl!(
     TemplateParameters => "template_parameters",
     // Operator => "operator",
     // Condition => "condition",
+    End => "end",
 );
 
-#[allow(unused)]
-mod exp {
-    use super::*;
-
-    // keywords (leafs with a specific unique serialized form)
-    // and concrete types (concrete rules) should definitely be stored.
-    // But hidden nodes are can either be supertypes or nodes that are just deemed uninteresting (but still useful to for example the treesitter internal repr.)
-    // The real important difference is the (max) number of children (btw an it cannot be a leaf (at least one child)),
-    // indeed, with a single child it is possible to easily implement optimization that effectively reduce the number of nodes.
-    // - a supertype should only have a single child
-    // - in tree-sitter repeats (star and plus patterns) are binary nodes (sure balanced?)
-    // - in tree-sitter other nodes can be hidden (even when they have fields), it can be espetially useful to add more structure without breaking existing queries !
-    // Anyway lets wait for better type generation, this way it should be possible to explicitely/completely handle optimizable cases (supertypes,...)
-
-    #[repr(transparent)]
-    pub struct T(u16);
-
-    #[repr(u16)]
-    pub enum T2 {
-        Java(u16),
-        Cpp(u16),
-    }
-
-    // pub trait Lang {
-    //     type Factory;
-    //     type Type;
-    // }
-
-    trait TypeFactory {
-        fn new() -> Self
-        where
-            Self: Sized;
-    }
-
-    mod polyglote {
-        /// has statements
-        struct Block;
-        /// has a name
-        struct Member;
-    }
-
-    // WARN order of fields matter in java for instantiation
-    // stuff where order does not matter should be sorted before erasing anything
-
-    pub enum TypeMapElement<Concrete, Abstract> {
-        Keyword(Keyword),
-        Concrete(Concrete),
-        Abstract(Abstract),
-    }
-
-    pub enum ConvertResult<Concrete, Abstract> {
-        Keyword(Keyword),
-        Concrete(Concrete),
-        Abstract(Abstract),
-        Missing,
-    }
-
-    trait KeywordProvider: Sized {
-        fn parse(&self, s: &str) -> Option<Self>;
-        fn as_str(&'static self) -> &'static str;
-        fn len(&self) -> usize;
-    }
-
-    /// only contains keywords such as
-    #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
-    #[strum(serialize_all = "snake_case")]
-    #[derive(Hash, Clone, Copy, PartialEq, Eq)]
-    pub enum Keyword {
-        // While,
-        // For,
-        // #[strum(serialize = ";")]
-        // SemiColon,
-        // #[strum(serialize = ".")]
-        // Dot,
-        // #[strum(serialize = "{")]
-        // LeftCurly,
-        // #[strum(serialize = "}")]
-        // RightCurly,
-    }
-
-    impl KeywordProvider for Keyword {
-        fn parse(&self, s: &str) -> Option<Self> {
-            Keyword::from_str(s).ok()
-        }
-
-        fn as_str(&'static self) -> &'static str {
-            Keyword::as_ref(&self)
-        }
-
-        fn len(&self) -> usize {
-            <Keyword as strum::EnumCount>::COUNT
-        }
-    }
-
-    mod macro_test {
-        macro_rules! parse_unitary_variants {
-        (@as_expr $e:expr) => {$e};
-        (@as_item $($i:item)+) => {$($i)+};
-
-        // Exit rules.
-        (
-            @collect_unitary_variants ($callback:ident ( $($args:tt)* )),
-            ($(,)*) -> ($($var_names:ident,)*)
-        ) => {
-            parse_unitary_variants! {
-                @as_expr
-                $callback!{ $($args)* ($($var_names),*) }
-            }
-        };
-
-        (
-            @collect_unitary_variants ($callback:ident { $($args:tt)* }),
-            ($(,)*) -> ($($var_names:ident,)*)
-        ) => {
-            parse_unitary_variants! {
-                @as_item
-                $callback!{ $($args)* ($($var_names),*) }
-            }
-        };
-
-        // Consume an attribute.
-        (
-            @collect_unitary_variants $fixed:tt,
-            (#[$_attr:meta] $($tail:tt)*) -> ($($var_names:tt)*)
-        ) => {
-            parse_unitary_variants! {
-                @collect_unitary_variants $fixed,
-                ($($tail)*) -> ($($var_names)*)
-            }
-        };
-
-        // Handle a variant, optionally with an with initialiser.
-        (
-            @collect_unitary_variants $fixed:tt,
-            ($var:ident $(= $_val:expr)*, $($tail:tt)*) -> ($($var_names:tt)*)
-        ) => {
-            parse_unitary_variants! {
-                @collect_unitary_variants $fixed,
-                ($($tail)*) -> ($($var_names)* $var,)
-            }
-        };
-
-        // Abort on variant with a payload.
-        (
-            @collect_unitary_variants $fixed:tt,
-            ($var:ident $_struct:tt, $($tail:tt)*) -> ($($var_names:tt)*)
-        ) => {
-            const _error: () = "cannot parse unitary variants from enum with non-unitary variants";
-        };
-
-        // Entry rule.
-        (enum $name:ident {$($body:tt)*} => $callback:ident $arg:tt) => {
-            parse_unitary_variants! {
-                @collect_unitary_variants
-                ($callback $arg), ($($body)*,) -> ()
-            }
-        };
-    }
-
-        macro_rules! coucou {
-            ( f(C, D)) => {
-                struct B {}
-            };
-        }
-        parse_unitary_variants! {
-            enum A {
-                C,D,
-            } => coucou{ f}
-        }
-    }
-
-    macro_rules! make_type {
-        (
-            Keyword {$(
-                $(#[$km:meta])*
-                $ka:ident
-            ),* $(,)?}
-            Concrete {$(
-                $(#[$cm:meta])*
-                $ca:ident$({$($cl:expr),+ $(,)*})?$(($($co:ident),+ $(,)*))?$([$($cx:ident),+ $(,)*])?
-            ),* $(,)?}
-            WithFields {$(
-                $(#[$wm:meta])*
-                $wa:ident{$($wb:tt)*}
-            ),* $(,)?}
-            Abstract {$(
-                $(#[$am:meta])*
-                $aa:ident($($ab:ident),* $(,)?)
-            ),* $(,)?}
-        ) => {
-            #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
-            #[strum(serialize_all = "snake_case")]
-            #[derive(Hash, Clone, Copy, PartialEq, Eq)]
-            pub enum Type {
-                // Keywords
-            $(
-                $( #[$km] )*
-                $ka,
-            )*
-                // Concrete
-            $(
-                $ca,
-            )*
-                // WithFields
-            $(
-                $( #[$wm] )*
-                $wa,
-            )*
-            }
-            enum Abstract {
-                $(
-                    $aa,
-                )*
-            }
-
-            pub struct Factory {
-                map: Box<[u16]>,
-            }
-
-            pub struct Language;
-        };
-    }
-
-    macro_rules! make_type_store {
-    ($kw:ty, $sh:ty, $($a:ident($l:ty)),* $(,)?) => {
-
-        #[repr(u16)]
-        pub enum CustomTypeStore {$(
-            $a(u16),
-        )*}
-
-        impl CustomTypeStore {
-            // fn lang<L: Lang>(&self) -> Option<L> {
-            //     todo!()
-            // }
-            fn eq_keyword(kw: &$kw) -> bool {
-                todo!()
-            }
-            fn eq_shared(kw: &$sh) -> bool {
-                todo!()
-            }
-        }
-    };
-}
-
-    make_type_store!(Keyword, Shared, Java(java::Language), Cpp(cpp::Language),);
-
-    pub mod java {
-        use super::*;
-
-        pub enum Field {
-            Name,
-            Body,
-            Expression,
-            Condition,
-            Then,
-            Else,
-            Block,
-            Type,
-        }
-
-        make_type! {
-            Keyword{
-                While,
-                For,
-                Public,
-                Private,
-                Protected,
-                #[strum(serialize = ";")]
-                SemiColon,
-                #[strum(serialize = ".")]
-                Dot,
-                #[strum(serialize = "{")]
-                LeftCurly,
-                #[strum(serialize = "}")]
-                RightCurly,
-                #[strum(serialize = "(")]
-                LeftParen,
-                #[strum(serialize = ")")]
-                RightParen,
-                #[strum(serialize = "[")]
-                LeftBracket,
-                #[strum(serialize = "]")]
-                RightBracket,
-            }
-            Concrete {
-                Comment{r"//.\*$",r"/\*.*\*/"},
-                Identifier{r"[a-zA-Z].*"},
-                ExpressionStatement(Statement, Semicolon),
-                ReturnStatement(Return, Expression, Semicolon),
-                TryStatement(Try, Paren, Block),
-            }
-            WithFields {
-                Class {
-                    name(Identifier),
-                    body(ClassBody),
-                },
-                Interface {
-                    name(Identifier),
-                    body(InterfaceBody),
-                },
-            }
-            Abstract {
-                Statement(
-                    StatementExpression,
-                    TryStatement,
-                ),
-                Expression(
-                    BinaryExpression,
-                    UnaryExpression,
-                ),
-            }
-        }
-    }
-}
-
-/// set of possible abtract type of nodes
+/// set of possible abstract type of nodes
 pub type Abstracts = enumset::EnumSet<Abstract>;
 
-/// the posible abstract type that a node can have
+/// the possible abstract type that a node can have
 #[derive(Debug, Hash, Display, enumset::EnumSetType)]
 pub enum Abstract {
     Expression,
@@ -552,17 +248,20 @@ pub enum Shared {
     Comment,
     // ExpressionStatement,
     // ReturnStatement,
-    // TryStatement,
+    Literal,
     Identifier,
     TypeDeclaration,
     Branch,
     Other,
-    // WARN do not include Abtract type/rules (should go in Abstract) ie.
+    // actually error is a concrete type
+    Error,
+    // WARN do not include Abstract type/rules (should go in Abstract) ie.
     // Expression,
     // Statement,
 }
 
-pub trait Lang<T>: LangRef<T> {
+pub trait Lang<T>: LangRef<T> + 'static + Send + Sync {
+    const INST: Self;
     fn make(t: TypeInternalSize) -> &'static T;
     fn to_u16(t: T) -> TypeInternalSize;
 }
@@ -574,6 +273,7 @@ pub trait LangRef<T> {
     fn ts_symbol(&self, t: T) -> u16;
 }
 
+#[derive(Clone, Copy)]
 pub struct LangWrapper<T: 'static + ?Sized>(&'static dyn LangRef<T>);
 
 impl<T> From<&'static (dyn LangRef<T> + 'static)> for LangWrapper<T> {
@@ -619,6 +319,7 @@ pub trait HyperType: Display + Debug {
     fn is_hidden(&self) -> bool;
     fn is_named(&self) -> bool;
     fn is_supertype(&self) -> bool;
+    fn is_error(&self) -> bool;
     fn get_lang(&self) -> LangWrapper<Self>
     where
         Self: Sized;
@@ -638,10 +339,7 @@ impl HyperType for u8 {
     {
         // Do a type-safe casting. If the types are different,
         // return false, otherwise test the values for equality.
-        other
-            .as_any()
-            .downcast_ref::<Self>()
-            .map_or(false, |a| self == a)
+        other.as_any().downcast_ref::<Self>() == Some(self)
     }
 
     fn as_shared(&self) -> Shared {
@@ -685,6 +383,10 @@ impl HyperType for u8 {
     }
 
     fn is_supertype(&self) -> bool {
+        todo!()
+    }
+
+    fn is_error(&self) -> bool {
         todo!()
     }
 
@@ -810,23 +512,29 @@ pub trait WithChildren:
     fn child_rev(&self, idx: &Self::ChildIdx) -> Option<<Self::TreeId as NodeId>::IdN> {
         let cs = self.children()?;
         let cs: Vec<_> = cs.collect();
-        cs.get(cs.len() - idx.to_usize().unwrap())
-            .cloned()
-            .map(|x| x)
+        cs.get(cs.len() - idx.to_usize().unwrap()).cloned()
     }
     fn children(&self) -> Option<LendC<'_, Self, Self::ChildIdx, <Self::TreeId as NodeId>::IdN>>;
 }
 
 pub trait WithRoles: WithChildren {
-    fn role_at<Role: 'static + Copy + std::marker::Sync + std::marker::Send>(
+    fn role_at<Role: 'static + Copy + Sync + Send>(&self, at: Self::ChildIdx) -> Option<Role>;
+
+    fn role_at_and_has_later<Role: 'static + Copy + Sync + Send + PartialEq>(
         &self,
         at: Self::ChildIdx,
-    ) -> Option<Role>;
+    ) -> Option<(Role, bool)>;
 }
 
 pub trait WithPrecompQueries {
     fn wont_match_given_precomputed_queries(&self, needed: u16) -> bool;
 }
+
+//
+// TODO need a super trait with all the capabilities provided
+// NOTE  might be better to provide it in child crates which makes those capabilities available
+//
+
 pub struct ChildrenSlice<'a, T>(pub &'a [T]);
 
 impl<'a, T> From<&'a [T]> for ChildrenSlice<'a, T> {
@@ -835,7 +543,7 @@ impl<'a, T> From<&'a [T]> for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T> Default for ChildrenSlice<'a, T> {
+impl<T> Default for ChildrenSlice<'_, T> {
     fn default() -> Self {
         Self(&[])
     }
@@ -883,7 +591,7 @@ impl<T: Debug> Debug for ChildrenSlice<'_, T> {
     }
 }
 
-impl<'a, T: Clone> Iterator for ChildrenSlice<'a, T> {
+impl<T: Clone> Iterator for ChildrenSlice<'_, T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         let r = self.0.first()?.clone();
@@ -892,7 +600,7 @@ impl<'a, T: Clone> Iterator for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T: Clone> DoubleEndedIterator for ChildrenSlice<'a, T> {
+impl<T: Clone> DoubleEndedIterator for ChildrenSlice<'_, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let r = self.0.last()?.clone();
         self.0 = &self.0[..self.0.len() - 1];
@@ -900,7 +608,7 @@ impl<'a, T: Clone> DoubleEndedIterator for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T: Clone> Children<u16, T> for ChildrenSlice<'a, T> {
+impl<T: Clone> Children<u16, T> for ChildrenSlice<'_, T> {
     fn child_count(&self) -> u16 {
         <[T]>::len(self.0).to_u16().unwrap()
     }
@@ -932,7 +640,7 @@ impl<'a, T: Clone> Children<u16, T> for ChildrenSlice<'a, T> {
     }
 }
 
-impl<'a, T: Clone> Childrn<T> for ChildrenSlice<'a, T> {
+impl<T: Clone> Childrn<T> for ChildrenSlice<'_, T> {
     fn len(&self) -> usize {
         <[T]>::len(self.0)
     }
@@ -941,11 +649,11 @@ impl<'a, T: Clone> Childrn<T> for ChildrenSlice<'a, T> {
     }
 
     fn iter_children(&self) -> Self {
-        Self(&self.0[..])
+        Self(self.0)
     }
 }
 
-impl<'a, T: Clone> Children<u8, T> for ChildrenSlice<'a, T> {
+impl<T: Clone> Children<u8, T> for ChildrenSlice<'_, T> {
     fn child_count(&self) -> u8 {
         <[T]>::len(self.0).to_u8().unwrap()
     }
@@ -989,12 +697,12 @@ mod owned {
         type ChildIdx: PrimInt;
 
         fn child_count(&self) -> Self::ChildIdx;
-        fn get_child(&self, idx: &Self::ChildIdx) -> RefMut<Self>;
-        fn get_child_mut(&mut self, idx: &Self::ChildIdx) -> Ref<Self>;
+        fn get_child(&self, idx: &Self::ChildIdx) -> RefMut<'_, Self>;
+        fn get_child_mut(&mut self, idx: &Self::ChildIdx) -> Ref<'_, Self>;
     }
     pub trait WithParent: Node {
-        fn get_parent(&self) -> Ref<Self>;
-        fn get_parent_mut(&mut self) -> RefMut<Self>;
+        fn get_parent(&self) -> Ref<'_, Self>;
+        fn get_parent_mut(&mut self) -> RefMut<'_, Self>;
     }
 }
 
@@ -1014,15 +722,21 @@ pub trait WithSerialization {
 pub trait WithHashs {
     type HK: HashKind;
     type HP: PrimInt + PartialEq + Eq;
-    fn hash<'a>(&'a self, kind: impl std::ops::Deref<Target = Self::HK>) -> Self::HP;
+    fn hash(&self, kind: impl Deref<Target = Self::HK>) -> Self::HP;
+    fn hash_label(&self) -> Self::HP {
+        self.hash(&<Self::HK as HashKind>::label())
+    }
+    fn hash_structural(&self) -> Self::HP {
+        self.hash(&<Self::HK as HashKind>::structural())
+    }
 }
 
 pub trait Labeled {
     type Label: Eq;
-    fn get_label_unchecked<'a>(&'a self) -> &'a Self::Label;
-    fn try_get_label<'a>(&'a self) -> Option<&'a Self::Label>;
+    fn get_label_unchecked(&self) -> &Self::Label;
+    fn try_get_label(&self) -> Option<&Self::Label>;
 }
-pub trait Tree: Labeled + WithChildren + ErasedHolder {
+pub trait Tree: Labeled + WithChildren + PolyglotHolder {
     fn has_children(&self) -> bool;
     fn has_label(&self) -> bool;
 }
@@ -1066,6 +780,10 @@ pub mod lending {
 
     pub trait NodeStore<IdN>: for<'a> NLending<'a, IdN> {
         fn resolve(&self, id: &IdN) -> LendN<'_, Self, IdN>;
+        #[doc(hidden)]
+        fn try_resolve(&self, id: &IdN) -> Option<LendN<'_, Self, IdN>> {
+            Some(self.resolve(id))
+        }
         fn scoped<R>(&self, id: &IdN, f: impl Fn(&LendN<'_, Self, IdN>) -> R) -> R {
             f(&self.resolve(id))
         }
@@ -1090,15 +808,17 @@ pub trait NodeStoreLife<'store, IdN> {
     fn resolve(&'store self, id: &IdN) -> Self::R<'store>;
 }
 
-pub trait NodeId: Eq + Clone + 'static {
-    type IdN: Eq + AAAA;
+pub trait NodeId: Debug + Eq + Clone + 'static {
+    type IdN: Eq + UniformNodeId;
     fn as_id(&self) -> &Self::IdN;
     // fn as_ty(&self) -> &Self::Ty;
     unsafe fn from_id(id: Self::IdN) -> Self;
     unsafe fn from_ref_id(id: &Self::IdN) -> &Self;
 }
 
-impl AAAA for u16 {}
+pub trait UniformNodeId: NodeId<IdN = Self> {}
+
+impl<T: NodeId<IdN = T>> UniformNodeId for T {}
 
 impl NodeId for u16 {
     type IdN = u16;
@@ -1113,8 +833,6 @@ impl NodeId for u16 {
         id
     }
 }
-
-pub trait AAAA: NodeId<IdN = Self> {}
 
 pub trait TypedNodeId: NodeId {
     type Ty: HyperType + Hash + Copy + Eq + Send + Sync;
@@ -1208,8 +926,8 @@ pub trait TypeStore {
         + Eq
         + std::hash::Hash
         + Copy
-        + std::marker::Send
-        + std::marker::Sync
+        + Send
+        + Sync
         + crate::store::nodes::Compo;
 
     fn type_to_u16(t: Self::Ty) -> TypeInternalSize {
@@ -1218,9 +936,15 @@ pub trait TypeStore {
     fn ts_symbol(t: Self::Ty) -> TypeInternalSize {
         t.get_lang().ts_symbol(t)
     }
-    fn decompress_type(erazed: &impl ErasedHolder, tid: std::any::TypeId) -> Self::Ty {
+    fn decompress_type(erazed: &impl PolyglotHolder, tid: std::any::TypeId) -> Self::Ty {
         *unsafe { erazed.unerase_ref_unchecked::<Self::Ty>(tid) }
             .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
+    }
+    fn try_decompress_type(
+        erazed: &impl PolyglotHolder,
+        tid: std::any::TypeId,
+    ) -> Option<Self::Ty> {
+        unsafe { erazed.unerase_ref_unchecked::<Self::Ty>(tid) }.map(|x| *x)
     }
 }
 
@@ -1230,7 +954,7 @@ pub trait TTypeStore: TypeStore {
 }
 
 pub trait ETypeStore: TypeStore + Copy {
-    type Ty2;
+    type Ty2: TypeTrait;
     fn intern(ty: Self::Ty2) -> Self::Ty;
 }
 
@@ -1271,6 +995,7 @@ mod lang_test {
     }
 
     impl Lang<TyTest> for LLangTest {
+        const INST: Self = LLangTest;
         fn make(t: TypeInternalSize) -> &'static TyTest {
             todo!()
         }
@@ -1348,7 +1073,7 @@ impl<L: LLang<Self, I = u16>> Copy for TypeU16<L> {}
 
 impl<L: LLang<Self, I = u16>> Clone for TypeU16<L> {
     fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1.clone())
+        *self
     }
 }
 
@@ -1443,6 +1168,10 @@ where
         self.e().is_supertype()
     }
 
+    fn is_error(&self) -> bool {
+        self.e().is_error()
+    }
+
     fn get_lang(&self) -> LangWrapper<Self>
     where
         Self: Sized,
@@ -1463,7 +1192,7 @@ pub trait SpecializedTypeStore<T: Typed>: TypeStore {}
 
 pub trait RoleStore: TypeStore {
     type IdF: 'static + Copy + Default + PartialEq;
-    type Role: 'static + Copy + PartialEq + std::marker::Sync + std::marker::Send;
+    type Role: 'static + Copy + PartialEq + Sync + Send;
     fn resolve_field(lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role;
     fn intern_role(lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF;
 }
@@ -1500,7 +1229,7 @@ pub trait HyperAST: for<'a> AstLending<'a> {
         let n: <Self as AstLending<'_>>::RT = ns.resolve(id);
         Self::TS::decompress_type(&n, std::any::TypeId::of::<<Self::TS as TypeStore>::Ty>())
     }
-    fn resolve<'a>(&self, id: &'a Self::IdN) -> <Self as AstLending<'_>>::RT {
+    fn resolve(&self, id: &Self::IdN) -> <Self as AstLending<'_>>::RT {
         let ns = self.node_store();
         let n = ns.resolve(id);
         n
@@ -1550,7 +1279,7 @@ pub trait NStoreRefAssoc {
 pub trait NodeStorage<IdN> {}
 
 pub trait HyperASTShared {
-    type IdN: NodeId;
+    type IdN: UniformNodeId;
     type Idx: PrimInt;
     type Label;
 }
@@ -1616,6 +1345,13 @@ impl From<&'static dyn HyperType> for AnyType {
         Self(value)
     }
 }
+impl Deref for AnyType {
+    type Target = dyn HyperType;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
 
 impl HyperType for AnyType {
     fn generic_eq(&self, other: &dyn HyperType) -> bool
@@ -1674,6 +1410,10 @@ impl HyperType for AnyType {
         self.0.is_named()
     }
 
+    fn is_error(&self) -> bool {
+        self.0.is_error()
+    }
+
     fn get_lang(&self) -> LangWrapper<Self>
     where
         Self: Sized,
@@ -1687,5 +1427,321 @@ impl HyperType for AnyType {
 
     fn lang_ref(&self) -> LangWrapper<AnyType> {
         self.0.lang_ref()
+    }
+}
+
+#[allow(unused)]
+mod exp {
+    use super::*;
+    use std::str::FromStr;
+
+    // keywords (leaves with a specific unique serialized form)
+    // and concrete types (concrete rules) should definitely be stored.
+    // But hidden nodes are can either be supertypes or nodes that are just deemed uninteresting (but still useful to, for example, the treesitter internal repr.)
+    // The real important difference is the (max) number of children (btw it cannot be a leaf (at least one child)),
+    // indeed, with a single child it is possible to easily implement optimization that effectively reduce the number of nodes.
+    // - a supertype should only have a single child
+    // - in tree-sitter repeats (star and plus patterns) are binary nodes (sure balanced?)
+    // - in tree-sitter other nodes can be hidden (even when they have fields), it can be espetially useful to add more structure without breaking existing queries !
+    // Anyway lets wait for better type generation, this way it should be possible to explicitely/completely handle optimizable cases (supertypes,...)
+
+    #[repr(transparent)]
+    pub struct T(u16);
+
+    #[repr(u16)]
+    pub enum T2 {
+        Java(u16),
+        Cpp(u16),
+    }
+
+    // pub trait Lang {
+    //     type Factory;
+    //     type Type;
+    // }
+
+    trait TypeFactory {
+        fn new() -> Self
+        where
+            Self: Sized;
+    }
+
+    mod polyglote {
+        /// has statements
+        struct Block;
+        /// has a name
+        struct Member;
+    }
+
+    // WARN order of fields matter in java for instantiation
+    // stuff where order does not matter should be sorted before erasing anything
+
+    pub enum TypeMapElement<Concrete, Abstract> {
+        Keyword(Keyword),
+        Concrete(Concrete),
+        Abstract(Abstract),
+    }
+
+    pub enum ConvertResult<Concrete, Abstract> {
+        Keyword(Keyword),
+        Concrete(Concrete),
+        Abstract(Abstract),
+        Missing,
+    }
+
+    trait KeywordProvider: Sized {
+        fn parse(&self, s: &str) -> Option<Self>;
+        fn as_str(&'static self) -> &'static str;
+        fn len(&self) -> usize;
+    }
+
+    /// only contains keywords such as
+    #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
+    #[strum(serialize_all = "snake_case")]
+    #[derive(Hash, Clone, Copy, PartialEq, Eq)]
+    pub enum Keyword {
+        // While,
+        // For,
+        // #[strum(serialize = ";")]
+        // SemiColon,
+        // #[strum(serialize = ".")]
+        // Dot,
+        // #[strum(serialize = "{")]
+        // LeftCurly,
+        // #[strum(serialize = "}")]
+        // RightCurly,
+    }
+
+    impl KeywordProvider for Keyword {
+        fn parse(&self, s: &str) -> Option<Self> {
+            Keyword::from_str(s).ok()
+        }
+
+        fn as_str(&'static self) -> &'static str {
+            Keyword::as_ref(self)
+        }
+
+        fn len(&self) -> usize {
+            <Keyword as strum::EnumCount>::COUNT
+        }
+    }
+
+    mod macro_test {
+        macro_rules! parse_unitary_variants {
+        (@as_expr $e:expr) => {$e};
+        (@as_item $($i:item)+) => {$($i)+};
+
+        // Exit rules.
+        (
+            @collect_unitary_variants ($callback:ident ( $($args:tt)* )),
+            ($(,)*) -> ($($var_names:ident,)*)
+        ) => {
+            parse_unitary_variants! {
+                @as_expr
+                $callback!{ $($args)* ($($var_names),*) }
+            }
+        };
+
+        (
+            @collect_unitary_variants ($callback:ident { $($args:tt)* }),
+            ($(,)*) -> ($($var_names:ident,)*)
+        ) => {
+            parse_unitary_variants! {
+                @as_item
+                $callback!{ $($args)* ($($var_names),*) }
+            }
+        };
+
+        // Consume an attribute.
+        (
+            @collect_unitary_variants $fixed:tt,
+            (#[$_attr:meta] $($tail:tt)*) -> ($($var_names:tt)*)
+        ) => {
+            parse_unitary_variants! {
+                @collect_unitary_variants $fixed,
+                ($($tail)*) -> ($($var_names)*)
+            }
+        };
+
+        // Handle a variant, optionally with an initializer.
+        (
+            @collect_unitary_variants $fixed:tt,
+            ($var:ident $(= $_val:expr)*, $($tail:tt)*) -> ($($var_names:tt)*)
+        ) => {
+            parse_unitary_variants! {
+                @collect_unitary_variants $fixed,
+                ($($tail)*) -> ($($var_names)* $var,)
+            }
+        };
+
+        // Abort on variant with a payload.
+        (
+            @collect_unitary_variants $fixed:tt,
+            ($var:ident $_struct:tt, $($tail:tt)*) -> ($($var_names:tt)*)
+        ) => {
+            const _error: () = "cannot parse unitary variants from enum with non-unitary variants";
+        };
+
+        // Entry rule.
+        (enum $name:ident {$($body:tt)*} => $callback:ident $arg:tt) => {
+            parse_unitary_variants! {
+                @collect_unitary_variants
+                ($callback $arg), ($($body)*,) -> ()
+            }
+        };
+    }
+
+        macro_rules! coucou {
+            ( f(C, D)) => {
+                struct B {}
+            };
+        }
+        parse_unitary_variants! {
+            enum A {
+                C,D,
+            } => coucou{ f}
+        }
+    }
+
+    macro_rules! make_type {
+        (
+            Keyword {$(
+                $(#[$km:meta])*
+                $ka:ident
+            ),* $(,)?}
+            Concrete {$(
+                $(#[$cm:meta])*
+                $ca:ident$({$($cl:expr),+ $(,)*})?$(($($co:ident),+ $(,)*))?$([$($cx:ident),+ $(,)*])?
+            ),* $(,)?}
+            WithFields {$(
+                $(#[$wm:meta])*
+                $wa:ident{$($wb:tt)*}
+            ),* $(,)?}
+            Abstract {$(
+                $(#[$am:meta])*
+                $aa:ident($($ab:ident),* $(,)?)
+            ),* $(,)?}
+        ) => {
+            #[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
+            #[strum(serialize_all = "snake_case")]
+            #[derive(Hash, Clone, Copy, PartialEq, Eq)]
+            pub enum Type {
+                // Keywords
+            $(
+                $( #[$km] )*
+                $ka,
+            )*
+                // Concrete
+            $(
+                $ca,
+            )*
+                // WithFields
+            $(
+                $( #[$wm] )*
+                $wa,
+            )*
+            }
+            enum Abstract {
+                $(
+                    $aa,
+                )*
+            }
+
+            pub struct Factory {
+                map: Box<[u16]>,
+            }
+
+            pub struct Language;
+        };
+    }
+
+    macro_rules! make_type_store {
+    ($kw:ty, $sh:ty, $($a:ident($l:ty)),* $(,)?) => {
+            #[repr(u16)]
+            pub enum CustomTypeStore {$(
+                $a(u16),
+            )*}
+
+            impl CustomTypeStore {
+                // fn lang<L: Lang>(&self) -> Option<L> {
+                //     todo!()
+                // }
+                fn eq_keyword(kw: &$kw) -> bool {
+                    todo!()
+                }
+                fn eq_shared(kw: &$sh) -> bool {
+                    todo!()
+                }
+            }
+        };
+    }
+
+    make_type_store!(Keyword, Shared, Java(java::Language), Cpp(cpp::Language),);
+
+    pub mod java {
+        use super::*;
+
+        pub enum Field {
+            Name,
+            Body,
+            Expression,
+            Condition,
+            Then,
+            Else,
+            Block,
+            Type,
+        }
+
+        make_type! {
+            Keyword{
+                While,
+                For,
+                Public,
+                Private,
+                Protected,
+                #[strum(serialize = ";")]
+                SemiColon,
+                #[strum(serialize = ".")]
+                Dot,
+                #[strum(serialize = "{")]
+                LeftCurly,
+                #[strum(serialize = "}")]
+                RightCurly,
+                #[strum(serialize = "(")]
+                LeftParen,
+                #[strum(serialize = ")")]
+                RightParen,
+                #[strum(serialize = "[")]
+                LeftBracket,
+                #[strum(serialize = "]")]
+                RightBracket,
+            }
+            Concrete {
+                Comment{r"//.\*$",r"/\*.*\*/"},
+                Identifier{r"[a-zA-Z].*"},
+                ExpressionStatement(Statement, Semicolon),
+                ReturnStatement(Return, Expression, Semicolon),
+                TryStatement(Try, Paren, Block),
+            }
+            WithFields {
+                Class {
+                    name(Identifier),
+                    body(ClassBody),
+                },
+                Interface {
+                    name(Identifier),
+                    body(InterfaceBody),
+                },
+            }
+            Abstract {
+                Statement(
+                    StatementExpression,
+                    TryStatement,
+                ),
+                Expression(
+                    BinaryExpression,
+                    UnaryExpression,
+                ),
+            }
+        }
     }
 }

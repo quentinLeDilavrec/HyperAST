@@ -26,14 +26,14 @@ fn compare_compressed_path_iter(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("slicing", i), &p, |b, p| {
             b.iter(|| {
                 tree_path::slicing::IntoIter::<u16>::new(p.clone())
-                    .map(|x| black_box(x))
+                    .map(black_box)
                     .collect::<Vec<_>>()
             })
         });
         group.bench_with_input(BenchmarkId::new("indexed", i), &p, |b, p| {
             b.iter(|| {
                 tree_path::indexed::IntoIter::<u16>::new(p.clone())
-                    .map(|x| black_box(x))
+                    .map(black_box)
                     .collect::<Vec<_>>()
             })
         });

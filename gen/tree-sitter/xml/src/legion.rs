@@ -1,35 +1,24 @@
-///! fully compress all subtrees from an Xml CST
+//! fully compress all subtrees from an Xml CST
 use std::{fmt::Debug, vec};
 
 use legion::world::EntryRef;
 use tuples::CombinConcat;
 
+use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::store::SimpleStores;
+use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo::{self, CS, NoSpacesCS};
-use hyperast::{
-    filter::BloomSize,
-    full::FullNode,
-    hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs},
-    nodes::Space,
-    store::{
-        SimpleStores,
-        nodes::{
-            DefaultNodeStore as NodeStore,
-            legion::{NodeIdentifier, PendingInsert, eq_node},
-        },
-    },
-    tree_gen::{
-        AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents,
-        PreResult, SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen,
-        WithByteRange, ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-        parser::{Node as _, TreeCursor},
-    },
-    types::LabelStore as _,
+use hyperast::store::nodes::legion::{NodeIdentifier, PendingInsert, eq_node};
+use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+use hyperast::tree_gen::{
+    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
+    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
+    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
 };
+use hyperast::{filter::BloomSize, full::FullNode, nodes::Space, types::LabelStore as _};
 
-use crate::{
-    TNode,
-    types::{TStore, Type, XmlEnabledTypeStore},
-};
+use crate::TNode;
+use crate::types::{TStore, Type, XmlEnabledTypeStore};
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 
@@ -97,11 +86,17 @@ impl WithByteRange for Acc {
     }
 }
 
+impl Debug for Acc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Acc").field("simple", &self.simple).finish()
+    }
+}
+
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct TTreeCursor<'a>(tree_sitter::TreeCursor<'a>);
 
-impl<'a> Debug for TTreeCursor<'a> {
+impl Debug for TTreeCursor<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("TTreeCursor")
             .field(&self.0.node().kind())
@@ -131,7 +126,7 @@ impl<'a> hyperast::tree_gen::parser::TreeCursor for TTreeCursor<'a> {
     }
 }
 
-impl<'stores, TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'stores, TS> {
+impl<TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'_, TS> {
     // type Node1 = SimpleNode1<NodeIdentifier, String>;
     type Stores = SimpleStores<TS>;
     type Text = [u8];
@@ -139,7 +134,7 @@ impl<'stores, TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'stores, TS>
     type TreeCursor<'b> = TTreeCursor<'b>;
 
     fn stores(&mut self) -> &mut Self::Stores {
-        &mut self.stores
+        self.stores
     }
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
@@ -205,7 +200,7 @@ impl<'stores, TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'stores, TS>
             text,
             node.start_byte(),
             global.sum_byte_length(),
-            &parent_indentation,
+            parent_indentation,
         );
         // if global.sum_byte_length() < 400 {
         //     dbg!((kind,node.start_byte(),node.end_byte(),global.sum_byte_length(),indent.len()));
@@ -259,7 +254,7 @@ pub fn tree_sitter_parse_xml(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitt
     hyperast::tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
 }
 
-impl<'a, TS> XmlTreeGen<'a, TS> {
+impl<TS> XmlTreeGen<'_, TS> {
     pub fn tree_sitter_parse(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
         let mut parser = tree_sitter::Parser::new();
         let language = crate::language();
@@ -282,7 +277,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         let line_count = spacing
             .matches("\n")
             .count()
-            .to_u16()
+            .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
@@ -315,7 +310,14 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
             let bytes_len = compo::BytesLen(bytes_len.try_into().unwrap());
             NodeStore::insert_after_prepare(
                 vacant,
-                (interned_kind, spacing_id, bytes_len, hashs, BloomSize::None),
+                (
+                    crate::types::Lang,
+                    interned_kind,
+                    spacing_id,
+                    bytes_len,
+                    hashs,
+                    BloomSize::None,
+                ),
             )
         };
         Local {
@@ -330,7 +332,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         }
     }
 
-    pub fn new(stores: &mut SimpleStores<TS>) -> XmlTreeGen<TS> {
+    pub fn new(stores: &mut SimpleStores<TS>) -> XmlTreeGen<'_, TS> {
         XmlTreeGen {
             line_break: "\n".as_bytes().to_vec(),
             stores,
@@ -546,7 +548,7 @@ fn compress<Ty: std::marker::Send + std::marker::Sync + 'static>(
             }}
         };
     }
-    let base = (interned_kind, hashs, bytes_len);
+    let base = (crate::types::Lang, interned_kind, hashs, bytes_len);
     match (label_id, 0) {
         (None, _) => children_dipatch!(base,),
         (Some(label), _) => children_dipatch!(base, (label,),),

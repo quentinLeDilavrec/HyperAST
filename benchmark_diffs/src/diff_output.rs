@@ -1,11 +1,12 @@
 use std::ops::Range;
 
-use hyper_diff::tree::tree_path::CompressedTreePath;
-use hyperast::{
-    position::{Position, compute_position},
-    types::{self, LabelStore, Labeled, NodeStore, WithSerialization},
-};
 use serde::Deserialize;
+
+use hyper_diff::tree::tree_path::CompressedTreePath;
+use hyperast::position::{Position, compute_position};
+use hyperast::types::NodeId;
+use hyperast::types::WithSerialization;
+use hyperast::types::{HyperAST, LendT};
 
 #[derive(Deserialize)]
 pub struct F<T> {
@@ -56,9 +57,13 @@ pub enum Kind {
 impl Tree {
     pub fn from_pos<HAST>(stores: HAST, (pos, x): (Position, HAST::IdN)) -> Self
     where
-        HAST: types::HyperAST,
-        for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::Tree,
+        HAST: HyperAST,
+        for<'t> LendT<'t, HAST>: hyperast::types::Tree,
     {
+        use hyperast::types::LabelStore as _;
+        use hyperast::types::Labeled as _;
+        use hyperast::types::NodeStore as _;
+
         let Range { start, end } = pos.range();
         let file = pos.file().to_string_lossy().to_string();
         let r = stores.node_store().resolve(&x);
@@ -67,7 +72,7 @@ impl Tree {
             r#type: t.to_string(),
             label: r
                 .try_get_label()
-                .map(|x| stores.label_store().resolve(&x).to_string())
+                .map(|x| stores.label_store().resolve(x).to_string())
                 .filter(|x| !x.is_empty()),
             file,
             start,
@@ -76,11 +81,11 @@ impl Tree {
     }
 }
 
-impl<'a, HAST> From<(HAST, HAST::IdN, &CompressedTreePath<HAST::Idx>)> for Tree
+impl<HAST> From<(HAST, HAST::IdN, &CompressedTreePath<HAST::Idx>)> for Tree
 where
-    HAST: types::HyperAST + Copy,
-    HAST::IdN: types::NodeId<IdN = HAST::IdN>,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::Tree + WithSerialization,
+    HAST: HyperAST + Copy,
+    HAST::IdN: NodeId<IdN = HAST::IdN>,
+    for<'t> LendT<'t, HAST>: hyperast::types::Tree + WithSerialization,
 {
     fn from((stores, ori, p): (HAST, HAST::IdN, &CompressedTreePath<HAST::Idx>)) -> Self {
         (stores, compute_position(ori, &mut p.iter(), stores)).into()
@@ -89,10 +94,14 @@ where
 
 impl<HAST> From<(HAST, (Position, HAST::IdN))> for Tree
 where
-    HAST: types::HyperAST,
-    for<'t> <HAST as hyperast::types::AstLending<'t>>::RT: types::Tree,
+    HAST: HyperAST,
+    for<'t> LendT<'t, HAST>: hyperast::types::Tree,
 {
     fn from((stores, (pos, x)): (HAST, (Position, HAST::IdN))) -> Self {
+        use hyperast::types::LabelStore as _;
+        use hyperast::types::Labeled as _;
+        use hyperast::types::NodeStore as _;
+
         let Range { start, end } = pos.range();
         let file = pos.file().to_string_lossy().to_string();
         let r = stores.node_store().resolve(&x);
@@ -101,7 +110,7 @@ where
             r#type: t.to_string(),
             label: r
                 .try_get_label()
-                .map(|x| stores.label_store().resolve(&x).to_string())
+                .map(|x| stores.label_store().resolve(x).to_string())
                 .filter(|x| !x.is_empty()),
             file,
             start,

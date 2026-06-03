@@ -1,9 +1,7 @@
 use hyperast::{store::labels::LabelStore, types::LabelStore as _};
 
-use super::{
-    element::{IdentifierFormat, LabelPtr, RefsEnum},
-    solver::Solver,
-};
+use super::element::{IdentifierFormat, LabelPtr, RefsEnum};
+use super::solver::Solver;
 
 #[test]
 fn test() {

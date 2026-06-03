@@ -1,5 +1,4 @@
 use axum::Json;
-// use hyperast::types::LabelStore;
 use hyperast_vcs_git::git::{fetch_github_repository, retrieve_commit};
 use serde::{Deserialize, Serialize};
 
@@ -39,11 +38,12 @@ pub fn commit_metadata(_state: SharedState, path: Param) -> Result<Json<Metadata
         name,
         version,
     } = path.clone();
-    let repo = fetch_github_repository(&format!("{}/{}", user, name));
-    log::debug!("done cloning {user}/{name}");
+    let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
+    let repo = repo_spec.fetch();
+    log::debug!("done cloning {repo_spec}");
     let commit = retrieve_commit(&repo, &version);
     if let Err(err) = &commit {
-        log::error!("{}", err.to_string());
+        log::error!("{}", err);
     }
     let commit = commit.map_err(|err| err.to_string())?;
     log::debug!("done retrieving commit {version}");
@@ -56,12 +56,13 @@ pub fn commit_metadata(_state: SharedState, path: Param) -> Result<Json<Metadata
     let mut forth_timestamp = i64::MAX;
     let mut ancestors = vec![commit.id().to_string()];
     let mut c = commit;
+    const MAX_ANCESTORS: usize = 4;
     loop {
-        if ancestors.len() > 4 {
+        if ancestors.len() > MAX_ANCESTORS {
             break;
         }
         if let Ok(p) = c.parent(0) {
-            if ancestors.len() == 4 {
+            if ancestors.len() == MAX_ANCESTORS {
                 let time = p.time();
                 let timezone = time.offset_minutes();
                 let time = time.seconds();
@@ -99,7 +100,8 @@ struct BuffOut {
 
 impl std::fmt::Write for BuffOut {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        Ok(self.buff.extend(s.chars()))
+        self.buff.push_str(s);
+        Ok(())
     }
 }
 
@@ -133,16 +135,14 @@ pub fn add_remote(_state: SharedState, path: ParamRemote) -> Result<(), String> 
     let r = repo.remote(&other, &remote);
 
     let r = match r {
-        Ok(x) => {
-            Ok(x)
-        }
+        Ok(x) => Ok(x),
         Err(e) => {
             log::warn!("{}", e);
-            if e.raw_code() == -4 {
+            if e.code() == hyperast_vcs_git::git::ErrorCode::Exists {
                 repo.find_remote(&other)
             } else {
                 log::error!("{:?}", e);
-                return Err(e.to_string())
+                return Err(e.to_string());
             }
         }
     };
@@ -150,7 +150,7 @@ pub fn add_remote(_state: SharedState, path: ParamRemote) -> Result<(), String> 
     match r {
         Ok(x) => {
             log::error!("{:?}", &head);
-            hyperast_vcs_git::git::fetch_fork(x, &head).unwrap();
+            hyperast_vcs_git::git::fetch_remote(x, &head).unwrap();
             Ok(())
         }
         Err(e) => {

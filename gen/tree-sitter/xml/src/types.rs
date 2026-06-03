@@ -2,9 +2,11 @@ use std::{fmt::Display, u16};
 
 use hyperast::tree_gen::{TsEnableTS, TsType};
 use hyperast::types::TypeStore;
-use hyperast::types::{AAAA, AnyType, HyperType, LangRef, NodeId, TypeTrait, TypeU16, TypedNodeId};
+use hyperast::types::{
+    AnyType, HyperType, LangRef, NodeId, TypeTrait, TypeU16, TypedNodeId, UniformNodeId,
+};
 
-impl<'a> hyperast::types::ETypeStore for TStore {
+impl hyperast::types::ETypeStore for TStore {
     type Ty2 = Type;
 
     fn intern(ty: Self::Ty2) -> Self::Ty {
@@ -61,6 +63,21 @@ mod impls {
         }
     }
 
+    // static dynamically initialized once association table between Role and tree_sitter_java Fields
+    static ROLE2FIELD: std::sync::LazyLock<Box<[u16]>> = std::sync::LazyLock::new(|| {
+        (0..hyperast::types::Role::len())
+            .map(|i| {
+                let i = i as u8;
+                let role: hyperast::types::Role = unsafe { std::mem::transmute(i) };
+                let field_name = role.to_string();
+                // dbg!(&field_name);
+                crate::language()
+                    .field_id_for_name(field_name)
+                    .map_or(u16::MAX, |x| x.into())
+            })
+            .collect()
+    });
+
     impl RoleStore for TStore {
         type IdF = u16;
 
@@ -75,11 +92,9 @@ mod impls {
         }
 
         fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
-            let field_name = role.to_string();
-            crate::language()
-                .field_id_for_name(field_name)
-                .unwrap()
-                .into()
+            let r = ROLE2FIELD[role as usize];
+            assert!(r < u16::MAX, "Role not found");
+            r
         }
     }
 }
@@ -124,7 +139,7 @@ impl Default for TStore {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TIdN<IdN>(IdN);
 
-impl<IdN: Clone + Eq + AAAA> NodeId for TIdN<IdN> {
+impl<IdN: Clone + Eq + UniformNodeId> NodeId for TIdN<IdN> {
     type IdN = IdN;
 
     fn as_id(&self) -> &Self::IdN {
@@ -140,7 +155,7 @@ impl<IdN: Clone + Eq + AAAA> NodeId for TIdN<IdN> {
     }
 }
 
-impl<IdN: Clone + Eq + AAAA> TypedNodeId for TIdN<IdN> {
+impl<IdN: Clone + Eq + UniformNodeId> TypedNodeId for TIdN<IdN> {
     type Ty = Type;
     type TyErazed = TType;
     fn unerase(ty: Self::TyErazed) -> Self::Ty {
@@ -159,6 +174,7 @@ pub struct Lang;
 pub type Xml = Lang;
 
 impl hyperast::types::Lang<Type> for Xml {
+    const INST: Self = Lang;
     fn make(t: u16) -> &'static Type {
         Lang.make(t)
     }
@@ -193,7 +209,12 @@ impl LangRef<Type> for Xml {
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        assert!(t != Type::Spaces || t != Type::Directory);
+        debug_assert_eq!(
+            Lang.to_u16(t),
+            id_for_node_kind(t.as_static_str(), t.is_named())
+        );
+        Lang.to_u16(t)
     }
 }
 
@@ -212,7 +233,15 @@ impl LangRef<AnyType> for Xml {
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        let t: Type = *t.as_any().downcast_ref().unwrap();
+        assert!(t != Type::Spaces && t != Type::Directory && t != Type::MavenDirectory);
+        debug_assert_eq!(
+            Lang.to_u16(t),
+            id_for_node_kind(t.as_static_str(), t.is_named()),
+            "{}",
+            t.as_static_str()
+        );
+        Lang.to_u16(t)
     }
 }
 
@@ -234,6 +263,15 @@ impl LangRef<hyperast::types::TypeU16<Self>> for Lang {
     }
 }
 
+macro_rules! is {
+    ($e:expr, $($p:ident $(if $guard:expr)?, )*) => {
+        match $e {$(
+            Type::$p $(if $guard)? => true,)*
+            _ => false
+        }
+    };
+}
+
 impl HyperType for Type {
     fn generic_eq(&self, other: &dyn HyperType) -> bool
     where
@@ -249,9 +287,14 @@ impl HyperType for Type {
 
     fn as_shared(&self) -> hyperast::types::Shared {
         use hyperast::types::Shared;
-        match self {
-            _ => Shared::Other,
+        if self.is_error() {
+            return Shared::Error;
         }
+        Shared::Other
+    }
+
+    fn is_error(&self) -> bool {
+        self == &Self::ERROR || self == &Self::_ERROR
     }
 
     fn as_abstract(&self) -> hyperast::types::Abstracts {
@@ -264,8 +307,8 @@ impl HyperType for Type {
 
     fn as_static(&self) -> &'static dyn HyperType {
         let t = <Xml as hyperast::types::Lang<Type>>::to_u16(*self);
-        let t = <Xml as hyperast::types::Lang<Type>>::make(t);
-        t
+
+        (<Xml as hyperast::types::Lang<Type>>::make(t)) as _
     }
 
     fn as_static_str(&self) -> &'static str {
@@ -285,63 +328,65 @@ impl HyperType for Type {
     }
 
     fn is_syntax(&self) -> bool {
-        self == &Type::TS2 // " ",
-        // || self == &Type::Nmtoken // "Nmtoken",
-        || self == &Type::TS3 // "\"",
-        || self == &Type::TS4 // "'",
-        // || self == &Type::TS5 // "Sep1_token1",
-        // || self == &Type::TS6 // "Sep2_token1",
-        // || self == &Type::TS7 // "Sep3_token1",
-        // || self == &Type::SystemLiteral // "SystemLiteral",
-        // || self == &Type::PubidLiteral // "PubidLiteral",
-        // || self == &Type::CharData // "CharData",
-        // || self == &Type::Comment // "Comment",
-        || self == &Type::TS8 // "<?",
-        || self == &Type::TS9 // "?>",
-        || self == &Type::CdSect // "CDSect",
-        || self == &Type::TS10 // "<?xml",
-        // || self == &Type::Version // "version",
-        || self == &Type::Eq // "=",
-        // || self == &Type::VersionNum // "VersionNum",
-        || self == &Type::TS11 // "<!DOCTYPE",
-        || self == &Type::LBracket // "[",
-        || self == &Type::RBracket // "]",
-        || self == &Type::GT // ">",
-        // || self == &Type::Standalone // "standalone",
-        // || self == &Type::Yes // "yes",
-        // || self == &Type::No // "no",
-        || self == &Type::LT // "<",
-        || self == &Type::TS12 // "</",
-        || self == &Type::TS13 // "/>",
-        || self == &Type::TS14 // "<!ELEMENT",
-        // || self == &Type::TS15 // "EMPTY",
-        // || self == &Type::TS16 // "ANY",
-        || self == &Type::QMark // "?",
-        || self == &Type::Star // "*",
-        || self == &Type::Plus // "+",
-        || self == &Type::LParen // "(",
-        || self == &Type::Pipe // "|",
-        || self == &Type::RParen // ")",
-        || self == &Type::Comma // ",",
-        // || self == &Type::TS17 // "#PCDATA",
-        || self == &Type::TS18 // ")*",
-        || self == &Type::TS19 // "<!ATTLIST",
-        || self == &Type::StringType // "StringType",
-        // || self == &Type::TS20 // "ID",
-        // || self == &Type::TS21 // "IDREF",
-        // || self == &Type::TS22 // "IDREFS",
-        // || self == &Type::TS23 // "ENTITY",
-        // || self == &Type::TS24 // "ENTITIES",
-        // || self == &Type::TS25 // "NMTOKEN",
-        // || self == &Type::TS26 // "NMTOKENS",
-        // || self == &Type::TS27 // "NOTATION",
-        // || self == &Type::TS28 // "#REQUIRED",
-        // || self == &Type::TS29 // "#IMPLIED",
-        // || self == &Type::TS30 // "#FIXED",
-        // || self == &Type::CharRef // "CharRef",
-        || self == &Type::Amp // "&",
-        || self == &Type::SemiColon // ";",
-        || self == &Type::Percent // "%",
+        is!(
+            self, TS2, // " ",
+            // Nmtoken, // "Nmtoken",
+            TS3, // "\"",
+            TS4, // "'",
+            // TS5, // "Sep1_token1",
+            // TS6, // "Sep2_token1",
+            // TS7, // "Sep3_token1",
+            // SystemLiteral, // "SystemLiteral",
+            // PubidLiteral, // "PubidLiteral",
+            // CharData, // "CharData",
+            // Comment, // "Comment",
+            TS8,    // "<?",
+            TS9,    // "?>",
+            CdSect, // "CDSect",
+            TS10,   // "<?xml",
+            // Version, // "version",
+            Eq, // "=",
+            // VersionNum, // "VersionNum",
+            TS11,     // "<!DOCTYPE",
+            LBracket, // "[",
+            RBracket, // "]",
+            GT,       // ">",
+            // Standalone, // "standalone",
+            // Yes, // "yes",
+            // No, // "no",
+            LT,   // "<",
+            TS12, // "</",
+            TS13, // "/>",
+            TS14, // "<!ELEMENT",
+            // TS15, // "EMPTY",
+            // TS16, // "ANY",
+            QMark,  // "?",
+            Star,   // "*",
+            Plus,   // "+",
+            LParen, // "(",
+            Pipe,   // "|",
+            RParen, // ")",
+            Comma,  // ",",
+            // TS17, // "#PCDATA",
+            TS18,       // ")*",
+            TS19,       // "<!ATTLIST",
+            StringType, // "StringType",
+            // TS20, // "ID",
+            // TS21, // "IDREF",
+            // TS22, // "IDREFS",
+            // TS23, // "ENTITY",
+            // TS24, // "ENTITIES",
+            // TS25, // "NMTOKEN",
+            // TS26, // "NMTOKENS",
+            // TS27, // "NOTATION",
+            // TS28, // "#REQUIRED",
+            // TS29, // "#IMPLIED",
+            // TS30, // "#FIXED",
+            // CharRef, // "CharRef",
+            Amp,       // "&",
+            SemiColon, // ";",
+            Percent,   // "%",
+        )
     }
 
     fn is_hidden(&self) -> bool {
@@ -476,21 +521,24 @@ impl TryFrom<&str> for Type {
 
 impl Type {
     pub(crate) fn is_repeat(&self) -> bool {
-        self == &Type::DocumentRepeat1
-            || self == &Type::TS42
-            || self == &Type::ContentRepeat1
-            || self == &Type::TS43
-            || self == &Type::TS44
-            || self == &Type::TS45
-            || self == &Type::TS46
-            || self == &Type::TS47
-            || self == &Type::_ChoiceRepeat1
-            || self == &Type::_ChoiceRepeat2
-            || self == &Type::TS48
-            || self == &Type::TS49
-            || self == &Type::TS50
-            || self == &Type::TS51
-            || self == &Type::TS52
+        is!(
+            self,
+            DocumentRepeat1,
+            TS42,
+            ContentRepeat1,
+            TS43,
+            TS44,
+            TS45,
+            TS46,
+            TS47,
+            _ChoiceRepeat1,
+            _ChoiceRepeat2,
+            TS48,
+            TS49,
+            TS50,
+            TS51,
+            TS52,
+        )
     }
 }
 
@@ -502,7 +550,7 @@ impl hyperast::types::LLang<hyperast::types::TypeU16<Self>> for Xml {
     const TE: &[Self::E] = S_T_L;
 
     fn as_lang_wrapper() -> hyperast::types::LangWrapper<hyperast::types::TypeU16<Self>> {
-        From::<&'static (dyn LangRef<_>)>::from(&Lang)
+        From::<&'static dyn LangRef<_>>::from(&Lang)
     }
 }
 
@@ -514,17 +562,19 @@ impl From<u16> for Type {
         S_T_L[value as usize]
     }
 }
-impl Into<TypeU16<Xml>> for Type {
-    fn into(self) -> TypeU16<Xml> {
-        TypeU16::new(self)
+
+impl From<Type> for TypeU16<Xml> {
+    fn from(val: Type) -> Self {
+        TypeU16::new(val)
     }
 }
 
-impl Into<u16> for Type {
-    fn into(self) -> u16 {
-        self as u8 as u16
+impl From<Type> for u16 {
+    fn from(val: Type) -> Self {
+        val as u8 as u16
     }
 }
+
 #[repr(u16)]
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum Type {
@@ -1268,7 +1318,7 @@ fn test_tslanguage_and_type_identity() {
     }
 }
 
-const S_T_L: &'static [Type] = &[
+const S_T_L: &[Type] = &[
     Type::End,
     Type::Name,
     Type::TS0,

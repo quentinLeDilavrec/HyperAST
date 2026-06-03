@@ -14,8 +14,14 @@ pub(crate) fn matches_default<'a>(
             format!("{}\n\n", x)
         })
         .collect::<String>();
-    let qqq = hyperast_tsquery::Query::new(&collect, hyperast_gen_ts_java::language())
-        .map_err(|e| e.to_string())?;
+    log::info!("collect lines: {}", collect.lines().count());
+    let qqq =
+        hyperast_tsquery::Query::new(&collect, hyperast_gen_ts_java::language()).map_err(|e| {
+            format!(
+                "{e}\n----{len}-----\n{}",
+                collect.chars().take(500).collect::<String>()
+            )
+        })?;
     if qqq.enabled_pattern_count() != len {
         dbg!(qqq.enabled_pattern_count(), len);
         let mut count = 0;
@@ -25,7 +31,7 @@ pub(crate) fn matches_default<'a>(
             .get_each_pat_start_byte()
             .into_iter()
             .skip(1)
-            .chain(vec![collect.len()].into_iter());
+            .chain(vec![collect.len()]);
         for (i, a) in a.enumerate() {
             count += 1;
             let a = a.split("@_root").next().unwrap().trim();
@@ -53,7 +59,7 @@ pub(crate) fn matches_default<'a>(
     }
     let qcursor = qqq.matches(hyperast_tsquery::hyperast_opt::TreeCursor::new(
         with_spaces_stores,
-        hyperast::position::structural_pos::CursorWithPersistance::new(tr),
+        hyperast::position::structural_pos::CursorWithPersistence::new(tr),
     ));
     let mut res = vec![0; len];
     for m in qcursor {

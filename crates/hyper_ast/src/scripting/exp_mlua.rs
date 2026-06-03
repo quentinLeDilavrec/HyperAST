@@ -43,6 +43,7 @@ fn test_mlua_scope() -> LuaResult<()> {
 }
 
 #[derive(Default, Debug)]
+#[allow(unused)]
 struct Rectangle {
     length: u32,
     width: u32,

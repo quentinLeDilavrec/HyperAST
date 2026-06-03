@@ -1,27 +1,26 @@
 #![allow(unused)] // WIP
-/// inspired by the implementation in gumtree
-/// WIP
-use std::{
-    collections::HashSet,
-    fmt::{Debug, Display},
-    hash::Hash,
-};
+//! inspired by the implementation in gumtree
+//! WIP
+
+use std::collections::HashSet;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
 
 use hyperast::PrimInt;
 use num_traits::{ToPrimitive, cast};
 
-use super::action_vec::ActionsVec;
-use crate::{
-    actions::Actions,
-    decompressed_tree_store::{
-        BreadthFirstIterable, DecompressedTreeStore, DecompressedWithParent, PostOrder,
-        PostOrderIterable,
-    },
-    matchers::{Mapping, mapping_store::MonoMappingStore},
-    tree::tree_path::TreePath,
-    utils::sequence_algorithms::longest_common_subsequence,
-};
 use hyperast::types::{HyperAST, Labeled};
+
+use super::Actions;
+use super::action_vec::ActionsVec;
+
+use crate::decompressed_tree_store::FullyDecompressedTreeStore;
+use crate::decompressed_tree_store::{BreadthFirstIterable, PostOrder, PostOrderIterable};
+use crate::decompressed_tree_store::{DecompressedWithParent, DeepDecompressedTreeStore};
+use crate::mappings::MonoMappingStore;
+use crate::matchers::Mapping;
+use crate::tree::tree_path::TreePath;
+use crate::utils::sequence_algorithms::longest_common_subsequence;
 
 #[derive(Clone)]
 pub struct ApplicablePath<P> {
@@ -48,16 +47,37 @@ impl<P: Debug> Debug for ApplicablePath<P> {
 #[derive(Clone)]
 pub enum Act<L, P, I> {
     Delete {},
-    Update { new: L },
+    Update { before: ApplicablePath<P>, new: L },
     Move { from: ApplicablePath<P> },
     MovUpd { from: ApplicablePath<P>, new: L },
     Insert { sub: I },
 }
 
+impl<L, Idx, I> Debug for Act<L, Idx, I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Delete { .. } => f.write_str("Delete"),
+            Self::Update { .. } => f.write_str("Update"),
+            Self::Move { .. } => f.write_str("Move"),
+            Self::MovUpd { .. } => f.write_str("MovUpd"),
+            Self::Insert { .. } => f.write_str("Insert"),
+        }
+    }
+}
+
 impl<L: PartialEq, Idx: PartialEq, I: PartialEq> PartialEq for Act<L, Idx, I> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Update { new: l_new }, Self::Update { new: r_new }) => l_new == r_new,
+            (
+                Self::Update {
+                    before: l_before,
+                    new: l_new,
+                },
+                Self::Update {
+                    before: r_before,
+                    new: r_new,
+                },
+            ) => l_before == r_before && l_new == r_new,
             (Self::Move { from: l_from }, Self::Move { from: r_from }) => l_from == r_from,
             (
                 Self::MovUpd {
@@ -92,7 +112,7 @@ impl<L: Debug, P: Debug, I: Debug> Debug for SimpleAction<L, P, I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.action {
             Act::Delete {} => write!(f, "Del {:?}", self.path),
-            Act::Update { new } => write!(f, "Upd {:?} {:?}", new, self.path),
+            Act::Update { new, before } => write!(f, "Upd {:?} {:?} {:?}", new, before, self.path),
             Act::Move { from } => write!(f, "Mov {:?} {:?}", from, self.path),
             Act::MovUpd { from, new } => write!(f, "MoU {:?} {:?} {:?}", from, new, self.path),
             Act::Insert { sub } => write!(f, "Ins {:?} {:?}", sub, self.path),
@@ -107,7 +127,7 @@ impl<L: Debug, P: Debug, I: Debug> super::action_tree::NodeSummary
         struct D<'a, L: Debug, P: Debug, I: Debug>(
             &'a super::action_tree::Node<SimpleAction<L, P, I>>,
         );
-        impl<'a, L: Debug, P: Debug, I: Debug> Display for D<'a, L, P, I> {
+        impl<L: Debug, P: Debug, I: Debug> Display for D<'_, L, P, I> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let t = aux(self.0);
                 let a = match self.0.action.action {
@@ -213,6 +233,10 @@ where
     dst_in_order: InOrderNodes<IdD>,
 }
 
+#[allow(type_alias_bounds)]
+type EditScriptResult<HAST: HyperAST, P: TreePath<Item = HAST::Idx>> =
+    Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String>;
+
 static MERGE_SIM_ACTIONS: bool = false;
 
 // TODO split IdD in 2 to help typecheck ids
@@ -221,12 +245,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -241,13 +265,11 @@ where
     pub fn compute_actions<'a: 'a1 + 'a2>(
         hast: HAST,
         mapping: &'a Mapping<SS, SD, M>,
-    ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
-        Ok(
-            ScriptGenerator::new(hast, &mapping.src_arena, &mapping.dst_arena)
-                .init_cpy(&mapping.mappings)
-                .generate()?
-                .actions,
-        )
+    ) -> EditScriptResult<HAST, P> {
+        ScriptGenerator::new(hast, &mapping.src_arena, &mapping.dst_arena)
+            .init_cpy(&mapping.mappings)
+            .generate()
+            .map(|x| x.actions)
     }
 }
 // TODO split IdD in 2 to help typecheck ids
@@ -256,12 +278,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: DeepDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: DeepDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -298,12 +320,12 @@ impl<
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -327,7 +349,7 @@ where
         // self.moved.resize(len, false);
         for x in self.src_arena_dont_use.iter_df_post::<true>() {
             let children = self.src_arena_dont_use.children(&x);
-            let children = if children.len() > 0 {
+            let children = if !children.is_empty() {
                 Some(children)
             } else {
                 None
@@ -349,18 +371,19 @@ where
         self
     }
 }
+
 // TODO split IdD in 2 to help typecheck ids
 impl<
     'a1: 'm,
     'a2: 'm,
     'm,
     IdD: PrimInt + Debug + Hash + PartialEq + Eq,
-    SS: DecompressedTreeStore<HAST, IdD>
+    SS: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + PostOrder<HAST, IdD>
         + PostOrderIterable<HAST, IdD>
         + Debug,
-    SD: DecompressedTreeStore<HAST, IdD>
+    SD: FullyDecompressedTreeStore<HAST, IdD>
         + DecompressedWithParent<HAST, IdD>
         + BreadthFirstIterable<HAST, IdD>,
     HAST: HyperAST + Copy,
@@ -377,15 +400,11 @@ where
         src_arena: &'a1 SS,
         dst_arena: &'a2 SD,
         ms: &'m M,
-    ) -> Result<ActionsVec<SimpleAction<HAST::Label, P, HAST::IdN>>, String> {
-        Ok(
-            ScriptGenerator::<'a1, 'a2, 'm, IdD, SS, SD, HAST, M, P>::new(
-                store, src_arena, dst_arena,
-            )
+    ) -> EditScriptResult<HAST, P> {
+        Self::new(store, src_arena, dst_arena)
             .init_cpy(ms)
-            .generate()?
-            .actions,
-        )
+            .generate()
+            .map(|x| x.actions)
     }
 
     pub fn precompute_actions(
@@ -429,15 +448,11 @@ where
             let z = y.map(|y| self.cpy_mappings.get_src_unchecked(&y));
             if !self.cpy_mappings.is_dst(&x) {
                 // insertion
-                let k = if let Some(y) = y {
-                    Some(self.find_pos(&x, &y))
-                } else {
-                    None
-                };
+                let k = y.map(|y| self.find_pos(&x, &y));
                 w = self.make_inserted_node(&x, &z);
                 let ori = self.path_dst(&self.dst_arena.root(), &x);
                 let mid = if let Some(z) = z {
-                    let p: P = self.path(z).into();
+                    let p: P = self.path(z);
                     p.extend(&[k.unwrap()])
                 } else if let Some(k) = k {
                     vec![k].into()
@@ -594,7 +609,13 @@ where
                         let path = ApplicablePath { ori, mid };
                         let action = SimpleAction {
                             path,
-                            action: Act::Update { new: x_l.unwrap() },
+                            action: Act::Update {
+                                new: x_l.unwrap(),
+                                before: ApplicablePath {
+                                    ori: self.orig_src(w),
+                                    mid: self.path(w),
+                                },
+                            },
                         };
                         // dbg!(&action);
                         self.mid_arena[w.to_usize().unwrap()].compressed =
@@ -633,13 +654,22 @@ where
                     self.actions.push(action);
                 } else if w_l != x_l {
                     // rename
-                    let path = ApplicablePath {
+                    let mid = self.path(w);
+                    let before = ApplicablePath {
                         ori: self.orig_src(w),
-                        mid: self.path(w),
+                        mid,
+                    };
+                    let mid = self.path(w);
+                    let path = ApplicablePath {
+                        ori: self.path_dst(&self.dst_arena.root(), &x),
+                        mid,
                     };
                     let action = SimpleAction {
                         path,
-                        action: Act::Update { new: x_l.unwrap() },
+                        action: Act::Update {
+                            new: x_l.unwrap(),
+                            before,
+                        },
                     };
                     self.mid_arena[w.to_usize().unwrap()].compressed = self.dst_arena.original(&x);
                     self.mid_arena[w.to_usize().unwrap()].action = Some(self.actions.len());
@@ -647,7 +677,7 @@ where
                 } else {
                     // not changed
                     // and no changes to parents
-                    // postentially try to share/map parent in super ast
+                    // potentially try to share/map parent in super ast
                     if COMPRESSION {
                         todo!()
                     }
@@ -798,25 +828,23 @@ where
             .children
             .as_ref()
             .unwrap_or(&d); //self.src_arena.children(self.store, w);
-        self.src_in_order.remove_all(&w_c);
+        self.src_in_order.remove_all(w_c);
         let x_c = self.dst_arena.children(x);
         self.dst_in_order.remove_all(x_c.as_slice());
 
         // todo use iter filter collect
         let mut s1 = vec![];
         for c in w_c {
-            if self.cpy_mappings.is_src(c) {
-                if x_c.contains(&self.cpy_mappings.get_dst_unchecked(c)) {
-                    s1.push(*c);
-                }
+            if self.cpy_mappings.is_src(c) && x_c.contains(&self.cpy_mappings.get_dst_unchecked(c))
+            {
+                s1.push(*c);
             }
         }
         let mut s2 = vec![];
         for c in &x_c {
-            if self.cpy_mappings.is_dst(c) {
-                if w_c.contains(&self.cpy_mappings.get_src_unchecked(c)) {
-                    s2.push(*c);
-                }
+            if self.cpy_mappings.is_dst(c) && w_c.contains(&self.cpy_mappings.get_src_unchecked(c))
+            {
+                s2.push(*c);
             }
         }
 
@@ -829,8 +857,8 @@ where
 
         for a in &s1 {
             for b in &s2 {
-                if self.ori_mappings.unwrap().has(&a, &b) && !lcs.contains(&(*a, *b)) {
-                    let k = self.find_pos(&b, x);
+                if self.ori_mappings.unwrap().has(a, b) && !lcs.contains(&(*a, *b)) {
+                    let k = self.find_pos(b, x);
                     let path = ApplicablePath {
                         ori: self.orig_src(*w).extend(&[k]),
                         mid: self.path(*w),
@@ -897,8 +925,8 @@ where
         }
         let xpos: usize = self.dst_arena.position_in_parent(x).unwrap(); //child.positionInParent();
         let mut v: Option<IdD> = None;
-        for i in 0..xpos {
-            let c: &IdD = &siblings[i];
+
+        for c in siblings.iter().take(xpos) {
             if self.dst_in_order.contains(c) {
                 v = Some(*c);
             };
@@ -1031,16 +1059,12 @@ struct Iter<'a, IdC, IdD: PrimInt> {
     mid_arena: &'a mut [MidNode<IdC, IdD>],
 }
 
-impl<'a, IdC, IdD: PrimInt> Iterator for Iter<'a, IdC, IdD> {
+impl<IdC, IdD: PrimInt> Iterator for Iter<'_, IdC, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (id, idx) = if let Some(id) = self.parent.pop() {
-                id
-            } else {
-                return None;
-            };
+            let (id, idx) = self.parent.pop()?;
             let curr = &self.mid_arena[id.to_usize().unwrap()];
             if let Some(cs) = &curr.children {
                 if cs.len() == idx {

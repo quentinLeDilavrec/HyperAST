@@ -1,12 +1,12 @@
-// window of one is just consecutive commits
+//! Computes structural diffs on consecutive commits.
 
-use hyperast_vcs_git::{multi_preprocessed::PreProcessedRepositories, processing::RepoConfig};
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::PathBuf,
-    str::FromStr,
-};
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
+use hyperast_vcs_git::processing::RepoConfig;
 
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;
@@ -126,13 +126,12 @@ fn inc(
         let dst_tr = commit_dst.ast_root;
         let dst_s = stores.node_store.resolve(dst_tr).size();
 
-        let hyperast = hyperast_vcs_git::no_space::as_nospaces2(stores);
+        let hyperast = hyperast_vcs_git::no_space::as_nospaces(stores);
 
         let mu = memusage_linux();
         let lazy = hyper_diff::algorithms::gumtree_lazy::diff(&hyperast, &src_tr, &dst_tr);
         let summarized_lazy = &lazy.summarize();
         let total_lazy_t: std::time::Duration = summarized_lazy.exec_data.sum().unwrap();
-        dbg!(summarized_lazy);
         log::warn!("ed+mappings size: {}", memusage_linux() - mu);
         log::warn!("done computing diff {i}");
         if let Some(buf) = &mut buf {
@@ -151,6 +150,17 @@ fn inc(
             )
             .unwrap();
             buf.flush().unwrap();
+        } else {
+            use hyper_diff::algorithms::RuntimeMeasurement;
+            println!(
+                "topdown: {}",
+                summarized_lazy.exec_data.cdr().cdr().current.display()
+            );
+            println!(
+                "bottomup: {}",
+                summarized_lazy.exec_data.cdr().current.display()
+            );
+            println!("gen: {}", summarized_lazy.exec_data.current.display());
         }
 
         curr = oid_src.to_string();
@@ -200,10 +210,12 @@ fn whole(
         .unwrap();
         buf.flush().unwrap();
     }
-    let mut i = 0;
     let c_len = processing_ordered_commits.len();
     use hyperast_gen_ts_java::utils::memusage_linux;
-    for c in (0..c_len - 1).map(|c| &processing_ordered_commits[c..(c + window_size).min(c_len)]) {
+    for (i, c) in (0..c_len - 1)
+        .map(|c| &processing_ordered_commits[c..(c + window_size).min(c_len)])
+        .enumerate()
+    {
         let oid_src = c[0];
         for oid_dst in &c[1..] {
             log::warn!("diff of {oid_src} and {oid_dst}");
@@ -221,13 +233,12 @@ fn whole(
             let dst_tr = commit_dst.ast_root;
             let dst_s = stores.node_store.resolve(dst_tr).size();
 
-            let hyperast = hyperast_vcs_git::no_space::as_nospaces2(stores);
+            let hyperast = hyperast_vcs_git::no_space::as_nospaces(stores);
 
             let mu = memusage_linux();
             let lazy = hyper_diff::algorithms::gumtree_lazy::diff(&hyperast, &src_tr, &dst_tr);
             let summarized_lazy = &lazy.summarize();
             let total_lazy_t: std::time::Duration = summarized_lazy.exec_data.sum().unwrap();
-            dbg!(summarized_lazy);
             log::warn!("ed+mappings size: {}", memusage_linux() - mu);
             if let Some(buf) = &mut buf {
                 writeln!(
@@ -245,10 +256,12 @@ fn whole(
                 )
                 .unwrap();
                 buf.flush().unwrap();
+            } else {
+                use hyper_diff::algorithms::RuntimeMeasurement;
+                println!("gen: {}", summarized_lazy.exec_data.current.display());
             }
         }
         log::warn!("done computing diff {i}");
-        i += 1;
     }
     let mu = memusage_linux();
     drop(preprocessed);

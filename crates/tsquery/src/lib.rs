@@ -85,7 +85,7 @@ pub struct Query {
     pub general_predicates: predicate::GeneralPredicates,
     immediate_predicates: Vec<predicate::ImmediateTextPredicate>,
     precomputed_patterns: Option<query::PrecomputedPatterns>,
-    used_precomputed: Precomps,
+    pub used_precomputed: Precomps,
     enabled_pattern_map: Vec<u16>,
     enabled_pattern_count: u16,
 }
@@ -106,31 +106,37 @@ impl<I> Slice<I> {
 }
 
 impl Query {
-    pub fn matches<'query, Cursor: self::Cursor, Node: crate::Node + Clone>(
-        &'query self,
+    pub fn matches<Cursor: self::Cursor, Node: crate::Node + Clone>(
+        &self,
         cursor: Cursor,
-    ) -> QueryCursor<'query, Cursor, Node> {
+    ) -> QueryCursor<'_, Cursor, Node> {
         QueryCursor::<Cursor, _> {
-            halted: false,
-            ascending: false,
-            states: vec![],
-            capture_list_pool: Default::default(),
-            finished_states: Default::default(),
+            query: self,
+            exec_state: QueryExecState {
+                states: vec![],
+                capture_list_pool: Default::default(),
+                finished_states: Default::default(),
+                did_exceed_match_limit: false,
+                next_state_id: indexed::StateId::ZERO,
+            },
             max_start_depth: u32::MAX,
-            did_exceed_match_limit: false,
             depth: 0,
             on_visible_node: cursor.is_visible_at_root(),
-            query: self,
+            halted: false,
+            ascending: false,
             cursor,
-            next_state_id: indexed::StateId::ZERO,
+            #[cfg(feature = "cursor_counts")]
+            status_count: 0,
+            #[cfg(feature = "cursor_counts")]
+            goto_count: 0,
         }
     }
 
     /// Match all patterns that starts on cursor current node
-    pub fn matches_immediate<'query, Cursor: self::Cursor, N: crate::Node + Clone>(
-        &'query self,
+    pub fn matches_immediate<Cursor: self::Cursor, N: crate::Node + Clone>(
+        &self,
         cursor: Cursor,
-    ) -> QueryCursor<'query, Cursor, N> {
+    ) -> QueryCursor<'_, Cursor, N> {
         let mut qcursor = self.matches(cursor);
         // can only match patterns starting on provided node
         qcursor.set_max_start_depth(0);
@@ -165,9 +171,23 @@ pub struct QueryCursor<'query, Cursor, Node> {
     pub on_visible_node: bool,
     pub cursor: Cursor,
     pub query: &'query Query,
-    pub states: Vec<query_cursor::State>,
     pub depth: Depth,
     pub max_start_depth: Depth,
+    pub exec_state: QueryExecState<Node>,
+
+    #[cfg(feature = "cursor_counts")]
+    #[doc(hidden)]
+    /// once per call to `hyperast_tsquery::Cursor::current_status()`
+    pub status_count: usize,
+
+    #[cfg(feature = "cursor_counts")]
+    #[doc(hidden)]
+    /// once per successful `hyperast_tsquery::Cursor::goto_*()`
+    pub goto_count: usize,
+}
+
+pub struct QueryExecState<Node> {
+    pub states: Vec<query_cursor::State>,
     capture_list_pool: indexed::CaptureListPool<Node>,
     pub finished_states: VecDeque<query_cursor::State>,
     next_state_id: indexed::StateId,
@@ -176,7 +196,7 @@ pub struct QueryCursor<'query, Cursor, Node> {
     pub did_exceed_match_limit: bool,
 }
 
-impl<'query, Cursor, N> QueryCursor<'query, Cursor, N> {
+impl<Cursor, N> QueryCursor<'_, Cursor, N> {
     pub fn cursor(&self) -> &Cursor {
         &self.cursor
     }
@@ -204,9 +224,12 @@ pub struct QueryMatch<Node> {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub enum TreeCursorStep {
-    TreeCursorStepNone,
-    TreeCursorStepHidden,
-    TreeCursorStepVisible,
+    // TreeCursorStepHidden
+    None,
+    // TreeCursorStepHidden
+    Hidden,
+    // TreeCursorStepVisible
+    Visible,
 }
 
 // pub trait CursorLending<'a> {
@@ -216,27 +239,32 @@ pub enum TreeCursorStep {
 pub trait WithField {
     type IdF;
 }
+
 pub trait CNLending<'a, __ImplBound = &'a Self>: WithField {
     type NR: Node<IdF = Self::IdF> + Clone;
 }
 
-pub trait Cursor: for<'a> CNLending<'a> {
+pub trait StatusLending<'a, __ImplBound = &'a Self>: WithField {
+    type Status: Status<IdF = Self::IdF>;
+}
+
+/// Cursor Interface for tree-sitter query executor
+pub trait Cursor: for<'a> CNLending<'a> + for<'a> StatusLending<'a> {
     type Node: Clone
         + Node<IdF = <Self as WithField>::IdF>
         + for<'a> TextLending<'a, TP = <<Self as CNLending<'a>>::NR as TextLending<'a>>::TP>;
-
+    /// move to next sibling
     fn goto_next_sibling_internal(&mut self) -> TreeCursorStep;
-
+    /// move to first child
     fn goto_first_child_internal(&mut self) -> TreeCursorStep;
-
+    /// move to parent
     fn goto_parent(&mut self) -> bool;
+
     fn current_node(&self) -> <Self as CNLending<'_>>::NR;
 
     fn parent_is_error(&self) -> bool;
 
-    type Status: Status<IdF = <Self::Node as Node>::IdF>;
-
-    fn current_status(&self) -> Self::Status;
+    fn current_status(&self) -> <Self as StatusLending<'_>>::Status;
 
     fn text_provider(&self) -> <Self::Node as TextLending<'_>>::TP;
 
@@ -247,8 +275,8 @@ pub trait Cursor: for<'a> CNLending<'a> {
         true
     }
     fn has_parent(&self) -> bool;
-    fn persist(&mut self) -> Self::Node;
-    fn persist_parent(&mut self) -> Option<Self::Node>;
+    fn persist(&self) -> Self::Node;
+    fn persist_parent(&self) -> Option<Self::Node>;
 }
 
 pub trait Status {
@@ -289,9 +317,9 @@ pub trait Node: for<'a> TextLending<'a> + Clone + PartialEq {
     /// Natural ordering over the position of source code elements (represented by `self` and `other`)
     fn compare(&self, other: &Self) -> std::cmp::Ordering;
     fn text<'s, 'l>(&'s self, text_provider: <Self as TextLending<'l>>::TP) -> BiCow<'s, 'l, str>;
-    fn text_equal<'s, 'l>(
-        &'s self,
-        text_provider: <Self as TextLending<'l>>::TP,
+    fn text_equal(
+        &self,
+        text_provider: <Self as TextLending<'_>>::TP,
         other: impl Iterator<Item = u8>,
     ) -> bool {
         self.text(text_provider)
@@ -384,9 +412,9 @@ where
     }
 }
 
-impl<'query, Cursor: self::Cursor> Iterator for QueryCursor<'query, Cursor, Cursor::Node>
+impl<Cursor: self::Cursor> Iterator for QueryCursor<'_, Cursor, Cursor::Node>
 where
-    <Cursor::Status as Status>::IdF: Into<u16> + From<u16>,
+    for<'a> <<Cursor as StatusLending<'a>>::Status as Status>::IdF: Into<u16> + From<u16>,
 {
     type Item = QueryMatch<Cursor::Node>;
 
@@ -403,6 +431,9 @@ where
         }
     }
 }
+
+#[doc(hidden)]
+pub static mut ELAPSED_STATUS: std::time::Duration = std::time::Duration::ZERO;
 
 impl<Node: self::Node> QueryMatch<Node> {
     pub(crate) fn satisfies_text_predicates<'a, 'b, 's: 'l, 'l, T: 'a + AsRef<str>>(
@@ -473,10 +504,7 @@ impl<Node: self::Node> QueryMatch<Node> {
         })
     }
 
-    pub fn nodes_for_capture_index<'a>(
-        &'a self,
-        index: CaptureId,
-    ) -> impl Iterator<Item = &'a Node> {
+    pub fn nodes_for_capture_index(&self, index: CaptureId) -> impl Iterator<Item = &Node> {
         self.captures.nodes_for_capture_index(index)
     }
 }
@@ -485,6 +513,67 @@ mod precompute_pattern_predicate;
 pub use precompute_pattern_predicate::PreparedQuerying;
 mod graph_overlaying;
 pub use graph_overlaying::PreparedOverlay;
+
+pub trait Opaque {
+    fn type_id(&self) -> std::any::TypeId;
+}
+
+#[cfg(feature = "tsg")]
+impl<G: 'static> Opaque for tree_sitter_graph::functions::Functions<G> {
+    fn type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<G>()
+    }
+}
+
+#[cfg(feature = "tsg")]
+pub type ImmGraph<HAST, Acc> =
+    tree_sitter_graph::graph::Graph<crate::stepped_query_imm::Node<HAST, Acc>>;
+
+#[derive(Clone)]
+pub struct ErazedFcts {
+    erzd: std::sync::Arc<dyn Opaque + Send + Sync>,
+}
+
+impl ErazedFcts {
+    #[cfg(feature = "tsg")]
+    pub fn new<G: tree_sitter_graph::graph::WithSynNodes + 'static>(
+        functions: tree_sitter_graph::functions::Functions<G>,
+    ) -> ErazedFcts {
+        Self {
+            erzd: std::sync::Arc::new(functions),
+        }
+    }
+    #[cfg(feature = "tsg")]
+    pub fn downcast_fcts<G: tree_sitter_graph::graph::WithSynNodes>(
+        &self,
+    ) -> &tree_sitter_graph::functions::Functions<G> {
+        // I tried other approaches but nothing worked,
+        // we cannot afford to rebuild the set each call,
+        // it cannot be passed easily as reference due to invariance over G (the fcts modify G)
+        let functions = &*self.erzd;
+        // SAFETY: assumes provided self.functions is the right one
+        let functions: &tree_sitter_graph::functions::Functions<G> =
+            unsafe { downcast_ref_unchecked(functions) };
+        pub unsafe fn downcast_ref_unchecked<T>(s: &dyn crate::Opaque) -> &T {
+            // SAFETY: caller guarantees that T is the correct type
+            unsafe { &*(s as *const dyn crate::Opaque as *const T) }
+        }
+        functions
+    }
+}
+
+#[test]
+fn test_issue_missing_last_child_before_ts_0_26() {
+    let meta_simp: &str = r#"(named_node
+    (identifier) (#EQ? "cast_expression")
+    .
+) @rm.all.full"#;
+
+    let meta_simp = Query::new(&meta_simp, tree_sitter_query::language()).unwrap();
+    println!("{}", meta_simp);
+    let s = meta_simp.steps.iter().nth(1).unwrap();
+    assert!(s.is_last_child());
+}
 
 // mod staged_graph {
 //     use std::collections::VecDeque;

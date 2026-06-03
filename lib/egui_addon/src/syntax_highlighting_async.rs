@@ -1,5 +1,5 @@
 use std::{
-    future::{IntoFuture},
+    future::IntoFuture,
     ops::Range,
     sync::{Arc, Mutex, RwLock},
 };
@@ -93,7 +93,11 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
     }
 
     impl cache::Spawner<(&CodeTheme, &str, &str), Incremental> for IncrementalSpawner {
-        fn spawn(&self, ctx: &egui::Context, (theme, code, lang): (&CodeTheme, &str, &str)) -> Incremental {
+        fn spawn(
+            &self,
+            ctx: &egui::Context,
+            (theme, code, lang): (&CodeTheme, &str, &str),
+        ) -> Incremental {
             Incremental {
                 mt: vec![],
                 h: Arc::new(self.0.incremental(ctx.clone(), theme, code, lang)),
@@ -105,7 +109,9 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
             }
         }
     }
-    impl cache::IncrementalComputer<IncrementalSpawner, (&CodeTheme, &str, &str), LayoutJob> for Incremental {
+    impl cache::IncrementalComputer<IncrementalSpawner, (&CodeTheme, &str, &str), LayoutJob>
+        for Incremental
+    {
         fn increment(&mut self, hh: &IncrementalSpawner, x: (&CodeTheme, &str, &str)) -> LayoutJob {
             if self.i < self.job.text.len() {
                 // self.0 = Some(increment(&self.h, &hh.0, x));
@@ -431,8 +437,7 @@ impl Highlighter {
     }
 
     fn init_h<'a>(&'a self, language: &str, theme: &CodeTheme) -> Option<HighlightLines<'_>> {
-        let syntax = self
-            .ps
+        let syntax = (self.ps)
             .find_syntax_by_name(language)
             .or_else(|| self.ps.find_syntax_by_extension(language))?;
         let theme = theme.syntect_theme.syntect_key_name();
@@ -449,7 +454,7 @@ impl Highlighter {
         job: &mut LayoutJob,
     ) -> Option<()> {
         let syntect_highlighted_line = h.highlight_line(line, &self.ps).ok()?;
-        Some(for (style, range) in syntect_highlighted_line {
+        for (style, range) in syntect_highlighted_line {
             let byte_range = as_byte_range(text, range);
             let format = convert_syntect_style(style);
             let section = LayoutSection {
@@ -458,7 +463,8 @@ impl Highlighter {
                 format,
             };
             job.sections.push(section);
-        })
+        }
+        Some(())
     }
 
     fn incremental(
@@ -525,7 +531,7 @@ impl IncrementalHighlightLayout {
         while n > 0 {
             n -= 1;
             let Some(line) = whole.get(self.i..) else {
-                return self.sections.clone()
+                return self.sections.clone();
             };
             let i = self.i;
             if let Some(i) = line.find("\n") {
@@ -568,7 +574,7 @@ impl IncrementalHighlightLayout {
                 let mut this = this.write().unwrap();
                 let whole = &this.text;
                 let Some(line) = whole.get(this.i..) else {
-                    return true
+                    return true;
                 };
                 let i = this.i;
                 if let Some(i) = line.find("\n") {
@@ -595,8 +601,8 @@ impl IncrementalHighlightLayout {
         loop {
             let whole = &self.text;
             let Some(line) = whole.get(self.i..) else {
-                    break
-                };
+                break;
+            };
             let i = self.i;
             if let Some(i) = line.find("\n") {
                 self.i += i + 1;
@@ -671,8 +677,8 @@ impl IncrementalHighlightLayout2 {
             let whole = &this.text;
             let mut inner = this.inner.write().unwrap();
             let Some(line) = whole.get(inner.i..) else {
-                    return
-                };
+                return;
+            };
             let i = inner.i;
             if let Some(i) = line.find("\n") {
                 inner.i += i + 1;
@@ -690,11 +696,17 @@ impl IncrementalHighlightLayout2 {
             // let mut t = that.write().unwrap();
 
             // t.async_aux(hh.as_ref(), &highlighter).await
-            IncrementalHighlightLayout2::highlight_n(this.clone(), hh.clone(), theme, (old_n * 2).min(500))
+            IncrementalHighlightLayout2::highlight_n(
+                this.clone(),
+                hh.clone(),
+                theme,
+                (old_n * 2).min(500),
+            )
             // .into_future()
             // .await
         };
-        aaa.ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        aaa.ctx
+            .request_repaint_after(std::time::Duration::from_millis(50));
         let value = async_exec::spawn_macrotask(Box::new(future));
         let a = aaa
             .inner
@@ -718,8 +730,8 @@ impl IncrementalHighlightLayout2 {
             let whole = &this.text;
             let mut inner = this.inner.write().unwrap();
             let Some(line) = whole.get(inner.i..) else {
-                    return
-                };
+                return;
+            };
             let i = inner.i;
             if let Some(i) = line.find("\n") {
                 inner.i += i + 1;
@@ -765,9 +777,9 @@ impl IncrementalHighlightLayout2 {
     }
 }
 
-use egui::text::{LayoutSection, TextFormat};
-use crate::syntax_highlighting_async::async_exec::TimeoutHandle;
 use super::syntect::CodeTheme;
+use crate::syntax_highlighting_async::async_exec::TimeoutHandle;
+use egui::text::{LayoutSection, TextFormat};
 
 fn convert_syntect_style(style: syntect::highlighting::Style) -> TextFormat {
     let fg = style.foreground;

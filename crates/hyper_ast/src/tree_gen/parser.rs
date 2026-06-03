@@ -24,10 +24,8 @@ pub trait Node {
         if self.child_count() >= 1 {
             // TODO maybe get node role
             false
-        } else if self.is_named() {
-            true
         } else {
-            false
+            self.is_named()
         }
     }
 }
@@ -47,6 +45,14 @@ pub trait TreeCursor {
     fn node(&self) -> Self::N;
     fn role(&self) -> Option<std::num::NonZeroU16>;
     fn goto_parent(&mut self) -> bool;
+
+    fn goto_parent_extended(&mut self) -> Option<Visibility> {
+        if self.goto_parent() {
+            Some(Visibility::Visible)
+        } else {
+            None
+        }
+    }
 
     /// try to goto first child and return if it is visible
     /// NOTE should be overridden to process hidden nodes

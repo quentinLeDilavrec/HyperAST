@@ -1,6 +1,6 @@
 use egui::{Align, Layout, Sense, Ui};
 
-use super::multi_splitter_orientation::{MultiSplitterOrientation, MultiSplitterResponse};
+use super::{MultiSplitterOrientation, MultiSplitterResponse};
 
 /// A splitter which can separate the UI into 2 parts either vertically or horizontally.
 ///
@@ -59,6 +59,7 @@ impl MultiSplitter {
         self.show_dyn(ui, Box::new(add_contents))
     }
 
+    #[expect(clippy::type_complexity)]
     pub fn show_dyn<'c, R>(
         self,
         ui: &mut Ui,
@@ -123,8 +124,6 @@ impl MultiSplitter {
                         orientation.rev().p(remaining_rect.min),
                     ))
                     .into();
-                let line_pos_2 =
-                    line_pos_1 + orientation.t((0.0, orientation.r(&remaining_rect))).into();
 
                 let mut patition_rect = {
                     let mut rect = remaining_rect;

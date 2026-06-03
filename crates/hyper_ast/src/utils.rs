@@ -5,9 +5,7 @@ use std::{
 };
 
 pub fn hash<T: ?Sized + Hash>(x: &T) -> u64 {
-    let mut state = hashbrown::hash_map::DefaultHashBuilder::default().build_hasher();
-    x.hash(&mut state);
-    state.finish()
+    hashbrown::hash_map::DefaultHashBuilder::default().hash_one(x)
 }
 
 /// Creates the `u64` hash value for the given value using the given hash builder.
@@ -35,19 +33,21 @@ impl fmt::Display for MemoryUsage {
     }
 }
 
-impl Into<Bytes> for MemoryUsage {
-    fn into(self) -> Bytes {
-        self.allocated
+impl From<MemoryUsage> for Bytes {
+    fn from(val: MemoryUsage) -> Self {
+        val.allocated
     }
 }
-impl Into<isize> for MemoryUsage {
-    fn into(self) -> isize {
-        self.allocated.bytes()
+
+impl From<MemoryUsage> for isize {
+    fn from(val: MemoryUsage) -> Self {
+        val.allocated.bytes()
     }
 }
-impl Into<isize> for &MemoryUsage {
-    fn into(self) -> isize {
-        self.allocated.bytes()
+
+impl From<&MemoryUsage> for isize {
+    fn from(val: &MemoryUsage) -> Self {
+        val.allocated.bytes()
     }
 }
 
@@ -200,9 +200,9 @@ impl fmt::Display for Bytes {
     }
 }
 
-impl Into<isize> for &Bytes {
-    fn into(self) -> isize {
-        self.0
+impl From<&Bytes> for isize {
+    fn from(val: &Bytes) -> Self {
+        val.0
     }
 }
 
@@ -261,7 +261,7 @@ impl FromStr for Url {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (protocol, rest) = match s.split_once("://") {
             Some((protocol, rest)) => (protocol, rest),
-            None => ("https", s.as_ref()),
+            None => ("https", s),
         };
 
         let (domain, path) = rest.split_once("/").ok_or(())?;

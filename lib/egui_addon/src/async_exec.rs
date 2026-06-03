@@ -128,42 +128,21 @@ pub mod web {
         }
     }
 
-    // Keep logging "hello" every second until the resulting `Interval` is dropped.
-    pub fn hello() -> IntervalHandle {
-        native::log("hello0");
-        let aa = Closure::new(|| {
-            native::log("hello");
-        });
-        set_interval(&aa, 1).unwrap()
-    }
-
+    #[allow(dead_code)]
     pub struct TimeoutHandle(TimeoutHandle0, Closure<dyn FnMut()>);
     unsafe impl Send for TimeoutHandle {}
 
     pub fn spawn_macrotask(mut f: Box<dyn FnMut() + 'static>) -> TimeoutHandle {
-        let aa = Closure::new(move || f());
-        TimeoutHandle(set_timeout(&aa, 4).unwrap(), aa)
-        // TimeoutHandle(Arc::new(Timeout::new(4, move || {
-        //     f()
-        // })))
-    }
-
-    use poll_promise::Promise;
-    pub(crate) fn spawn_stuff<T: Send + 'static>(
-        f: impl std::future::Future<Output = T> + 'static,
-    ) -> poll_promise::Promise<T> {
-        Promise::spawn_local(f)
+        let x = Closure::new(move || f());
+        TimeoutHandle(set_timeout(&x, 4).unwrap(), x)
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
-    use std::{
-        sync::{Arc, Mutex},
-        thread::{spawn, JoinHandle},
-    };
+    use std::thread::{JoinHandle, spawn};
 
-    pub struct TimeoutHandle(JoinHandle<()>);
+    pub struct TimeoutHandle(#[allow(dead_code)] JoinHandle<()>);
     pub fn spawn_macrotask(f: Box<dyn FnMut() + 'static + Send>) -> TimeoutHandle {
         let spawn = spawn(f);
         TimeoutHandle(spawn)

@@ -1,6 +1,7 @@
 use hyperast::test_utils::simple_tree::SimpleTree;
 
-use crate::{matchers::mapping_store::VecStore, tests::tree};
+use crate::mappings::VecStore;
+use crate::tests::tree;
 
 type ST<K> = SimpleTree<K>;
 

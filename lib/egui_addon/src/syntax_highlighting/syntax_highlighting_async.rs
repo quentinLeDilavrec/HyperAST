@@ -1,7 +1,5 @@
-use std::{
-    ops::Range,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::ops::Range;
+use std::sync::{Arc, Mutex, RwLock};
 
 use egui::text::LayoutJob;
 
@@ -10,7 +8,7 @@ pub fn code_view_ui(ui: &mut egui::Ui, mut code: &str) {
     let language = "rs";
     let theme = CodeTheme::from_memory(ui.ctx());
 
-    let mut layouter = |ui: &egui::Ui, string: &str, _wrap_width: f32| {
+    let mut layouter = |ui: &egui::Ui, string: &dyn egui::TextBuffer, _wrap_width: f32| {
         let layout_job = highlight(ui.ctx(), &theme, string, language);
         // layout_job.wrap.max_width = wrap_width; // no wrapping
         ui.fonts(|f| f.layout_job(layout_job))
@@ -44,7 +42,12 @@ pub fn highlight0(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: 
 }
 
 /// Memoized Code highlighting
-pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &str) -> LayoutJob {
+pub fn highlight(
+    ctx: &egui::Context,
+    theme: &CodeTheme,
+    code: &dyn egui::TextBuffer,
+    language: &str,
+) -> LayoutJob {
     // async fn something_async() {
     //     wasm_rs_dbg::dbg!("aaa");
     // }
@@ -137,7 +140,7 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
                         IncrementalHighlightLayout2::highlight_n_auto(
                             this.clone(),
                             hh.clone(),
-                            &theme,
+                            theme,
                             10,
                         )
                     };
@@ -173,6 +176,7 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
         }
     }
 
+    #[allow(dead_code)] // TODO finish implementation
     fn increment(
         this: Arc<IncrementalHighlightLayout2>,
         hh: &Arc<Highlighter>,
@@ -204,7 +208,7 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
     let res = ctx.memory_mut(|mem| {
         mem.caches
             .cache::<HighlightCache>()
-            .get(ctx, (theme, code, language))
+            .get(ctx, (theme, code.as_str(), language))
     });
 
     // drop(aaa);
@@ -213,10 +217,7 @@ pub fn highlight(ctx: &egui::Context, theme: &CodeTheme, code: &str, language: &
 
 /// slight modifications to egui's Framecache
 pub mod cache {
-    use std::{
-        collections::HashMap,
-        hash::{BuildHasher, Hasher},
-    };
+    use std::{collections::HashMap, hash::BuildHasher};
 
     use egui::util::cache::CacheTrait;
 
@@ -277,10 +278,8 @@ pub mod cache {
         {
             // let hash = crate::util::hash(key);
             let hash = {
-                let ref this = self.cache.hasher();
-                let mut hasher = this.build_hasher();
-                (&key).hash(&mut hasher);
-                hasher.finish()
+                let this = self.cache.hasher();
+                this.hash_one(&key)
             };
 
             match self.cache.entry(hash) {
@@ -371,8 +370,7 @@ impl Highlighter {
     }
 
     fn init_h<'a>(&'a self, language: &str, theme: &CodeTheme) -> Option<HighlightLines<'a>> {
-        let syntax = self
-            .ps
+        let syntax = (self.ps)
             .find_syntax_by_name(language)
             .or_else(|| self.ps.find_syntax_by_extension(language))?;
         let theme = theme.syntect_theme.syntect_key_name();
@@ -389,7 +387,7 @@ impl Highlighter {
         job: &mut LayoutJob,
     ) -> Option<()> {
         let syntect_highlighted_line = h.highlight_line(line, &self.ps).ok()?;
-        Some(for (style, range) in syntect_highlighted_line {
+        for (style, range) in syntect_highlighted_line {
             let byte_range = as_byte_range(text, range);
             let format = convert_syntect_style(style);
             let section = LayoutSection {
@@ -398,7 +396,8 @@ impl Highlighter {
                 format,
             };
             job.sections.push(section);
-        })
+        }
+        Some(())
     }
 
     fn incremental(
@@ -454,6 +453,7 @@ struct IncrementalHighlightLayout2 {
 }
 
 struct IncrementalHighlightLayout2Inner {
+    #[allow(dead_code)] // TODO finish implementation
     macrotask: Option<Arc<Mutex<async_exec::TimeoutHandle>>>,
     highlight_state: syntect::highlighting::HighlightState,
     parse_state: syntect::parsing::ParseState,
@@ -561,7 +561,7 @@ impl IncrementalHighlightLayout2 {
             &mut inner.highlight_state,
             &ops[..],
             line,
-            &highlighter,
+            highlighter,
         );
         for (style, range) in highlighted {
             let byte_range = as_byte_range(line, range);
@@ -591,14 +591,14 @@ fn convert_syntect_style(style: syntect::highlighting::Style) -> TextFormat {
     } else {
         egui::Stroke::NONE
     };
-    let format = TextFormat {
+
+    TextFormat {
         font_id: egui::FontId::monospace(12.0),
         color: text_color,
         italics,
         underline,
         ..Default::default()
-    };
-    format
+    }
 }
 
 fn as_byte_range(whole: &str, range: &str) -> std::ops::Range<usize> {

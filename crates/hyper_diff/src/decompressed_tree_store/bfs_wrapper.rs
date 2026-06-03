@@ -1,25 +1,33 @@
-use std::{borrow::Borrow, fmt::Debug, marker::PhantomData};
+use std::{borrow::Borrow, fmt::Debug};
 
 use num_traits::{cast, zero};
 
-use crate::decompressed_tree_store::{
-    BreadthFirstIterable, DecompressedParentsLending, DecompressedTreeStore,
-    DecompressedWithParent, PostOrder, ShallowDecompressedTreeStore,
-};
-use hyperast::PrimInt;
 use hyperast::types::HyperAST;
 
-use super::BreadthFirstIt;
+use super::Decompressed;
+use super::FullyDecompressedTreeStore;
+use super::PostOrder;
+use super::PrimInt;
+use super::Shallow;
+use super::ShallowDecompressedTreeStore;
+use super::{BreadthFirstIt, BreadthFirstIterable, DeepDecompressedTreeStore};
+use super::{DecompressedParentsLending, DecompressedWithParent};
 
 /// Wrap or just map a decompressed tree in breadth-first eg. post-order,
 pub struct SimpleBfsMapper<'a, IdD, DTS, D: Borrow<DTS> = DTS> {
+    /// back ids ordered in breadth-first order
     map: Vec<IdD>,
+    // Note: not sure if it is needed
     rev: Vec<IdD>,
+    /// Backend tree
+    ///
+    /// Thanks to Borrow, gives flexibility on ownership of backend tree.
     pub back: D,
-    phantom: PhantomData<&'a DTS>,
+    /// Bounds are on DTS
+    phantom: std::marker::PhantomData<&'a DTS>,
 }
 
-impl<'a, IdD: Debug, DTS: Debug, D: Borrow<DTS>> Debug for SimpleBfsMapper<'a, IdD, DTS, D> {
+impl<IdD: Debug, DTS: Debug, D: Borrow<DTS>> Debug for SimpleBfsMapper<'_, IdD, DTS, D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SD")
             .field("map", &self.map)
@@ -30,11 +38,27 @@ impl<'a, IdD: Debug, DTS: Debug, D: Borrow<DTS>> Debug for SimpleBfsMapper<'a, I
     }
 }
 
-impl<'a, IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'a, IdD, DTS, D> {
-    pub fn with_store<HAST>(_store: HAST, back: D) -> Self
+impl<IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'_, IdD, DTS, D> {
+    fn new(back: D, map: Vec<IdD>, rev: Vec<IdD>) -> Self {
+        Self {
+            map,
+            rev,
+            back,
+            phantom: std::marker::PhantomData,
+        }
+    }
+    pub fn from<D2, HAST>(d: D2) -> Self
+    where
+        D: From<D2>,
+        HAST: HyperAST + Copy,
+        DTS: PostOrder<HAST, IdD, IdD = IdD>,
+    {
+        Self::make(d.into())
+    }
+    pub fn make<HAST>(back: D) -> Self
     where
         HAST: HyperAST + Copy,
-        DTS: PostOrder<HAST, IdD>,
+        DTS: PostOrder<HAST, IdD, IdD = IdD>,
     {
         let x: &DTS = back.borrow();
         let mut map = Vec::with_capacity(x.len());
@@ -52,17 +76,11 @@ impl<'a, IdD: PrimInt, DTS, D: Borrow<DTS>> SimpleBfsMapper<'a, IdD, DTS, D> {
         }
 
         map.shrink_to_fit();
-        Self {
-            map,
-            // fc,
-            rev,
-            back,
-            phantom: PhantomData,
-        }
+        Self::new(back, map, rev)
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD>, D: Borrow<DTS>>
+impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD, IdD = IdD>, D: Borrow<DTS>>
     From<(&'a HAST, D)> for SimpleBfsMapper<'a, IdD, DTS, D>
 {
     fn from((_store, back): (&'a HAST, D)) -> Self {
@@ -70,44 +88,48 @@ impl<'a, HAST: HyperAST + Copy, IdD: PrimInt, DTS: PostOrder<HAST, IdD>, D: Borr
         let mut map = Vec::with_capacity(x.len());
         let mut rev = vec![num_traits::zero(); x.len()];
         let mut i = 0;
-        rev[x.root().to_usize().unwrap()] = cast(i).unwrap();
+        rev[x.root().index()] = cast(i).unwrap();
         map.push(x.root());
 
         while map.len() < x.len() {
             let curr = &map[i];
             let cs = x.children(curr);
-            rev[(*curr).to_usize().unwrap()] = cast(i).unwrap();
+            rev[(*curr).index()] = cast(i).unwrap();
             map.extend(cs);
             i += 1;
         }
 
         map.shrink_to_fit();
-        Self {
-            map,
-            // fc,
-            rev,
-            back,
-            phantom: PhantomData,
-        }
+        Self::new(back, map, rev)
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD, DTS: DecompressedTreeStore<HAST, IdD>, D: Borrow<DTS>>
-    ShallowDecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'a, IdD, DTS, D>
+impl<IdD: Shallow<IdD>, DTS: Decompressed<IdD, IdD = IdD>, D: Borrow<DTS>> Decompressed<IdD>
+    for SimpleBfsMapper<'_, IdD, DTS, D>
+{
+    type IdD = IdD;
+}
+
+impl<
+    HAST: HyperAST + Copy,
+    IdD: Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
+    D: Borrow<DTS>,
+> ShallowDecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
     fn len(&self) -> usize {
         self.map.len()
-    }
-
-    fn original(&self, id: &IdD) -> HAST::IdN {
-        self.back.borrow().original(id)
     }
 
     fn root(&self) -> IdD {
         self.back.borrow().root()
     }
 
-    fn child(&self, x: &IdD, p: &[impl PrimInt]) -> IdD {
+    fn original(&self, id: &IdD) -> HAST::IdN {
+        self.back.borrow().original(id)
+    }
+
+    fn child(&self, x: &IdD, p: &[impl hyperast::PrimInt]) -> IdD {
         let b: &DTS = self.back.borrow();
         b.child(x, p)
     }
@@ -118,12 +140,18 @@ impl<'a, HAST: HyperAST + Copy, IdD, DTS: DecompressedTreeStore<HAST, IdD>, D: B
     }
 }
 
-impl<'a, HAST: HyperAST + Copy, IdD, DTS: DecompressedTreeStore<HAST, IdD>, D: Borrow<DTS>>
-    DecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'a, IdD, DTS, D>
+impl<
+    HAST: HyperAST + Copy,
+    IdD: Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
+    D: Borrow<DTS>,
+> DeepDecompressedTreeStore<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
-    fn descendants(&self, x: &IdD) -> Vec<IdD>
-where {
+    fn descendants(&self, x: &IdD) -> Vec<IdD> {
         self.back.borrow().descendants(x)
+    }
+    fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
+        self.back.borrow().descendants(x).into_iter()
     }
 
     fn descendants_count(&self, x: &IdD) -> usize {
@@ -139,19 +167,18 @@ where {
     }
 }
 
-impl<'a, 'd, IdD: PrimInt, DTS: DecompressedParentsLending<'a, IdD>, D: Borrow<DTS>>
-    DecompressedParentsLending<'a, IdD> for SimpleBfsMapper<'d, IdD, DTS, D>
+impl<'a, IdD: PrimInt, DTS: DecompressedParentsLending<'a, IdD>, D: Borrow<DTS>>
+    DecompressedParentsLending<'a, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
     type PIt = <DTS as DecompressedParentsLending<'a, IdD>>::PIt;
 }
 
 impl<
-    'd,
     HAST: HyperAST + Copy,
     IdD: PrimInt,
-    DTS: DecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
+    DTS: DeepDecompressedTreeStore<HAST, IdD> + DecompressedWithParent<HAST, IdD>,
     D: Borrow<DTS>,
-> DecompressedWithParent<HAST, IdD> for SimpleBfsMapper<'d, IdD, DTS, D>
+> DecompressedWithParent<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
     fn has_parent(&self, id: &IdD) -> bool {
         self.back.borrow().has_parent(id)
@@ -161,7 +188,7 @@ impl<
         self.back.borrow().parent(id)
     }
 
-    fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
+    fn position_in_parent<Idx: hyperast::PrimInt>(&self, c: &IdD) -> Option<Idx> {
         self.back.borrow().position_in_parent(c)
     }
 
@@ -169,7 +196,7 @@ impl<
         self.back.borrow().parents(id)
     }
 
-    fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
+    fn path<Idx: hyperast::PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
         self.back.borrow().path(parent, descendant)
     }
 
@@ -179,23 +206,21 @@ impl<
 }
 
 impl<
-    'd,
     HAST: HyperAST + Copy,
-    IdD: 'static + Clone,
-    DTS: DecompressedTreeStore<HAST, IdD>,
+    IdD: 'static + Clone + Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
     D: Borrow<DTS>,
-> BreadthFirstIt<HAST, IdD> for SimpleBfsMapper<'d, IdD, DTS, D>
+> BreadthFirstIt<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
     type It<'b> = Iter<'b, IdD>;
 }
 
 impl<
-    'd,
     HAST: HyperAST + Copy,
-    IdD: 'static + Clone,
-    DTS: DecompressedTreeStore<HAST, IdD>,
+    IdD: 'static + Clone + Shallow<IdD>,
+    DTS: FullyDecompressedTreeStore<HAST, IdD>,
     D: Borrow<DTS>,
-> BreadthFirstIterable<HAST, IdD> for SimpleBfsMapper<'d, IdD, DTS, D>
+> BreadthFirstIterable<HAST, IdD> for SimpleBfsMapper<'_, IdD, DTS, D>
 {
     fn iter_bf(&self) -> Iter<'_, IdD> {
         Iter {
@@ -212,7 +237,7 @@ pub struct Iter<'a, IdD> {
     map: &'a [IdD],
 }
 
-impl<'a, IdD: Clone> Iterator for Iter<'a, IdD> {
+impl<IdD: Clone> Iterator for Iter<'_, IdD> {
     type Item = IdD;
 
     fn next(&mut self) -> Option<Self::Item> {

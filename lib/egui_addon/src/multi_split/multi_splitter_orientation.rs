@@ -18,42 +18,43 @@ pub struct MultiSplitterResponse<R> {
     // /// The response of the whole splitter widget.
     // pub splitter_response: Response,
 }
-
+use MultiSplitterOrientation::*;
 impl MultiSplitterOrientation {
     pub(crate) fn rev(self) -> Self {
         match self {
-            MultiSplitterOrientation::Vertical => MultiSplitterOrientation::Horizontal,
-            MultiSplitterOrientation::Horizontal => MultiSplitterOrientation::Vertical,
+            Vertical => Horizontal,
+            Horizontal => Vertical,
         }
     }
-    fn v(self, v: &Vec2) -> f32 {
+    #[allow(unused)]
+    pub(crate) fn v(self, v: &Vec2) -> f32 {
         match self {
-            MultiSplitterOrientation::Vertical => v.x,
-            MultiSplitterOrientation::Horizontal => v.y,
+            Vertical => v.x,
+            Horizontal => v.y,
         }
     }
     pub(crate) fn p(self, p: Pos2) -> f32 {
         match self {
-            MultiSplitterOrientation::Vertical => p.x,
-            MultiSplitterOrientation::Horizontal => p.y,
+            Vertical => p.x,
+            Horizontal => p.y,
         }
     }
     pub(crate) fn m(self, p: &mut Pos2) -> &mut f32 {
         match self {
-            MultiSplitterOrientation::Vertical => &mut p.x,
-            MultiSplitterOrientation::Horizontal => &mut p.y,
+            Vertical => &mut p.x,
+            Horizontal => &mut p.y,
         }
     }
     pub(crate) fn r(self, r: &Rect) -> f32 {
         match self {
-            MultiSplitterOrientation::Vertical => r.height(),
-            MultiSplitterOrientation::Horizontal => r.width(),
+            Vertical => r.height(),
+            Horizontal => r.width(),
         }
     }
     pub(crate) fn t<T>(self, (a, b): (T, T)) -> (T, T) {
         match self {
-            MultiSplitterOrientation::Vertical => (a, b),
-            MultiSplitterOrientation::Horizontal => (b, a),
+            Vertical => (a, b),
+            Horizontal => (b, a),
         }
     }
 }

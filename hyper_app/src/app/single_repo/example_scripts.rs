@@ -1,4 +1,5 @@
 use crate::app::types::Config;
+use crate::app::utils::{Commit, Forge, Repo};
 
 #[derive(Clone)]
 pub(super) struct Scripts {
@@ -14,41 +15,6 @@ pub(super) struct Example {
     pub(crate) config: Config,
     pub(crate) commits: usize,
     pub(crate) scripts: Scripts,
-}
-
-#[derive(Clone)]
-pub(crate) enum Forge {
-    GitHub,
-    GitLab,
-}
-
-#[derive(Clone)]
-pub(crate) struct Repo {
-    pub(crate) forge: Forge,
-    pub(crate) user: &'static str,
-    pub(crate) name: &'static str,
-}
-#[derive(Clone)]
-pub(crate) struct Commit {
-    pub(crate) repo: Repo,
-    pub(crate) id: &'static str,
-}
-
-impl From<&Repo> for super::super::types::Repo {
-    fn from(value: &Repo) -> Self {
-        Self {
-            user: value.user.into(),
-            name: value.name.into(),
-        }
-    }
-}
-impl From<&Commit> for super::super::types::Commit {
-    fn from(value: &Commit) -> Self {
-        Self {
-            repo: (&value.repo).into(),
-            id: value.id.into(),
-        }
-    }
 }
 
 pub(super) const EXAMPLES: &[Example] = &[
@@ -89,7 +55,7 @@ Made to work on Java source code."#,
     p.files += 1;
     p.type_decl += s.type_decl;
 } else if is_type_decl() {
-    p.type_decl += 1; 
+    p.type_decl += 1;
 }"##,
         },
     },
@@ -141,9 +107,9 @@ Made to work on Cpp source code."#,
         || type() == "declaration_list" {
     p.type_decl += s.type_decl;
 } else if type() == "preproc_include" {
-    p.type_decl += 1; 
+    p.type_decl += 1;
 } else if type() == "declaration" {
-    p.type_decl += 1; 
+    p.type_decl += 1;
 }"##,
         },
     },
@@ -189,7 +155,7 @@ Works on Stockfish, hangs on the Linux kernel."#,
     p.files += 1;
     p.size += s.size + 1;
 } else {
-    p.size += s.size + 1; 
+    p.size += s.size + 1;
 }"##,
         },
     },
@@ -229,7 +195,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += 1;
     p.size += size();
 } else { // will not reach
-    p.size += size(); 
+    p.size += size();
 }"##,
         },
     },
@@ -272,7 +238,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += 1;
     p.size += s.size + 1;
 } else {
-    p.size += s.size + 1; 
+    p.size += s.size + 1;
 }"##,
         },
     },
@@ -309,7 +275,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += 1;
     p.size += size();
 } else { // will not reach
-    p.size += size(); 
+    p.size += size();
 }"##,
         },
     },
@@ -346,7 +312,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += 1;
     p.size += size();
 } else { // will not reach
-    p.size += size(); 
+    p.size += size();
 }"##,
         },
     },
@@ -385,7 +351,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
         folders: [32],
         folder_count: s.folder_count,
         files: s.files,
-        type_decl: s.type_decl, 
+        type_decl: s.type_decl,
     }])
 } else if s.in_mm && type() == "Directory" {
     s.folders += "j:"+file_name();
@@ -441,14 +407,14 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.folders += [["f:"+file_name(), 1]];
     p.folder_count += 1;
 } else if s.in_mm && (hold_java_folder() || hold_maven_submodule()) {
-    if !s.folders.is_empty() { 
+    if !s.folders.is_empty() {
         p.folders += [s.folders];
     }
     p.folder_count += s.folder_count;
     p.files += s.files;
     p.type_decl += s.type_decl;
 } else if s.in_mm && hold_java_folder() {
-    if !s.folders.is_empty() { 
+    if !s.folders.is_empty() {
         p.folders += [s.folders];
     }
     p.folder_count += s.folder_count;
@@ -458,7 +424,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += 1;
     p.type_decl += s.type_decl;
 } else if is_type_decl() {
-    p.type_decl += 1; 
+    p.type_decl += 1;
 }"##,
         },
     },
@@ -497,7 +463,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
         folders: [32],
         folder_count: s.folder_count,
         files: s.files,
-        type_decl: s.type_decl, 
+        type_decl: s.type_decl,
     }])
 } else if s.in_mm && type() == "Directory" {
     s.folders = FsCont(file_name(), s.folders);
@@ -551,19 +517,19 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += s.files;
     p.type_decl += s.type_decl;
     p.folders += FsCont(file_name(), #{
-        f:s.files, 
+        f:s.files,
         t:s.type_decl,
         s:size()});
     p.folder_count += 1;
 } else if s.in_mm && (hold_java_folder() || hold_maven_submodule()) {
-    if !s.folders.is_empty() { 
+    if !s.folders.is_empty() {
         p.folders += s.folders;
     }
     p.folder_count += s.folder_count;
     p.files += s.files;
     p.type_decl += s.type_decl;
 } else if s.in_mm && hold_java_folder() {
-    if !s.folders.is_empty() { 
+    if !s.folders.is_empty() {
         p.folders += s.folders;
     }
     p.folder_count += s.folder_count;
@@ -612,7 +578,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
         folders: [32],
         folder_count: s.folder_count,
         files: s.files,
-        type_decl: s.type_decl, 
+        type_decl: s.type_decl,
     }])
 } else if s.in_mm && type() == "Directory" {
     s.folders = FsCont(file_name(), s.folders);
@@ -666,7 +632,7 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     p.files += s.files;
     p.type_decl += s.type_decl;
     p.folders += FsCont(file_name(), #{
-        f:s.files, 
+        f:s.files,
         t:s.type_decl,
         s:size(),
         Object: references("java.lang.Object", "/spoon"),
@@ -679,14 +645,14 @@ Works on Stockfish AND on the Linux kernel. Yay"#,
     });
     p.folder_count += 1;
 } else if s.in_mm && (hold_java_folder() || hold_maven_submodule()) {
-    if !s.folders.is_empty() { 
+    if !s.folders.is_empty() {
         p.folders += s.folders;
     }
     p.folder_count += s.folder_count;
     p.files += s.files;
     p.type_decl += s.type_decl;
 } else if s.in_mm && hold_java_folder() {
-    if !s.folders.is_empty() { 
+    if !s.folders.is_empty() {
         p.folders += s.folders;
     }
     p.folder_count += s.folder_count;

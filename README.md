@@ -1,15 +1,15 @@
-# HyperAST
+# [HyperAST](https://hyperast.github.io/) &nbsp;&nbsp;&nbsp; [![Rust][Rust badge]][Rust badge] &nbsp;&nbsp; [![CICD badge]][CICD] &nbsp;&nbsp; [![DOI][zenodo-badge]][zenodo-link]
+[CICD badge]:     https://github.com/HyperAST/HyperAST/actions/workflows/deploy.yml/badge.svg 
+[CICD]:           https://github.com/HyperAST/HyperAST/actions/workflows/deploy.yml
+[zenodo-badge]:   https://zenodo.org/badge/DOI/10.5281/zenodo.14810468.svg
+[zenodo-link]:    https://doi.org/10.5281/zenodo.14810468
+[zenodo-link]:    https://doi.org/10.5281/zenodo.14810468
+[Rust badge]:     https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white
 
-[![CICD badge]][CICD]
-[![DOI](https://zenodo.org/badge/14164618.svg)](https://doi.org/10.1145/3551349.3560423)
-![](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)
-
-[CICD badge]: https://github.com/HyperAST/HyperAST/actions/workflows/deploy.yml/badge.svg
-[CICD]: https://github.com/HyperAST/HyperAST/actions/workflows/deploy.yml
-
-> [Home Page HyperAST](https://hyperast.github.io/)
-
-### [Book](https://hyperast.github.io/book/index.html)
+<table class="tg"><thead><th>
+  
+| [Book](https://hyperast.github.io/book/index.html) | [GUI](https://hyperast.github.io/gui/index.html) | [Rust doc](https://hyperast.github.io/doc/hyperast/index.html)  |
+|---|---|---|
 
 #### [Getting Started](https://hyperast.github.io/book/quickstart/quickstart.html)
 
@@ -17,50 +17,63 @@
 
 ##### [Track Code(GUI)](https://hyperast.github.io/book/quickstart/track_code.html)
 
----
-
-### [GUI](https://hyperast.github.io/gui/index.html)
-
----
-
-### [Doc](https://hyperast.github.io/doc/hyperast/index.html)
+</th><th><img src="./hyper_app/assets/icon-512.png" width="320px" /></th></thead></table>
 
 ## Summary
 
-HyperAST is an AST structured as a Direct Acyclic Graph (DAG) (similar to MerkleDAG used in Git).
-An HyperAST is efficiently constructed by leveraging [Git](https://git-scm.com/) and [TreeSitter](https://tree-sitter.github.io/tree-sitter/).
+The HyperAST project aims to facilitate the exploration and processing of large source code histories.
+At its core an HyperAST is a compressed syntax tree structure similar to the MerkleDAG of Git (but beyond files).
+An HyperAST is typically constructed from a [Git](https://git-scm.com/) repository,
+by parsing each unique file once with [TreeSitter](https://tree-sitter.github.io/tree-sitter/).
+In the process, only structurally unique subtrees are stored and processed,
+thus compressing and incrementally deriving useful information to be used later.
 
-It reimplements the [Gumtree](https://hal.science/hal-01054552/document) algorithm in Rust while using HyperAST as the underlying AST structure.
+The project includes a use-def solver,
+based on the context-free indexing of references present in subtrees (each subtree has a bloom filter of contained references).
+It should be noted that this feature is currently being reworked to generalize beyond the analysis of Java projects.
 
-It implements a use-def solver,
-that uses a context-free indexing of references present in subtrees (each subtree has a bloom filter of contained references).
+It also includes a tree diff module, called HyperDiff, largely inspired by [Gumtree](https://github.com/GumTreeDiff/gumtree) and its [algorithms](https://hal.science/hal-04855170v1/document). We notably adapted the algorithms to lazily decompress nodes.
+
+Many other features are provided, and can be discovered reading the [book](https://hyperast.github.io/book/index.html), the [rust doc](https://hyperast.github.io/doc/hyperast/index.html) or through the [graphical app](https://hyperast.github.io/gui/index.html).
 
 ## How to use 
 
-You can use the dedicated [GUI](https://hyperast.github.io/gui/index.html) in your browser. However, in order to use any of the GUI features, you will need to launch/connect to the REST API server. 
+You can use the dedicated [GUI](https://hyperast.github.io/gui/index.html) in your browser. However, in order to use any of the GUI features, you will need to launch/connect to the server. 
 
-### Launch server with Nix (A package manager for reproducible, declarative and reliable systems)
-Look [there](https://nixos.org/download) for instruction on how to install Nix on your system.
+### Launch the server with [Cargo](https://github.com/rust-lang/cargo)
 ```sh
-nix run .#hyperast-webapi // similar to the prev. mentioned cargo run 
-nix run github:HyperAST/HyperAST#hyperast-webapi // here nix handles everything, no need to clone!
+# from the project root dir, after having cloned the repository
+cargo run -p backend --release 
 ```
-This will download all dependencies and build locally. 
-It can work on any *NIX system (Linux, WSL, MACOSX, ...), but the CPU architecture can be a problem e.g. I could not make it work on an M1.
+> [!WARNING]
+> You have to handle system dependencies yourself, such as, `rustc`, `openssl`.
+> Please use [rustup](https://github.com/rust-lang/rustup) to automatically handle the build chain compatibility.
 
-There is also a development shell provided with all the necessary dependencies installed in a healthy environment to develop and build the project. You can enter the environment with:
+### Launch server with [Nix](https://nixos.org/)
+```
+nix run .#hyperast-backend
+```
+instead of `cargo run`, or without even cloning the repository
+```
+nix run github:HyperAST/HyperAST#hyperast-webapi # Nix handles everything!
+```
+
+Nix is a package manager for reproducible, declarative and reliable systems.
+This will download all dependencies and build locally. 
+It works easily on most *NIX systems (Linux, WSL, macOs, ...) and can produce OCI-images like Docker.
+
+> [!TIP]
+> Look [there](https://nixos.org/download) for instruction on how to install Nix on your system.
+
+There is also a development shell provided with all the necessary dependencies installed in a healthy environment to develop and build the project.
+You can enter the environment with:
 ```sh
 nix develop # from the project root dir
 ```
-### Launch our server with Cargo (You have to handle system dependencies yourself, such as, `rustc`, `openssl` )
-```sh
-cargo run -p backend --release # from the project root dir, after having cloned the repository
-```
-Note: Currently HyperAST uses features from the nightly channel, so you should definitely use [rustup](https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file), the Rust version manager.
 
 ## How to Cite
 
-If you use HyperAST and/or HyperDiff in an academic purpose, please cite the following papers:
+If you use HyperAST and HyperDiff for academic purposes, please cite the following papers:
 
 ```bibtex
 @inproceedings{ledilavrec:hal-03764541,
@@ -74,7 +87,6 @@ If you use HyperAST and/or HyperDiff in an academic purpose, please cite the fol
 }
 ```
 
-
 ```bibtex
 @inproceedings{ledilavrec:hal-04189855,
   TITLE = {{HyperDiff: Computing Source Code Diffs at Scale}},
@@ -86,4 +98,3 @@ If you use HyperAST and/or HyperDiff in an academic purpose, please cite the fol
   YEAR = {2023}
 }
 ```
-

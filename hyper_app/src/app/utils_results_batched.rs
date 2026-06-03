@@ -3,6 +3,7 @@ use poll_promise::Promise;
 use super::types::CommitId;
 use super::utils::SecFmt;
 use super::utils::file_save;
+use crate::app::utils_egui::MyUiExt;
 use crate::utils_poll::Resource;
 
 pub(crate) trait ComputeError {
@@ -163,7 +164,7 @@ fn show_long_result_compute_failure(ui: &mut egui::Ui, error: &impl ComputeError
             .heading()
             .color(ui.visuals().error_fg_color),
     );
-    ui.colored_label(ui.visuals().error_fg_color, error.content());
+    ui.probable_fetch_error(error.content());
 }
 
 pub(crate) fn show_long_result_success(ui: &mut egui::Ui, content: &ComputeResults) {

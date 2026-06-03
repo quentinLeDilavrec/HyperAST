@@ -1,5 +1,6 @@
 use epaint::{Pos2, ahash::HashSet};
 use poll_promise::Promise;
+use re_ui::UiExt as _;
 use std::collections::{HashMap, VecDeque};
 use std::ops::{ControlFlow, Range};
 use std::sync::Arc;
@@ -11,16 +12,14 @@ use egui_addon::egui_utils::highlight_byte_range;
 use hyperast::store::nodes::fetched::NodeIdentifier;
 use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
 
-use crate::app::code_aspects::Focus;
-use crate::app::types::CommitId;
-
-use super::code_aspects::{FetchedView, HighLightHandle, remote_fetch_node_old};
-use super::code_tracking::{
-    FetchedFiles, RemoteFile, TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges,
-};
+use super::code_aspects::remote_fetch_node_old;
+use super::code_aspects::{FetchedView, Focus, HighLightHandle};
+use super::code_tracking::{FetchedFiles, RemoteFile};
+use super::code_tracking::{TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges};
 use super::commit::{CommitMetadata, fetch_commit0};
 use super::tree_view::{Action, store::FetchedHyperAST};
-use super::types::{CodeRange, Commit, ComputeConfigAspectViews, FileIdentifier, SelectedConfig};
+use super::types::{CodeRange, ComputeConfigAspectViews, FileIdentifier, SelectedConfig};
+use super::types::{Commit, CommitId};
 use super::utils_egui::MyUiExt as _;
 use crate::utils_poll::{AccumulableResult, Buffered, MultiBuffered, Resource};
 
@@ -407,7 +406,7 @@ fn show_commit(
             md.show(ui);
         }
         Err(err) => {
-            ui.colored_label(ui.visuals().error_fg_color, err);
+            ui.probable_fetch_error(err.as_str());
         }
     }
 }
@@ -752,7 +751,7 @@ impl<'a> AttachedImpl<'a> {
             ) {
                 Ok(curr_view) => curr_view,
                 Err(err) => {
-                    ui.colored_label(ui.visuals().error_fg_color, err);
+                    ui.probable_fetch_error(err);
                     continue;
                 }
             };
@@ -977,7 +976,7 @@ fn show_tree_view_of_tracking(
     };
     let Ok(tree_viewer) = tree_viewer.as_mut().map_err(|err| {
         log::error!("{}", err);
-        ui.colored_label(ui.visuals().error_fg_color, err);
+        ui.probable_fetch_error(err.as_str());
     }) else {
         return;
     };

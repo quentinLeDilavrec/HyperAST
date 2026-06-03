@@ -64,6 +64,7 @@ fn top_bar(app: &mut crate::HyperApp, ui: &mut egui::Ui, frame_style: egui::Fram
             handle_app_title_click(app);
         }
         ui.menu_button("File", |ui| file_menu(ui, &app.data.command_sender));
+        ui.menu_button("Settings", |ui| settings_menu(ui, &app.data.command_sender));
         egui::warn_if_debug_build(ui);
 
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -247,4 +248,9 @@ fn file_menu(ui: &mut egui::Ui, command_sender: &CommandSender) {
     UICommand::Open.menu_button_ui(ui, command_sender);
     #[cfg(not(target_arch = "wasm32"))]
     UICommand::Quit.menu_button_ui(ui, command_sender);
+}
+
+fn settings_menu(ui: &mut egui::Ui, command_sender: &CommandSender) {
+    UICommand::BackendSettings.menu_button_ui(ui, command_sender);
+    UICommand::FrontendSettings.menu_button_ui(ui, command_sender);
 }

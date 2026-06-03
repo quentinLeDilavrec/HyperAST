@@ -17,6 +17,8 @@ pub enum UICommand {
     // Listed in the order they show up in the command palette by default!
     Open,
     SaveResults,
+    BackendSettings,
+    FrontendSettings,
     SaveLayout,
     ResetLayout,
     // kind of temporary, because of issues with persistance in browser on close
@@ -136,6 +138,14 @@ impl UICommand {
     pub fn text_and_tooltip(self) -> (&'static str, &'static str) {
         match self {
             Self::SaveResults => ("Save Results…", "Save all results and associated config"),
+            Self::BackendSettings => (
+                "Backend Settings…",
+                "Settings for the backend, notably its address",
+            ),
+            Self::FrontendSettings => (
+                "Frontend Settings…",
+                "Settings for the frontend, notably global appearance",
+            ),
             Self::SaveLayout => ("Save Current Layout…", "Save current layout"),
             Self::ResetLayout => (
                 "Reset Current Layout…",
@@ -358,6 +368,8 @@ impl UICommand {
 
         match self {
             Self::SaveResults => Some(cmd(Key::S)),
+            Self::BackendSettings => None,
+            Self::FrontendSettings => None,
             Self::SaveLayout => Some(cmd_alt(Key::S)),
             Self::ResetLayout => None,
             Self::PersistApp => None,

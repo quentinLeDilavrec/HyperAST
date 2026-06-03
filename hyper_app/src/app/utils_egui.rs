@@ -1,11 +1,9 @@
-use super::{code_tracking, types};
-use egui::{CollapsingResponse, Id};
-use egui_addon::{
-    egui_utils::{radio_collapsing, show_wip},
-    syntax_highlighting,
-};
-use re_ui::UiExt;
 use std::collections::hash_map;
+
+use egui::CollapsingResponse;
+use re_ui::UiExt;
+
+use super::{code_tracking, types};
 
 type ShowRes<T> = (
     egui::Response,
@@ -17,17 +15,34 @@ type ShowRes<T> = (
 pub trait MyUiExt: UiExt {
     fn radio_collapsing<R, S: PartialEq + Clone>(
         &mut self,
-        id: Id,
+        id: egui::Id,
         title: impl Into<String>,
         selected: &mut S,
         wanted: &S,
         add_body: impl FnOnce(&mut egui::Ui) -> R,
     ) -> CollapsingResponse<R> {
+        use egui_addon::egui_utils::radio_collapsing;
         radio_collapsing(self.ui_mut(), id, title, selected, wanted, add_body)
     }
 
     fn wip(&mut self, short: Option<&str>) {
+        use egui_addon::egui_utils::show_wip;
         show_wip(self.ui_mut(), short)
+    }
+
+    fn probable_fetch_error(&mut self, error: impl Into<String>) -> egui::Response {
+        let error = error.into();
+        let error = if error.is_empty() {
+            "Error".into()
+        } else {
+            error
+        };
+        const WARNING_TEXT: &'static str =
+            "Did you set the address of a valid server in Settings > Backend Settings ?";
+        let color = self.ui().visuals().error_fg_color;
+        self.ui_mut()
+            .colored_label(color, error)
+            .union(self.warning_label(WARNING_TEXT))
     }
 
     fn show_remote_code(
@@ -113,6 +128,7 @@ pub trait MyUiExt: UiExt {
         code: &str,
         desired_width: f32,
     ) -> Option<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>> {
+        use egui_addon::syntax_highlighting;
         use syntax_highlighting::syntax_highlighting_async as syntax_highlighter;
         let theme = syntax_highlighting::syntect::CodeTheme::from_memory(self.ui().ctx());
 

@@ -99,6 +99,11 @@ pub struct HyperApp {
 
     selected_commit: Option<(ProjectId, CommitId)>,
     selected_baseline: Option<CommitId>,
+
+    #[serde(skip)]
+    backend_settings_modal: re_ui::modal::ModalHandler,
+    #[serde(skip)]
+    frontend_settings_modal: re_ui::modal::ModalHandler,
 }
 
 struct ProjectsOrCommitsModal {
@@ -753,6 +758,8 @@ impl Default for HyperApp {
             notifs: Default::default(),
             selected_commit: None,
             selected_baseline: None,
+            backend_settings_modal: Default::default(),
+            frontend_settings_modal: Default::default(),
         }
     }
 }
@@ -760,11 +767,13 @@ impl Default for HyperApp {
 const DEFAULT_EXPLAINATIONS_MDS: &[&str] = &[r#"# Graphical Interface of the HyperAST
 
 You are using the GUI of the HyperAST.
-The HyperAST enables developpers and researchers alike to explore and investigate
+The HyperAST enables developers and researchers alike to explore and investigate
 temporal code evolutions in the repositories of their choice.
 
 Readily supports projects using Java with Maven, and simple C/C++ (Makefile in root and an src/ dir).
 Other codebase structures, languages and build systems could be added, but time is lacking for now.
+
+https://github.com/HyperAST/HyperAST
 
 ## Default Layouts
 
@@ -2736,11 +2745,44 @@ impl eframe::App for HyperApp {
                 UICommand::ZoomReset => {
                     ctx.set_zoom_factor(1.0);
                 }
+                UICommand::BackendSettings => {
+                    self.backend_settings_modal.open();
+                }
+                UICommand::FrontendSettings => {
+                    self.frontend_settings_modal.open();
+                }
                 x => {
                     wasm_rs_dbg::dbg!(x);
                 }
             }
         }
+
+        self.backend_settings_modal.ui(
+            ctx,
+            || re_ui::modal::ModalWrapper::new("Backend Settings"),
+            |ui| {
+                // TODO: in native mode provide an option to run the backend directly as a process
+                ui.label("address of the backend:");
+                ui.text_edit_singleline(&mut self.data.api_addr);
+                ui.horizontal(|ui| {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                    ui.spacing_mut().item_spacing = egui::Vec2::splat(4.0);
+                    ui.small_icon(&re_ui::icons::INFO, None);
+                    ui.small(BACKEND_ADDR_INFO)
+                        .on_hover_text(BACKEND_ADDR_INFO_HOVER);
+                });
+            },
+        );
+
+        self.frontend_settings_modal.ui(
+            ctx,
+            || re_ui::modal::ModalWrapper::new("Frontend Settings"),
+            |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ctx.settings_ui(ui);
+                });
+            },
+        );
 
         self.modal_handler_proj_or_commits.ui(ctx, &mut self.data);
 
@@ -2756,3 +2798,10 @@ impl eframe::App for HyperApp {
         }
     }
 }
+
+const BACKEND_ADDR_INFO: &'static str = concat!(
+    "The backend is necessary to clone repositories, ",
+    "it also has more memory available than the 2 Gb in a browser."
+);
+const BACKEND_ADDR_INFO_HOVER: &'static str =
+    "You can run a backend yourself following the instructions on the HyperAST's GitHub page.";

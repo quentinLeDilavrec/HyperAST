@@ -7,6 +7,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay?ref=stable";
     nix-filter.url = "github:numtide/nix-filter";
     crane.url = "github:ipetkov/crane";
+    nix2container.url = "github:nlewo/nix2container";
   };
 
   outputs =
@@ -16,6 +17,7 @@
       flake-utils,
       crane,
       rust-overlay,
+      nix2container,
       ...
     }@inputs:
     flake-utils.lib.eachDefaultSystem (
@@ -95,6 +97,31 @@
                 "--"
                 "0.0.0.0:8888"
               ];
+              Env = [
+                "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+                "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              ];
+            };
+          };
+          hyperast-ociImage = nix2container.packages.${system}.nix2container.buildImage {
+            name = "hyperast";
+            tag = "0.5.0";
+
+            copyToRoot = [
+              (pkgs.runCommand "symlinks" { } ''
+                mkdir -p $out
+                ln -s ${hyperast-backend}/bin/backend $out/backend
+                ln -s ${hyperast-backend}/bin/scripting $out/scripting
+              '')
+            ];
+
+            config = {
+              Cmd = [
+                "/backend"
+                "--"
+                "0.0.0.0:8888"
+              ];
+
               Env = [
                 "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"

@@ -6,23 +6,29 @@
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay?ref=stable";
     nix-filter.url = "github:numtide/nix-filter";
+    crane.url = "github:ipetkov/crane";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-    rust-overlay,
-    ...
-  } @ inputs:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      crane,
+      rust-overlay,
+      ...
+    }@inputs:
     flake-utils.lib.eachDefaultSystem (
-      system: let
-        overlays = [(import rust-overlay)];
+      system:
+      let
+        overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
         };
         filter = inputs.nix-filter.lib;
-        hyperast-backend = pkgs.rustPlatform.buildRustPackage {
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+        commonArgs = {
           pname = "HyperAST";
           version = "0.5.0";
           src = filter {
@@ -38,31 +44,27 @@
               ./README.md
             ];
           };
-          buildAndTestSubdir = "crates/backend";
-          OPENSSL_NO_VENDOR = 1;
-          release = true;
+          strictDeps = true;
+          OPENSSL_NO_VENDOR = "1";
           doCheck = false;
-          buildInputs = with pkgs; [
-            # misc libraries
-            openssl
-            cacert
-          ];
+          buildInputs = with pkgs; [ openssl ];
           nativeBuildInputs = with pkgs; [
-            # misc libraries
             cmake
             pkg-config
-            openssl
-            cacert
-
-            # Rust
-            (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
           ];
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            allowBuiltinFetchGit = true;
-          };
+          CARGO_PROFILE_RELEASE_STRIP = "symbols";
+          cargoExtraArgs = "-p backend"; # builds both `backend` and `scripting` bins
         };
-      in {
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        hyperast-backend = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+          }
+        );
+      in
+      {
         apps = {
           hyperast-backend = {
             type = "app";
@@ -80,12 +82,19 @@
           hyperast-dockerImage = pkgs.dockerTools.buildLayeredImage {
             name = "HyperAST";
             tag = "0.5.0";
-            runAsRoot = ''
-              ln -s  ${hyperast-backend}/bin/scripting /scripting
-              ln -s  ${hyperast-backend}/bin/backend /backend
-            '';
+            contents = [
+              (pkgs.runCommand "symlinks" { } ''
+                mkdir -p $out
+                ln -s ${hyperast-backend}/bin/scripting $out/scripting
+                ln -s ${hyperast-backend}/bin/backend $out/backend
+              '')
+            ];
             config = {
-              Cmd = ["/backend -- 0.0.0.0:8888"];
+              Cmd = [
+                "/backend"
+                "--"
+                "0.0.0.0:8888"
+              ];
               Env = [
                 "GIT_SSL_CAINFO=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
                 "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"

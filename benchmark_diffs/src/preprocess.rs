@@ -306,12 +306,12 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
     let insertion = node_store.prepare_insertion(&hashable, eq);
 
     if let Some(id) = insertion.occupied_id() {
-        let ana = None;
         let metrics = primary.metrics.map_hashs(|h| h.build());
         return Local {
             compressed_node: id,
             metrics,
-            ana,
+            #[cfg(feature = "impact")]
+            ana: None,
             mcc: Mcc::new(&kind),
             role: None,
             precomp_queries: Default::default(),
@@ -322,8 +322,6 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
 
     let mut dyn_builder =
         hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(Lang);
-
-    let ana = None;
 
     let children_is_empty = primary.children.is_empty();
 
@@ -341,7 +339,8 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
     Local {
         compressed_node: node_id,
         metrics,
-        ana,
+        #[cfg(feature = "impact")]
+        ana: None,
         mcc: Mcc::new(&kind),
         role: None,
         precomp_queries: Default::default(),

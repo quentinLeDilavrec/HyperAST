@@ -88,6 +88,7 @@ pub type MDCache = hashbrown::HashMap<NodeIdentifier, MD>;
 // they can be qualitative metadata .eg a hash or they can be quantitative .eg lines of code
 pub struct MD {
     pub metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
+    #[cfg(feature = "impact")]
     pub ana: Option<PartialAnalysis>,
     pub mcc: Mcc,
     pub precomp_queries: PrecompQueries,
@@ -98,6 +99,7 @@ impl MD {
         Local {
             compressed_node,
             metrics: self.metrics,
+            #[cfg(feature = "impact")]
             ana: self.ana.clone(),
             mcc: self.mcc.clone(),
             role: None,
@@ -109,12 +111,14 @@ impl MD {
 }
 
 // Enables static reference analysis
+#[cfg(feature = "impact")]
 const ANA: bool = false;
 
 impl From<Local> for MD {
     fn from(x: Local) -> Self {
         MD {
             metrics: x.metrics,
+            #[cfg(feature = "impact")]
             ana: x.ana,
             mcc: x.mcc,
             precomp_queries: x.precomp_queries,
@@ -132,6 +136,7 @@ pub struct Local {
     // * metadata: computation results from concrete code of node and its children
     // they can be qualitative metadata, e.g. a hash or they can be quantitative e.g. lines of code
     pub metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
+    #[cfg(feature = "impact")]
     pub ana: Option<PartialAnalysis>,
     pub mcc: Mcc,
     pub role: Option<Role>,
@@ -180,6 +185,7 @@ pub struct Acc<Scope = hyperast::scripting::Acc> {
     start_byte: usize,
     end_byte: usize,
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
+    #[cfg(feature = "impact")]
     ana: Option<PartialAnalysis>,
     mcc: Mcc,
     padding_start: usize,
@@ -249,18 +255,19 @@ impl<'acc> tree_gen::WithLabel for &'acc Acc {
 
 impl<S> Debug for Acc<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Acc")
-            .field("simple", &self.simple)
+        let mut f = f.debug_struct("Acc");
+        f.field("simple", &self.simple)
             .field("no_space", &self.no_space)
             .field("labeled", &self.labeled)
             .field("start_byte", &self.start_byte)
             .field("end_byte", &self.end_byte)
             .field("metrics", &self.metrics)
-            .field("ana", &self.ana)
             .field("mcc", &self.mcc)
             .field("padding_start", &self.padding_start)
-            .field("indentation", &self.indentation)
-            .finish()
+            .field("indentation", &self.indentation);
+        #[cfg(feature = "impact")]
+        f.field("ana", &self.ana);
+        f.finish()
     }
 }
 
@@ -310,6 +317,7 @@ where
             &parent_indentation,
         );
         let labeled = node.has_label();
+        #[cfg(feature = "impact")]
         let ana = self.build_ana(&kind);
         let mcc = Mcc::new(&kind);
         let prepro = if More::USING {
@@ -327,6 +335,7 @@ where
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
             metrics: Default::default(),
+            #[cfg(feature = "impact")]
             ana,
             mcc,
             padding_start: 0,
@@ -420,6 +429,7 @@ where
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
             metrics: Default::default(),
+            #[cfg(feature = "impact")]
             ana: self.build_ana(&kind),
             mcc: Mcc::new(&kind),
             padding_start: global.sum_byte_length(),
@@ -686,6 +696,7 @@ where
                 hashs,
                 line_count,
             },
+            #[cfg(feature = "impact")]
             ana: Default::default(),
             mcc: Mcc::new(&Type::Spaces),
             role: None,
@@ -801,6 +812,7 @@ where
         full_node
     }
 
+    #[cfg(feature = "impact")]
     fn build_ana(&mut self, _kind: &Type) -> Option<PartialAnalysis> {
         if !ANA {
             return None;
@@ -957,6 +969,7 @@ where
                 compressed_node,
                 MD {
                     metrics,
+                    #[cfg(feature = "impact")]
                     ana: acc.ana.clone(),
                     mcc: acc.mcc.clone(),
                     precomp_queries: acc.precomp_queries,
@@ -965,6 +978,7 @@ where
             Local {
                 compressed_node,
                 metrics,
+                #[cfg(feature = "impact")]
                 ana: acc.ana,
                 mcc: acc.mcc,
                 role: current_role,
@@ -1021,6 +1035,7 @@ where
                 start_byte: 0,
                 end_byte: 0,
                 metrics: Default::default(),
+                #[cfg(feature = "impact")]
                 ana: None,
                 mcc: Mcc::new(&kind),
                 padding_start: 0,
@@ -1042,11 +1057,12 @@ where
                 // print_tree_syntax(&self.stores.node_store, &self.stores.label_store, &c);
                 // println!();
                 let md = self.md_cache.get(&c);
-                let (ana, metrics, mcc) = if let Some(md) = md {
-                    let ana = md.ana.clone();
+                #[cfg(feature = "impact")]
+                panic!("does not support impact analysis in and code modifications");
+                let (metrics, mcc) = if let Some(md) = md {
                     let metrics = md.metrics;
                     let mcc = md.mcc.clone();
-                    (ana, metrics, mcc)
+                    (metrics, mcc)
                 } else {
                     let node: HashedNodeRef<_> = self.stores.node_store.resolve(c);
                     let hashs = SyntaxNodeHashs {
@@ -1065,12 +1081,13 @@ where
                     let mcc = node
                         .get_component::<Mcc>()
                         .map_or(Mcc::new(&kind), |x| x.clone());
-                    (None, metrics, mcc)
+                    (metrics, mcc)
                 };
                 Local {
                     compressed_node: c,
                     metrics,
-                    ana,
+                    #[cfg(feature = "impact")]
+                    ana: None,
                     mcc,
                     role: acc.role.current,
                     precomp_queries: todo!(),
@@ -1108,6 +1125,7 @@ where
                 Local {
                     compressed_node: id,
                     metrics: md.metrics,
+                    #[cfg(feature = "impact")]
                     ana: md.ana.clone(),
                     mcc: md.mcc.clone(),
                     role: acc.role.current,
@@ -1167,6 +1185,7 @@ where
                     compressed_node,
                     MD {
                         metrics,
+                        #[cfg(feature = "impact")]
                         ana: acc.ana.clone(),
                         mcc: acc.mcc.clone(),
                         precomp_queries: acc.precomp_queries,
@@ -1175,6 +1194,7 @@ where
                 Local {
                     compressed_node,
                     metrics,
+                    #[cfg(feature = "impact")]
                     ana: acc.ana,
                     mcc: acc.mcc,
                     role: current_role,

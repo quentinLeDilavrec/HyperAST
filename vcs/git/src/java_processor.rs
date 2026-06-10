@@ -240,8 +240,8 @@ fn make(
         .inner
         .prepare_insertion(dedup_cache, &hashable, eq);
 
+    #[cfg(feature = "impact")]
     let compute_ana = || {
-        #[cfg(feature = "impact")]
         {
             let ana = acc.ana;
             let ana = if acc.skiped_ana {
@@ -280,10 +280,7 @@ fn make(
             // }
             ana
         }
-        #[cfg(not(feature = "impact"))]
-        {
-            None
-        }
+        None
     };
 
     // Guard to avoid computing metadata for an already present subtree
@@ -299,6 +296,7 @@ fn make(
         };
     }
 
+    #[cfg(feature = "impact")]
     let ana = compute_ana();
 
     let mut dyn_builder = subtree_builder::<hyperast_gen_ts_java::types::TStore>(interned_kind);
@@ -336,6 +334,7 @@ fn make(
         compressed_node,
         legion_with_refs::MD {
             metrics,
+            #[cfg(feature = "impact")]
             ana: None,
             mcc: Mcc::new(&kind),
             precomp_queries: acc.precomp_queries,
@@ -344,6 +343,7 @@ fn make(
     let full_node = legion_with_refs::Local {
         compressed_node,
         metrics,
+        #[cfg(feature = "impact")]
         ana,
         mcc: Mcc::new(&kind),
         role: None,

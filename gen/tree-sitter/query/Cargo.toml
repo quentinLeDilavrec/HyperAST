@@ -9,7 +9,6 @@ workspace = true
 [dependencies]
 tree-sitter = { workspace = true, optional = true }
 tree-sitter-query = { git = "https://github.com/tree-sitter-grammars/tree-sitter-query", rev = "d25e8d183f319497b8b22a2a1585975b020da722", version = "0.3.0", optional = true }
-atomic-counter = "1.0.1"
 num = "0.4.0"
 bitvec = "1.0.1"
 cfg-if = "1.0"

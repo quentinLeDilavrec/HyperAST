@@ -9,7 +9,6 @@ workspace = true
 [dependencies]
 tree-sitter = { workspace = true, optional = true }
 tree-sitter-typescript = { version = "0.23.0", optional = true }
-atomic-counter = "1.0.1"
 num = "0.4.0"
 bitvec = "1.0.1"
 cfg-if = "1.0"

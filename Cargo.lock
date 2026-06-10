@@ -903,12 +903,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomic-counter"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f447d68cfa5a9ab0c1c862a703da2a65b5ed1b7ce1153c9eb0169506d56019"
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4362,7 +4356,6 @@ dependencies = [
 name = "hyperast_gen_ts_c"
 version = "0.5.0"
 dependencies = [
- "atomic-counter",
  "bitvec",
  "cfg-if",
  "enumset",
@@ -4384,7 +4377,6 @@ dependencies = [
 name = "hyperast_gen_ts_cpp"
 version = "0.5.0"
 dependencies = [
- "atomic-counter",
  "bitvec",
  "cfg-if",
  "enumset",
@@ -4409,7 +4401,6 @@ dependencies = [
 name = "hyperast_gen_ts_java"
 version = "0.5.0"
 dependencies = [
- "atomic-counter",
  "bitvec",
  "cc",
  "cfg-if",
@@ -4441,7 +4432,6 @@ dependencies = [
 name = "hyperast_gen_ts_ts"
 version = "0.5.0"
 dependencies = [
- "atomic-counter",
  "bitvec",
  "cfg-if",
  "enumset",
@@ -4463,7 +4453,6 @@ dependencies = [
 name = "hyperast_gen_ts_tsquery"
 version = "0.5.0"
 dependencies = [
- "atomic-counter",
  "bitvec",
  "cfg-if",
  "criterion 0.6.1",

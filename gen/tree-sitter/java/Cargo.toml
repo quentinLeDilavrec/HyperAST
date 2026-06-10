@@ -30,8 +30,6 @@ enumset = "1.0.8"
 
 serde = "1.0.130"
 
-ref-cast = "1.0" # help with transparent unit structs, it makes proper layout assertions
-
 [build-dependencies]
 cc = "*"
 

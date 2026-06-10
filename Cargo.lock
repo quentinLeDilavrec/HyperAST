@@ -4416,7 +4416,6 @@ dependencies = [
  "log",
  "num",
  "pretty_assertions",
- "ref-cast",
  "serde",
  "stack-graphs",
  "streaming-iterator",

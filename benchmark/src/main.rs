@@ -241,20 +241,3 @@ pub fn single_commit_ref_ana(
     drop(preprocessed);
     log::warn!("hyperAST size: {}", mu - memusage_linux());
 }
-
-#[test]
-fn all() {
-    use std::fs::read_to_string;
-    use std::path::Path;
-    use std::path::PathBuf;
-
-    use pommes::Project;
-
-    let path: PathBuf = Path::new("pom.xml").to_path_buf();
-    println!("path: {}", &path.display());
-
-    let contents = read_to_string(path).unwrap();
-    let _parsed: Project = serde_xml_rs::from_str(&contents).unwrap();
-
-    println!("{:#?}", _parsed);
-}

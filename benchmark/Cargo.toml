@@ -17,9 +17,6 @@ log = { version = "0.4.6", features = [
     "release_max_level_warn",
 ] }
 
-pommes = "0.0.2"
-
-
 serde = { version = "1.0.130" }
 serde-xml-rs = "0.5.1"
 

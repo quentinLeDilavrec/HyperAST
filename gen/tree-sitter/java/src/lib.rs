@@ -8,9 +8,6 @@ pub mod compat;
 pub mod legion_with_refs; // TODO rename and move to a module for construction
 
 pub mod types;
-#[allow(unused)]
-#[cfg(feature = "impl")]
-pub mod types_exp;
 
 #[cfg(all(feature = "impl", feature = "impact"))]
 pub mod impact;

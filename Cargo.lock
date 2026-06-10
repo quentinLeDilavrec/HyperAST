@@ -4415,7 +4415,6 @@ dependencies = [
  "libc 0.2.171",
  "log",
  "num",
- "paste",
  "pretty_assertions",
  "ref-cast",
  "serde",

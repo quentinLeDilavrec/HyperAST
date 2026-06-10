@@ -4,11 +4,11 @@ use std::hash::Hash;
 use legion::EntityStore;
 use legion::storage::IntoComponentSource;
 
-use super::DedupMap;
 use crate::compat::hash_map::{HashMap, RawEntryMut, RawVacantEntryMut};
 use crate::types::{Typed, TypedNodeId, TypedNodeStore};
 use crate::utils::make_hash;
 
+use super::DedupMap;
 use super::PendingInsert;
 use super::TypedNode;
 use super::dyn_builder;
@@ -32,35 +32,38 @@ impl Default for NodeStore {
 
 impl<'a> PendingInsert<'a> {
     pub fn occupied_id(&self) -> Option<NodeIdentifier> {
-        match &self.0 {
-            RawEntryMut::Occupied(occupied) => Some(*occupied.key()),
-            _ => None,
+        if let RawEntryMut::Occupied(occupied) = &self.0 {
+            Some(*occupied.key())
+        } else {
+            None
         }
     }
     pub fn resolve<T>(&self, id: NodeIdentifier) -> HashedNodeRef<'_, T> {
         (self.1.1.internal.entry_ref(id))
-            .map(|x| HashedNodeRef::new(x))
+            .map(HashedNodeRef::new)
             .unwrap()
     }
     pub fn occupied(&'a self) -> Option<(NodeIdentifier, (u64, &'a NodeStoreInner))> {
-        match &self.0 {
-            RawEntryMut::Occupied(occupied) => Some((*occupied.key(), (self.1.0, self.1.1))),
-            _ => None,
+        if let RawEntryMut::Occupied(occupied) = &self.0 {
+            Some((*occupied.key(), (self.1.0, self.1.1)))
+        } else {
+            None
         }
     }
 
-    pub fn vacant(
-        self,
-    ) -> (
-        RawVacantEntryMut<'a, legion::Entity, (), ()>,
-        (u64, &'a mut NodeStoreInner),
-    ) {
-        match self.0 {
-            RawEntryMut::Vacant(occupied) => (occupied, self.1),
-            _ => panic!(),
+    pub fn vacant(self) -> PreparedVacant<'a> {
+        if let RawEntryMut::Vacant(occupied) = self.0 {
+            (occupied, self.1)
+        } else {
+            panic!("only call this if occupied_id() returns None")
         }
     }
 }
+
+type PreparedVacant<'a> = (
+    RawVacantEntryMut<'a, legion::Entity, (), ()>,
+    (u64, &'a mut NodeStoreInner),
+);
 
 impl NodeStoreInner {
     #[inline]
@@ -90,15 +93,10 @@ impl NodeStore {
         hashable: &V,
         eq: Eq,
     ) -> Option<legion::Entity> {
-        let Self {
-            dedup,
-            inner: NodeStoreInner {
-                internal: backend, ..
-            },
-        } = self;
-        let hash = make_hash(&self.inner.hasher, hashable);
+        let Self { dedup, inner } = self;
+        let hash = make_hash(&inner.hasher, hashable);
         let entry = dedup.raw_entry().from_hash(hash, |symbol| {
-            let r = eq(backend.entry_ref(*symbol).unwrap());
+            let r = eq(inner.internal.entry_ref(*symbol).unwrap());
             r
         });
         entry.map(|x| *x.0)
@@ -114,52 +112,41 @@ impl NodeStore {
 
     #[inline]
     pub fn insert_after_prepare<T>(
-        (vacant, (hash, inner)): (
-            RawVacantEntryMut<legion::Entity, (), ()>,
-            (u64, &mut NodeStoreInner),
-        ),
+        (vacant, (hash, inner)): PreparedVacant<'_>,
         components: T,
     ) -> legion::Entity
     where
         Option<T>: IntoComponentSource,
     {
-        let (&mut symbol, _) = {
-            let symbol = inner.internal.push(components);
-            vacant.insert_with_hasher(hash, symbol, (), |id| {
-                let node: HashedNodeRef<'_, NodeIdentifier> = inner
-                    .internal
-                    .entry_ref(*id)
-                    .map(HashedNodeRef::new)
-                    .unwrap();
-
-                make_hash(&inner.hasher, &node)
-            })
+        let id = inner.internal.push(components);
+        let hasher = |id: &legion::Entity| {
+            let node: HashedNodeRef<'_, NodeIdentifier> = inner
+                .internal
+                .entry_ref(*id)
+                .map(HashedNodeRef::new)
+                .unwrap();
+            make_hash(&inner.hasher, &node)
         };
-        symbol
+        vacant.insert_with_hasher(hash, id, (), hasher).0.clone()
     }
 
     /// uses the dyn builder see dyn_builder::EntityBuilder
     #[inline]
     pub fn insert_built_after_prepare(
-        (vacant, (hash, inner)): (
-            RawVacantEntryMut<legion::Entity, (), ()>,
-            (u64, &mut NodeStoreInner),
-        ),
+        (vacant, (hash, inner)): PreparedVacant,
         components: dyn_builder::BuiltEntity,
     ) -> legion::Entity {
-        let (&mut symbol, _) = {
-            let symbol = inner.internal.extend(components)[0];
-            vacant.insert_with_hasher(hash, symbol, (), |id| {
-                let node: HashedNodeRef<'_, NodeIdentifier> = inner
-                    .internal
-                    .entry_ref(*id)
-                    .map(HashedNodeRef::new)
-                    .unwrap();
+        let id = inner.internal.extend(components)[0];
+        let hasher = |id: &legion::Entity| {
+            let node: HashedNodeRef<'_, NodeIdentifier> = inner
+                .internal
+                .entry_ref(*id)
+                .map(HashedNodeRef::new)
+                .unwrap();
 
-                make_hash(&inner.hasher, &node)
-            })
+            make_hash(&inner.hasher, &node)
         };
-        symbol
+        vacant.insert_with_hasher(hash, id, (), hasher).0.clone()
     }
 
     pub fn resolve(&self, id: NodeIdentifier) -> HashedNodeRef<'_, NodeIdentifier> {
@@ -174,7 +161,7 @@ impl NodeStore {
         self.inner
             .internal
             .entry_ref(*id)
-            .map(|x| HashedNodeRef::new(x))
+            .map(HashedNodeRef::new)
             .unwrap()
     }
 

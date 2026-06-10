@@ -44,8 +44,6 @@ bevy_ecs = { version = "0.14.2", default-features = false, optional = true }
 ref-cast = "1.0"   # help with transparent unit structs, it makes proper layout assertions
 enumset = "1.0.12"
 
-frunk = { version = "0.4.3", optional = true }
-
 # # scripting
 mlua = { version = "0.9", features = ["luau"], optional = true }
 rhai = { version = "=1.20.0", features = [
@@ -75,7 +73,7 @@ default = [
 ]
 legion = ["dep:legion"]
 hecs = ["dep:hecs"]
-bevy_ecs = ["dep:bevy_ecs", "dep:frunk"]
+bevy_ecs = ["dep:bevy_ecs"]
 web = ["getrandom/js", "dep:string-interner", "dep:hashbrown"]
 native = ["dep:string-interner", "dep:hashbrown", "hashbrown?/ahash"]
 jemalloc = ["jemallocator", "jemalloc-ctl"]

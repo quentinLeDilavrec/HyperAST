@@ -9,9 +9,6 @@ mod legion_ts_simp;
 mod tests;
 
 pub mod types;
-#[allow(unused)]
-#[cfg(feature = "impl")]
-pub mod types_exp;
 
 #[cfg(feature = "legion")]
 mod tnode {

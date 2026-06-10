@@ -89,7 +89,7 @@ futures = "0.3"
 tokio-tungstenite-wasm = { version = "0.3.1" }
 http = "0.2.6" # Types for HTTP requests and responses.
 
-# # command palette stuff
+# # to iterate through variants in a command palette
 strum = "0.24"
 strum_macros = "0.24"   # issue on later version with serialization of curly braces
 sublime_fuzzy = "0.7.0"

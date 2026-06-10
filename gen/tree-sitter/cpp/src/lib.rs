@@ -13,10 +13,6 @@ pub mod types_alt;
 #[cfg(feature = "alt_grammar")]
 pub use types_alt as types;
 
-#[allow(unused)]
-#[cfg(feature = "impl_intern")]
-pub mod types_exp;
-
 #[cfg(feature = "impl_intern")]
 #[cfg(test)]
 mod tests;

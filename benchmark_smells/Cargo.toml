@@ -8,8 +8,6 @@ autobins = true
 [lints]
 workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 tree-sitter = { workspace = true }
 hyperast = { workspace = true }
@@ -47,11 +45,5 @@ base16ct = "0.2.0"
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 jemallocator = { package = "tikv-jemallocator", version = "0.5.0" }
 
-# [build-dependencies]
-
 [dev-dependencies]
 hyperast_gen_ts_java = { workspace = true }
-
-# [[bin]]
-# name = "window_combination"
-# path = "binwindow_combination.rs"

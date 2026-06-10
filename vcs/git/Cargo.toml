@@ -60,4 +60,7 @@ ts = []
 # cargo = []
 # rust = []
 impact = []
-subtree-stats = ["hyperast/subtree-stats", "hyperast_gen_ts_java/subtree-stats"]
+subtree-stats = [
+    "hyperast/subtree-stats",
+    "hyperast_gen_ts_java/subtree-stats"
+]

@@ -21,7 +21,6 @@ legion = { workspace = true, features = [
     "extended-tuple-impls", # soon should not be req., ie moving to the entry builder
 ], optional = true }
 bitvec = "1.0.1"
-controlled-option = "0.4.1" # check if really needed
 string-interner = { version = "0.17.0", optional = true }
 
 # # gen

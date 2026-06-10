@@ -2,13 +2,9 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::types::TypeStore;
 
-pub mod handle;
 pub mod labels;
-// pub mod mapped_world;
 pub mod nodes;
 // pub mod ecs; // TODO try a custom ecs ?
-// pub mod radix_hash_store; // TODO yet another WIP store
-// pub mod vec_map_store; // TODO yet another WIP store
 
 pub struct SimpleStores<TS, NS = nodes::DefaultNodeStore, LS = labels::LabelStore> {
     pub label_store: LS,

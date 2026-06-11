@@ -1,22 +1,32 @@
 //! fully compress all subtrees
 #![allow(unused)]
 use num::ToPrimitive as _;
-use std::{collections::HashMap, fmt::Debug, vec};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
-use super::{P, parser::Visibility, utils_ts::*, zipped::Has};
-use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use crate::full::FullNode;
+use crate::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use crate::store::SimpleStores;
 use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
-use crate::store::nodes::legion::{NodeIdentifier, dyn_builder, eq_node};
-use crate::tree_gen::parser::{Node as _, TreeCursor};
-use crate::tree_gen::{
-    self, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
-    SpacedGlobalData, SubTreeMetrics, TextedGlobalData, TotalBytesGlobalData as _, WithByteRange,
-    has_final_space,
-};
-use crate::types::{HyperType, LabelStore as _};
-use crate::{filter::BloomSize, full::FullNode};
+use crate::store::nodes::legion::NodeIdentifier;
+use crate::store::nodes::legion::{dyn_builder, eq_node};
+use crate::types::HyperType;
+use crate::types::LabelStore as _;
+
+use super::TotalBytesGlobalData;
+use super::parser::Visibility;
+use super::parser::{Node as _, TreeCursor};
+use super::utils_ts::TTreeCursor;
+use super::utils_ts::make_leaf;
+use super::utils_ts::{PrePost, TNode, TsEnableTS, TsType};
+use super::zipped::Has;
+use super::{AccIndentation, Accumulator, WithByteRange};
+use super::{BasicAccumulator, SubTreeMetrics};
+use super::{BasicGlobalData, GlobalData, Spaces};
+use super::{Parents, PreResult};
+use super::{SpacedGlobalData, TextedGlobalData};
+use super::{compute_indentation, has_final_space};
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 
@@ -110,18 +120,18 @@ impl<T: Debug> Debug for Acc<T> {
     }
 }
 
-impl<T> tree_gen::WithChildren<NodeIdentifier> for Acc<T> {
+impl<T> super::WithChildren<NodeIdentifier> for Acc<T> {
     fn children(&self) -> &[NodeIdentifier] {
         &self.simple.children
     }
 }
 
-impl<'acc, T> tree_gen::WithLabel for &'acc Acc<T> {
+impl<'acc, T> super::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
 impl<'store, 'cache, TS: TsEnableTS>
-    TsTreeGen<'store, 'cache, TS, tree_gen::NoOpMore<TS, Acc<TS::Ty2>>, true>
+    TsTreeGen<'store, 'cache, TS, super::NoOpMore<TS, Acc<TS::Ty2>>, true>
 where
     TS::Ty2: TsType,
 {
@@ -152,15 +162,15 @@ impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
 
 pub trait ZippedTreeGen: TreeGen
 where
-    Self::Global: tree_gen::TotalBytesGlobalData,
+    Self::Global: TotalBytesGlobalData,
 {
     // # results
     // type Node1;
     type Stores;
     // # source
     type Text: ?Sized;
-    type Node<'a>: tree_gen::parser::Node;
-    type TreeCursor<'a>: tree_gen::parser::TreeCursor<N = Self::Node<'a>>;
+    type Node<'a>: super::parser::Node;
+    type TreeCursor<'a>: super::parser::TreeCursor<N = Self::Node<'a>>;
 
     fn init_val(&mut self, text: &Self::Text, node: &Self::Node<'_>) -> Self::Acc;
 
@@ -170,7 +180,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         PreResult::Ok(self.pre(text, &cursor.node(), stack, global))
     }
 
@@ -180,22 +190,18 @@ where
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc;
+    ) -> Self::Acc;
 
-    fn acc(
-        &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
-        full_node: <<Self as TreeGen>::Acc as Accumulator>::Node,
-    ) {
+    fn acc(&mut self, parent: &mut Self::Acc, full_node: <Self::Acc as Accumulator>::Node) {
         parent.push(full_node);
     }
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &Self::Text,
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 
     fn stores(&mut self) -> &mut Self::Stores;
@@ -213,7 +219,7 @@ impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS,
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     type Stores = SimpleStores<TS>;
     type Text = [u8];
@@ -272,7 +278,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
@@ -307,7 +313,7 @@ where
         node: &Self::Node<'_>,
         _stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         // println!(
         //     "`{}`",
         //     from_utf8(&text[node.start_byte()..node.end_byte()]).unwrap()
@@ -334,10 +340,10 @@ where
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
@@ -363,7 +369,7 @@ impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More,
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     fn make_spacing(&mut self, spacing: Vec<u8>) -> Local<TS::Ty2> {
         let kind = TS::Ty2::spaces();
@@ -375,7 +381,7 @@ where
         let node_store = &mut self.stores.node_store.inner;
         let label_store = &mut self.stores.label_store;
         let line_break = &self.line_break;
-        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+        let (compressed_node, metrics) = super::utils_ts::make_leaf::<TS>(
             node_store,
             label_store,
             dedup,
@@ -444,7 +450,7 @@ where
         global.down();
         match self.pre_skippable(text, cursor, stack, global) {
             PreResult::Skip => {
-                stack.push(tree_gen::P::BothHidden);
+                stack.push(super::P::BothHidden);
                 *has = Has::Up;
                 global.up();
             }
@@ -452,7 +458,7 @@ where
             PreResult::SkipChildren(_) => todo!(),
             PreResult::Ok(acc) => {
                 global.set_sum_byte_length(acc.begin_byte());
-                stack.push(tree_gen::P::Visible(acc))
+                stack.push(super::P::Visible(acc))
             }
         }
     }
@@ -464,6 +470,7 @@ where
         text: &[u8],
     ) {
         let acc = stack.pop().unwrap();
+        use super::P;
         let acc = match acc {
             P::ManualyHidden => todo!(),
             P::BothHidden => return,
@@ -530,7 +537,7 @@ pub trait TreeGen {
     fn make(
         &mut self,
         global: &mut Self::Global,
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 }
@@ -540,14 +547,14 @@ impl<'stores, TS, More, const HIDDEN_NODES: bool> TreeGen
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     type Acc = Acc<TS::Ty2>;
     type Global = SpacedGlobalData<'stores>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;
@@ -577,7 +584,7 @@ where
             }
         } else {
             let mut metrics = metrics.map_hashs(|h| h.build());
-            let own_line_count = tree_gen::newline_count(&label);
+            let own_line_count = super::newline_count(&label);
             metrics.line_count += own_line_count;
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
             let bytes_len = compo::BytesLen(byte_len);

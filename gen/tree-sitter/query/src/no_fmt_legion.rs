@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use num::ToPrimitive;
 
-use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
@@ -148,7 +148,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
@@ -173,7 +173,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
         node: &Self::Node<'_>,
         _stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let kind = TS::obtain_type(node);
         Acc {
             labeled: node.has_label(),
@@ -190,10 +190,10 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
 
     fn post(
         &mut self,
-        _parent: &mut <Self as TreeGen>::Acc,
+        _parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let label = if acc.labeled {
             std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
@@ -249,8 +249,8 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
     type Global = SpacedGlobalData<'stores>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let node_store = &mut self.stores.node_store;
@@ -289,7 +289,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
 {
     pub fn build_then_insert(
         &mut self,
-        _i: <hashed::HashedNode as hyperast::types::Stored>::TreeId,
+        _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
         t: Type,
         l: Option<LabelIdentifier>,
         cs: Vec<NodeIdentifier>,
@@ -329,7 +329,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
     /// Only take self as shared ref and check if the would be created node would already exist
     pub fn try_build(
         stores: &'stores SimpleStores<TS>,
-        _i: <hashed::HashedNode as hyperast::types::Stored>::TreeId,
+        _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
         t: Type,
         l: Option<LabelIdentifier>,
         cs: Vec<NodeIdentifier>,
@@ -353,7 +353,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
     fn insert_new_subtree(
         acc: Acc,
         interned_kind: <TS as hyperast::types::TypeStore>::Ty,
-        metrics: SubTreeMetrics<hashed::HashesBuilder<SyntaxNodeHashs<u32>>>,
+        metrics: SubTreeMetrics<hyperast::hashed::HashesBuilder<SyntaxNodeHashs<u32>>>,
         label_id: Option<hyperast::store::labels::DefaultLabelIdentifier>,
         insertion: hyperast::store::nodes::legion::PendingInsert<'_>,
         byte_len: compo::BytesLen,

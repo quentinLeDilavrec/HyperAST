@@ -5,6 +5,7 @@ use super::TotalBytesGlobalData;
 use super::TreeGen;
 use super::parser;
 use super::parser::Visibility;
+use super::utils_ts::PrePost2;
 
 use super::GlobalData as _;
 use super::WithByteRange as _;
@@ -39,7 +40,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         PreResult::Ok(self.pre(text, &cursor.node(), stack, global))
     }
 
@@ -50,23 +51,19 @@ where
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc;
+    ) -> Self::Acc;
 
-    fn acc(
-        &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
-        full_node: <<Self as TreeGen>::Acc as Accumulator>::Node,
-    ) {
+    fn acc(&mut self, parent: &mut Self::Acc, full_node: <Self::Acc as Accumulator>::Node) {
         parent.push(full_node);
     }
 
     /// Called when going up
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &Self::Text,
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 
     fn stores(&mut self) -> &mut Self::Stores;
@@ -78,7 +75,7 @@ where
         cursor: &mut Self::TreeCursor<'_>,
         global: &mut Self::Global,
     ) {
-        let mut pre_post = super::utils_ts::PrePost2::new(cursor.clone());
+        let mut pre_post = PrePost2::new(cursor.clone());
         let mut state = ZippedTreeGenAux {
             tree_gen: self,
             text,
@@ -132,7 +129,7 @@ pub enum PreResult<Acc> {
 
 pub fn gen_while<Slf: ZippedTreeGen + ?Sized>(
     state: &mut ZippedTreeGenAux<'_, Slf>,
-    mut pre_post: super::utils_ts::PrePost2<Slf::TreeCursor<'_>>,
+    mut pre_post: PrePost2<Slf::TreeCursor<'_>>,
 ) where
     Slf::Global: TotalBytesGlobalData,
 {
@@ -154,7 +151,7 @@ pub fn gen_while<Slf: ZippedTreeGen + ?Sized>(
 
 fn gen_next<Slf: ZippedTreeGen + ?Sized>(
     state: &mut ZippedTreeGenAux<'_, Slf>,
-    pre_post: &mut super::utils_ts::PrePost2<Slf::TreeCursor<'_>>,
+    pre_post: &mut PrePost2<Slf::TreeCursor<'_>>,
 ) -> Option<()>
 where
     Slf::Global: TotalBytesGlobalData,
@@ -337,7 +334,7 @@ where
     Slf::Global: TotalBytesGlobalData,
 {
     pub aux: &'a mut ZippedTreeGenAux<'a, Slf>,
-    pub pre_post: super::utils_ts::PrePost2<Slf::TreeCursor<'b>>,
+    pub pre_post: PrePost2<Slf::TreeCursor<'b>>,
 }
 
 impl<'a, 'b, Slf: ZippedTreeGen + ?Sized> ZippedTreeGenIt<'a, 'b, Slf>
@@ -346,7 +343,7 @@ where
 {
     pub fn new(
         aux: &'a mut ZippedTreeGenAux<'a, Slf>,
-        pre_post: super::utils_ts::PrePost2<Slf::TreeCursor<'b>>,
+        pre_post: PrePost2<Slf::TreeCursor<'b>>,
     ) -> Self {
         Self { aux, pre_post }
     }

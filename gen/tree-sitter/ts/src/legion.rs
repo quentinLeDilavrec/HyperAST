@@ -1,5 +1,6 @@
 //! fully compress all subtrees from a typescript CST
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use hyperast::full::FullNode;
 use hyperast::hashed::SyntaxNodeHashs;
@@ -9,12 +10,14 @@ use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
-use hyperast::tree_gen::parser::{Node, TreeCursor};
+use hyperast::tree_gen;
+use hyperast::tree_gen::BasicGlobalData;
+use hyperast::tree_gen::GlobalData as _;
+use hyperast::tree_gen::parser::Node as _;
+use hyperast::tree_gen::parser::TreeCursor;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
-use hyperast::tree_gen::{self, BasicGlobalData};
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
 use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
-use hyperast::tree_gen::{GlobalData as _, Spaces};
 use hyperast::tree_gen::{Parents, PreResult};
 use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
@@ -78,7 +81,7 @@ pub struct Acc {
     end_byte: usize,
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
     padding_start: usize,
-    indentation: Spaces,
+    indentation: tree_gen::Spaces,
 }
 
 pub type FNode = FullNode<BasicGlobalData, Local>;
@@ -90,7 +93,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation(&self) -> &Spaces {
+    fn indentation(&self) -> &tree_gen::Spaces {
         &self.indentation
     }
 }
@@ -165,7 +168,7 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> hyperast::tree_gen::PreResult<<Self as TreeGen>::Acc> {
+    ) -> hyperast::tree_gen::PreResult<Self::Acc> {
         let node = cursor.node();
         if node.0.is_missing() {
             return PreResult::Skip;
@@ -183,7 +186,7 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         let indent = compute_indentation(
@@ -210,10 +213,10 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(
             acc.padding_start,
@@ -345,8 +348,8 @@ impl<'stores, 'cache, TS: TsEnabledTypeStore> TreeGen for TsTreeGen<'stores, 'ca
     type Global = SpacedGlobalData<'stores>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let node_store = &mut self.stores.node_store;

@@ -1,26 +1,37 @@
 //! fully compress all subtrees
 #![allow(unused)]
 use num::ToPrimitive as _;
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
-use crate::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use crate::compat::HashMap;
+use crate::full::FullNode;
+use crate::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use crate::nodes::Space;
 use crate::store::SimpleStores;
 use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
-use crate::store::nodes::legion::{NodeIdentifier, eq_node};
-use crate::store::nodes::legion::{RawHAST, dyn_builder, subtree_builder};
-use crate::tree_gen::parser::{Node as _, TreeCursor};
-use crate::tree_gen::{self, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries};
-use crate::tree_gen::{
-    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
-    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-};
-use crate::types::{self, HyperType};
-use crate::types::{LabelStore as _, Role};
-use crate::{filter::BloomSize, full::FullNode, nodes::Space};
+use crate::store::nodes::legion::NodeIdentifier;
+use crate::store::nodes::legion::RawHAST;
+use crate::store::nodes::legion::eq_node;
+use crate::store::nodes::legion::{dyn_builder, subtree_builder};
+use crate::types::LabelStore as _;
+use crate::types::Role;
+use crate::types::{ETypeStore, HyperType};
 
-use super::utils_ts::*;
+use super::TreeGen;
+use super::parser::Node as _;
+use super::parser::TreeCursor as _;
+use super::utils_ts::TNode;
+use super::utils_ts::TTreeCursor;
+use super::utils_ts::make_leaf;
+use super::{AccIndentation, Accumulator, WithByteRange};
+use super::{BasicAccumulator, SubTreeMetrics};
+use super::{BasicGlobalData, GlobalData, Spaces, TotalBytesGlobalData as _};
+use super::{Parents, PreResult};
+use super::{RoleAcc, add_md_precomp_queries};
+use super::{SpacedGlobalData, TextedGlobalData};
+use super::{ZippedTreeGen, get_spacing};
+use super::{compute_indentation, has_final_space};
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 
@@ -93,7 +104,7 @@ pub struct Acc<T> {
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
     padding_start: usize,
     indentation: Spaces,
-    role: RoleAcc<crate::types::Role>,
+    role: RoleAcc<Role>,
 
     // # non ts specific
     precomp_queries: PrecompQueries,
@@ -127,7 +138,7 @@ impl<T> WithByteRange for Acc<T> {
     }
 }
 
-impl<T: HyperType + Eq + Copy + Send + Sync> types::Typed for Acc<T> {
+impl<T: HyperType + Eq + Copy + Send + Sync> crate::types::Typed for Acc<T> {
     type Type = T;
 
     fn get_type(&self) -> Self::Type {
@@ -135,13 +146,13 @@ impl<T: HyperType + Eq + Copy + Send + Sync> types::Typed for Acc<T> {
     }
 }
 
-impl<T> crate::tree_gen::WithChildren<NodeIdentifier> for Acc<T> {
+impl<T> super::WithChildren<NodeIdentifier> for Acc<T> {
     fn children(&self) -> &[NodeIdentifier] {
         &self.simple.children
     }
 }
 
-impl<T> crate::tree_gen::WithRole<Role> for Acc<T> {
+impl<T> super::WithRole<Role> for Acc<T> {
     fn role_at(&self, o: usize) -> Option<Role> {
         self.role
             .offsets
@@ -167,12 +178,12 @@ impl<T: Debug> Debug for Acc<T> {
     }
 }
 
-impl<'acc, T> tree_gen::WithLabel for &'acc Acc<T> {
+impl<'acc, T> super::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
 impl<'store, 'cache, TS: TsEnableTS>
-    TsTreeGen<'store, 'cache, TS, tree_gen::NoOpMore<TS, Acc<TS::Ty2>>, true>
+    TsTreeGen<'store, 'cache, TS, super::NoOpMore<TS, Acc<TS::Ty2>>, true>
 where
     TS::Ty2: TsType,
 {
@@ -186,11 +197,11 @@ where
     }
 }
 
-pub trait TsEnableTS: crate::types::ETypeStore
+pub trait TsEnableTS: ETypeStore
 where
     Self::Ty2: TsType,
 {
-    fn obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
+    fn obtain_type<N: super::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
 }
 
 pub trait TsType: HyperType + Copy {
@@ -202,7 +213,7 @@ impl<TS, More> TsTreeGen<'_, '_, TS, More>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
 }
 
@@ -210,7 +221,7 @@ impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS,
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     type Stores = SimpleStores<TS>;
     type Text = [u8];
@@ -256,7 +267,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
         if HIDDEN_NODES && (kind.is_hidden() || kind.is_repeat()) {
@@ -291,7 +302,7 @@ where
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         let indent = compute_indentation(
@@ -320,10 +331,10 @@ where
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(
             acc.padding_start,
@@ -354,7 +365,7 @@ impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More,
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     fn make_spacing(&mut self, spacing: Vec<u8>) -> Local<TS::Ty2> {
         let kind = TS::Ty2::spaces();
@@ -366,7 +377,7 @@ where
         let node_store = &mut self.stores.node_store.inner;
         let label_store = &mut self.stores.label_store;
         let line_break = &self.line_break;
-        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+        let (compressed_node, metrics) = make_leaf::<TS>(
             node_store,
             label_store,
             dedup,
@@ -441,14 +452,14 @@ impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     type Acc = Acc<TS::Ty2>;
     type Global = SpacedGlobalData<'store>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        mut acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        mut acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;
@@ -481,7 +492,7 @@ where
             }
         } else {
             let mut metrics = metrics.map_hashs(|h| h.build());
-            let own_line_count = tree_gen::newline_count(&label);
+            let own_line_count = super::newline_count(&label);
             metrics.line_count += own_line_count;
 
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
@@ -515,7 +526,7 @@ where
 
             if acc.simple.children.len() != acc.no_space.len() {
                 let children = acc.no_space;
-                tree_gen::add_cs_no_spaces(&mut dyn_builder, children);
+                super::add_cs_no_spaces(&mut dyn_builder, children);
             }
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
@@ -550,10 +561,9 @@ where
 // where each transmuter can own and require some fields
 // and can add derived data to subtree
 
-impl<TS: types::ETypeStore, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
+impl<TS: ETypeStore, More, const HIDDEN_NODES: bool> TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
-    More: for<'t> tree_gen::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     fn custom_dd(
         stores: RawHAST<TS>,

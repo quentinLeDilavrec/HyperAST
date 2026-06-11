@@ -37,8 +37,9 @@ use hyperast::{
     types::LabelStore as LabelStoreTrait,
 };
 use num::ToPrimitive;
+use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::{collections::HashMap, fmt::Debug, vec};
 
 use bevy_ecs::NodeStore;
 use hyperast::store::nodes::bevy_ecs;
@@ -267,7 +268,7 @@ where
         &mut self.stores
     }
 
-    fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> <Self as TreeGen>::Acc {
+    fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
         let kind = TS::obtain_type(node);
         let parent_indentation = Space::try_format_indentation(&self.line_break)
             .unwrap_or_else(|| vec![Space::Space; self.line_break.len()]);
@@ -309,7 +310,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = &cursor.node();
         let kind = TS::obtain_type(node);
         if should_get_hidden_nodes() {
@@ -352,7 +353,7 @@ where
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         assert!(
@@ -392,11 +393,7 @@ where
         }
     }
 
-    fn acc(
-        &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
-        full_node: <<Self as TreeGen>::Acc as Accumulator>::Node,
-    ) {
+    fn acc(&mut self, parent: &mut Self::Acc, full_node: <Self::Acc as Accumulator>::Node) {
         // let id = full_node.local.compressed_node;
         // let ty = parent.simple.kind;
         parent.push(full_node);
@@ -407,10 +404,10 @@ where
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(
             acc.padding_start,
@@ -750,8 +747,8 @@ where
     type Global = Global<'stores>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        mut acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        mut acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;

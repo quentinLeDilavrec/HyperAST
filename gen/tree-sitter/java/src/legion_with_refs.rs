@@ -25,7 +25,7 @@ use hyperast::tree_gen::{SpacedGlobalData, StatsGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
 use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
 use hyperast::types::LabelStore as LabelStoreTrait;
-use hyperast::types::{self, AnyType, NodeStoreExt, TypeTrait, WithHashs, WithStats};
+use hyperast::types::{AnyType, NodeStoreExt, TypeTrait, WithHashs, WithStats};
 use hyperast::types::{Role, RoleStore};
 
 use crate::TNode;
@@ -220,7 +220,7 @@ impl<Scope> WithByteRange for Acc<Scope> {
     }
 }
 
-impl types::Typed for Acc {
+impl hyperast::types::Typed for Acc {
     type Type = Type;
 
     fn get_type(&self) -> Self::Type {
@@ -288,7 +288,7 @@ pub(crate) fn should_get_hidden_nodes() -> bool {
 impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
     for JavaTreeGen<'_, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>
 where
-    TS: JavaEnabledTypeStore + 'static + types::RoleStore<Role = Role, IdF = u16>,
+    TS: JavaEnabledTypeStore + 'static + RoleStore<Role = Role, IdF = u16>,
     More: tree_gen::Prepro<SimpleStores<TS>>
         + tree_gen::PreproTSG<SimpleStores<TS>, Acc = Acc<More::Scope>>,
 {
@@ -865,7 +865,7 @@ where
     type Global = Global<'stores>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
+        global: &mut Self::Global,
         mut acc: Self::Acc,
         label: Option<String>,
     ) -> <Self::Acc as Accumulator>::Node {
@@ -1031,11 +1031,11 @@ where
     #[allow(unused)]
     fn build_then_insert(
         &mut self,
-        i: <HashedNode as types::Stored>::TreeId,
+        i: <HashedNode as hyperast::types::Stored>::TreeId,
         t: AnyType, //<HashedNode as types::Typed>::Type,
-        l: Option<<HashedNode as types::Labeled>::Label>,
-        cs: Vec<<HashedNode as types::Stored>::TreeId>,
-    ) -> <HashedNode as types::Stored>::TreeId {
+        l: Option<<HashedNode as hyperast::types::Labeled>::Label>,
+        cs: Vec<<HashedNode as hyperast::types::Stored>::TreeId>,
+    ) -> <HashedNode as hyperast::types::Stored>::TreeId {
         todo!();
         // if t.is_spaces() {
         //     //     // TODO improve ergonomics

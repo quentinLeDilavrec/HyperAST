@@ -433,6 +433,7 @@ pub trait TreeGen {
     /// Container holding data waiting to be added to the HyperAST
     /// Note: needs WithByteRange to handle hidden node properly, it allows to go back up without using the cursor. When Treesitter is "fixed" change that
     type Acc: AccIndentation + WithByteRange;
+
     /// Container holding global data used during generation.
     ///
     /// Useful for transient data needed during generation,
@@ -443,7 +444,7 @@ pub trait TreeGen {
     fn make(
         &mut self,
         global: &mut Self::Global,
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 }

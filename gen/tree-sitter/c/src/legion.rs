@@ -1,5 +1,6 @@
 //! fully compress all subtrees from a C CST
-use std::{collections::HashMap, fmt::Debug, vec};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use hyperast::full::FullNode;
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
@@ -8,16 +9,21 @@ use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::store::nodes::legion::{NodeIdentifier, eq_node};
-use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+
+use hyperast::tree_gen;
+use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::tree_gen::parser::Node as _;
+use hyperast::tree_gen::parser::TreeCursor;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
-use hyperast::tree_gen::{
-    self, NoOpMore, RoleAcc, TotalBytesGlobalData as _, add_md_precomp_queries,
-};
-use hyperast::tree_gen::{
-    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
-    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-};
+use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
+use hyperast::tree_gen::{BasicAccumulator, RoleAcc, SubTreeMetrics};
+use hyperast::tree_gen::{BasicGlobalData, NoOpMore};
+use hyperast::tree_gen::{GlobalData as _, TotalBytesGlobalData as _};
+use hyperast::tree_gen::{Parents, PreResult};
+use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
+use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
+use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+
 use hyperast::types;
 use hyperast::types::{LabelStore as _, Role};
 
@@ -91,7 +97,7 @@ pub struct Acc {
     end_byte: usize,
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
     padding_start: usize,
-    indentation: Spaces,
+    indentation: tree_gen::Spaces,
     role: RoleAcc<crate::types::Role>,
     precomp_queries: PrecompQueries,
 }
@@ -105,7 +111,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation(&self) -> &Spaces {
+    fn indentation(&self) -> &tree_gen::Spaces {
         &self.indentation
     }
 }
@@ -132,13 +138,13 @@ impl types::Typed for Acc {
     }
 }
 
-impl hyperast::tree_gen::WithChildren<NodeIdentifier> for Acc {
+impl tree_gen::WithChildren<NodeIdentifier> for Acc {
     fn children(&self) -> &[NodeIdentifier] {
         &self.simple.children
     }
 }
 
-impl hyperast::tree_gen::WithRole<Role> for Acc {
+impl tree_gen::WithRole<Role> for Acc {
     fn role_at(&self, o: usize) -> Option<Role> {
         self.role
             .offsets
@@ -149,7 +155,7 @@ impl hyperast::tree_gen::WithRole<Role> for Acc {
     }
 }
 
-impl<'acc> hyperast::tree_gen::WithLabel for &'acc Acc {
+impl<'acc> tree_gen::WithLabel for &'acc Acc {
     type L = &'acc str;
 }
 
@@ -218,7 +224,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
@@ -258,7 +264,7 @@ where
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         let indent = compute_indentation(
@@ -287,10 +293,10 @@ where
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(
             acc.padding_start,
@@ -339,7 +345,7 @@ impl<'store, 'cache, TS, More> CTreeGen<'store, 'cache, TS, More, true> {
 }
 
 pub fn tree_sitter_parse(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
-    hyperast::tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
+    tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
 }
 
 impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool>
@@ -445,14 +451,14 @@ impl<'store, 'cache, TS, More, const HIDDEN_NODES: bool> TreeGen
 where
     TS: CEnabledTypeStore<Ty2 = Type>,
     More: tree_gen::Prepro<SimpleStores<TS>> + tree_gen::More<SimpleStores<TS>, Acc = Acc>,
-    TS::Ty2: hyperast::tree_gen::utils_ts::TsType,
+    TS::Ty2: tree_gen::utils_ts::TsType,
 {
     type Acc = Acc;
     type Global = SpacedGlobalData<'store>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        mut acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        mut acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;

@@ -2,7 +2,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use hyperast::full::FullNode;
-use hyperast::hashed::{self, HashesBuilder, SyntaxNodeHashs};
+use hyperast::hashed::{HashesBuilder, SyntaxNodeHashs};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
@@ -169,7 +169,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
@@ -194,7 +194,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         let indent = compute_indentation(
@@ -221,10 +221,10 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
 
     fn post(
         &mut self,
-        parent: &mut <Self as TreeGen>::Acc,
+        parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
-        acc: <Self as TreeGen>::Acc,
+        acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(
             acc.padding_start,
@@ -349,8 +349,8 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
     type Global = SpacedGlobalData<'stores>;
     fn make(
         &mut self,
-        global: &mut <Self as TreeGen>::Global,
-        acc: <Self as TreeGen>::Acc,
+        global: &mut Self::Global,
+        acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let node_store = &mut self.stores.node_store;
@@ -408,7 +408,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
 impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
     pub fn build_then_insert(
         &mut self,
-        _i: <hashed::HashedNode as hyperast::types::Stored>::TreeId,
+        _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
         t: Type,
         l: Option<LabelIdentifier>,
         cs: Vec<NodeIdentifier>,
@@ -544,7 +544,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
     /// Only take self as shared ref and check if the would be created node would already exist
     pub fn try_build(
         stores: &'stores SimpleStores<crate::types::TStore>,
-        _i: <hashed::HashedNode as hyperast::types::Stored>::TreeId,
+        _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
         t: Type,
         l: Option<LabelIdentifier>,
         cs: Vec<NodeIdentifier>,

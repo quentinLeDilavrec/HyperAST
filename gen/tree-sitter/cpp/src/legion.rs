@@ -1,20 +1,28 @@
 //! fully compress all subtrees from a cpp CST
-use std::{collections::HashMap, fmt::Debug, vec};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
-use hyperast::store::nodes::legion::{DedupMap, subtree_builder};
-use hyperast::store::nodes::legion::{NodeIdentifier, eq_node};
-use hyperast::tree_gen::parser::{Node as _, TreeCursor};
+use hyperast::store::nodes::legion::DedupMap;
+use hyperast::store::nodes::legion::NodeIdentifier;
+use hyperast::store::nodes::legion::eq_node;
+use hyperast::store::nodes::legion::subtree_builder;
+use hyperast::tree_gen;
+use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::tree_gen::parser::Node as _;
+use hyperast::tree_gen::parser::TreeCursor;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
-use hyperast::tree_gen::{self, NoOpMore, TotalBytesGlobalData as _, add_md_precomp_queries};
-use hyperast::tree_gen::{AccIndentation, Accumulator, BasicAccumulator, RoleAcc};
-use hyperast::tree_gen::{
-    BasicGlobalData, GlobalData, Parents, PreResult, SubTreeMetrics, TextedGlobalData, TreeGen,
-    WithByteRange, ZippedTreeGen, compute_indentation,
-};
-use hyperast::tree_gen::{SpacedGlobalData, Spaces, get_spacing, has_final_space, try_get_spacing};
+use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
+use hyperast::tree_gen::{BasicAccumulator, RoleAcc, SubTreeMetrics};
+use hyperast::tree_gen::{BasicGlobalData, NoOpMore};
+use hyperast::tree_gen::{GlobalData as _, TotalBytesGlobalData as _};
+use hyperast::tree_gen::{Parents, PreResult};
+use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
+use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
+use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+
 use hyperast::types;
 use hyperast::types::{LabelStore as _, Role};
 use hyperast::{full::FullNode, nodes::Space};
@@ -130,7 +138,7 @@ pub struct Acc {
     /// children that are not spaces
     no_space: Vec<NodeIdentifier>,
     /// At some point it will be used to make deduplication formatting independent
-    indentation: Spaces,
+    indentation: tree_gen::Spaces,
     /// supports retrieval of roles
     role: RoleAcc<crate::types::Role>,
     /// aggregate of precomputed queries
@@ -151,7 +159,7 @@ impl Accumulator for Acc {
 }
 
 impl AccIndentation for Acc {
-    fn indentation(&self) -> &Spaces {
+    fn indentation(&self) -> &tree_gen::Spaces {
         &self.indentation
     }
 }
@@ -269,7 +277,7 @@ where
         cursor: &Self::TreeCursor<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> PreResult<<Self as TreeGen>::Acc> {
+    ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let Some(kind) = TS::try_obtain_type(&node) else {
             log::warn!("Failed to obtain type of cpp node");
@@ -323,7 +331,7 @@ where
         node: &Self::Node<'_>,
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
-    ) -> <Self as TreeGen>::Acc {
+    ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
         let indent = if node.start_byte() < global.sum_byte_length() {
@@ -384,7 +392,7 @@ where
         );
         if global.sum_byte_length() < acc.end_byte {
             // only create an error node if tree-sitter is skipping non-whitespaces
-            if try_get_spacing(
+            if tree_gen::try_get_spacing(
                 global.sum_byte_length(),
                 acc.end_byte,
                 text,

@@ -205,7 +205,6 @@ fn make(
     java_proc: &mut JavaProc,
 ) -> hyperast_gen_ts_java::legion_with_refs::Local {
     use hyperast::cyclomatic::Mcc;
-    use hyperast::store::nodes::legion::NodeStore;
     use hyperast::store::nodes::legion::eq_node;
     use hyperast::types::ETypeStore as _;
     use hyperast::types::LabelStore;
@@ -326,7 +325,7 @@ fn make(
     };
 
     let vacant = insertion.vacant();
-    let compressed_node = NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+    let compressed_node = vacant.insert_built(dyn_builder.build());
 
     md_cache.insert(
         compressed_node,

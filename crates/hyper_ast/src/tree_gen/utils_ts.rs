@@ -489,10 +489,7 @@ where
             dyn_builder.add(compo::LineCount(line_count));
         }
         f(&mut dyn_builder);
-        crate::store::nodes::legion::NodeStore::insert_built_after_prepare(
-            vacant,
-            dyn_builder.build(),
-        )
+        vacant.insert_built(dyn_builder.build())
     };
     let metrics = crate::tree_gen::SubTreeMetrics {
         size: 1,

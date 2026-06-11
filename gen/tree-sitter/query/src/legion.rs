@@ -6,7 +6,6 @@ use hyperast::hashed::{self, HashesBuilder, SyntaxNodeHashs};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
-use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen;
@@ -391,8 +390,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
             }
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(insertion.vacant(), dyn_builder.build());
+            let compressed_node = insertion.vacant().insert_built(dyn_builder.build());
 
             Local {
                 compressed_node,
@@ -524,8 +522,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
             }
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(insertion.vacant(), dyn_builder.build());
+            let compressed_node = insertion.vacant().insert_built(dyn_builder.build());
 
             let metrics = SubTreeMetrics {
                 size,

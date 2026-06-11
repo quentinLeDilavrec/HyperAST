@@ -274,10 +274,7 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdenti
     hashs.persist(&mut dyn_builder);
 
     let vacant = insertion.vacant();
-    let node_id = hyperast::store::nodes::legion::NodeStore::insert_built_after_prepare(
-        vacant,
-        dyn_builder.build(),
-    );
+    let node_id = vacant.insert_built(dyn_builder.build());
 
     let full_node = (node_id, MD { metrics });
     full_node

@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt::Debug, vec};
 
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
-use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::{DedupMap, subtree_builder};
 use hyperast::store::nodes::legion::{NodeIdentifier, eq_node};
@@ -744,8 +743,7 @@ where
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
 
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+            let compressed_node = vacant.insert_built(dyn_builder.build());
 
             self.md_cache.insert(
                 compressed_node,

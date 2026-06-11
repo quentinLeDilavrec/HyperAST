@@ -331,10 +331,7 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
     hashs.persist(&mut dyn_builder);
 
     let vacant = insertion.vacant();
-    let node_id = hyperast::store::nodes::legion::NodeStore::insert_built_after_prepare(
-        vacant,
-        dyn_builder.build(),
-    );
+    let node_id = vacant.insert_built(dyn_builder.build());
 
     Local {
         compressed_node: node_id,

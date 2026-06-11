@@ -747,8 +747,7 @@ where
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
 
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+            let compressed_node = vacant.insert_built(dyn_builder.build());
 
             self.md_cache.insert(compressed_node, DD { metrics });
             Local {

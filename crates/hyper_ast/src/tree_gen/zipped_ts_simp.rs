@@ -4,7 +4,6 @@ use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
 use super::{P, parser::Visibility, utils_ts::*, zipped::Has};
 use crate::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use crate::store::SimpleStores;
-use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
 use crate::store::nodes::legion::{NodeIdentifier, dyn_builder, eq_node};
 use crate::tree_gen::parser::{Node as _, TreeCursor};
@@ -771,8 +770,7 @@ where
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
 
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+            let compressed_node = vacant.insert_built(dyn_builder.build());
 
             self.md_cache.insert(compressed_node, DD { metrics });
             Local {

@@ -414,7 +414,6 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
         };
         return (id, md);
     }
-    use hyperast::store::nodes::legion::NodeStore;
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
     assert_eq!(primary.children_names.len(), primary.children.len());
@@ -438,7 +437,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
     };
 
     let vacant = insertion.vacant();
-    let node_id = NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+    let node_id = vacant.insert_built(dyn_builder.build());
 
     let status = acc.status;
 

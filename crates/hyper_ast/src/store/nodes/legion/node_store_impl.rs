@@ -53,16 +53,16 @@ impl<'a> PendingInsert<'a> {
 
     pub fn vacant(self) -> PreparedVacant<'a> {
         if let RawEntryMut::Vacant(occupied) = self.0 {
-            (occupied, self.1)
+            PreparedVacant(occupied, self.1)
         } else {
             panic!("only call this if occupied_id() returns None")
         }
     }
 }
 
-type PreparedVacant<'a> = (
-    RawVacantEntryMut<'a, legion::Entity, (), ()>,
-    (u64, &'a mut NodeStoreInner),
+pub struct PreparedVacant<'a>(
+    pub RawVacantEntryMut<'a, legion::Entity, (), ()>,
+    pub (u64, &'a mut NodeStoreInner),
 );
 
 impl NodeStoreInner {
@@ -112,7 +112,7 @@ impl NodeStore {
 
     #[inline]
     pub fn insert_after_prepare<T>(
-        (vacant, (hash, inner)): PreparedVacant<'_>,
+        PreparedVacant(vacant, (hash, inner)): PreparedVacant<'_>,
         components: T,
     ) -> legion::Entity
     where
@@ -133,7 +133,7 @@ impl NodeStore {
     /// uses the dyn builder see dyn_builder::EntityBuilder
     #[inline]
     pub fn insert_built_after_prepare(
-        (vacant, (hash, inner)): PreparedVacant,
+        PreparedVacant(vacant, (hash, inner)): PreparedVacant,
         components: dyn_builder::BuiltEntity,
     ) -> legion::Entity {
         let id = inner.internal.extend(components)[0];
@@ -225,6 +225,12 @@ impl NodeStore {
         let ty = x.get_component::<crate::types::TypeU16<L>>().ok()?;
         let ty = ty.e();
         Some(TypedNode(HashedNodeRef::new(x), ty))
+    }
+}
+
+impl<'a> PreparedVacant<'a> {
+    pub fn insert_built(self, components: dyn_builder::BuiltEntity) -> legion::Entity {
+        NodeStore::insert_built_after_prepare(self, components)
     }
 }
 

@@ -7,10 +7,7 @@ use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::subtree_builder;
-use hyperast::store::nodes::{
-    DefaultNodeStore as NodeStore,
-    legion::{NodeIdentifier, eq_node},
-};
+use hyperast::store::nodes::legion::{NodeIdentifier, eq_node};
 use hyperast::tree_gen::parser::{Node as _, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{
@@ -522,8 +519,7 @@ where
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
 
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+            let compressed_node = vacant.insert_built(dyn_builder.build());
 
             self.md_cache.insert(
                 compressed_node,

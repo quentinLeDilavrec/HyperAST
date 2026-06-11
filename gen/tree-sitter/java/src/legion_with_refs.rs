@@ -10,7 +10,6 @@ use hyperast::hashed::{SyntaxNodeHashs, SyntaxNodeHashsKinds};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::LabelIdentifier;
-use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::legion::DedupMap;
 use hyperast::store::nodes::legion::HashedNodeRef;
 use hyperast::store::nodes::legion::NodeIdentifier;
@@ -987,8 +986,7 @@ where
                 dyn_builder.add(ss);
             }
 
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+            let compressed_node = vacant.insert_built(dyn_builder.build());
 
             // TODO see if possible to only keep md in md_cache, but would need a generational cache I think
             self.md_cache.insert(
@@ -1202,8 +1200,7 @@ where
                 }
                 acc.simple
                     .add_primary(&mut dyn_builder, interned_kind, label_id);
-                let compressed_node =
-                    NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+                let compressed_node = vacant.insert_built(dyn_builder.build());
 
                 // TODO see if possible to only keep md in md_cache, but would need a generational cache I think
                 self.md_cache.insert(

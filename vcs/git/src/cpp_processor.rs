@@ -463,10 +463,7 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
     hashs.persist(&mut dyn_builder);
 
     let vacant = insertion.vacant();
-    let node_id = hyperast::store::nodes::legion::NodeStore::insert_built_after_prepare(
-        vacant,
-        dyn_builder.build(),
-    );
+    let node_id = vacant.insert_built(dyn_builder.build());
 
     md_cache.insert(
         node_id,

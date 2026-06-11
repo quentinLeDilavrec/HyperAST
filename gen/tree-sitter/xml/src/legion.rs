@@ -6,7 +6,6 @@ use hyperast::hashed::SyntaxNodeHashs;
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
-use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
@@ -381,8 +380,7 @@ impl<'stores, TS: XmlEnabledTypeStore> TreeGen for XmlTreeGen<'stores, TS> {
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
 
-            let compressed_node =
-                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+            let compressed_node = vacant.insert_built(dyn_builder.build());
 
             Local {
                 compressed_node,

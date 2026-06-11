@@ -1,9 +1,6 @@
 //! fully compress all subtrees from a tree-sitter query CST
 use std::{collections::HashMap, fmt::Debug};
 
-use hyperast::tree_gen;
-use legion::world::EntryRef;
-
 use hyperast::filter::BloomSize;
 use hyperast::full::FullNode;
 use hyperast::hashed::{self, HashesBuilder, SyntaxNodeHashs};
@@ -13,6 +10,7 @@ use hyperast::store::SimpleStores;
 use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
+use hyperast::tree_gen;
 use hyperast::tree_gen::BasicGlobalData;
 use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
@@ -277,7 +275,7 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let hsyntax = hbuilder.most_discriminating();
         let hashable = &hsyntax;
 
-        let eq = |x: EntryRef| {
+        let eq = |x: hyperast::store::nodes::legion::EntryRef| {
             let t = x.get_component::<TS::Ty>();
             if t != Ok(&interned_kind) {
                 return false;

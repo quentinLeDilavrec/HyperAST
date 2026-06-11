@@ -1,8 +1,6 @@
 //! fully compress all subtrees from an Xml CST
 use std::{fmt::Debug, vec};
 
-use legion::world::EntryRef;
-
 use hyperast::filter::BloomSize;
 use hyperast::full::FullNode;
 use hyperast::hashed;
@@ -294,7 +292,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         let hsyntax = hbuilder.most_discriminating();
         let hashable = &hsyntax;
 
-        let eq = |x: EntryRef| {
+        let eq = |x: hyperast::store::nodes::legion::EntryRef| {
             let t = x.get_component::<_>();
             if t != Ok(&interned_kind) {
                 return false;

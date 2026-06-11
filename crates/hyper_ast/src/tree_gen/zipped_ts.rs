@@ -1,6 +1,5 @@
 //! fully compress all subtrees
 #![allow(unused)]
-use legion::world::EntryRef;
 use num::ToPrimitive as _;
 use std::{collections::HashMap, fmt::Debug};
 
@@ -377,7 +376,7 @@ where
         let hsyntax = hbuilder.most_discriminating();
         let hashable = &hsyntax;
 
-        let eq = |x: EntryRef| {
+        let eq = |x: crate::store::nodes::legion::EntryRef| {
             let t = x.get_component::<TS::Ty>();
             if t != Ok(&interned_kind) {
                 return false;

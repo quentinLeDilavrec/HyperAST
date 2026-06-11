@@ -1,6 +1,6 @@
 //! fully compress all subtrees from a C CST
-use legion::world::EntryRef;
 use num::ToPrimitive as _;
+use std::{collections::HashMap, fmt::Debug, vec};
 
 use hyperast::filter::BloomSize;
 use hyperast::full::FullNode;
@@ -378,7 +378,7 @@ where
         let hsyntax = hbuilder.most_discriminating();
         let hashable = &hsyntax;
 
-        let eq = |x: EntryRef| {
+        let eq = |x: hyperast::store::nodes::legion::EntryRef| {
             let t = x.get_component::<TS::Ty>();
             if t != Ok(&interned_kind) {
                 return false;

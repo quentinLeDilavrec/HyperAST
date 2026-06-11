@@ -2,20 +2,29 @@
 use std::{fmt::Debug, vec};
 
 use legion::world::EntryRef;
-use tuples::CombinConcat;
 
-use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::filter::BloomSize;
+use hyperast::full::FullNode;
+use hyperast::hashed;
+use hyperast::hashed::SyntaxNodeHashs;
+use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
+use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
-use hyperast::store::nodes::DefaultNodeStore as NodeStore;
-use hyperast::store::nodes::compo::{self, CS, NoSpacesCS};
-use hyperast::store::nodes::legion::{NodeIdentifier, PendingInsert, eq_node};
-use hyperast::tree_gen::parser::{Node as _, TreeCursor};
-use hyperast::tree_gen::{
-    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
-    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-    ZippedTreeGen, compute_indentation, get_spacing, has_final_space,
-};
-use hyperast::{filter::BloomSize, full::FullNode, nodes::Space, types::LabelStore as _};
+use hyperast::store::nodes::compo;
+use hyperast::store::nodes::legion::NodeIdentifier;
+use hyperast::store::nodes::legion::{eq_node, subtree_builder};
+use hyperast::store::nodes::{DefaultNodeStore as NodeStore, EntityBuilder as _};
+use hyperast::tree_gen;
+use hyperast::tree_gen::Spaces;
+use hyperast::tree_gen::parser::{Node, TreeCursor};
+use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
+use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
+use hyperast::tree_gen::{BasicGlobalData, GlobalData};
+use hyperast::tree_gen::{Parents, PreResult};
+use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
+use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
+use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+use hyperast::types::LabelStore as LabelStoreTrait;
 
 use crate::TNode;
 use crate::types::{TStore, Type, XmlEnabledTypeStore};
@@ -307,24 +316,21 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
             id
         } else {
             let vacant = insertion.vacant();
-            let bytes_len = compo::BytesLen(bytes_len.try_into().unwrap());
-            NodeStore::insert_after_prepare(
-                vacant,
-                (
-                    crate::types::Lang,
-                    interned_kind,
-                    spacing_id,
-                    bytes_len,
-                    hashs,
-                    BloomSize::None,
-                ),
-            )
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
+            dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
+            dyn_builder.add(spacing_id);
+            dyn_builder.add(hashs);
+            dyn_builder.add(BloomSize::None);
+            if line_count != 0 {
+                dyn_builder.add(compo::LineCount(line_count));
+            }
+            NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
         };
         Local {
             compressed_node,
             metrics: SubTreeMetrics {
                 size: 1,
-                height: 1,
+                height: 0,
                 hashs,
                 size_no_spaces: 0,
                 line_count,
@@ -400,68 +406,57 @@ impl<'stores, TS: XmlEnabledTypeStore> TreeGen for XmlTreeGen<'stores, TS> {
         acc: <Self as TreeGen>::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
-        let interned_kind = TS::intern(acc.simple.kind);
-        let node_store = &mut self.stores.node_store;
-        let label_store = &mut self.stores.label_store;
-        let line_count = acc.metrics.line_count;
-        let hashs = acc.metrics.hashs;
-        let size = acc.metrics.size + 1;
-        let height = acc.metrics.height + 1;
-        let size_no_spaces = acc.metrics.size_no_spaces + 1;
-        let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
-        let hsyntax = hbuilder.most_discriminating();
-        let hashable = &hsyntax;
+        let stores = &mut self.stores;
+        let kind = acc.simple.kind;
+        let interned_kind = TS::intern(kind);
+        let metrics = acc.metrics.finalize(&interned_kind, &label, 0);
 
-        let label_id = label
-            .as_ref()
-            .map(|label| label_store.get_or_insert(label.as_str()));
+        let hashable = &metrics.hashs.most_discriminating();
+
+        let label_id = label.as_ref().map(|label| {
+            // Some notable type can contain very different labels,
+            // they might benefit from a particular storing (like a blob storage, even using git's object database )
+            // eg. acc.simple.kind == Type::Comment and acc.simple.kind.is_literal()
+            stores.label_store.get_or_insert(label.as_str())
+        });
         let eq = eq_node(&interned_kind, label_id.as_ref(), &acc.simple.children);
 
-        let insertion = node_store.prepare_insertion(&hashable, eq);
+        let node_store = &mut stores.node_store;
 
-        // let ana = None as Option<PartialAnalysis>;
-
-        // let ana = match ana {
-        //     Some(ana) => Some(ana), // TODO partial ana resolution such as deps in pom.xml
-        //     None => None,
-        // };
+        let insertion = node_store.prepare_insertion(hashable, eq);
 
         let local = if let Some(compressed_node) = insertion.occupied_id() {
-            let hashs = hbuilder.build();
-            let metrics = SubTreeMetrics {
-                size,
-                height,
-                hashs,
-                size_no_spaces,
-                line_count,
-            };
+            let metrics = metrics.map_hashs(|h| h.build());
             Local {
                 compressed_node,
                 metrics,
             }
         } else {
-            let hashs = hbuilder.build();
-            let bytes_len = compo::BytesLen((acc.end_byte - acc.start_byte).try_into().unwrap());
-            let compressed_node = compress(
-                label_id,
-                interned_kind,
-                acc.simple,
-                acc.no_space,
-                bytes_len,
-                size,
-                height,
-                size_no_spaces,
-                insertion,
-                hashs,
-            );
+            let mut metrics = metrics.map_hashs(|h| h.build());
 
-            let metrics = SubTreeMetrics {
-                size,
-                height,
-                hashs,
-                size_no_spaces,
-                line_count,
-            };
+            let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
+            let bytes_len = compo::BytesLen(byte_len);
+            let children_is_empty = acc.simple.children.is_empty();
+
+            let vacant = insertion.vacant();
+
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
+            dyn_builder.add(bytes_len);
+
+            let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
+            hashs.persist(&mut dyn_builder);
+
+            if acc.simple.children.len() != acc.no_space.len() {
+                let children = acc.no_space;
+                tree_gen::add_cs_no_spaces(&mut dyn_builder, children);
+            }
+
+            acc.simple
+                .add_primary(&mut dyn_builder, interned_kind, label_id);
+
+            let compressed_node =
+                NodeStore::insert_built_after_prepare(vacant, dyn_builder.build());
+
             Local {
                 compressed_node,
                 metrics,
@@ -474,173 +469,3 @@ impl<'stores, TS: XmlEnabledTypeStore> TreeGen for XmlTreeGen<'stores, TS> {
         }
     }
 }
-
-fn compress<Ty: std::marker::Send + std::marker::Sync + 'static>(
-    label_id: Option<LabelIdentifier>,
-    interned_kind: Ty,
-    simple: BasicAccumulator<Type, NodeIdentifier>,
-    no_space: Vec<NodeIdentifier>,
-    bytes_len: compo::BytesLen,
-    size: u32,
-    height: u32,
-    size_no_spaces: u32,
-    insertion: PendingInsert,
-    hashs: SyntaxNodeHashs<u32>,
-) -> legion::Entity {
-    let vacant = insertion.vacant();
-    macro_rules! insert {
-        ( $c0:expr, $($c:expr),* $(,)? ) => {{
-            let c = $c0;
-            $(
-                let c = c.concat($c);
-            )*
-            NodeStore::insert_after_prepare(vacant, c)
-        }};
-    }
-    macro_rules! children_dipatch {
-        ( $c0:expr, $($c:expr),* $(,)? ) => {{
-            let c = $c0;
-            $(
-                let c = c.concat($c);
-            )*
-            match simple.children.len() {
-                0 => {
-                    assert_eq!(1, size);
-                    assert_eq!(1, height);
-                    insert!(
-                        c,
-                        (BloomSize::None,)
-                    )
-                }
-                1 => {
-                    let a = [simple.children[0]];
-                    let c = c.concat((compo::Size(size), compo::SizeNoSpaces(size_no_spaces), compo::Height(height), ));
-                    let c = c.concat((compo::CS0(a),));
-                    if 1 == no_space.len() {
-                        insert!(c,)
-                    } else {
-                        let b = no_space.into_boxed_slice();
-                        insert!(c, (NoSpacesCS(b),))
-                    }
-                }
-                2 => {
-                    let a = [simple.children[0], simple.children[1]];
-                    let c = c.concat((compo::Size(size), compo::SizeNoSpaces(size_no_spaces), compo::Height(height), ));
-                    let c = c.concat((compo::CS0(a),));
-                    if 2 == no_space.len() {
-                        insert!(c,)
-                    } else {
-                        let b = no_space.into_boxed_slice();
-                        insert!(c, (NoSpacesCS(b),))
-                    }
-                }
-                x => {
-                    let a = simple.children.into_boxed_slice();
-                    let c = c.concat((compo::Size(size), compo::SizeNoSpaces(size_no_spaces), compo::Height(height), ));
-                    let c = c.concat((CS(a),));
-                    if x == no_space.len() {
-                        insert!(c,)
-                    } else {
-                        let b = no_space.into_boxed_slice();
-                        insert!(c, (NoSpacesCS(b),))
-                    }
-                }
-            }}
-        };
-    }
-    let base = (crate::types::Lang, interned_kind, hashs, bytes_len);
-    match (label_id, 0) {
-        (None, _) => children_dipatch!(base,),
-        (Some(label), _) => children_dipatch!(base, (label,),),
-    }
-}
-
-// pub fn print_tree_ids(node_store: &NodeStore, id: &NodeIdentifier) {
-//     nodes::print_tree_ids(
-//         |id| -> _ {
-//             node_store
-//                 .resolve(id.clone())
-//                 .into_compressed_node()
-//                 .unwrap()
-//         },
-//         id,
-//     )
-// }
-
-// pub fn print_tree_structure(node_store: &NodeStore, id: &NodeIdentifier) {
-//     nodes::print_tree_structure(
-//         |id| -> _ {
-//             node_store
-//                 .resolve(id.clone())
-//                 .into_compressed_node()
-//                 .unwrap()
-//         },
-//         id,
-//     )
-// }
-
-// pub fn print_tree_labels(node_store: &NodeStore, label_store: &LabelStore, id: &NodeIdentifier) {
-//     nodes::print_tree_labels(
-//         |id| -> _ {
-//             node_store
-//                 .resolve(id.clone())
-//                 .into_compressed_node()
-//                 .unwrap()
-//         },
-//         |id| -> _ { label_store.resolve(id).to_owned() },
-//         id,
-//     )
-// }
-
-// pub fn print_tree_syntax(node_store: &NodeStore, label_store: &LabelStore, id: &NodeIdentifier) {
-//     nodes::print_tree_syntax(
-//         |id| -> _ {
-//             node_store
-//                 .resolve(id.clone())
-//                 .into_compressed_node()
-//                 .unwrap()
-//         },
-//         |id| -> _ { label_store.resolve(id).to_owned() },
-//         id,
-//         &mut Into::<IoOut<_>>::into(stdout()),
-//     )
-// }
-
-// pub fn print_tree_syntax_with_ids(
-//     node_store: &NodeStore,
-//     label_store: &LabelStore,
-//     id: &NodeIdentifier,
-// ) {
-//     nodes::print_tree_syntax_with_ids(
-//         |id| -> _ {
-//             node_store
-//                 .resolve(id.clone())
-//                 .into_compressed_node()
-//                 .unwrap()
-//         },
-//         |id| -> _ { label_store.resolve(id).to_owned() },
-//         id,
-//         &mut Into::<IoOut<_>>::into(stdout()),
-//     )
-// }
-
-// pub fn serialize<W: std::fmt::Write>(
-//     node_store: &NodeStore,
-//     label_store: &LabelStore,
-//     id: &NodeIdentifier,
-//     out: &mut W,
-//     parent_indent: &str,
-// ) -> Option<String> {
-//     nodes::serialize(
-//         |id| -> _ {
-//             node_store
-//                 .resolve(id.clone())
-//                 .into_compressed_node()
-//                 .unwrap()
-//         },
-//         |id| -> _ { label_store.resolve(id).to_owned() },
-//         id,
-//         out,
-//         parent_indent,
-//     )
-// }

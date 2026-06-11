@@ -4295,7 +4295,6 @@ dependencies = [
  "tikv-jemalloc-ctl",
  "tikv-jemallocator",
  "tree-sitter",
- "tuples",
 ]
 
 [[package]]
@@ -4349,7 +4348,6 @@ dependencies = [
  "sha2",
  "tikv-jemallocator",
  "tree-sitter",
- "tuples",
 ]
 
 [[package]]
@@ -4358,7 +4356,6 @@ version = "0.5.0"
 dependencies = [
  "bitvec",
  "cfg-if",
- "enumset",
  "env_logger 0.11.5",
  "hashbrown 0.14.5",
  "hyperast",
@@ -4370,7 +4367,6 @@ dependencies = [
  "serde",
  "tree-sitter",
  "tree-sitter-c",
- "tuples",
 ]
 
 [[package]]
@@ -4379,7 +4375,6 @@ version = "0.5.0"
 dependencies = [
  "bitvec",
  "cfg-if",
- "enumset",
  "env_logger 0.11.5",
  "hashbrown 0.14.5",
  "hyperast",
@@ -4394,7 +4389,6 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-cpp 0.23.1",
  "tree-sitter-cpp 0.23.4",
- "tuples",
 ]
 
 [[package]]
@@ -4432,7 +4426,6 @@ version = "0.5.0"
 dependencies = [
  "bitvec",
  "cfg-if",
- "enumset",
  "env_logger 0.11.5",
  "hashbrown 0.14.5",
  "hyperast",
@@ -4444,7 +4437,6 @@ dependencies = [
  "serde",
  "tree-sitter",
  "tree-sitter-typescript",
- "tuples",
 ]
 
 [[package]]
@@ -4472,7 +4464,6 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-java 0.23.5",
  "tree-sitter-query",
- "tuples",
 ]
 
 [[package]]
@@ -4488,7 +4479,6 @@ dependencies = [
  "pretty_assertions",
  "tree-sitter",
  "tree-sitter-xml",
- "tuples",
 ]
 
 [[package]]
@@ -4526,7 +4516,6 @@ dependencies = [
  "serde",
  "tree-sitter",
  "tree-sitter-graph",
- "tuples",
  "vec_extract_if_polyfill",
 ]
 

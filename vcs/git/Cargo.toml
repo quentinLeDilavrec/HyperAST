@@ -16,7 +16,6 @@ hyperast = { workspace = true }
 hyperast_tsquery = { workspace = true }
 log = { version = "0.4.6" }
 num = "0.4.0"
-tuples = "=1.4.1"
 
 enumset = "1.0.12"
 

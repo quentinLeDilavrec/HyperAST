@@ -62,9 +62,10 @@ async fn main() {
             repos.register_config(x.repo.clone(), x.config);
         })
     }
-    let app = Router::new()
-        .fallback(fallback)
-        .route("/ws", axum::routing::get(backend::ws_handler))
+    let app = Router::new().fallback(fallback);
+    #[cfg(feature = "collab")]
+    let app = app.route("/ws", axum::routing::get(backend::ws_handler));
+    let app = app
         .merge(kv_store_app(Arc::clone(&shared_state)))
         .merge(scripting_app(Arc::clone(&shared_state)))
         .merge(querying_app(Arc::clone(&shared_state)))

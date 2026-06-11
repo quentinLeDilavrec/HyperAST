@@ -540,8 +540,10 @@ pub(crate) trait WithDesc<T> {
     fn desc(&self) -> &T;
 }
 
-#[derive(
-    serde::Deserialize, serde::Serialize, autosurgeon::Hydrate, autosurgeon::Reconcile, Clone, Debug,
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[cfg_attr(
+    feature = "collab",
+    derive(autosurgeon::Hydrate, autosurgeon::Reconcile)
 )]
 #[serde(default)]
 pub(crate) struct CodeEditors<T = code_editor::CodeEditor<Languages>> {
@@ -551,8 +553,10 @@ pub(crate) struct CodeEditors<T = code_editor::CodeEditor<Languages>> {
     pub(crate) accumulate: T,
 }
 
-#[derive(
-    serde::Deserialize, serde::Serialize, autosurgeon::Hydrate, autosurgeon::Reconcile, Clone, Debug,
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[cfg_attr(
+    feature = "collab",
+    derive(autosurgeon::Hydrate, autosurgeon::Reconcile)
 )]
 #[serde(default)]
 pub(crate) struct QueryEditor<T = code_editor::CodeEditor<Languages>> {
@@ -565,8 +569,10 @@ pub trait EditorHolder {
     fn iter_editors_mut(&mut self) -> impl Iterator<Item = &mut Self::Item>;
 }
 
-#[derive(
-    serde::Deserialize, serde::Serialize, autosurgeon::Hydrate, autosurgeon::Reconcile, Clone, Debug,
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[cfg_attr(
+    feature = "collab",
+    derive(autosurgeon::Hydrate, autosurgeon::Reconcile)
 )]
 #[serde(default)]
 pub(crate) struct TsgEditor<T = code_editor::CodeEditor<Languages>> {

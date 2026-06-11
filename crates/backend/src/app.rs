@@ -84,7 +84,7 @@ pub fn scripting_app(_st: SharedState) -> Router<SharedState> {
         // .request_body_limit(1024 * 5_000 /* ~5mb */)
         .timeout(Duration::from_secs(10))
         .layer(TraceLayer::new_for_http());
-    Router::new()
+    let router = Router::new()
         .route(
             "/script/github/:user/:name/:commit",
             post(scripting).layer(scripting_service_config.clone()),
@@ -92,12 +92,15 @@ pub fn scripting_app(_st: SharedState) -> Router<SharedState> {
         .route(
             "/script-depth/github/:user/:name/:commit",
             post(scripting_depth).layer(scripting_service_config.clone()),
-        )
+        );
+    #[cfg(feature = "collab")]
+    let router = router
         .route("/sharing-scripts/shared-db", get(crate::ws::connect_db))
         .route(
             "/sharing-scripts/shared/:session",
             get(crate::ws::connect_doc),
-        )
+        );
+    router
     // .route(
     //     "/script/gitlab/:user/:name/:commit",
     //     post(scripting).layer(scripting_service_config),
@@ -180,7 +183,7 @@ pub fn querying_app(_st: SharedState) -> Router<SharedState> {
         // .request_body_limit(1024 * 5_000 /* ~5mb */)
         .timeout(Duration::from_secs(10))
         .layer(TraceLayer::new_for_http());
-    Router::new()
+    let router = Router::new()
         .route(
             "/query/github/:user/:name/*commit",
             post(querying).layer(querying_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
@@ -192,7 +195,9 @@ pub fn querying_app(_st: SharedState) -> Router<SharedState> {
         .route(
             "/query-differential/github/:user/:name/:commit/:baseline",
             post(querying_differential).layer(querying_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
-        )
+        );
+    #[cfg(feature = "collab")]
+    let router = router
         .route(
             "/sharing-queries/shared-db",
             get(crate::ws::connect_db), // .with_state(Arc::clone(&shared_state)),
@@ -200,7 +205,8 @@ pub fn querying_app(_st: SharedState) -> Router<SharedState> {
         .route(
             "/sharing-queries/shared/:session",
             get(crate::ws::connect_doc), // .with_state(Arc::clone(&shared_state)),
-        )
+        );
+    router
 }
 
 #[cfg(not(feature = "tsg"))]
@@ -230,11 +236,12 @@ pub fn tsg_app(_st: SharedState) -> Router<SharedState> {
         // .request_body_limit(1024 * 5_000 /* ~5mb */)
         .timeout(Duration::from_secs(10))
         .layer(TraceLayer::new_for_http());
-    Router::new()
-        .route(
-            "/tsg/github/:user/:name/:commit",
-            post(tsg).layer(tsg_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
-        )
+    let router = Router::new().route(
+        "/tsg/github/:user/:name/:commit",
+        post(tsg).layer(tsg_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
+    );
+    #[cfg(feature = "collab")]
+    let router = router
         .route(
             "/sharing-tsg/shared-db",
             get(crate::ws::connect_db), // .with_state(Arc::clone(&shared_state)),
@@ -242,7 +249,8 @@ pub fn tsg_app(_st: SharedState) -> Router<SharedState> {
         .route(
             "/sharing-tsg/shared/:session",
             get(crate::ws::connect_doc), // .with_state(Arc::clone(&shared_state)),
-        )
+        );
+    router
 }
 
 async fn smells(
@@ -477,7 +485,7 @@ impl IntoResponse for fetch::FetchedNodes {
     fn into_response(self) -> Response {
         let to_string = serde_json::to_string(&self);
         let var_name = to_string.unwrap();
-        
+
         // let resp = Json(self).into_response();
         var_name.into_response()
     }

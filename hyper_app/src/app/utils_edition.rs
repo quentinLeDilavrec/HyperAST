@@ -1,12 +1,22 @@
-use super::code_editor_automerge;
-use super::utils_results_batched::{ComputeError, ComputeResultsProm, show_short_result};
-use super::{Sharing, crdt_over_ws, types::WithDesc};
-use automerge::sync::{Message, SyncDoc};
-use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
-use std::ops::DerefMut;
-use std::sync::{Arc, Mutex, RwLock};
 
+use super::types::WithDesc;
+use super::utils_results_batched::{ComputeError, ComputeResultsProm, show_short_result};
+
+#[cfg(feature = "collab")]
+use super::code_editor_automerge;
+#[cfg(feature = "collab")]
+use super::crdt_over_ws;
+#[cfg(feature = "collab")]
+use automerge::sync::{Message, SyncDoc};
+#[cfg(feature = "collab")]
+use futures_util::SinkExt;
+#[cfg(feature = "collab")]
+use std::ops::DerefMut;
+#[cfg(feature = "collab")]
+use std::sync::{Arc, Mutex};
+
+#[cfg(feature = "collab")]
 type SharedCodeEditors<T> = std::sync::Arc<std::sync::Mutex<T>>;
 
 // TODO allow to change user name and generate a random default
@@ -28,19 +38,23 @@ impl<L, S> EditingContext<L, S> {
     pub(crate) fn map<R>(
         &mut self,
         f: impl Fn(&mut L) -> R,
-        g: impl Fn(&mut Arc<std::sync::Mutex<S>>) -> R,
+        #[cfg(feature = "collab")] g: impl Fn(&mut Arc<std::sync::Mutex<S>>) -> R,
     ) -> R {
         match &mut self.current {
+            EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
+                f(content)
+            } // ScriptContent::new(content, single),
+            #[cfg(feature = "collab")]
             EditStatus::Shared(_, shared) | EditStatus::Sharing(shared) => {
                 // let mut code_editors = shared.lock().unwrap();
                 g(shared)
                 // ScriptContent::new(&mut code_editors, single)
             }
-            EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
-                f(content)
-            } // ScriptContent::new(content, single),
+            #[cfg(not(feature = "collab"))]
+            EditStatus::Shared(_) => unreachable!(),
         }
     }
+    #[cfg(feature = "collab")]
     pub(crate) fn when_shared<R>(
         &mut self,
         mut g: impl FnMut(&mut Arc<std::sync::Mutex<S>>) -> R,
@@ -61,12 +75,24 @@ impl<L, S> EditingContext<L, S> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub(crate) enum EditStatus<L, S> {
-    Sharing(Arc<std::sync::Mutex<S>>),       //(Id)
+pub(crate) enum EditStatus<L, S = ()> {
+    #[cfg(feature = "collab")]
+    Sharing(Arc<std::sync::Mutex<S>>), //(Id)
+    #[cfg(feature = "collab")]
     Shared(usize, Arc<std::sync::Mutex<S>>), //(Id)
-    Local { name: String, content: L },
-    Example { i: usize, content: L },
+    #[cfg(not(feature = "collab"))]
+    #[serde(skip)]
+    Shared(std::marker::PhantomData<S>),
+    Local {
+        name: String,
+        content: L,
+    },
+    Example {
+        i: usize,
+        content: L,
+    },
 }
+
 impl<L: Default, S> Default for EditStatus<L, S> {
     fn default() -> Self {
         Self::Example {
@@ -76,10 +102,11 @@ impl<L: Default, S> Default for EditStatus<L, S> {
     }
 }
 
+#[cfg(feature = "collab")]
 pub(crate) fn show_shared_code_edition<T, U>(
     ui: &mut egui::Ui,
     query_editors: &mut SharedCodeEditors<T>,
-    single: &mut Sharing<U>,
+    single: &mut super::Sharing<U>,
 ) where
     T: autosurgeon::Reconcile,
     T: super::types::EditorHolder<Item = code_editor_automerge::CodeEditor>,
@@ -111,6 +138,7 @@ pub(crate) fn show_shared_code_edition<T, U>(
     }
 }
 
+#[cfg(feature = "collab")]
 fn timed_updater<T: autosurgeon::Reconcile>(
     ui: &mut egui::Ui,
     timer: f32,
@@ -130,6 +158,7 @@ fn timed_updater<T: autosurgeon::Reconcile>(
     }
 }
 
+#[cfg(feature = "collab")]
 pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
     mut receiver: futures_util::stream::SplitStream<tokio_tungstenite_wasm::WebSocketStream>,
     mut sender: futures::channel::mpsc::Sender<tokio_tungstenite_wasm::Message>,
@@ -218,13 +247,15 @@ pub(super) async fn update_handler<T: autosurgeon::Hydrate>(
         }
     }
 }
+#[cfg(feature = "collab")]
 type SparseVecSharedDoc = Vec<Option<crdt_over_ws::SharedDocView>>;
+#[cfg(feature = "collab")]
 pub(super) async fn db_update_handler(
     mut sender: futures::channel::mpsc::Sender<tokio_tungstenite_wasm::Message>,
     mut receiver: futures_util::stream::SplitStream<tokio_tungstenite_wasm::WebSocketStream>,
     owner: String,
     ctx: egui::Context,
-    data: Arc<RwLock<(Option<usize>, SparseVecSharedDoc)>>,
+    data: Arc<std::sync::RwLock<(Option<usize>, SparseVecSharedDoc)>>,
 ) {
     use futures_util::StreamExt;
     type User = String;
@@ -300,9 +331,10 @@ pub(super) async fn db_update_handler(
     }
 }
 
+#[cfg(feature = "collab")]
 pub(super) fn update_shared_editors<T, L, S: 'static + autosurgeon::Hydrate + std::marker::Send>(
     ui: &mut egui::Ui,
-    single: &mut Sharing<T>,
+    single: &mut super::Sharing<T>,
     api_endpoint: &str,
     code_editors: &mut EditingContext<L, S>,
 ) {
@@ -381,10 +413,11 @@ pub(super) fn update_shared_editors<T, L, S: 'static + autosurgeon::Hydrate + st
     }
 }
 
+#[cfg(feature = "collab")]
 pub(super) fn show_shared<T, L, S: std::default::Default>(
     ui: &mut egui::Ui,
     api_endpoint: &str,
-    single: &mut Sharing<T>,
+    single: &mut super::Sharing<T>,
     context: &mut EditingContext<L, S>,
     names: Vec<(String, usize)>,
 ) {
@@ -448,11 +481,12 @@ pub(super) fn show_locals<L: Clone, S>(
 pub(crate) fn show_interactions<'a, L, S>(
     ui: &mut egui::Ui,
     context: &'a mut EditingContext<L, S>,
-    docs_db: &Option<crdt_over_ws::WsDocsDb>,
+    #[cfg(feature = "collab")] docs_db: &Option<crdt_over_ws::WsDocsDb>,
     compute_result: &mut Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,
     examples_names: impl Fn(usize) -> String,
 ) -> InteractionResp<&'a L> {
     let mut save_button = None;
+    #[cfg(feature = "collab")]
     let mut share_button = None;
     let mut editor: Option<(String, &L)> = None;
     ui.horizontal(|ui| match &mut context.current {
@@ -463,6 +497,7 @@ pub(crate) fn show_interactions<'a, L, S>(
             editor = Some((name, &*content));
         }
         EditStatus::Local { name, content } => {
+            #[cfg(feature = "collab")]
             if let Some(doc_db) = docs_db {
                 if doc_db.is_connected() {
                     share_button = Some(ui.add(egui::Button::new("Share Script")));
@@ -486,6 +521,7 @@ pub(crate) fn show_interactions<'a, L, S>(
         compute_button,
         editor,
         save_button,
+        #[cfg(feature = "collab")]
         share_button,
     }
 }
@@ -493,14 +529,16 @@ pub(crate) fn show_interactions<'a, L, S>(
 pub(super) struct InteractionResp<E> {
     pub(super) compute_button: egui::Response,
     pub(super) save_button: Option<egui::Response>,
+    #[cfg(feature = "collab")]
     pub(super) share_button: Option<egui::Response>,
     pub(super) editor: Option<(String, E)>,
 }
 
+#[cfg(feature = "collab")]
 pub(super) fn show_available_remote_docs<T, L, S: std::default::Default>(
     ui: &mut egui::Ui,
     api_endpoint: &str,
-    single: &mut Sharing<T>,
+    single: &mut super::Sharing<T>,
     context: &mut EditingContext<L, S>,
 ) {
     if let Some(doc_db) = &single.doc_db {
@@ -523,21 +561,19 @@ pub(super) fn show_available_remote_docs<T, L, S: std::default::Default>(
     }
 }
 
-pub(super) fn show_locals_and_interact<T, U, L, S>(
+pub(super) fn show_locals_and_interact<U, L, S>(
     ui: &mut egui::Ui,
     context: &mut EditingContext<L, S>,
-    docs: &mut Sharing<T>,
-) where
+) -> Option<(egui::Response, L, String)>
+where
     U: AsRef<str>,
     L: Clone + WithDesc<U> + Into<S>,
-    S: autosurgeon::Reconcile,
 {
-    let Some((button, content, name)) = show_locals(ui, context) else {
-        return;
-    };
+    let (button, content, name) = show_locals(ui, context)?;
     if button.clicked() {
         // res = Some(ex);
         context.current = EditStatus::Local { name, content };
+        None
     } else if button.hovered() {
         egui::Tooltip::always_open(
             ui.ctx().clone(),
@@ -549,23 +585,43 @@ pub(super) fn show_locals_and_interact<T, U, L, S>(
             let desc = content.desc().as_ref();
             egui_demo_lib::easy_mark::easy_mark(ui, desc);
         });
+        None
     } else {
-        button.context_menu(|ui| {
-            if ui.button("share").clicked() {
-                let content = content.into();
-                let content = Arc::new(Mutex::new(content));
-                context.current = EditStatus::Shared(usize::MAX, content.clone());
-                let mut content = content.lock().unwrap();
-                docs.doc_db.as_mut().unwrap().create_doc_attempt(
-                    &docs.rt,
-                    name,
-                    content.deref_mut(),
-                );
-            }
-            if ui.button("close menu").clicked() {
-                ui.close()
-            }
-        });
+        Some((button, content, name))
+    }
+}
+
+#[cfg(feature = "collab")]
+pub(super) fn locals_and_interact_menu<T, L, S, U>(
+    context: &mut EditingContext<L, S>,
+    docs: &mut super::Sharing<T>,
+    (button, content, name): (egui::Response, L, String),
+) where
+    U: AsRef<str>,
+    L: Clone + WithDesc<U> + Into<S>,
+    S: autosurgeon::Reconcile,
+{
+    button.context_menu(|ui| {
+        if ui.button("share").clicked() {
+            let content = content.into();
+            let content = Arc::new(Mutex::new(content));
+            context.current = EditStatus::Shared(usize::MAX, content.clone());
+            let mut content = content.lock().unwrap();
+            docs.doc_db
+                .as_mut()
+                .unwrap()
+                .create_doc_attempt(&docs.rt, name, content.deref_mut());
+        }
+        if ui.button("close menu").clicked() {
+            ui.close()
+        }
+    });
+}
+
+#[cfg(not(feature = "collab"))]
+fn locals_and_interact_menu<T>(ui: &mut egui::Ui) {
+    if ui.button("close menu").clicked() {
+        ui.close()
     }
 }
 

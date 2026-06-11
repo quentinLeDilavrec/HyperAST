@@ -28,9 +28,12 @@ pub mod track;
 mod tsg;
 mod utils;
 mod view;
+#[cfg(feature = "collab")]
 mod ws;
+#[cfg(feature = "collab")]
 pub use ws::ws_handler;
 
+#[cfg(feature = "collab")]
 type DocState = (
     RwLock<automerge::AutoCommitWithObs<automerge::transaction::UnObserved>>,
     (
@@ -44,13 +47,15 @@ type DocState = (
 pub struct AppState {
     pub db: DashMap<String, Bytes>,
     pub repositories: RwLock<PreProcessedRepositories>,
-    // configs: RwLock<RepoConfigs>,
+    /// configs: RwLock<RepoConfigs>,
     mappings: MappingCache,
     mappings_alone: MappingAloneCache,
     partial_decomps: PartialDecompCache,
-    // Single shared doc
+    /// Single shared doc
+    #[cfg(feature = "collab")]
     doc: Arc<DocState>,
-    // Multiple shared docs
+    /// Multiple shared docs
+    #[cfg(feature = "collab")]
     doc2: ws::SharedDocs,
     pr_cache: RwLock<std::collections::HashMap<commit::Param, pull_requests::RawPrData>>,
 }
@@ -63,11 +68,13 @@ impl Default for AppState {
             mappings: Default::default(),
             mappings_alone: Default::default(),
             partial_decomps: Default::default(),
+            #[cfg(feature = "collab")]
             doc: Arc::new((
                 RwLock::new(automerge::AutoCommit::new()),
                 tokio::sync::broadcast::channel(50),
                 Default::default(),
             )),
+            #[cfg(feature = "collab")]
             doc2: Default::default(),
             pr_cache: Default::default(),
         }

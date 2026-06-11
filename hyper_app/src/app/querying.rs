@@ -1,22 +1,30 @@
 use poll_promise::Promise;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 
 use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 
+use super::Sharing;
+use super::show_repo_menu;
 use super::types::{CodeRange, Commit, CommitId, Config, QueryEditor, SelectedConfig};
 use super::types::{EditorHolder, WithDesc};
 use super::utils_edition::{EditStatus, EditingContext};
-use super::utils_edition::{
-    show_available_remote_docs, show_interactions, show_locals_and_interact,
-    show_shared_code_edition, update_shared_editors,
-};
+use super::utils_edition::{show_interactions, show_locals_and_interact};
 use super::utils_results_batched::show_long_result;
 use super::utils_results_batched::{ComputeError, PartialError};
 use super::utils_results_batched::{ComputeResultIdentified, ComputeResults, ComputeResultsProm};
-use super::{Sharing, code_editor_automerge, show_repo_menu};
 use crate::utils_poll::Resource;
+
+#[cfg(feature = "collab")]
+use super::utils_edition::{
+    locals_and_interact_menu, show_available_remote_docs, show_shared_code_edition,
+    update_shared_editors,
+};
+
+#[cfg(feature = "collab")]
+use super::code_editor_automerge::CodeEditor as CodeEditor2;
+#[cfg(not(feature = "collab"))]
+type CodeEditor2 = egui_addon::code_editor::CodeEditor<crate::Languages>;
 
 pub(crate) mod example_queries;
 use self::example_queries::EXAMPLES;
@@ -74,6 +82,7 @@ impl<T> EditorHolder for QueryEditor<T> {
 }
 
 impl<T> QueryEditor<T> {
+    #[cfg(feature = "collab")]
     pub(crate) fn to_shared<U>(self) -> QueryEditor<U>
     where
         T: Into<U>,
@@ -85,8 +94,9 @@ impl<T> QueryEditor<T> {
     }
 }
 
-impl Into<QueryEditor<code_editor_automerge::CodeEditor>> for QueryEditor {
-    fn into(self) -> QueryEditor<code_editor_automerge::CodeEditor> {
+#[cfg(feature = "collab")]
+impl Into<QueryEditor<CodeEditor2>> for QueryEditor {
+    fn into(self) -> QueryEditor<CodeEditor2> {
         self.to_shared()
     }
 }
@@ -116,8 +126,7 @@ impl Default for ComputeConfigQuery {
     }
 }
 
-pub(crate) type QueryingContext =
-    EditingContext<QueryEditor, QueryEditor<code_editor_automerge::CodeEditor>>;
+pub(crate) type QueryingContext = EditingContext<QueryEditor, QueryEditor<CodeEditor2>>;
 
 pub(super) fn remote_compute_query(
     ctx: &egui::Context,
@@ -132,12 +141,17 @@ pub(super) fn remote_compute_query(
     }
     .to_string();
     let query = match &mut query_editors.current {
+        EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
+            content.query.code().to_string()
+        }
+        #[cfg(feature = "collab")]
         EditStatus::Shared(_, shared_script) | EditStatus::Sharing(shared_script) => {
             let code_editors = shared_script.lock().unwrap();
             code_editors.query.code().to_string()
         }
-        EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
-            content.query.code().to_string()
+        #[cfg(not(feature = "collab"))]
+        EditStatus::Shared(_) => {
+            unreachable!()
         }
     };
     let script = QueryContent {
@@ -443,12 +457,20 @@ pub(super) fn show_querying(
     querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
 ) {
     let api_endpoint = &end_point(api_addr);
+    #[cfg(feature = "collab")]
     update_shared_editors(ui, query, api_endpoint, query_editors);
     let is_portrait = ui.available_rect_before_wrap().aspect_ratio() < 1.0;
     if is_portrait {
         egui::ScrollArea::vertical().show(ui, |ui| {
             show_scripts_edition(ui, api_endpoint, query_editors, query);
-            handle_interactions(ui, query_editors, querying_result, query, trigger_compute);
+            handle_interactions(
+                ui,
+                query_editors,
+                querying_result,
+                #[cfg(feature = "collab")]
+                query,
+                trigger_compute,
+            );
             show_long_result(&*querying_result, ui);
         });
     } else {
@@ -459,7 +481,14 @@ pub(super) fn show_querying(
                     show_scripts_edition(ui, api_endpoint, query_editors, query);
                 });
                 let ui = ui2;
-                handle_interactions(ui, query_editors, querying_result, query, trigger_compute);
+                handle_interactions(
+                    ui,
+                    query_editors,
+                    querying_result,
+                    #[cfg(feature = "collab")]
+                    query,
+                    trigger_compute,
+                );
                 show_long_result(&*querying_result, ui);
             });
     }
@@ -473,12 +502,18 @@ pub(crate) fn handle_interactions(
     ui: &mut egui::Ui,
     code_editors: &mut QueryingContext,
     querying_result: &mut Option<ComputeResultsProm<QueryingError>>,
-    single: &mut Sharing<ComputeConfigQuery>,
+    #[cfg(feature = "collab")] single: &mut Sharing<ComputeConfigQuery>,
     trigger_compute: &mut bool,
 ) {
-    let interaction = show_interactions(ui, code_editors, &single.doc_db, querying_result, |i| {
-        EXAMPLES[i].name.to_string()
-    });
+    let interaction = show_interactions(
+        ui,
+        code_editors,
+        #[cfg(feature = "collab")]
+        &single.doc_db,
+        querying_result,
+        |i| EXAMPLES[i].name.to_string(),
+    );
+    #[cfg(feature = "collab")]
     if interaction.share_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         let content = content.clone().to_shared();
@@ -487,8 +522,10 @@ pub(crate) fn handle_interactions(
         code_editors.current = EditStatus::Sharing(content.clone());
         let mut content = content.lock().unwrap();
         let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_attempt(&single.rt, name, content.deref_mut());
-    } else if interaction.save_button.map_or(false, |x| x.clicked()) {
+        db.create_doc_attempt(&single.rt, name, &mut *content);
+        return;
+    }
+    if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving query: {:#?}", content.clone());
         let name = name.to_string();
@@ -518,15 +555,24 @@ pub(crate) fn show_scripts_edition(
         egui::CollapsingHeader::new("Local Queries")
             .default_open(true)
             .show(ui, |ui| {
-                show_locals_and_interact(ui, querying_context, single);
+                if let Some(r) = show_locals_and_interact(ui, querying_context) {
+                    locals_and_interact_menu(querying_context, single, r);
+                }
             });
     }
+    #[cfg(feature = "collab")]
     show_available_remote_docs(ui, api_endpoint, single, querying_context);
+    #[cfg(not(feature = "collab"))]
+    let _ = api_endpoint;
     let local = querying_context
         .when_local(|code_editors| code_editors.iter_editors_mut().for_each(|c| c.ui(ui)));
+    #[cfg(feature = "collab")]
     let shared = querying_context
         .when_shared(|query_editors| show_shared_code_edition(ui, query_editors, single));
+    #[cfg(feature = "collab")]
     assert!(local.or(shared).is_some());
+    #[cfg(not(feature = "collab"))]
+    assert!(local.is_some());
 }
 
 fn show_examples(

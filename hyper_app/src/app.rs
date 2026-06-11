@@ -25,9 +25,11 @@ pub use types::Languages;
 
 mod app_components;
 mod code_aspects;
+#[cfg(feature = "collab")]
 mod code_editor_automerge;
 mod code_tracking;
 pub mod commit;
+#[cfg(feature = "collab")]
 pub(crate) mod crdt_over_ws;
 mod detached_view;
 #[allow(unused)]
@@ -684,12 +686,17 @@ impl Tab {
 #[serde(default)]
 pub(crate) struct Sharing<T> {
     pub(crate) content: T,
+    #[cfg(feature = "collab")]
     #[serde(skip)]
     rt: crdt_over_ws::Rt, // TODO do not init
+    #[cfg(feature = "collab")]
     #[serde(skip)]
     ws: Option<crdt_over_ws::WsDoc>,
+    #[cfg(feature = "collab")]
     #[serde(skip)]
     doc_db: Option<crdt_over_ws::WsDocsDb>,
+    #[cfg(not(feature = "collab"))]
+    doc_db: Option<()>,
 }
 
 impl SelectedConfig {

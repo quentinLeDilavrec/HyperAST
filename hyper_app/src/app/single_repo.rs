@@ -1,20 +1,27 @@
 use poll_promise::Promise;
-use std::ops::DerefMut;
-use std::sync::{Arc, Mutex};
 
 use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 
+use super::Sharing;
+use super::show_repo_menu;
 use super::types::{CodeEditors, Commit, Config, SelectedConfig};
 use super::types::{EditorHolder, WithDesc};
 use super::utils_edition::{EditStatus, EditingContext};
-use super::utils_edition::{
-    show_available_remote_docs, show_interactions, show_locals_and_interact,
-    show_shared_code_edition, update_shared_editors,
-};
+use super::utils_edition::{show_interactions, show_locals_and_interact};
 use super::utils_results_batched::ComputeError;
 use super::utils_results_batched::{ComputeResults, ComputeResultsProm, show_long_result};
-use super::{Sharing, code_editor_automerge, show_repo_menu};
 use crate::utils_poll::Resource;
+
+#[cfg(feature = "collab")]
+use super::utils_edition::{
+    locals_and_interact_menu, show_available_remote_docs, show_shared_code_edition,
+    update_shared_editors,
+};
+
+#[cfg(feature = "collab")]
+use super::code_editor_automerge::CodeEditor as CodeEditor2;
+#[cfg(not(feature = "collab"))]
+type CodeEditor2 = egui_addon::code_editor::CodeEditor<super::Languages>;
 
 mod example_scripts;
 
@@ -97,6 +104,7 @@ impl<T> WithDesc<T> for CodeEditors<T> {
 }
 
 impl<T> CodeEditors<T> {
+    #[cfg(feature = "collab")]
     pub(crate) fn to_shared<U>(self) -> CodeEditors<U>
     where
         T: Into<U>,
@@ -110,14 +118,14 @@ impl<T> CodeEditors<T> {
     }
 }
 
-impl Into<CodeEditors<super::code_editor_automerge::CodeEditor>> for CodeEditors {
-    fn into(self) -> CodeEditors<super::code_editor_automerge::CodeEditor> {
+#[cfg(feature = "collab")]
+impl Into<CodeEditors<CodeEditor2>> for CodeEditors {
+    fn into(self) -> CodeEditors<CodeEditor2> {
         self.to_shared()
     }
 }
 
-pub(super) type ScriptingContext =
-    EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>;
+pub(super) type ScriptingContext = EditingContext<CodeEditors, CodeEditors<CodeEditor2>>;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -183,6 +191,7 @@ pub(super) fn remote_compute_single(
     }
     let script = code_editors.map(
         |code_editors| ScriptContent::new(code_editors, single),
+        #[cfg(feature = "collab")]
         |code_editors| ScriptContent::new(&mut code_editors.lock().unwrap(), single),
     );
 
@@ -218,6 +227,7 @@ pub(super) fn show_single_repo(
     compute_single_result: &mut Option<ComputeResultsProm<ScriptingError>>,
 ) {
     let api_endpoint = &format!("{}/sharing-scripts", api_addr);
+    #[cfg(feature = "collab")]
     update_shared_editors(ui, single, api_endpoint, code_editors);
     let is_portrait = ui.available_rect_before_wrap().aspect_ratio() < 1.0;
     if is_portrait {
@@ -254,28 +264,36 @@ pub(super) fn show_single_repo(
 
 fn handle_interactions(
     ui: &mut egui::Ui,
-    code_editors: &mut EditingContext<CodeEditors, CodeEditors<code_editor_automerge::CodeEditor>>,
+    code_editors: &mut EditingContext<CodeEditors, CodeEditors<CodeEditor2>>,
     compute_single_result: &mut Option<ComputeResultsProm<ScriptingError>>,
     single: &mut Sharing<ComputeConfigSingle>,
     trigger_compute: &mut bool,
 ) {
+    #[cfg(not(feature = "collab"))]
+    let _ = single;
+
     let interaction = show_interactions(
         ui,
         code_editors,
+        #[cfg(feature = "collab")]
         &single.doc_db,
         compute_single_result,
         |i| EXAMPLES[i].name.to_string(),
     );
+    #[cfg(feature = "collab")]
     if interaction.share_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         let content = content.clone().to_shared();
-        let content = Arc::new(Mutex::new(content));
+        let content = std::sync::Mutex::new(content);
+        let content = std::sync::Arc::new(content);
         let name = name.to_string();
         code_editors.current = EditStatus::Sharing(content.clone());
         let mut content = content.lock().unwrap();
         let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_attempt(&single.rt, name, content.deref_mut());
-    } else if interaction.save_button.map_or(false, |x| x.clicked()) {
+        db.create_doc_attempt(&single.rt, name, &mut *content);
+        return;
+    }
+    if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving script: {:#?}", content.clone());
         let name = name.to_string();
@@ -305,15 +323,24 @@ fn show_scripts_edition(
         egui::CollapsingHeader::new("Local Queries")
             .default_open(true)
             .show(ui, |ui| {
-                show_locals_and_interact(ui, scripting_context, single);
+                if let Some(r) = show_locals_and_interact(ui, scripting_context) {
+                    locals_and_interact_menu(scripting_context, single, r);
+                }
             });
     }
+    #[cfg(feature = "collab")]
     show_available_remote_docs(ui, api_endpoint, single, scripting_context);
+    #[cfg(not(feature = "collab"))]
+    let _ = api_endpoint;
     let local = scripting_context
         .when_local(|code_editors| code_editors.iter_editors_mut().for_each(|e| e.ui(ui)));
+    #[cfg(feature = "collab")]
     let shared = scripting_context
         .when_shared(|code_editors| show_shared_code_edition(ui, code_editors, single));
+    #[cfg(feature = "collab")]
     assert!(local.or(shared).is_some());
+    #[cfg(not(feature = "collab"))]
+    assert!(local.is_some());
 }
 
 fn show_examples(

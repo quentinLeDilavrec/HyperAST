@@ -152,7 +152,7 @@ where
         let seeds = (self.dst_arena.descendants(dst))
             .into_iter()
             .flat_map(|c| self.mapping.mappings.get_srcs(&c))
-            .map(|m| self.mapping.src_arena.decompress_to(&m))
+            .map(|m| self.mapping.src_arena.decompress_to(m))
             .collect::<Vec<_>>();
         let s = &self.dst_arena.original(dst);
         candidates_aux2(seeds, s, &self.mapping.src_arena, self.hyperast, |x| {

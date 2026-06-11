@@ -277,24 +277,21 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> DecompressedWithParent<
     }
 
     fn position_in_parent<Idx: PrimInt>(&self, c: &IdD) -> Option<Idx> {
-        Decompressible::position_in_parent(&(*self), c)
+        Decompressible::position_in_parent(self, c)
     }
 
     fn parents(&self, id: IdD) -> <Self as DecompressedParentsLending<'_, IdD>>::PIt {
-        IterParents {
-            id,
-            id_parent: &self.id_parent,
-        }
+        let id_parent = &self.id_parent;
+        IterParents { id, id_parent }
     }
     fn path<Idx: PrimInt>(&self, parent: &IdD, descendant: &IdD) -> Vec<Idx> {
-        let this = self;
         let mut idxs: Vec<Idx> = vec![];
         let mut curr = *descendant;
         while &curr != parent {
-            let p = this
+            let p = self
                 .parent(&curr)
                 .expect("reached root before given parent");
-            let idx = this._position_in_parent(&curr, &p);
+            let idx = self._position_in_parent(&curr, &p);
             idxs.push(cast(idx).unwrap());
             curr = p;
         }

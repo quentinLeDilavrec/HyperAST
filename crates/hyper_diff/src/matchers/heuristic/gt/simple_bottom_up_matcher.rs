@@ -248,10 +248,10 @@ where
         self.lcs_equal_matching(src, dst);
         self.lcs_structure_matching(src, dst);
 
-        let src_type = (self.src_arena.parent(&src))
+        let src_type = (self.src_arena.parent(src))
             .map(|p| self.src_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
-        let dst_type = (self.dst_arena.parent(&dst))
+        let dst_type = (self.dst_arena.parent(dst))
             .map(|p| self.dst_arena.original(&p))
             .map(|p| self.hyperast.resolve_type(&p));
         if src_type != dst_type {

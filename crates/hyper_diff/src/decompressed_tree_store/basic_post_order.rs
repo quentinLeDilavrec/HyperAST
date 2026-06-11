@@ -308,7 +308,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> DeepDecompressedTreeSto
     for Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>>
 {
     fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
-        self.first_descendant(&x).step_until(*x)
+        self.first_descendant(x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
@@ -326,7 +326,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt + Shallow<IdD>> DeepDecompressedTreeSto
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, &BasicPostOrder<HAST::IdN, IdD>> {
     pub(crate) fn iter_descendants(&self, x: &IdD) -> hyperast::primint_it::Iter<IdD> {
-        self.first_descendant(&x).step_until(*x)
+        self.first_descendant(x).step_until(*x)
     }
 }
 
@@ -501,7 +501,7 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
     for Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>>
 {
     fn it_descendants(&self, x: &IdD) -> impl Iterator<Item = IdD> {
-        self.first_descendant(&x).step_until(*x)
+        self.first_descendant(x).step_until(*x)
     }
 
     fn first_descendant(&self, i: &IdD) -> IdD {
@@ -519,6 +519,6 @@ impl<HAST: HyperAST + Copy, IdD: PrimInt> DeepDecompressedTreeStore<HAST, IdD>
 
 impl<HAST: HyperAST + Copy, IdD: PrimInt> Decompressible<HAST, BasicPOSlice<'_, HAST::IdN, IdD>> {
     pub(crate) fn iter_descendants(&self, x: &IdD) -> hyperast::primint_it::Iter<IdD> {
-        self.first_descendant(&x).step_until(*x)
+        self.first_descendant(x).step_until(*x)
     }
 }

@@ -150,3 +150,6 @@ impl<T> Extendable<T> for Option<T> {
         *self = None;
     }
 }
+
+trait ComparatorFnMut<K>: FnMut(&K, &K) -> std::cmp::Ordering {}
+impl<K, F: FnMut(&K, &K) -> std::cmp::Ordering> ComparatorFnMut<K> for F {}

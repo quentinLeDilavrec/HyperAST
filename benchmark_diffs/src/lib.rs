@@ -236,20 +236,11 @@ pub enum Prep {
     CD = 2,
 }
 
+#[derive(Default)]
 pub struct Stats {
     pub size: (usize, usize),
     pub mapped: (usize, usize),
     pub decomp: (usize, usize),
-}
-
-impl Default for Stats {
-    fn default() -> Self {
-        Self {
-            size: (0, 0),
-            mapped: (0, 0),
-            decomp: (0, 0),
-        }
-    }
 }
 
 #[allow(dead_code)]

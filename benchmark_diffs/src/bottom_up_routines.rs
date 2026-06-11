@@ -38,6 +38,7 @@ impl<F> std::ops::AddAssign<Routine<F>> for Vek<Routine<F>> {
         self.0.push(other);
     }
 }
+type RVec<R> = Vek<Routine<R>>;
 
 impl<HAST, IdN, B: WithSetup> Routines<(HAST, IdN, B)> {
     pub fn lazy_to_complete<const MAX_SIZE: usize, const S: usize>()
@@ -54,7 +55,7 @@ impl<HAST, IdN, B: WithSetup> Routines<(HAST, IdN, B)> {
     {
         use hyper_diff::matchers::heuristic::cd;
         use hyper_diff::matchers::heuristic::gt;
-        let mut routines: Vek<Routine<fn(&mut B, &HAST, OwnedLazyMapping<IdN, S>)>> = Vek(vec![]);
+        let mut routines: RVec<fn(&mut B, &HAST, OwnedLazyMapping<IdN, S>)> = Vek(vec![]);
         macro_rules! routine {
             (@in $prep:ident; $f:expr; $mpr:pat => $matcher:expr) => {
                 routines += Routine { routine: |b, hyperast, (owned, mappings)| { b.run(
@@ -206,7 +207,7 @@ impl<HAST, IdN, B: WithSetup> Routines<(HAST, IdN, B)> {
         routine!("StableSimple"; 0==[MAX_SIZE]
             mut mapper => {
                 mapper.bottom_up_stable_with_similarity_threshold_and_recovery(
-                    |_, _, _| 1 as f64 / 2 as f64,
+                    |_, _, _| 1f64 / 2f64,
                     hyper_diff::similarity_metrics::SimilarityMeasure::chawathe,
                     Mapper::last_chance_match_histogram,
                 );
@@ -237,7 +238,7 @@ impl<HAST, IdN, B: WithSetup> Routines<(HAST, IdN, B)> {
     {
         use hyper_diff::matchers::heuristic::cd;
         use hyper_diff::matchers::heuristic::gt;
-        let mut routines: Vek<Routine<fn(&mut B, &HAST, OwnedLazyMapping<IdN, S>)>> = Vek(vec![]);
+        let mut routines: RVec<fn(&mut B, &HAST, OwnedLazyMapping<IdN, S>)> = Vek(vec![]);
         macro_rules! routine {
             (@in $prep:ident; $f:expr; $mpr:pat => $matcher:expr) => {
                 routines += Routine { routine: |b, hyperast, (owned, mappings)| { b.run(

@@ -127,7 +127,7 @@ impl NodeStore {
                 .unwrap();
             make_hash(&inner.hasher, &node)
         };
-        vacant.insert_with_hasher(hash, id, (), hasher).0.clone()
+        *vacant.insert_with_hasher(hash, id, (), hasher).0
     }
 
     /// uses the dyn builder see dyn_builder::EntityBuilder
@@ -146,7 +146,7 @@ impl NodeStore {
 
             make_hash(&inner.hasher, &node)
         };
-        vacant.insert_with_hasher(hash, id, (), hasher).0.clone()
+        *vacant.insert_with_hasher(hash, id, (), hasher).0
     }
 
     pub fn resolve(&self, id: NodeIdentifier) -> HashedNodeRef<'_, NodeIdentifier> {

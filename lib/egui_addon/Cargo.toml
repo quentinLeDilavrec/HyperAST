@@ -7,8 +7,12 @@ edition = "2024"
 workspace = true
 
 [dependencies]
-egui = { version = "0.32.0", default-features = false }
-eframe = { version = "0.32.0", default-features = false }
+egui = { version = "0.32.0", default-features = false, features = [
+    "accesskit",
+] }
+eframe = { version = "0.32.0", default-features = false, features = [
+    "accesskit",
+] }
 epaint = { version = "0.32.0", default-features = false }
 emath = { version = "0.32.0", default-features = false }
 egui_demo_lib = { version = "0.32.0", default-features = false, features = [

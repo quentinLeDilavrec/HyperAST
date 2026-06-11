@@ -163,9 +163,7 @@ where
     for<'t> LendT<'t, HAST>: WithHashs,
     HAST::Label: Eq + Clone,
 {
-    fn ambiguous_mappings_comparator(
-        &mut self,
-    ) -> impl FnMut(&(M::Src, M::Dst), &(M::Src, M::Dst)) -> std::cmp::Ordering {
+    fn ambiguous_mappings_comparator(&mut self) -> impl super::ComparatorFnMut<(M::Src, M::Dst)> {
         let mut sib_sim = HashMap::<(M::Src, M::Dst), f64>::default();
         let mut psib_sim = sib_sim.clone();
         let mut p_in_p_sim = sib_sim.clone();
@@ -309,8 +307,8 @@ where
             for (i, src) in current_height_src_trees.iter().enumerate() {
                 for (j, dst) in current_height_dst_trees.iter().enumerate() {
                     let iso = {
-                        let src = src_trees.arena.original(&src);
-                        let dst = dst_trees.arena.original(&dst);
+                        let src = src_trees.arena.original(src);
+                        let dst = dst_trees.arena.original(dst);
                         super::isomorphic::<_, true, false>(hyperast, &src, &dst)
                     };
                     if iso {

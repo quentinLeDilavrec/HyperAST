@@ -186,7 +186,7 @@ where
 
     fn ambiguous_mappings_comparator(
         mapper: &Mapper<HAST, Dsrc, Ddst, M>,
-    ) -> impl FnMut(&(Dsrc::IdD, Ddst::IdD), &(Dsrc::IdD, Ddst::IdD)) -> std::cmp::Ordering {
+    ) -> impl super::ComparatorFnMut<(Dsrc::IdD, Ddst::IdD)> {
         let mut sib_sim = HashMap::<(Dsrc::IdD, Ddst::IdD), f64>::default();
         let mut psib_sim = sib_sim.clone();
         let mut p_in_p_sim = sib_sim.clone();

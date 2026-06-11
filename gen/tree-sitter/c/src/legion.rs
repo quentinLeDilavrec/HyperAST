@@ -1,7 +1,4 @@
-//! fully compress all subtrees from a cpp CST
-
-use std::{collections::HashMap, fmt::Debug, vec};
-
+//! fully compress all subtrees from a C CST
 use legion::world::EntryRef;
 use num::ToPrimitive as _;
 

@@ -1,5 +1,4 @@
-//! fully compress all subtrees from a cpp CST
-
+//! fully compress all subtrees
 use std::{collections::HashMap, fmt::Debug, str::from_utf8, vec};
 
 use legion::world::EntryRef;

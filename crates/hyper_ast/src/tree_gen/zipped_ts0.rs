@@ -1,4 +1,4 @@
-//! fully compress all subtrees from a cpp CST
+//! fully compress all subtrees
 #![allow(unused)]
 
 use legion::world::EntryRef;

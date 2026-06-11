@@ -12,6 +12,7 @@ use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen::parser::{Node, TreeCursor};
+use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{self, BasicGlobalData};
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
 use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
@@ -123,41 +124,6 @@ impl Debug for Acc {
             .field("padding_start", &self.padding_start)
             .field("indentation", &self.indentation)
             .finish()
-    }
-}
-
-#[repr(transparent)]
-#[derive(Clone)]
-pub struct TTreeCursor<'a>(tree_sitter::TreeCursor<'a>);
-
-impl<'a> Debug for TTreeCursor<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("TTreeCursor")
-            .field(&self.0.node().kind())
-            .finish()
-    }
-}
-
-impl<'a> hyperast::tree_gen::parser::TreeCursor for TTreeCursor<'a> {
-    type N = TNode<'a>;
-    fn node(&self) -> TNode<'a> {
-        TNode(self.0.node())
-    }
-
-    fn role(&self) -> Option<std::num::NonZeroU16> {
-        self.0.field_id()
-    }
-
-    fn goto_first_child(&mut self) -> bool {
-        self.0.goto_first_child()
-    }
-
-    fn goto_parent(&mut self) -> bool {
-        self.0.goto_parent()
-    }
-
-    fn goto_next_sibling(&mut self) -> bool {
-        self.0.goto_next_sibling()
     }
 }
 

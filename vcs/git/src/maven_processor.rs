@@ -378,7 +378,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
 
     let primary = acc
         .primary
-        .map_metrics(|m| m.finalize(&interned_kind, &label_id, 0));
+        .map_metrics(|m| m.finalize(&interned_kind, &label_id));
 
     let hashable = primary.metrics.hashs.most_discriminating();
 

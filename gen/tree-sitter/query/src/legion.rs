@@ -1,6 +1,7 @@
 //! fully compress all subtrees from a tree-sitter query CST
 use std::{collections::HashMap, fmt::Debug};
 
+use hyperast::tree_gen;
 use legion::world::EntryRef;
 
 use hyperast::filter::BloomSize;
@@ -10,12 +11,11 @@ use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::DefaultNodeStore as NodeStore;
-use hyperast::store::nodes::compo::NoSpacesCS;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
+use hyperast::tree_gen::BasicGlobalData;
 use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
-use hyperast::tree_gen::{self, BasicGlobalData};
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
 use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
 use hyperast::tree_gen::{GlobalData as _, Spaces};
@@ -268,9 +268,7 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let bytes_len = spacing.len();
         let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
         use num::ToPrimitive;
-        let line_count = spacing
-            .matches("\n")
-            .count()
+        let line_count = (spacing.matches("\n").count())
             .to_u32()
             .expect("too many newlines");
         let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
@@ -402,16 +400,10 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        let own_line_count = label.as_ref().map_or(0, |l| {
-            use num::ToPrimitive;
-            l.matches("\n").count().to_u32().expect("too many newlines")
-        });
-        let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
         let hashable = &metrics.hashs.most_discriminating();
 
-        let label_id = label
-            .as_ref()
-            .map(|label| label_store.get_or_insert(label.as_str()));
+        let label_id = label.as_deref().map(|l| label_store.get_or_insert(l));
         let eq = eq_node(&interned_kind, label_id.as_ref(), &acc.simple.children);
 
         let insertion = node_store.prepare_insertion(&hashable, eq);
@@ -424,7 +416,9 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
             }
         } else {
             use hyperast::store::nodes::compo;
-            let metrics = metrics.map_hashs(|h| h.build());
+            let mut metrics = metrics.map_hashs(|h| h.build());
+            let own_line_count = tree_gen::newline_count(&label);
+            metrics.line_count += own_line_count;
 
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             let children_is_empty = acc.simple.children.is_empty();
@@ -568,7 +562,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
                 dyn_builder.add(compo::SizeNoSpaces(size_no_spaces));
                 dyn_builder.add(compo::Height(height));
                 if acc.simple.children.len() != acc.no_space.len() {
-                    dyn_builder.add(NoSpacesCS(acc.no_space.into_boxed_slice()));
+                    dyn_builder.add(compo::NoSpacesCS(acc.no_space.into_boxed_slice()));
                 }
             }
             acc.simple

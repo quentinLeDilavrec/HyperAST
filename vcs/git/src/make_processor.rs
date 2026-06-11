@@ -244,7 +244,7 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdenti
 
     let primary = acc
         .primary
-        .map_metrics(|m| m.finalize(&interned_kind, &label_id, 0));
+        .map_metrics(|m| m.finalize(&interned_kind, &label_id));
 
     let hashable = primary.metrics.hashs.most_discriminating();
 

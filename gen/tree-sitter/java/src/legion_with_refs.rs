@@ -14,8 +14,9 @@ use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::store::nodes::DefaultNodeStore as NodeStore;
+use hyperast::store::nodes::legion::DedupMap;
 use hyperast::store::nodes::legion::HashedNodeRef;
-use hyperast::store::nodes::legion::{DedupMap, NodeIdentifier};
+use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen;
 use hyperast::tree_gen::parser::{Node, TreeCursor};
@@ -847,10 +848,7 @@ where
         let more = &mut self.more;
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
-        let own_line_count = label.as_ref().map_or(0, |l| {
-            l.matches("\n").count().to_u32().expect("too many newlines")
-        });
-        let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
 
         let hashable = &metrics.hashs.most_discriminating();
 
@@ -889,7 +887,10 @@ where
                 &mut stores.label_store,
                 &insertion,
             );
-            let metrics = metrics.map_hashs(|h| h.build());
+            let mut metrics = metrics.map_hashs(|h| h.build());
+            let own_line_count = tree_gen::newline_count(&label);
+            metrics.line_count += own_line_count;
+
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
             let bytes_len = compo::BytesLen(byte_len);
             let vacant = insertion.vacant();
@@ -1105,10 +1106,7 @@ where
             let label = label_id.map(|l| label_store.resolve(&l));
 
             let interned_kind = TS::intern(acc.simple.kind);
-            let own_line_count = label.as_ref().map_or(0, |l| {
-                l.matches("\n").count().to_u32().expect("too many newlines")
-            });
-            let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
+            let metrics = acc.metrics.finalize(&interned_kind, &label);
 
             let hsyntax = metrics.hashs.most_discriminating();
             let hashable = &hsyntax;
@@ -1134,7 +1132,9 @@ where
                 }
             } else {
                 use hyperast::store::nodes::compo;
-                let metrics = metrics.map_hashs(|h| h.build());
+                let mut metrics = metrics.map_hashs(|h| h.build());
+                let own_line_count = tree_gen::newline_count(&label);
+                metrics.line_count += own_line_count;
                 let bytes_len = compo::BytesLen((acc.end_byte - acc.start_byte) as u32);
 
                 let vacant = insertion.vacant();

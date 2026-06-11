@@ -259,36 +259,18 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        // let hashs = acc.metrics.hashs;
-        // let size = acc.metrics.size + 1;
-        // let height = acc.metrics.height + 1;
-        // let line_count = acc.metrics.line_count;
-        let size_no_spaces = acc.metrics.size_no_spaces + 1;
-        // let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
-        // let hsyntax = hbuilder.most_discriminating();
-        // let hashable = &hsyntax;
 
-        let metrics = acc.metrics.finalize(&interned_kind, &label, size_no_spaces);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
 
         let hashable = &metrics.hashs.most_discriminating();
 
-        let label_id = label
-            .as_ref()
-            .map(|label| label_store.get_or_insert(label.as_str()));
+        let label_id = label.as_deref().map(|l| label_store.get_or_insert(l));
         let eq = eq_node(&interned_kind, label_id.as_ref(), &acc.simple.children);
 
         let insertion = node_store.prepare_insertion(&hashable, eq);
 
         let local = if let Some(compressed_node) = insertion.occupied_id() {
             let metrics = metrics.map_hashs(|h| h.build());
-            // let hashs = hbuilder.build();
-            // let metrics = SubTreeMetrics {
-            //     size,
-            //     height,
-            //     hashs,
-            //     size_no_spaces,
-            //     line_count,
-            // };
             Local {
                 compressed_node,
                 metrics,
@@ -320,18 +302,10 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        // let hashs = acc.metrics.hashs;
-        // let size = acc.metrics.size + 1;
-        // let height = acc.metrics.height + 1;
-        let line_count = acc.metrics.line_count;
-        // let size_no_spaces = acc.metrics.size_no_spaces + 1;
 
         let label = l.map(|l| label_store.resolve(&l));
-        // let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
-        // let hsyntax = hbuilder.most_discriminating();
-        // let hashable = &hsyntax;
 
-        let metrics = acc.metrics.finalize(&interned_kind, &label, line_count);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
 
         let hashable = &metrics.hashs.most_discriminating();
 
@@ -347,9 +321,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
                 metrics,
             }
         } else {
-            let byte_len = compo::BytesLen(
-                byte_len.to_u32().unwrap(), // (acc.end_byte - acc.start_byte).try_into().unwrap(),
-            );
+            let byte_len = compo::BytesLen(byte_len.to_u32().unwrap());
             Self::insert_new_subtree(acc, interned_kind, metrics, label_id, insertion, byte_len)
         };
         local.compressed_node
@@ -369,14 +341,10 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         let node_store = &stores.node_store;
         let label_store = &stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        let size_no_spaces = acc.metrics.size_no_spaces + 1;
 
         let label = l.map(|l| label_store.resolve(&l));
-        // let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
-        // let hsyntax = hbuilder.most_discriminating();
-        // let hashable = &hsyntax;
 
-        let metrics = acc.metrics.finalize(&interned_kind, &label, size_no_spaces);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
         let hashable = &metrics.hashs.most_discriminating();
 
         let label_id = l;

@@ -429,7 +429,7 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
 
     let primary = acc
         .primary
-        .map_metrics(|m| m.finalize(&interned_kind, &label_id, 0));
+        .map_metrics(|m| m.finalize(&interned_kind, &label_id));
     let hashable = primary.metrics.hashs.most_discriminating();
     let eq = eq_node(&Type::Directory, Some(&label_id), &primary.children);
     let md_cache = &mut cpp_proc.cache.md_cache;

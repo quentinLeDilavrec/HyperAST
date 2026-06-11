@@ -409,7 +409,7 @@ impl<'stores, TS: XmlEnabledTypeStore> TreeGen for XmlTreeGen<'stores, TS> {
         let stores = &mut self.stores;
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
-        let metrics = acc.metrics.finalize(&interned_kind, &label, 0);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
 
         let hashable = &metrics.hashs.most_discriminating();
 
@@ -433,6 +433,8 @@ impl<'stores, TS: XmlEnabledTypeStore> TreeGen for XmlTreeGen<'stores, TS> {
             }
         } else {
             let mut metrics = metrics.map_hashs(|h| h.build());
+            let own_line_count = tree_gen::newline_count(&label);
+            metrics.line_count += own_line_count;
 
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
             let bytes_len = compo::BytesLen(byte_len);

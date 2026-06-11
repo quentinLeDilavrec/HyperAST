@@ -299,7 +299,7 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
 
     let primary = acc
         .primary
-        .map_metrics(|m| m.finalize(&interned_kind, &label_id, 0));
+        .map_metrics(|m| m.finalize(&interned_kind, &label_id));
     let hashable = primary.metrics.hashs.most_discriminating();
     let eq =
         hyperast::store::nodes::legion::eq_node(&interned_kind, Some(&label_id), &primary.children);

@@ -214,7 +214,6 @@ impl<U: crate::hashed::ComputableNodeHashs> SubTreeMetrics<U> {
         self,
         k: &K,
         l: &L,
-        line_count: u32,
     ) -> SubTreeMetrics<crate::hashed::HashesBuilder<U>> {
         let size_no_spaces = self.size_no_spaces + 1;
         use crate::hashed::IndexingHashBuilder;
@@ -224,7 +223,7 @@ impl<U: crate::hashed::ComputableNodeHashs> SubTreeMetrics<U> {
             size: self.size + 1,
             height: self.height + 1,
             size_no_spaces,
-            line_count: self.line_count + line_count,
+            line_count: self.line_count,
         }
     }
 }
@@ -1220,6 +1219,14 @@ pub fn try_get_spacing(
 pub fn has_final_space(depth: &usize, sum_byte_length: usize, text: &[u8]) -> bool {
     // TODO not sure about depth
     *depth == 0 && sum_byte_length < text.len()
+}
+
+pub fn newline_count(label: &Option<impl AsRef<str>>) -> u32 {
+    let Some(label) = label.as_ref() else {
+        return 0;
+    };
+    let r = label.as_ref().matches("\n").count();
+    num::ToPrimitive::to_u32(&r).expect("too many newlines")
 }
 
 pub fn hash32<T: ?Sized + std::hash::Hash>(t: &T) -> u32 {

@@ -429,7 +429,7 @@ impl<'stores, 'cache, TS: TsEnabledTypeStore> TreeGen for TsTreeGen<'stores, 'ca
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        let metrics = acc.metrics.finalize(&interned_kind, &label, 0);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
         let hashable = &metrics.hashs.most_discriminating();
 
         let label_id = label.as_deref().map(|l| label_store.get_or_insert(l));
@@ -448,7 +448,9 @@ impl<'stores, 'cache, TS: TsEnabledTypeStore> TreeGen for TsTreeGen<'stores, 'ca
                 metrics: md.metrics,
             }
         } else {
-            let metrics = metrics.map_hashs(|h| h.build());
+            let mut metrics = metrics.map_hashs(|h| h.build());
+            let own_line_count = tree_gen::newline_count(&label);
+            metrics.line_count += own_line_count;
 
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             let children_is_empty = acc.simple.children.is_empty();

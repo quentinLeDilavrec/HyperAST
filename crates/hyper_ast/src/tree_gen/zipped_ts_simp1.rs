@@ -592,16 +592,13 @@ where
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
-        let own_line_count = label.as_ref().map_or(0, |l| {
-            l.matches("\n").count().to_u32().expect("too many newlines")
-        });
-        let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
+        let metrics = acc.metrics.finalize(&interned_kind, &label);
 
         let hashable = &metrics.hashs.most_discriminating();
 
         let label_id = label
-            .as_ref()
-            .map(|label| self.stores.label_store.get_or_insert(label.as_str()));
+            .as_deref()
+            .map(|l| self.stores.label_store.get_or_insert(l));
         let eq = eq_node(&interned_kind, label_id.as_ref(), &acc.simple.children);
 
         let insertion = self.stores.node_store.prepare_insertion(hashable, eq);
@@ -611,7 +608,6 @@ where
             debug_assert_eq!(metrics.height, md.metrics.height);
             debug_assert_eq!(metrics.size, md.metrics.size);
             debug_assert_eq!(metrics.size_no_spaces, md.metrics.size_no_spaces);
-            debug_assert_eq!(metrics.line_count, md.metrics.line_count);
             debug_assert_eq!(metrics.hashs.build(), md.metrics.hashs);
             let metrics = md.metrics;
             Local {
@@ -620,7 +616,9 @@ where
                 _ty: kind,
             }
         } else {
-            let metrics = metrics.map_hashs(|h| h.build());
+            let mut metrics = metrics.map_hashs(|h| h.build());
+            let own_line_count = tree_gen::newline_count(&label);
+            metrics.line_count += own_line_count;
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
             let bytes_len = compo::BytesLen(byte_len);
             let vacant = insertion.vacant();

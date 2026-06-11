@@ -304,7 +304,6 @@ fn make(
     add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
     let children_is_empty = primary.children.is_empty();
     if acc.skiped_ana {
-        use hyperast::store::nodes::EntityBuilder;
         dyn_builder.add(hyperast::filter::BloomSize::None);
     } else {
         #[cfg(feature = "impact")]
@@ -323,7 +322,6 @@ fn make(
         let subtr = hyperast::scripting::Subtr(kind, &dyn_builder);
         let ss = acc.finish(&subtr).unwrap();
         log::error!("dir {:?}", ss.0);
-        use hyperast::store::nodes::EntityBuilder;
         dyn_builder.add(ss);
     };
 

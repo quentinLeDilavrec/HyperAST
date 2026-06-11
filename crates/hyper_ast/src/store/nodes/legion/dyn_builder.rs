@@ -133,9 +133,16 @@ impl EntityBuilder {
         let mut s = Self {
             inner: Default::default(),
         };
-        use super::super::EntityBuilder;
         s.add(l);
         s
+    }
+
+    /// Add `component` to the entity.
+    ///
+    /// If the bundle already contains a component of type `T`, it will be dropped and replaced with
+    /// the most recently added one.
+    pub fn add<T: Component>(&mut self, component: T) -> &mut Self {
+        self._add(component)
     }
 
     pub fn build(self) -> BuiltEntity {
@@ -146,11 +153,12 @@ impl EntityBuilder {
     /// If the bundle already contains a component of type `T`, it will be dropped and replaced with
     /// the most recently added one.
     pub(crate) fn _add<T: legion::storage::Component>(&mut self, mut component: T) -> &mut Self {
+        // Safety: `component` is a valid instance of `T`.
         unsafe {
             self.inner.add(
                 (&mut component as *mut T).cast(),
                 TypeInfo::of::<T>(),
-                || Box::new(T::Storage::default()), //DynamicClone::new::<T>(),
+                || Box::new(T::Storage::default()),
             );
         }
         core::mem::forget(component);

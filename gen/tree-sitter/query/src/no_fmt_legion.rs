@@ -5,10 +5,10 @@ use num::ToPrimitive;
 
 use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
+use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
-use hyperast::store::nodes::{DefaultNodeStore as NodeStore, EntityBuilder};
 use hyperast::tree_gen::parser::{Node as _, TreeCursor};
 use hyperast::tree_gen::{
     AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, Parents, PreResult,

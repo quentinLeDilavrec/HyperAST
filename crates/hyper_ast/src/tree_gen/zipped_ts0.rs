@@ -488,7 +488,6 @@ where
             let mut dyn_builder = dyn_builder::EntityBuilder::new();
 
             let children_is_empty = acc.simple.children.is_empty();
-            use crate::store::nodes::EntityBuilder;
             dyn_builder.add(bytes_len);
 
             acc.role.add_md(&mut dyn_builder);

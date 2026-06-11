@@ -13,7 +13,7 @@ use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::store::nodes::{
-    DefaultNodeStore as NodeStore, EntityBuilder,
+    DefaultNodeStore as NodeStore,
     legion::{NodeIdentifier, eq_node},
 };
 use hyperast::tree_gen::parser::{Node as _, TreeCursor};

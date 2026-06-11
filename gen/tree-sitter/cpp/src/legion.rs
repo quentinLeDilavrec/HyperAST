@@ -6,10 +6,10 @@ use std::{collections::HashMap, fmt::Debug, vec};
 
 use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
+use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::{DedupMap, subtree_builder};
 use hyperast::store::nodes::legion::{NodeIdentifier, eq_node};
-use hyperast::store::nodes::{DefaultNodeStore as NodeStore, EntityBuilder};
 use hyperast::tree_gen::parser::{Node as _, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{self, NoOpMore, TotalBytesGlobalData as _, add_md_precomp_queries};

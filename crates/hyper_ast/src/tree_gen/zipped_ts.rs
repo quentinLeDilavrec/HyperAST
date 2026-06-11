@@ -543,7 +543,6 @@ where
             }
 
             let children_is_empty = acc.simple.children.is_empty();
-            use crate::store::nodes::EntityBuilder;
             dyn_builder.add(bytes_len);
 
             let current_role = Option::take(&mut acc.role.current);

@@ -14,7 +14,6 @@ use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::store::nodes::DefaultNodeStore as NodeStore;
-use hyperast::store::nodes::EntityBuilder;
 use hyperast::store::nodes::legion::HashedNodeRef;
 use hyperast::store::nodes::legion::{DedupMap, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};

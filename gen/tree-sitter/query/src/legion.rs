@@ -10,7 +10,6 @@ use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::DefaultNodeStore as NodeStore;
-use hyperast::store::nodes::EntityBuilder;
 use hyperast::store::nodes::compo::NoSpacesCS;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};

@@ -5,9 +5,9 @@ use std::path::{Components, PathBuf};
 use git2::{Oid, Repository};
 
 use hyperast::hashed::MetaDataHashsBuilder;
+use hyperast::store::defaults::NodeIdentifier;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::RawHAST;
-use hyperast::store::{defaults::NodeIdentifier, nodes::EntityBuilder};
 use hyperast::tree_gen::Accumulator;
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
@@ -434,7 +434,6 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
         let subtr = hyperast::scripting::Subtr(kind, &dyn_builder);
         let ss = acc.finish(&subtr).unwrap();
         log::error!("mm {:?}", ss.0);
-        use hyperast::store::nodes::EntityBuilder;
         dyn_builder.add(ss);
     };
 

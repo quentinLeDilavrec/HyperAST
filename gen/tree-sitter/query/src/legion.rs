@@ -3,19 +3,28 @@ use std::{collections::HashMap, fmt::Debug};
 
 use legion::world::EntryRef;
 
-use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::filter::BloomSize;
+use hyperast::full::FullNode;
+use hyperast::hashed::{self, HashesBuilder, SyntaxNodeHashs};
+use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
+use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
-use hyperast::store::nodes::compo::{self, NoSpacesCS};
-use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier, eq_node, subtree_builder};
-use hyperast::store::nodes::{DefaultNodeStore as NodeStore, EntityBuilder};
-use hyperast::tree_gen::parser::{Node as _, TreeCursor};
-use hyperast::tree_gen::{
-    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, GlobalData, Parents, PreResult,
-    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-    ZippedTreeGen, compute_indentation, get_spacing, has_final_space, utils_ts::TTreeCursor,
-};
-use hyperast::types::{ETypeStore as _, LabelStore as _};
-use hyperast::{filter::BloomSize, full::FullNode, nodes::Space};
+use hyperast::store::nodes::DefaultNodeStore as NodeStore;
+use hyperast::store::nodes::EntityBuilder;
+use hyperast::store::nodes::compo::NoSpacesCS;
+use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
+use hyperast::store::nodes::legion::{eq_node, subtree_builder};
+use hyperast::tree_gen::parser::{Node, TreeCursor};
+use hyperast::tree_gen::utils_ts::TTreeCursor;
+use hyperast::tree_gen::{self, BasicGlobalData};
+use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
+use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
+use hyperast::tree_gen::{GlobalData as _, Spaces};
+use hyperast::tree_gen::{Parents, PreResult};
+use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
+use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
+use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+use hyperast::types::{ETypeStore as _, LabelStore as LabelStoreTrait};
 
 use crate::TNode;
 use crate::types::{TIdN, TsQueryEnabledTypeStore, Type};
@@ -292,22 +301,24 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let compressed_node = if let Some(id) = insertion.occupied_id() {
             id
         } else {
+            use hyperast::store::nodes::compo;
             let vacant = insertion.vacant();
-            let bytes_len = compo::BytesLen(bytes_len.try_into().unwrap());
-            let a = (interned_kind, spacing_id, bytes_len, hashs, BloomSize::None);
-            if line_count == 0 {
-                NodeStore::insert_after_prepare(vacant, a)
-            } else {
-                use tuples::CombinRight;
-                let a = a.push(compo::LineCount(line_count));
-                NodeStore::insert_after_prepare(vacant, a)
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
+
+            dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
+            dyn_builder.add(spacing_id);
+            dyn_builder.add(hashs);
+            dyn_builder.add(BloomSize::None);
+            if line_count != 0 {
+                dyn_builder.add(compo::LineCount(line_count));
             }
+            NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
         };
         Local {
             compressed_node,
             metrics: SubTreeMetrics {
                 size: 1,
-                height: 1,
+                height: 0,
                 hashs,
                 size_no_spaces: 0,
                 line_count,
@@ -392,14 +403,12 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        let hashs = acc.metrics.hashs;
-        let size = acc.metrics.size + 1;
-        let height = acc.metrics.height + 1;
-        let line_count = acc.metrics.line_count;
-        let size_no_spaces = acc.metrics.size_no_spaces + 1;
-        let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
-        let hsyntax = hbuilder.most_discriminating();
-        let hashable = &hsyntax;
+        let own_line_count = label.as_ref().map_or(0, |l| {
+            use num::ToPrimitive;
+            l.matches("\n").count().to_u32().expect("too many newlines")
+        });
+        let metrics = acc.metrics.finalize(&interned_kind, &label, own_line_count);
+        let hashable = &metrics.hashs.most_discriminating();
 
         let label_id = label
             .as_ref()
@@ -409,46 +418,32 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         let insertion = node_store.prepare_insertion(&hashable, eq);
 
         let local = if let Some(compressed_node) = insertion.occupied_id() {
-            let hashs = hbuilder.build();
-            let metrics = SubTreeMetrics {
-                size,
-                height,
-                hashs,
-                size_no_spaces,
-                line_count,
-            };
+            let metrics = metrics.map_hashs(|h| h.build());
             Local {
                 compressed_node,
                 metrics,
             }
         } else {
-            let hashs = hbuilder.build();
+            use hyperast::store::nodes::compo;
+            let metrics = metrics.map_hashs(|h| h.build());
 
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
-            dyn_builder.add(hashs);
-            dyn_builder.add(compo::BytesLen(
-                (acc.end_byte - acc.start_byte).try_into().unwrap(),
-            ));
-            if !acc.simple.children.is_empty() {
-                dyn_builder.add(compo::Size(size));
-                dyn_builder.add(compo::SizeNoSpaces(size_no_spaces));
-                dyn_builder.add(compo::Height(height));
-                if acc.simple.children.len() != acc.no_space.len() {
-                    dyn_builder.add(NoSpacesCS(acc.no_space.into_boxed_slice()));
-                }
+            let children_is_empty = acc.simple.children.is_empty();
+            let bytes_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
+            dyn_builder.add(compo::BytesLen(bytes_len));
+
+            let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
+            hashs.persist(&mut dyn_builder);
+
+            if acc.simple.children.len() != acc.no_space.len() {
+                let children = acc.no_space;
+                tree_gen::add_cs_no_spaces(&mut dyn_builder, children);
             }
             acc.simple
                 .add_primary(&mut dyn_builder, interned_kind, label_id);
             let compressed_node =
                 NodeStore::insert_built_after_prepare(insertion.vacant(), dyn_builder.build());
 
-            let metrics = SubTreeMetrics {
-                size,
-                height,
-                hashs,
-                size_no_spaces,
-                line_count,
-            };
             Local {
                 compressed_node,
                 metrics,
@@ -535,7 +530,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
         let size_no_spaces = acc.metrics.size_no_spaces + 1;
 
         let label = l.map(|l| label_store.resolve(&l));
-        let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
+        let hbuilder = HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
         let hsyntax = hbuilder.most_discriminating();
         let hashable = &hsyntax;
 
@@ -558,6 +553,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
                 metrics,
             }
         } else {
+            use hyperast::store::nodes::compo;
             let hashs = hbuilder.build();
 
             let mut dyn_builder = subtree_builder::<crate::types::TStore>(interned_kind);
@@ -662,7 +658,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
         let size_no_spaces = acc.metrics.size_no_spaces + 1;
 
         let label = l.map(|l| label_store.resolve(&l));
-        let hbuilder = hashed::HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
+        let hbuilder = HashesBuilder::new(hashs, &interned_kind, &label, size_no_spaces);
         let hsyntax = hbuilder.most_discriminating();
         let hashable = &hsyntax;
 

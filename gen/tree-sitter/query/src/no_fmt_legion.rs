@@ -64,8 +64,6 @@ impl Local {
     fn acc(self, acc: &mut Acc) {
         acc.simple.push(self.compressed_node);
         acc.metrics.acc(self.metrics);
-
-        // TODO things with this.ana
     }
 }
 

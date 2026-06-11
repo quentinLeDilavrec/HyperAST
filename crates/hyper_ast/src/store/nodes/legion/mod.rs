@@ -15,7 +15,9 @@ mod node_store_impl;
 
 mod stores_impl;
 
-pub struct NodeStore<I = NodeStoreInner, D = hashbrown::HashMap<NodeIdentifier, (), ()>> {
+pub type DedupInner = crate::compat::HashMap<NodeIdentifier, (), ()>;
+
+pub struct NodeStore<I = NodeStoreInner, D = DedupInner> {
     #[doc(hidden)]
     pub dedup: D,
     #[doc(hidden)]
@@ -29,7 +31,7 @@ pub struct NodeStoreInner {
     #[cfg(feature = "subtree-stats")]
     stats: super::NodeStoreStats,
     // roots: HashMap<(u8, u8, u8), NodeIdentifier>,
-    // dedup: hashbrown::HashMap<NodeIdentifier, (), ()>,
+    // dedup: Dedup,
     internal: legion::World,
     // TODO intern lists of [`NodeIdentifier`]s, e.g. children, no space children, ...
     // hasher: hashbrown::hash_map::DefaultHashBuilder,
@@ -88,9 +90,9 @@ pub fn _resolve<'a, T>(
 }
 
 #[derive(Default)]
-pub struct DedupMap(pub crate::compat::HashMap<NodeIdentifier, (), ()>);
+pub struct DedupMap(pub DedupInner);
 
-fn default_dedup_hashmap() -> crate::compat::HashMap<NodeIdentifier, (), ()> {
+fn default_dedup_hashmap() -> DedupInner {
     crate::compat::HashMap::with_capacity_and_hasher(1 << 21, ())
 }
 

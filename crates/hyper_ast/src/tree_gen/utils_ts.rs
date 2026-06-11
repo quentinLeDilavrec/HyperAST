@@ -430,3 +430,76 @@ impl<C: super::parser::TreeCursor> PrePost2<C> {
         }
     }
 }
+
+pub fn make_leaf<TS>(
+    node_store: &mut crate::store::nodes::legion::NodeStoreInner,
+    label_store: &mut crate::store::labels::LabelStore,
+    dedup: &mut crate::store::nodes::legion::DedupInner,
+    line_break: &[u8],
+    kind: TS::Ty,
+    text: &str,
+    f: impl FnOnce(&mut crate::store::nodes::legion::dyn_builder::EntityBuilder),
+) -> (
+    crate::store::nodes::legion::NodeIdentifier,
+    super::SubTreeMetrics<crate::hashed::SyntaxNodeHashs<u32>>,
+)
+where
+    TS: crate::types::TypeStore + crate::types::ETypeStore,
+{
+    let bytes_len = text.len();
+    let line_count = text
+        .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
+        .count();
+    let line_count = num::ToPrimitive::to_u32(&line_count).expect("too many newlines");
+    use crate::types::LabelStore;
+    let text_id = label_store.get_or_insert(text);
+    use crate::hashed::IndexingHashBuilder;
+    let hbuilder: crate::hashed::HashesBuilder<crate::hashed::SyntaxNodeHashs<u32>> =
+        crate::hashed::HashesBuilder::new(Default::default(), &kind, &text, 1);
+    let hsyntax = hbuilder.most_discriminating();
+    let hashable = &hsyntax;
+    let eq = |x: crate::store::nodes::legion::EntryRef| {
+        let t = x.get_component::<TS::Ty>();
+        if t != Ok(&kind) {
+            return false;
+        }
+        let l = x.get_component::<crate::store::defaults::LabelIdentifier>();
+        if l != Ok(&text_id) {
+            return false;
+        }
+        // NOTE no children expected
+        true
+    };
+    let insertion = node_store.prepare_insertion(dedup, &hashable, eq);
+    use crate::hashed::MetaDataHashsBuilder;
+    let mut hashs = hbuilder.build();
+    hashs.structt = 0;
+    hashs.label = 0;
+    let compressed_node = if let Some(id) = insertion.occupied_id() {
+        id
+    } else {
+        use crate::store::nodes::compo;
+        let vacant = insertion.vacant();
+        let mut dyn_builder = crate::store::nodes::legion::subtree_builder::<TS>(kind);
+        dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
+        dyn_builder.add(text_id);
+        dyn_builder.add(hashs);
+        dyn_builder.add(crate::filter::BloomSize::None);
+        if line_count != 0 {
+            dyn_builder.add(compo::LineCount(line_count));
+        }
+        f(&mut dyn_builder);
+        crate::store::nodes::legion::NodeStore::insert_built_after_prepare(
+            vacant,
+            dyn_builder.build(),
+        )
+    };
+    let metrics = crate::tree_gen::SubTreeMetrics {
+        size: 1,
+        height: 0,
+        size_no_spaces: 0,
+        hashs,
+        line_count,
+    };
+    (compressed_node, metrics)
+}

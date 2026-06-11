@@ -4,10 +4,9 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use hyperast::cyclomatic::Mcc;
-use hyperast::filter::BloomSize;
 use hyperast::full::FullNode;
 use hyperast::hashed::{HashedNode, IndexingHashBuilder, MetaDataHashsBuilder};
-use hyperast::hashed::{HashesBuilder, SyntaxNodeHashs, SyntaxNodeHashsKinds};
+use hyperast::hashed::{SyntaxNodeHashs, SyntaxNodeHashsKinds};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::LabelIdentifier;
@@ -619,64 +618,33 @@ where
         let kind = Type::Spaces;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
-        let bytes_len = spacing.len();
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
-        let line_count = spacing
-            .matches("\n")
-            .count()
-            .to_u32()
-            .expect("too many newlines");
-        let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
-        let hbuilder: HashesBuilder<SyntaxNodeHashs<u32>> =
-            HashesBuilder::new(Default::default(), &interned_kind, &spacing, 1);
-        let hsyntax = hbuilder.most_discriminating();
-        let hashable = &hsyntax;
 
-        let eq = |x: hyperast::store::nodes::legion::EntryRef| {
-            let t = x.get_component::<TS::Ty>();
-            if t != Ok(&interned_kind) {
-                return false;
-            }
-            let l = x.get_component::<LabelIdentifier>();
-            if l != Ok(&spacing_id) {
-                return false;
-            }
-            true
-        };
+        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
 
         let dedup = &mut self.stores.node_store.dedup;
         let dedup = self.dedup.as_mut().map_or(dedup, |x| &mut x.0);
-        let insertion = (self.stores.node_store.inner).prepare_insertion(dedup, &hashable, eq);
-
-        let mut hashs = hbuilder.build();
-        hashs.structt = 0;
-        hashs.label = 0;
-
-        let compressed_node = if let Some(id) = insertion.occupied_id() {
-            id
-        } else {
-            use hyperast::store::nodes::compo;
-            let vacant = insertion.vacant();
-            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
-            dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
-            dyn_builder.add(spacing_id);
-            dyn_builder.add(hashs);
-            dyn_builder.add(BloomSize::None);
-            if line_count != 0 {
-                dyn_builder.add(compo::LineCount(line_count));
-            }
+        let node_store = &mut self.stores.node_store.inner;
+        let label_store = &mut self.stores.label_store;
+        let line_break = &self.line_break;
+        let more = |dyn_builder: &mut _| {
             if More::USING {
                 let prepro = self.more.preprocessing(Type::Spaces).unwrap();
                 let subtr = hyperast::scripting::Subtr(kind, &dyn_builder);
                 use hyperast::scripting::Finishable;
-                let ss = prepro
-                    .finish_with_label(self.more.scripts(), &subtr, &spacing)
-                    .unwrap();
+                let scripts = self.more.scripts();
+                let ss = prepro.finish_with_label(scripts, &subtr, &spacing).unwrap();
                 dyn_builder.add(ss);
             };
-
-            NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
         };
+        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+            node_store,
+            label_store,
+            dedup,
+            line_break,
+            interned_kind,
+            &spacing,
+            more,
+        );
         debug_assert!(
             hyperast::store::nodes::PolyglotHolder::lang_id(
                 &self.stores.node_store.resolve(compressed_node)
@@ -687,16 +655,10 @@ where
         );
         Local {
             compressed_node,
-            metrics: SubTreeMetrics {
-                size: 1,
-                height: 0,
-                size_no_spaces: 0,
-                hashs,
-                line_count,
-            },
+            metrics,
             #[cfg(feature = "impact")]
             ana: Default::default(),
-            mcc: Mcc::new(&Type::Spaces),
+            mcc: Mcc::new(&kind),
             role: None,
             precomp_queries: Default::default(),
             stmt_count: 0,
@@ -826,6 +788,72 @@ where
         }
     }
 }
+
+// fn make_spacing<TS>(
+//     node_store: &mut hyperast::store::nodes::legion::NodeStoreInner,
+//     label_store: &mut hyperast::store::labels::LabelStore,
+//     dedup: &mut hyperast::store::nodes::legion::DedupInner,
+//     kind: TS::Ty,
+//     spacing: &str,
+//     f: impl FnOnce(&mut hyperast::store::nodes::legion::dyn_builder::EntityBuilder),
+// ) -> (NodeIdentifier, SubTreeMetrics<SyntaxNodeHashs<u32>>)
+// where
+//     TS: types::TypeStore,
+// {
+//     let interned_kind = TS::intern(kind);
+//     debug_assert_eq!(kind, TS::resolve(interned_kind));
+//     let bytes_len = spacing.as_bytes().len();
+//     let line_count = spacing
+//         .matches("\n")
+//         .count()
+//         .to_u32()
+//         .expect("too many newlines");
+//     let spacing_id = label_store.get_or_insert(spacing);
+//     let hbuilder: HashesBuilder<SyntaxNodeHashs<u32>> =
+//         HashesBuilder::new(Default::default(), &interned_kind, &spacing, 1);
+//     let hsyntax = hbuilder.most_discriminating();
+//     let hashable = &hsyntax;
+//     let eq = |x: hyperast::store::nodes::legion::EntryRef| {
+//         let t = x.get_component::<TS::Ty>();
+//         if t != Ok(&interned_kind) {
+//             return false;
+//         }
+//         let l = x.get_component::<LabelIdentifier>();
+//         if l != Ok(&spacing_id) {
+//             return false;
+//         }
+//         true
+//     };
+//     let insertion = node_store.prepare_insertion(dedup, &hashable, eq);
+//     let mut hashs = hbuilder.build();
+//     hashs.structt = 0;
+//     hashs.label = 0;
+//     let compressed_node = if let Some(id) = insertion.occupied_id() {
+//         id
+//     } else {
+//         use hyperast::store::nodes::compo;
+//         let vacant = insertion.vacant();
+//         let mut dyn_builder = subtree_builder::<TS>(interned_kind);
+//         dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
+//         dyn_builder.add(spacing_id);
+//         dyn_builder.add(hashs);
+//         dyn_builder.add(BloomSize::None);
+//         if line_count != 0 {
+//             dyn_builder.add(compo::LineCount(line_count));
+//         }
+//         f(&mut dyn_builder);
+
+//         NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
+//     };
+//     let metrics = SubTreeMetrics {
+//         size: 1,
+//         height: 0,
+//         size_no_spaces: 0,
+//         hashs,
+//         line_count,
+//     };
+//     (compressed_node, metrics)
+// }
 
 impl<'stores, TS, More, const HIDDEN_NODES: bool> TreeGen
     for JavaTreeGen<'stores, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>

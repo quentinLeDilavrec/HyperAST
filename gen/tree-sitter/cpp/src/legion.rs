@@ -1,8 +1,7 @@
 //! fully compress all subtrees from a cpp CST
-use num::ToPrimitive as _;
 use std::{collections::HashMap, fmt::Debug, vec};
 
-use hyperast::hashed::{self, IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
+use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::DefaultNodeStore as NodeStore;
 use hyperast::store::nodes::compo;
@@ -19,7 +18,7 @@ use hyperast::tree_gen::{
 use hyperast::tree_gen::{SpacedGlobalData, Spaces, get_spacing, has_final_space, try_get_spacing};
 use hyperast::types;
 use hyperast::types::{LabelStore as _, Role};
-use hyperast::{filter::BloomSize, full::FullNode, nodes::Space};
+use hyperast::{full::FullNode, nodes::Space};
 
 use crate::TNode;
 use crate::types::{CppEnabledTypeStore, TStore, Type};
@@ -118,8 +117,6 @@ impl Local {
             .viz_cs_count
             .checked_add(self.viz_cs_count)
             .expect("type of viz_cs_count is too small");
-
-        // TODO things with this.ana
     }
 }
 
@@ -521,72 +518,29 @@ where
             _p: std::marker::PhantomData,
         }
     }
-    pub(crate) fn make_spacing(
-        &mut self,
-        spacing: Vec<u8>, //Space>,
-    ) -> Local {
+    pub(crate) fn make_spacing(&mut self, spacing: Vec<u8>) -> Local {
         let kind = Type::Spaces;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
-        let bytes_len = spacing.len();
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
-        let line_count = spacing
-            .matches("\n")
-            .count()
-            .to_u32()
-            .expect("too many newlines");
-        let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
-        let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
-            hashed::HashesBuilder::new(Default::default(), &interned_kind, &spacing, 1);
-        let hsyntax = hbuilder.most_discriminating();
-        let hashable = &hsyntax;
 
-        let eq = |x: hyperast::store::nodes::legion::EntryRef| {
-            let t = x.get_component::<TS::Ty>();
-            if t != Ok(&interned_kind) {
-                return false;
-            }
-            let l = x.get_component::<LabelIdentifier>();
-            if l != Ok(&spacing_id) {
-                return false;
-            }
-            true
-        };
+        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
 
         let dedup = &mut self.stores.node_store.dedup;
-        let dedup = self.dedup.as_mut().map_or(dedup, |x| &mut x.0);
-        let insertion = (self.stores.node_store.inner).prepare_insertion(dedup, &hashable, eq);
-
-        let mut hashs = hbuilder.build();
-        hashs.structt = 0;
-        hashs.label = 0;
-
-        let compressed_node = if let Some(id) = insertion.occupied_id() {
-            id
-        } else {
-            let vacant = insertion.vacant();
-            let bytes_len = compo::BytesLen(bytes_len.try_into().unwrap());
-            NodeStore::insert_after_prepare(
-                vacant,
-                (
-                    crate::types::Lang,
-                    interned_kind,
-                    spacing_id,
-                    bytes_len,
-                    hashs,
-                    BloomSize::None,
-                ),
-            )
-        };
+        let node_store = &mut self.stores.node_store.inner;
+        let label_store = &mut self.stores.label_store;
+        let line_break = &self.line_break;
+        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+            node_store,
+            label_store,
+            dedup,
+            line_break,
+            interned_kind,
+            &spacing,
+            |_| {},
+        );
         Local {
             compressed_node,
-            metrics: SubTreeMetrics {
-                size: 1,
-                height: 0,
-                size_no_spaces: 0,
-                hashs,
-                line_count,
-            },
+            metrics,
             ana: Default::default(),
             role: None,
             precomp_queries: Default::default(),
@@ -598,55 +552,23 @@ where
         let kind = Type::ERROR;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
-        let bytes_len = text.len();
         let text = std::str::from_utf8(text).unwrap().to_string();
-        let line_count = text
-            .matches("\n")
-            .count()
-            .to_u32()
-            .expect("too many newlines");
-        let label_id = self.stores.label_store.get_or_insert(text.clone());
-        let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
-            hashed::HashesBuilder::new(Default::default(), &interned_kind, &text, 1);
-        let hsyntax = hbuilder.most_discriminating();
-        let hashable = &hsyntax;
-
-        let eq = eq_node::<_, _, NodeIdentifier>(&interned_kind, Some(&label_id), &[]);
-
-        let node_store = &mut self.stores.node_store;
-
-        let dedup = self.dedup.as_mut();
-        let dedup = dedup.map_or(&mut node_store.dedup, |x| &mut x.0);
-        let insertion = node_store.inner.prepare_insertion(dedup, hashable, eq);
-
-        let hashs = hbuilder.build();
-
-        let compressed_node = if let Some(id) = insertion.occupied_id() {
-            id
-        } else {
-            let vacant = insertion.vacant();
-            let bytes_len = compo::BytesLen(bytes_len.try_into().unwrap());
-            NodeStore::insert_after_prepare(
-                vacant,
-                (
-                    crate::types::Lang,
-                    interned_kind,
-                    label_id,
-                    bytes_len,
-                    hashs,
-                    BloomSize::None,
-                ),
-            )
-        };
+        let dedup = &mut self.stores.node_store.dedup;
+        let node_store = &mut self.stores.node_store.inner;
+        let label_store = &mut self.stores.label_store;
+        let line_break = &self.line_break;
+        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+            node_store,
+            label_store,
+            dedup,
+            line_break,
+            interned_kind,
+            &text,
+            |_| {},
+        );
         Local {
             compressed_node,
-            metrics: SubTreeMetrics {
-                size: 1,
-                height: 0,
-                size_no_spaces: 0,
-                hashs,
-                line_count,
-            },
+            metrics,
             ana: Default::default(),
             role: None,
             precomp_queries: Default::default(),

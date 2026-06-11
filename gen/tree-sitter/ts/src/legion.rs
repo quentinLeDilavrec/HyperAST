@@ -1,9 +1,8 @@
 //! fully compress all subtrees from a typescript CST
 use std::{collections::HashMap, fmt::Debug};
 
-use hyperast::filter::BloomSize;
 use hyperast::full::FullNode;
-use hyperast::hashed::{self, SyntaxNodeHashs};
+use hyperast::hashed::SyntaxNodeHashs;
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
@@ -69,8 +68,6 @@ impl Local {
         }
         acc.simple.push(self.compressed_node);
         acc.metrics.acc(self.metrics);
-
-        // TODO things with this.ana
     }
 }
 
@@ -243,66 +240,29 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
 }
 
 impl<'store, 'cache, TS: TsEnabledTypeStore> TsTreeGen<'store, 'cache, TS> {
-    fn make_spacing(
-        &mut self,
-        spacing: Vec<u8>, //Space>,
-    ) -> Local {
+    fn make_spacing(&mut self, spacing: Vec<u8>) -> Local {
         let kind = Type::Spaces;
         let interned_kind = TS::intern(kind);
-        let bytes_len = spacing.len();
+        debug_assert_eq!(kind, TS::resolve(interned_kind));
+
         let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
-        use num::ToPrimitive;
-        let line_count = (spacing.matches("\n").count())
-            .to_u32()
-            .expect("too many newlines");
-        let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
-        let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
-            hashed::HashesBuilder::new(Default::default(), &interned_kind, &spacing, 1);
-        let hsyntax = hbuilder.most_discriminating();
-        let hashable = &hsyntax;
 
-        let eq = |x: hyperast::store::nodes::legion::EntryRef| {
-            let t = x.get_component::<TS::Ty>();
-            if t != Ok(&interned_kind) {
-                return false;
-            }
-            let l = x.get_component::<LabelIdentifier>();
-            if l != Ok(&spacing_id) {
-                return false;
-            }
-            true
-        };
-
-        let insertion = self.stores.node_store.prepare_insertion(&hashable, eq);
-
-        let mut hashs = hbuilder.build();
-        hashs.structt = 0;
-        hashs.label = 0;
-
-        let compressed_node = if let Some(id) = insertion.occupied_id() {
-            id
-        } else {
-            let vacant = insertion.vacant();
-            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
-
-            dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
-            dyn_builder.add(spacing_id);
-            dyn_builder.add(hashs);
-            dyn_builder.add(BloomSize::None);
-            if line_count != 0 {
-                dyn_builder.add(compo::LineCount(line_count));
-            }
-            NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
-        };
+        let dedup = &mut self.stores.node_store.dedup;
+        let node_store = &mut self.stores.node_store.inner;
+        let label_store = &mut self.stores.label_store;
+        let line_break = &self.line_break;
+        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+            node_store,
+            label_store,
+            dedup,
+            line_break,
+            interned_kind,
+            &spacing,
+            |_| {},
+        );
         Local {
             compressed_node,
-            metrics: SubTreeMetrics {
-                size: 1,
-                height: 0,
-                hashs,
-                size_no_spaces: 0,
-                line_count: 0,
-            },
+            metrics,
         }
     }
 

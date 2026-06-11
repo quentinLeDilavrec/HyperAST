@@ -562,6 +562,36 @@ impl ErazedFcts {
     }
 }
 
+/// returns marker of a `tree_sitter::Language`,
+/// either TreeSitter::Metadata or a hash of some markers
+/// NOTE the hash is an approximation
+///
+/// TIP save the result and use it to check if you might have a language incompatibility
+pub fn language_marker(language: &tree_sitter::Language) -> u64 {
+    use hyperast::compat::DefaultHashBuilder;
+    use std::hash::BuildHasher;
+    use std::hash::Hash;
+    let metadata = language.metadata();
+    if let Some(metadata) = metadata {
+        ((metadata.major_version as u64) << 16)
+            + ((metadata.minor_version as u64) << 8)
+            + metadata.patch_version as u64
+    } else {
+        use std::hash::Hasher;
+        let mut h = DefaultHashBuilder::new().build_hasher();
+        h.write_usize(language.abi_version());
+        h.write_usize(language.node_kind_count());
+        for i in (0..language.node_kind_count()) {
+            h.write(language.node_kind_for_id(i as u16).unwrap().as_bytes())
+        }
+        h.write_usize(language.field_count());
+        for i in (0..language.field_count()) {
+            h.write(language.field_name_for_id(i as u16).unwrap().as_bytes())
+        }
+        h.finish()
+    }
+}
+
 #[test]
 fn test_issue_missing_last_child_before_ts_0_26() {
     let meta_simp: &str = r#"(named_node

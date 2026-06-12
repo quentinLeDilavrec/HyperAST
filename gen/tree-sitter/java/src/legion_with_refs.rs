@@ -31,7 +31,7 @@ use hyperast::types::{Role, RoleStore};
 use crate::TNode;
 use crate::TStore;
 use crate::Type;
-use crate::types::JavaEnabledTypeStore;
+use crate::types::impls::JavaEnabledTypeStore;
 
 #[cfg(feature = "impact")]
 mod reference_analysis;

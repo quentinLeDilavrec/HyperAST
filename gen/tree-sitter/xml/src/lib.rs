@@ -9,17 +9,11 @@ pub use types::{Lang, TIdN, TStore};
 #[doc(hidden)]
 pub use types::TType;
 
-#[cfg(feature = "impl")]
-#[cfg(test)]
+#[cfg(all(test, feature = "impl"))]
 mod tests;
 
 #[cfg(feature = "legion")]
-mod tnode {
-    pub use hyperast::tree_gen::utils_ts::TNode;
-}
-
-#[cfg(feature = "legion")]
-pub use tnode::TNode;
+pub use hyperast::tree_gen::utils_ts::TNode;
 
 #[cfg(feature = "legion")]
 pub mod iter;

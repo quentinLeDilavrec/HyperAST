@@ -18,9 +18,7 @@ pub mod no_fmt_legion;
 pub mod tests;
 
 #[cfg(feature = "legion")]
-mod tnode {
-    pub use hyperast::tree_gen::utils_ts::TNode;
-}
+pub use hyperast::tree_gen::utils_ts::TNode;
 
 #[cfg(feature = "impl")]
 use auto::tsq_ser_meta::Conv;
@@ -28,8 +26,6 @@ use auto::tsq_ser_meta::Conv;
 use hyperast::types::TypeTrait;
 #[cfg(feature = "impl")]
 use search::Captured;
-#[cfg(feature = "legion")]
-pub use tnode::TNode;
 
 #[cfg(feature = "impl")]
 pub mod search;

@@ -24,7 +24,7 @@ use hyperast::types::{HyperType, WithSerialization};
 use crate::TIdN;
 use crate::TNode;
 use crate::Type;
-use crate::types::TsQueryEnabledTypeStore;
+use crate::types::impls::TsQueryEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

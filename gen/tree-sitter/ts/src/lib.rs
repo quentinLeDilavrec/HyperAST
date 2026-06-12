@@ -11,12 +11,7 @@ pub use types::Type;
 pub use types::{Lang, TIdN};
 
 #[cfg(feature = "legion")]
-mod tnode {
-    pub use hyperast::tree_gen::utils_ts::TNode;
-}
-
-#[cfg(feature = "legion")]
-pub use tnode::TNode;
+pub use hyperast::tree_gen::utils_ts::TNode;
 
 #[cfg(feature = "impl")]
 pub fn language() -> tree_sitter::Language {

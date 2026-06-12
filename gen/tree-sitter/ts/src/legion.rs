@@ -26,7 +26,7 @@ use hyperast::types::LabelStore as LabelStoreTrait;
 
 use crate::TNode;
 use crate::Type;
-use crate::types::TsEnabledTypeStore;
+use crate::types::impls::TsEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

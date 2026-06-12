@@ -2,57 +2,46 @@
 //!
 //! wraps tree-sitter-cpp
 
-#[cfg(all(feature = "impl_intern", feature = "legion"))]
-pub mod legion;
-
-#[cfg(test)]
-#[cfg(all(feature = "impl_intern", feature = "legion"))]
-mod legion_ts_simp;
-
-#[cfg(not(feature = "alt_grammar"))]
-pub(crate) mod types;
-
-#[cfg(feature = "alt_grammar")]
-pub(crate) mod types_alt;
-#[cfg(feature = "alt_grammar")]
-pub(crate) use types_alt as types;
+cfg_if::cfg_if! { if #[cfg(feature = "alt_grammar")] {
+    pub(crate) mod types_alt;
+    pub(crate) use types_alt as types;
+} else {
+    pub(crate) mod types;
+}}
 
 pub use types::{Lang, Role, TIdN, TStore, Type};
 
 #[doc(hidden)]
 pub use types::TType;
 
-#[cfg(feature = "impl_intern")]
-#[cfg(test)]
-mod tests;
+cfg_if::cfg_if! { if #[cfg(feature = "legion")] {
+    pub mod legion;
 
-#[cfg(feature = "legion")]
-mod tnode {
+    #[cfg(test)]
+    mod legion_ts_simp;
+
     pub use hyperast::tree_gen::utils_ts::TNode;
-}
 
-#[cfg(feature = "legion")]
-pub use tnode::TNode;
-
-#[cfg(feature = "legion")]
-pub mod iter;
+    pub mod iter;
+}}
 
 #[cfg(feature = "impl_intern")]
 pub fn language() -> tree_sitter::Language {
-    #[cfg(feature = "alt_grammar")]
-    {
+    cfg_if::cfg_if! { if #[cfg(feature = "alt_grammar")] {
         tree_sitter::Language::new(tree_sitter_cpp_alt::LANGUAGE)
-    }
-    #[cfg(not(feature = "alt_grammar"))]
-    tree_sitter::Language::new(tree_sitter_cpp::LANGUAGE)
+    } else {
+        tree_sitter::Language::new(tree_sitter_cpp::LANGUAGE)
+    }}
 }
 
 #[cfg(feature = "impl_intern")]
 pub fn node_types() -> &'static str {
-    #[cfg(feature = "alt_grammar")]
-    {
+    cfg_if::cfg_if! { if #[cfg(feature = "alt_grammar")] {
         tree_sitter_cpp_alt::NODE_TYPES
-    }
-    #[cfg(not(feature = "alt_grammar"))]
-    tree_sitter_cpp::NODE_TYPES
+    } else {
+        tree_sitter_cpp::NODE_TYPES
+    }}
 }
+
+#[cfg(all(test, feature = "impl_intern"))]
+mod tests;

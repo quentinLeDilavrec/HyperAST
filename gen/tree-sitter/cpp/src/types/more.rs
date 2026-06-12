@@ -3,16 +3,6 @@
 
 use crate::types::Type;
 
-macro_rules! is {
-    ($e:expr, $($p:ident $(if $guard:expr)?, )*) => {
-        match $e {$(
-            Type::$p $(if $guard)? => true,)*
-            _ => false
-        }
-    };
-}
-pub(super) use is;
-
 impl Type {
     pub fn is_repeat(&self) -> bool {
         is!(
@@ -240,3 +230,13 @@ impl Type {
         }
     }
 }
+
+macro_rules! is {
+    ($e:expr, $($p:ident $(if $guard:expr)?, )*) => {
+        match $e {$(
+            Type::$p $(if $guard)? => true,)*
+            _ => false
+        }
+    };
+}
+pub(super) use is;

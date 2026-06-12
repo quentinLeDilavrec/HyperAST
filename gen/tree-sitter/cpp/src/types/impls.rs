@@ -63,11 +63,7 @@ impl hyperast::types::ETypeStore for TStore {
     }
 }
 
-#[cfg(feature = "impl_intern")]
-mod legion_impls {
-
-    use super::*;
-
+cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
     use hyperast::types::{LangWrapper, RoleStore};
 
     impl CppEnabledTypeStore for TStore {
@@ -79,14 +75,14 @@ mod legion_impls {
     impl RoleStore for TStore {
         type IdF = u16;
 
-        type Role = super::Role;
+        type Role = Role;
 
         fn resolve_field(_lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
             let s = crate::language()
                 .field_name_for_id(field_id)
                 .ok_or_else(|| format!("{}", field_id))
                 .unwrap();
-            crate::Role::try_from(s).expect(s)
+            Role::try_from(s).expect(s)
         }
 
         fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
@@ -97,30 +93,28 @@ mod legion_impls {
                 .into()
         }
     }
-}
 
-#[cfg(feature = "impl_intern")]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    crate::language().id_for_node_kind(kind, named)
-}
-#[cfg(not(feature = "impl_intern"))]
-fn id_for_node_kind(_kind: &str, _named: bool) -> u16 {
-    unimplemented!("need treesitter grammar")
-}
+    fn id_for_node_kind(kind: &str, named: bool) -> u16 {
+        crate::language().id_for_node_kind(kind, named)
+    }
 
-#[cfg(feature = "impl_intern")]
-pub trait CppEnabledTypeStore:
-    hyperast::types::ETypeStore<Ty2 = Type> + Clone + hyperast::tree_gen::TsEnableTS
-{
-    // fn intern(t: Type) -> Self::Ty;
-    fn resolve(t: Self::Ty) -> Type;
-}
+    pub trait CppEnabledTypeStore:
+        hyperast::types::ETypeStore<Ty2 = Type> + Clone + hyperast::tree_gen::TsEnableTS
+    {
+        // fn intern(t: Type) -> Self::Ty;
+        fn resolve(t: Self::Ty) -> Type;
+    }
 
-#[cfg(not(feature = "impl_intern"))]
-pub trait CppEnabledTypeStore: TypeStore {
-    // fn intern(t: Type) -> Self::Ty;
-    fn resolve(t: Self::Ty) -> Type;
-}
+} else {
+    fn id_for_node_kind(_kind: &str, _named: bool) -> u16 {
+        unimplemented!("need treesitter grammar")
+    }
+
+    pub trait CppEnabledTypeStore: TypeStore {
+        // fn intern(t: Type) -> Self::Ty;
+        fn resolve(t: Self::Ty) -> Type;
+    }
+}}
 
 impl Type {
     pub fn resolve(t: u16) -> Self {
@@ -150,12 +144,6 @@ impl<IdN: Clone + Eq + UniformNodeId> TypedNodeId for TIdN<IdN> {
     type TyErazed = TType;
     fn unerase(ty: Self::TyErazed) -> Self::Ty {
         ty.e()
-    }
-}
-
-impl Default for TStore {
-    fn default() -> Self {
-        Self
     }
 }
 

@@ -11,6 +11,7 @@ macro_rules! is {
         }
     };
 }
+pub(super) use is;
 
 impl Type {
     pub fn is_repeat(&self) -> bool {

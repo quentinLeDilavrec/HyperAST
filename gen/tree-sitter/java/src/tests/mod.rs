@@ -18,9 +18,9 @@ mod test_cases;
 fn type_test_generic_eq() {
     use hyperast::types::HyperType;
 
-    let k = crate::types::Type::EnhancedForStatement;
-    let k0 = crate::types::Type::EnhancedForStatement;
-    let k1 = crate::types::Type::ClassDeclaration;
+    let k = crate::Type::EnhancedForStatement;
+    let k0 = crate::Type::EnhancedForStatement;
+    let k1 = crate::Type::ClassDeclaration;
     assert!(k.eq(&k));
     assert!(k.eq(&k0));
     assert!(k0.eq(&k));
@@ -35,9 +35,9 @@ fn type_test_generic_eq() {
     assert!(!k.generic_eq(&k1));
     assert!(!k1.generic_eq(&k));
 
-    let ak = crate::types::as_any(&crate::types::Type::EnhancedForStatement);
-    let ak0 = crate::types::as_any(&crate::types::Type::EnhancedForStatement);
-    let ak1 = crate::types::as_any(&crate::types::Type::ClassDeclaration);
+    let ak = crate::types::as_any(&crate::Type::EnhancedForStatement);
+    let ak0 = crate::types::as_any(&crate::Type::EnhancedForStatement);
+    let ak1 = crate::types::as_any(&crate::Type::ClassDeclaration);
 
     assert!(ak.generic_eq(&ak));
     assert!(ak.generic_eq(&ak0));
@@ -71,8 +71,9 @@ fn type_test_generic_eq() {
 mod structure {
     use hyperast::store::SimpleStores;
 
-    use crate::legion_with_refs::{self, JavaTreeGen};
-    use crate::types::TStore;
+    use crate::TStore;
+    use crate::legion_with_refs::JavaTreeGen;
+    use crate::legion_with_refs::tree_sitter_parse;
 
     #[test]
     fn structure_test() {
@@ -88,7 +89,7 @@ mod structure {
         let mut md_cache = Default::default();
         let mut java_tree_gen = JavaTreeGen::new(&mut stores, &mut md_cache);
 
-        let tree = match legion_with_refs::tree_sitter_parse(text) {
+        let tree = match tree_sitter_parse(text) {
             Ok(t) => t,
             Err(t) => t,
         };
@@ -144,7 +145,7 @@ mod structure {
         let mut md_cache = Default::default();
         let mut java_tree_gen = JavaTreeGen::new(&mut stores, &mut md_cache);
 
-        let tree = match legion_with_refs::tree_sitter_parse(text) {
+        let tree = match tree_sitter_parse(text) {
             Ok(t) => t,
             Err(t) => t,
         };

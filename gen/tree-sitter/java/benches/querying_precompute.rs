@@ -27,14 +27,13 @@ fn prep_default(
     text: &[u8],
 ) -> (
     hyperast_tsquery::Query,
-    hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>,
+    hyperast::store::SimpleStores<hyperast_gen_ts_java::TStore>,
     hyperast::store::defaults::NodeIdentifier,
 ) {
     use hyperast_gen_ts_java::legion_with_refs;
     let query = hyperast_tsquery::Query::new(query, hyperast_gen_ts_java::language()).unwrap();
 
-    let mut stores =
-        hyperast::store::SimpleStores::<hyperast_gen_ts_java::types::TStore>::default();
+    let mut stores = hyperast::store::SimpleStores::<hyperast_gen_ts_java::TStore>::default();
     let mut md_cache = Default::default();
     let mut java_tree_gen = legion_with_refs::JavaTreeGen::new(&mut stores, &mut md_cache);
 
@@ -54,11 +53,11 @@ fn prep_precomputed(
     text: &[u8],
 ) -> (
     hyperast_tsquery::Query,
-    hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>,
+    hyperast::store::SimpleStores<hyperast_gen_ts_java::TStore>,
     hyperast::store::defaults::NodeIdentifier,
 ) {
+    use hyperast_gen_ts_java::TStore;
     use hyperast_gen_ts_java::legion_with_refs;
-    use hyperast_gen_ts_java::types::TStore;
     let (precomp, query) =
         hyperast_tsquery::Query::with_precomputed(query, hyperast_gen_ts_java::language(), precomp)
             .unwrap();
@@ -169,7 +168,7 @@ fn compare_querying_group(c: &mut Criterion) {
                 let query =
                     hyperast_tsquery::Query::new(q.1, hyperast_gen_ts_java::language()).unwrap();
                 let mut stores =
-                    hyperast::store::SimpleStores::<hyperast_gen_ts_java::types::TStore>::default();
+                    hyperast::store::SimpleStores::<hyperast_gen_ts_java::TStore>::default();
                 let mut md_cache = Default::default();
                 let mut java_tree_gen = hyperast_gen_ts_java::legion_with_refs::JavaTreeGen::new(
                     &mut stores,
@@ -211,13 +210,12 @@ fn compare_querying_group(c: &mut Criterion) {
                         q.0,
                     )
                     .unwrap();
-                    let mut stores = hyperast::store::SimpleStores::<
-                        hyperast_gen_ts_java::types::TStore,
-                    >::default();
+                    let mut stores =
+                        hyperast::store::SimpleStores::<hyperast_gen_ts_java::TStore>::default();
                     let mut md_cache = Default::default();
                     let more = hyperast_tsquery::PreparedQuerying::<
                         _,
-                        hyperast_gen_ts_java::types::TStore,
+                        hyperast_gen_ts_java::TStore,
                         _,
                     >::from(&precomp);
                     let mut java_tree_gen =

@@ -15,10 +15,10 @@ use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::{Processor, StackEle};
 
 use crate::make::MakeModuleAcc;
+use hyperast_gen_ts_cpp::Type;
 use hyperast_gen_ts_cpp::legion::{self as cpp_gen};
-use hyperast_gen_ts_cpp::types::Type;
 
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::types::TStore>;
+pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
 
 type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<CppProc>;
 
@@ -325,7 +325,7 @@ impl RepositoryProcessor {
                 let dedup = &mut cpp_proc.cache.dedup;
                 let stores = self
                     .main_stores
-                    .mut_with_ts::<hyperast_gen_ts_cpp::types::TStore>();
+                    .mut_with_ts::<hyperast_gen_ts_cpp::TStore>();
                 let r = if let Some(more) = &cpp_proc.query {
                     let more = &more.0;
                     let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
@@ -424,7 +424,7 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
     let kind = Type::Directory;
-    let interned_kind = hyperast_gen_ts_cpp::types::TStore::intern(kind);
+    let interned_kind = hyperast_gen_ts_cpp::TStore::intern(kind);
     let label_id = label_store.get_or_insert(acc.primary.name.clone());
 
     let primary = acc
@@ -449,7 +449,7 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
         return cpp_gen::Local { ..md.local(id) };
     }
 
-    let mut dyn_builder = subtree_builder::<hyperast_gen_ts_cpp::types::TStore>(interned_kind);
+    let mut dyn_builder = subtree_builder::<hyperast_gen_ts_cpp::TStore>(interned_kind);
 
     let ana = None;
 

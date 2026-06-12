@@ -236,7 +236,7 @@ fn main() {
                 // nofetch avoids potential noise and unintentional dataset changes
                 let repository = repo_h.nofetch();
                 let elapsed_load_repo = start.elapsed();
-                let uniqs = synth_init_inst::find_uniques::<ts_gen::types::TStore>(
+                let uniqs = synth_init_inst::find_uniques::<ts_gen::TStore>(
                     &mut repositories,
                     repository,
                     &sub,
@@ -251,7 +251,7 @@ fn main() {
                 let elapsed_initial_prepare = uniqs.initial_prepare_duration.unwrap_or_default();
                 let elapsed_compute_examples = start.elapsed();
                 let stores = &repositories.processor.main_stores;
-                let sss: &hyperast::store::SimpleStores<ts_gen::types::TStore> = stores.with_ts();
+                let sss: &hyperast::store::SimpleStores<ts_gen::TStore> = stores.with_ts();
                 let meta_gen = hyperast_benchmark_search::meta_queries::META_GEN;
                 let mut inst = uniqs.set.values().copied().collect::<Vec<_>>();
                 dbg!(inst.len());
@@ -458,7 +458,7 @@ fn main() {
 
             let lang = hyperast_vcs_git::resolve_language(&language).unwrap();
             if language == "Java" {
-                per_blob::<hyperast_gen_ts_java::types::TStore>(
+                per_blob::<hyperast_gen_ts_java::TStore>(
                     repo, &sub, commit, depth, &lang, queries, timeout,
                 );
             } else if language == "Cpp" {

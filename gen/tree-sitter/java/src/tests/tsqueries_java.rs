@@ -421,7 +421,7 @@ fn prep_stepped(
     text: &[u8],
 ) -> (
     hyperast_tsquery::Query,
-    SimpleStores<crate::types::TStore>,
+    SimpleStores<crate::TStore>,
     NodeIdentifier,
 ) {
     use crate::legion_with_refs;
@@ -451,11 +451,11 @@ fn prep_prepro(
     text: &[u8],
 ) -> (
     hyperast_tsquery::Query,
-    SimpleStores<crate::types::TStore>,
+    SimpleStores<crate::TStore>,
     NodeIdentifier,
 ) {
+    use crate::TStore;
     use crate::legion_with_refs;
-    use crate::types::TStore;
     let (precomp, query) =
         hyperast_tsquery::Query::with_precomputed(query, crate::language(), subqueries).unwrap();
     assert_eq!(precomp.enabled_pattern_count(), subqueries.len());

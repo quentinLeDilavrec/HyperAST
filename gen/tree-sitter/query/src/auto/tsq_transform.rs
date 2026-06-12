@@ -2,7 +2,7 @@ use hyperast::PrimInt;
 use hyperast::store::{SimpleStores, defaults::NodeIdentifier};
 use hyperast::types::{Childrn, Labeled};
 
-use crate::types::TIdN;
+use crate::TIdN;
 
 #[derive(Debug, Clone)]
 pub enum Action<Idx, IdN = NodeIdentifier> {
@@ -22,7 +22,7 @@ impl Action<Idx, IdN> {
 type Idx = u16;
 type IdN = NodeIdentifier;
 pub fn regen_query(
-    ast: &mut SimpleStores<crate::types::TStore>,
+    ast: &mut SimpleStores<crate::TStore>,
     root: NodeIdentifier,
     actions: Vec<Action<Idx, IdN>>,
 ) -> Option<NodeIdentifier> {
@@ -185,7 +185,7 @@ pub fn regen_query(
     }
     let actions = ActionTree::from(actions);
     fn apply(
-        ast: &mut crate::no_fmt_legion::TsQueryTreeGen<'_, '_, crate::types::TStore>,
+        ast: &mut crate::no_fmt_legion::TsQueryTreeGen<'_, '_, crate::TStore>,
         a: ActionTree<Idx>,
         c: NodeIdentifier,
     ) -> Option<NodeIdentifier> {
@@ -239,7 +239,7 @@ pub fn regen_query(
 }
 
 pub fn try_regen_query(
-    stores: &SimpleStores<crate::types::TStore>,
+    stores: &SimpleStores<crate::TStore>,
     root: NodeIdentifier,
     actions: Vec<Action<Idx, IdN>>,
 ) -> Option<NodeIdentifier> {
@@ -365,7 +365,7 @@ pub fn try_regen_query(
     }
     let actions = ActionTree::from(actions);
     fn apply(
-        stores: &SimpleStores<crate::types::TStore>,
+        stores: &SimpleStores<crate::TStore>,
         a: ActionTree<Idx>,
         c: NodeIdentifier,
     ) -> Option<NodeIdentifier> {

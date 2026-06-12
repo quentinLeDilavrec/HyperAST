@@ -1040,7 +1040,7 @@ impl<'a> FetchedViewImpl<'a> {
                         x => panic!("{:?}", x),
                     }
                 } else {
-                    let kind: &'static dyn HyperType = &hyperast_gen_ts_cpp::types::Type::ERROR;
+                    let kind: &'static dyn HyperType = &hyperast_gen_ts_cpp::Type::ERROR;
                     imp.additions = None;
                     imp.deletions = None;
                     let a = imp.ui_typed_impl2(ui, AnyType::from(kind), 0);

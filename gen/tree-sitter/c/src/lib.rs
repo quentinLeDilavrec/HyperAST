@@ -1,3 +1,7 @@
+//! HyperAST generator for the C programming language using TreeSitter.
+//!
+//! wraps tree-sitter-c
+
 #[cfg(all(feature = "impl", feature = "legion"))]
 pub mod legion;
 
@@ -8,7 +12,13 @@ mod legion_ts_simp;
 #[cfg(test)]
 mod tests;
 
-pub mod types;
+pub(crate) mod types;
+
+pub use types::Type;
+pub use types::{Lang, Role, TIdN, TStore};
+
+#[doc(hidden)]
+pub use types::TType;
 
 #[cfg(feature = "legion")]
 mod tnode {

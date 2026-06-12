@@ -1,6 +1,6 @@
 use hyperast::tree_gen::NoOpMore;
 
-use crate::types::TStore;
+use crate::TStore;
 
 type SimpleStores = hyperast::store::SimpleStores<TStore>;
 type CppTreeGen<'store, 'cache, HAST, Acc> =

@@ -23,12 +23,16 @@ use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
 use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
 
+use hyperast::full::FullNode;
+use hyperast::nodes::Space;
 use hyperast::types;
-use hyperast::types::{LabelStore as _, Role};
-use hyperast::{full::FullNode, nodes::Space};
+use hyperast::types::LabelStore as _;
+use hyperast::types::Role;
 
 use crate::TNode;
-use crate::types::{CppEnabledTypeStore, TStore, Type};
+use crate::TStore;
+use crate::Type;
+use crate::types::CppEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 
@@ -140,7 +144,7 @@ pub struct Acc {
     /// At some point it will be used to make deduplication formatting independent
     indentation: tree_gen::Spaces,
     /// supports retrieval of roles
-    role: RoleAcc<crate::types::Role>,
+    role: RoleAcc<crate::Role>,
     /// aggregate of precomputed queries
     precomp_queries: PrecompQueries,
     /// number of visible children (by tree-sitter definition)

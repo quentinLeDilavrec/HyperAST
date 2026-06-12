@@ -1,7 +1,8 @@
 use hyperast::tree_gen::NoOpMore;
 use tree_sitter::Parser;
 
-use crate::{legion::tree_sitter_parse, types::TStore};
+use crate::TStore;
+use crate::legion::tree_sitter_parse;
 
 type CTreeGen<'store, 'cache, HAST, Acc> =
     crate::legion::CTreeGen<'store, 'cache, TStore, NoOpMore<HAST, Acc>, true>;

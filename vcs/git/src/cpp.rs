@@ -8,8 +8,8 @@ use crate::{Accumulator, BasicDirAcc};
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use crate::cpp_processor::SimpleStores;
+use hyperast_gen_ts_cpp::TStore;
 use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
-use hyperast_gen_ts_cpp::types::TStore;
 
 // waiting for residual stabilization https://github.com/rust-lang/rust/issues/84277
 // see after the temporary solution

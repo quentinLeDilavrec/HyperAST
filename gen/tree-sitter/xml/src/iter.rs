@@ -1,11 +1,13 @@
-use crate::types::TIdN;
+use num::ToPrimitive;
+use std::fmt;
+
 use hyperast::position::{TreePath, TreePathMut};
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::types::{Childrn, HyperAST, Tree, TypedNodeStore, WithChildren};
 use hyperast::types::{NodeId, UniformNodeId};
 use hyperast::types::{NodeStore, TypedHyperAST};
-use num::ToPrimitive;
-use std::fmt;
+
+use crate::TIdN;
 
 pub struct IterAll<'a, T, HAST> {
     stores: &'a HAST,

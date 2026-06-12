@@ -18,7 +18,7 @@ pub struct TreeToQuery<
     phantom: PhantomData<TIdN>,
 }
 
-static Q_STORE: LazyLock<QStore<crate::types::TStore>> = LazyLock::new(Default::default);
+static Q_STORE: LazyLock<QStore<crate::TStore>> = LazyLock::new(Default::default);
 
 struct QStore<
     TS,

@@ -2,9 +2,9 @@ use std::fmt::Display;
 
 use hyperast::tree_gen::TsEnableTS;
 use hyperast::tree_gen::TsType;
-use hyperast::types::{
-    AnyType, HyperType, LangRef, NodeId, TypeStore, TypeTrait, TypeU16, TypedNodeId, UniformNodeId,
-};
+use hyperast::types::{AnyType, TypeU16};
+use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
+use hyperast::types::{NodeId, UniformNodeId};
 
 impl TsEnableTS for TStore {
     fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
@@ -155,19 +155,17 @@ impl Default for TStore {
     }
 }
 
-type TypeInternalSize = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct T(TypeInternalSize);
-
 #[derive(Debug)]
 pub struct Lang;
 pub type Cpp = Lang;
 
 impl Cpp {
     pub const INST: Cpp = Lang;
+    pub const NAME: &'static str = "hyperast_gen_ts_cpp::types::Lang";
+    // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
 }
 
+#[cfg(test)]
 pub fn as_any(t: &Type) -> AnyType {
     let t = <Cpp as hyperast::types::Lang<Type>>::to_u16(*t);
     let t = <Cpp as hyperast::types::Lang<Type>>::make(t);
@@ -187,7 +185,8 @@ impl LangRef<AnyType> for Cpp {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Cpp>()
+        debug_assert_eq!(std::any::type_name::<Cpp>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
@@ -216,7 +215,8 @@ impl LangRef<Type> for Cpp {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Cpp>()
+        debug_assert_eq!(std::any::type_name::<Cpp>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
@@ -234,7 +234,8 @@ impl LangRef<TType> for Lang {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Lang>()
+        debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

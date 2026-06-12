@@ -4,10 +4,9 @@ use tree_sitter::Parser;
 
 use hyperast::store::SimpleStores;
 
-use crate::{
-    legion::{XmlTreeGen, tree_sitter_parse_xml},
-    types::TStore,
-};
+use crate::TStore;
+use crate::legion::XmlTreeGen;
+use crate::legion::tree_sitter_parse_xml;
 
 #[test]
 fn xml_tree_sitter_simple() {
@@ -131,9 +130,9 @@ fn xml_issue_cdata() {
 fn type_test_generic_eq() {
     use hyperast::types::HyperType;
 
-    let k = crate::types::Type::Document;
-    let k0 = crate::types::Type::Document;
-    let k1 = crate::types::Type::Element;
+    let k = crate::Type::Document;
+    let k0 = crate::Type::Document;
+    let k1 = crate::Type::Element;
     assert!(k.eq(&k));
     assert!(k.eq(&k0));
     assert!(k0.eq(&k));
@@ -148,9 +147,9 @@ fn type_test_generic_eq() {
     assert!(!k.generic_eq(&k1));
     assert!(!k1.generic_eq(&k));
 
-    let ak = crate::types::as_any(&crate::types::Type::Document);
-    let ak0 = crate::types::as_any(&crate::types::Type::Document);
-    let ak1 = crate::types::as_any(&crate::types::Type::Element);
+    let ak = crate::types::as_any(&crate::Type::Document);
+    let ak0 = crate::types::as_any(&crate::Type::Document);
+    let ak1 = crate::types::as_any(&crate::Type::Element);
 
     assert!(ak.generic_eq(&ak));
     assert!(ak.generic_eq(&ak0));

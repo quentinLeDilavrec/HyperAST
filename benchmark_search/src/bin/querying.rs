@@ -229,11 +229,11 @@ fn main() {
                     depth,
                 };
                 let per_blob = if cached {
-                    with_hyperast::per_blob_cached::<hyperast_gen_ts_java::types::TStore>
+                    with_hyperast::per_blob_cached::<hyperast_gen_ts_java::TStore>
                 } else if nospace {
-                    with_hyperast::per_blob_nospaces::<hyperast_gen_ts_java::types::TStore>
+                    with_hyperast::per_blob_nospaces::<hyperast_gen_ts_java::TStore>
                 } else {
-                    with_hyperast::per_blob::<hyperast_gen_ts_java::types::TStore>
+                    with_hyperast::per_blob::<hyperast_gen_ts_java::TStore>
                 };
                 per_blob(repo, &sub, commit, config, &language, queries, timeout);
             } else if c == RepoConfig::JavaMaven {

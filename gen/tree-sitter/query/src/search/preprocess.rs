@@ -9,8 +9,9 @@ use hyperast::types::{Childrn, HyperAST, Labeled, Typed, WithChildren};
 
 use tree_sitter::CaptureQuantifier as Quant;
 
+use crate::Lang as TsQuery;
+use crate::TStore;
 use crate::auto::tsq_ser_meta::Converter;
-use crate::types::{TStore, TsQuery};
 
 pub struct PreparingMatcher<Ty, C> {
     root_types: Vec<Ty>,
@@ -79,7 +80,7 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
         query_store: &'a SimpleStores<TStore>,
         query: legion::Entity,
     ) -> PreparingMatcher<Ty, C> {
-        use crate::types::Type;
+        use crate::Type;
         use hyperast::types::LabelStore;
         let mut res = PreparingMatcher::default();
         let n = query_store.node_store.resolve(query);
@@ -198,7 +199,7 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
         rule: NodeIdentifier,
         preparing: &mut PreparingMatcher<Ty, C>,
     ) -> Pattern<Ty> {
-        use crate::types::Type;
+        use crate::Type;
         use hyperast::types::LabelStore;
         let mut patterns = vec![];
         let n = query_store
@@ -431,7 +432,7 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
         rule: NodeIdentifier,
         preparing: &mut PreparingMatcher<Ty, C>,
     ) -> Pattern<Ty> {
-        use crate::types::Type;
+        use crate::Type;
         use hyperast::types::LabelStore;
         let n = query_store
             .node_store
@@ -491,7 +492,7 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
         rule: NodeIdentifier,
         preparing: &mut PreparingMatcher<Ty, C>,
     ) -> Pattern<Ty> {
-        use crate::types::Type;
+        use crate::Type;
         use hyperast::types::LabelStore;
         let n = query_store
             .node_store()
@@ -623,7 +624,7 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
         query_store: &SimpleStores<TStore>,
         rule: NodeIdentifier,
     ) -> Predicate<String> {
-        use crate::types::Type;
+        use crate::Type;
         use hyperast::types::LabelStore;
         let n = query_store
             .node_store()
@@ -720,11 +721,11 @@ impl<'a, Ty, C: Converter<Ty = Ty>> PreparedMatcher<Ty, C> {
 pub(crate) fn preprocess_capture_pred_arg(
     arg: hyperast::store::nodes::legion::TypedNode<
         hyperast::store::nodes::legion::HashedNodeRef<'_, NodeIdentifier>,
-        crate::types::Type,
+        crate::Type,
     >,
     query_store: &SimpleStores<TStore>,
 ) -> String {
-    use crate::types::Type;
+    use crate::Type;
     use hyperast::types::LabelStore;
     if let Type::Capture = arg.get_type() {
         let mut cs = arg.children().unwrap().iter_children();

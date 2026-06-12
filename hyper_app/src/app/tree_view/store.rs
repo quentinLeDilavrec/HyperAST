@@ -53,19 +53,19 @@ impl FetchedHyperAST {
         let lang = n.get_lang();
         let raw = n.get_raw_type();
         match lang {
-            "hyperast_gen_ts_java::types::Lang" => {
+            hyperast_gen_ts_java::Lang::NAME => {
                 let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_java::types::Lang::make(raw);
+                    hyperast_gen_ts_java::Lang::make(raw);
                 t.into()
             }
-            "hyperast_gen_ts_cpp::types_alt::Lang" | "hyperast_gen_ts_cpp::types::Lang" => {
+            hyperast_gen_ts_cpp::Lang::NAME => {
                 let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_cpp::types::Lang::make(raw);
+                    hyperast_gen_ts_cpp::Lang::make(raw);
                 t.into()
             }
-            "hyperast_gen_ts_xml::types::Lang" => {
+            hyperast_gen_ts_xml::Lang::NAME => {
                 let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_xml::types::Lang::make(raw);
+                    hyperast_gen_ts_xml::Lang::make(raw);
                 t.into()
             }
             l => unreachable!("{}", l),
@@ -143,9 +143,7 @@ impl<'b> hyperast::types::TypeStore for LockedFetchedHyperAST<'b> {
     type Ty = AnyType;
 }
 
-impl<'a> hyperast::types::HyperASTShared for LockedFetchedHyperAST<'a>
-where
-{
+impl<'a> hyperast::types::HyperASTShared for LockedFetchedHyperAST<'a> {
     type IdN = NodeIdentifier;
     type Idx = u16;
     type Label = LabelIdentifier;
@@ -174,24 +172,24 @@ impl<'a> hyperast::types::HyperAST for LockedFetchedHyperAST<'a> {
         let ns = &self.node_store;
         let Some(n) = ns.try_resolve::<NodeIdentifier>(*id) else {
             use hyperast::types::HyperType;
-            return hyperast_gen_ts_java::types::Type::Dot.as_static().into();
+            return hyperast_gen_ts_java::Type::Dot.as_static().into();
         };
         let lang = n.get_lang();
         let raw = n.get_raw_type();
         match lang {
-            "hyperast_gen_ts_java::types::Lang" => {
+            hyperast_gen_ts_java::Lang::NAME => {
                 let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_java::types::Lang::make(raw);
+                    hyperast_gen_ts_java::Lang::make(raw);
                 t.into()
             }
-            "hyperast_gen_ts_cpp::types_alt::Lang" | "hyperast_gen_ts_cpp::types::Lang" => {
+            hyperast_gen_ts_cpp::Lang::NAME => {
                 let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_cpp::types::Lang::make(raw);
+                    hyperast_gen_ts_cpp::Lang::make(raw);
                 t.into()
             }
-            "hyperast_gen_ts_xml::types::Lang" => {
+            hyperast_gen_ts_xml::Lang::NAME => {
                 let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_xml::types::Lang::make(raw);
+                    hyperast_gen_ts_xml::Lang::make(raw);
                 t.into()
             }
             l => unreachable!("{}", l),

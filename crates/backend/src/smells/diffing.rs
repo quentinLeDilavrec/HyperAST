@@ -894,8 +894,7 @@ mod tests {
     #[ignore]
     #[test_log::test]
     fn test_wrong_diff() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let mut stores =
-            hyperast::store::SimpleStores::<hyperast_gen_ts_java::types::TStore>::default();
+        let mut stores = hyperast::store::SimpleStores::<hyperast_gen_ts_java::TStore>::default();
         let mut md_cache = Default::default();
         let mut java_tree_gen =
             hyperast_gen_ts_java::legion_with_refs::JavaTreeGen::new(&mut stores, &mut md_cache);

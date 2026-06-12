@@ -221,7 +221,7 @@ pub fn smells(
 
     // NOTE temporary solution, will be fixed when adding more polyglote facilities
     use hyperast_gen_ts_java as ts_gen;
-    let sss: &hyperast::store::SimpleStores<ts_gen::types::TStore> = with_spaces_stores.with_ts();
+    let sss: &hyperast::store::SimpleStores<ts_gen::TStore> = with_spaces_stores.with_ts();
 
     let meta_gen = hyperast_tsquery::Query::new(&meta_gen, ts_gen::language())
         .map_err(|e| format!("error in meta_gen: {e}"))?;
@@ -247,7 +247,7 @@ pub fn smells(
             acc
         });
     let query_lattice = if false {
-        QueryLattice::with_examples_by_size_try::<_, ts_gen::types::TIdN<_>>(
+        QueryLattice::with_examples_by_size_try::<_, ts_gen::TIdN<_>>(
             sss,
             ex_map.keys(),
             &meta_gen,
@@ -255,7 +255,7 @@ pub fn smells(
         )
     } else {
         let stores = sss;
-        let b = QueryLattice::builder::<ts_gen::types::TStore, ts_gen::types::TIdN<_>, _>(
+        let b = QueryLattice::builder::<ts_gen::TStore, ts_gen::TIdN<_>, _>(
             stores,
             ex_map.keys(),
             &meta_gen,
@@ -1167,8 +1167,7 @@ mod test_gen {
 
         // NOTE temporary solution, will be fixed when adding more polyglote facilities
         use hyperast_gen_ts_java as ts_gen;
-        let sss: &hyperast::store::SimpleStores<ts_gen::types::TStore> =
-            with_spaces_stores.with_ts();
+        let sss: &hyperast::store::SimpleStores<ts_gen::TStore> = with_spaces_stores.with_ts();
 
         let meta_gen = hyperast_tsquery::Query::new(&meta_gen, ts_gen::language())
             .map_err(|e| format!("error in meta_gen: {e}"))?;
@@ -1200,7 +1199,7 @@ mod test_gen {
             });
         let query_lattice = {
             let stores = sss;
-            let b = QueryLattice::builder::<ts_gen::types::TStore, ts_gen::types::TIdN<_>, _>(
+            let b = QueryLattice::builder::<ts_gen::TStore, ts_gen::TIdN<_>, _>(
                 stores,
                 ex_map.keys(),
                 &meta_gen,

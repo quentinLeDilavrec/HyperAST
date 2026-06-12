@@ -6,7 +6,7 @@ use hyperast::types::{NodeStore, TypedHyperAST};
 use num::ToPrimitive;
 use std::fmt;
 
-use crate::types::TIdN;
+use crate::TIdN;
 
 pub struct IterAll<'a, T, HAST> {
     stores: &'a HAST,

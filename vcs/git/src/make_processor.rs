@@ -7,7 +7,7 @@ use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::{defaults::NodeIdentifier, nodes::legion::eq_node};
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
-use hyperast_gen_ts_xml::types::Type;
+use hyperast_gen_ts_xml::Type;
 
 use crate::Processor;
 use crate::StackEle;
@@ -19,7 +19,7 @@ use crate::processing::erased::{
     ParametrizedCommitProcessor2Handle as PCP2Handle,
 };
 use crate::processing::{CacheHolding, InFiles, ObjectName, ParametrizedCommitProcessorHandle};
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::types::TStore>;
+pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
 
 pub struct MakeProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     prepro: &'b mut RepositoryProcessor,
@@ -239,7 +239,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
 
 pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdentifier, MD) {
     let kind = Type::Directory;
-    let interned_kind = hyperast_gen_ts_xml::types::TStore::intern(kind);
+    let interned_kind = hyperast_gen_ts_xml::TStore::intern(kind);
     let label_id = stores.label_store.get_or_insert(acc.primary.name.clone());
 
     let primary = acc
@@ -263,7 +263,7 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdenti
     log::info!("make mm {} {}", &primary.name, primary.children.len());
 
     let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(
-        hyperast_gen_ts_xml::types::Lang,
+        hyperast_gen_ts_xml::Lang,
     );
 
     let children_is_empty = primary.children.is_empty();

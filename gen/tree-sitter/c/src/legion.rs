@@ -28,7 +28,8 @@ use hyperast::types;
 use hyperast::types::{LabelStore as _, Role};
 
 use crate::TNode;
-use crate::types::{CEnabledTypeStore, Type};
+use crate::Type;
+use crate::types::CEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 
@@ -98,7 +99,7 @@ pub struct Acc {
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
     padding_start: usize,
     indentation: tree_gen::Spaces,
-    role: RoleAcc<crate::types::Role>,
+    role: RoleAcc<crate::Role>,
     precomp_queries: PrecompQueries,
 }
 

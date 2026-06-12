@@ -29,8 +29,9 @@ use hyperast::types::{AnyType, NodeStoreExt, TypeTrait, WithHashs, WithStats};
 use hyperast::types::{Role, RoleStore};
 
 use crate::TNode;
+use crate::TStore;
+use crate::Type;
 use crate::types::JavaEnabledTypeStore;
-use crate::types::{TStore, Type};
 
 #[cfg(feature = "impact")]
 mod reference_analysis;

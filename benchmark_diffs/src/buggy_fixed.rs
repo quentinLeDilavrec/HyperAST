@@ -52,7 +52,7 @@ fn test_simple_1() {
     let mut md_cache = Default::default();
     let (src_tr, dst_tr) = parse_string_pair(&mut stores, &mut md_cache, buggy, fixed);
 
-    let stores = stores.change_type_store::<hyperast_gen_ts_java::types::TStore>();
+    let stores = stores.change_type_store::<hyperast_gen_ts_java::TStore>();
 
     println!(
         "{}",
@@ -480,13 +480,13 @@ mod test {
     use hyperast::types::{DecompressedFrom, HyperASTShared, Typed};
     use hyperast::{nodes::SyntaxWithIdsSerializer, store::SimpleStores};
 
+    use hyperast_gen_ts_xml::TStore;
     use hyperast_gen_ts_xml::legion::XmlTreeGen;
     use hyperast_gen_ts_xml::legion::tree_sitter_parse_xml as parse_xml;
-    use hyperast_gen_ts_xml::types::TStore;
 
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-    use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
     use hyper_diff::mappings::{DefaultMultiMappingStore, VecStore};
+    use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
     use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
 
     use crate::other_tools::gumtree::subprocess;

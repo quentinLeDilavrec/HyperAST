@@ -3,22 +3,28 @@ use std::{collections::HashMap, fmt::Debug};
 
 use num::ToPrimitive;
 
+use hyperast::full::FullNode;
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use hyperast::store::SimpleStores;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
-use hyperast::tree_gen::parser::{Node as _, TreeCursor};
-use hyperast::tree_gen::{
-    AccIndentation, Accumulator, BasicAccumulator, BasicGlobalData, Parents, PreResult,
-    SpacedGlobalData, Spaces, SubTreeMetrics, TextedGlobalData, TreeGen, WithByteRange,
-    ZippedTreeGen, utils_ts::TTreeCursor,
-};
+use hyperast::tree_gen::BasicGlobalData;
+use hyperast::tree_gen::Spaces;
+use hyperast::tree_gen::parser::{Node, TreeCursor};
+use hyperast::tree_gen::utils_ts::TTreeCursor;
+use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
+use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
+use hyperast::tree_gen::{Parents, PreResult};
+use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
+use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
+use hyperast::types::LabelStore as _;
 use hyperast::types::{HyperType, WithSerialization};
-use hyperast::{full::FullNode, types::LabelStore as _};
 
-use crate::types::{TsQueryEnabledTypeStore, Type};
-use crate::{TNode, types::TIdN};
+use crate::TIdN;
+use crate::TNode;
+use crate::Type;
+use crate::types::TsQueryEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 
@@ -866,7 +872,7 @@ mod tests {
     }
 
     fn identity_check(text: &str) -> Result<(), ()> {
-        use crate::types::TStore;
+        use crate::TStore;
         let mut query_store = SimpleStores::<TStore>::default();
         let mut md_cache = Default::default();
         let mut query_tree_gen = TsQueryTreeGen::new(&mut query_store, &mut md_cache);

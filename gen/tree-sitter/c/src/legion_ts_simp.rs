@@ -1,7 +1,8 @@
-use crate::types::{TStore, Type};
+use crate::{TStore, Type};
 use hyperast::nodes::{SyntaxSerializer, TextSerializer};
 use hyperast::store::SimpleStores;
-use hyperast::tree_gen::{self, utils_ts};
+use hyperast::tree_gen;
+use hyperast::tree_gen::utils_ts;
 
 #[test]
 fn simple() {

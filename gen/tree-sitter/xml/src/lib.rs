@@ -1,7 +1,13 @@
 #[cfg(feature = "impl")]
 pub mod legion;
 
-pub mod types;
+pub(crate) mod types;
+
+pub use types::Type;
+pub use types::{Lang, TIdN, TStore};
+
+#[doc(hidden)]
+pub use types::TType;
 
 #[cfg(feature = "impl")]
 #[cfg(test)]

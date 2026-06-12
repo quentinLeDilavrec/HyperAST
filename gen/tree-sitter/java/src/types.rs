@@ -94,6 +94,7 @@ mod impls {
             t.e()
         }
     }
+    #[cfg(test)]
     pub fn as_any(t: &Type) -> AnyType {
         let t = <Java as hyperast::types::Lang<Type>>::to_u16(*t);
         let t = <Java as hyperast::types::Lang<Type>>::make(t);
@@ -101,7 +102,7 @@ mod impls {
         t.into()
     }
 }
-#[cfg(feature = "impl")]
+#[cfg(all(feature = "impl", test))]
 pub use impls::as_any;
 
 #[cfg(feature = "impl")]
@@ -160,14 +161,14 @@ impl<IdN: Clone + Eq + UniformNodeId> TypedNodeId for TIdN<IdN> {
     }
 }
 
-type TypeInternalSize = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct T(TypeInternalSize);
-
 #[derive(Debug)]
 pub struct Lang;
 pub type Java = Lang;
+
+impl Lang {
+    pub const NAME: &'static str = "hyperast_gen_ts_java::types::Lang";
+    // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
+}
 
 impl hyperast::types::Lang<Type> for Java {
     const INST: Self = Lang;
@@ -199,7 +200,8 @@ impl LangRef<Type> for Java {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Java>()
+        debug_assert_eq!(std::any::type_name::<Java>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
@@ -218,7 +220,8 @@ impl LangRef<AnyType> for Java {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Java>()
+        debug_assert_eq!(std::any::type_name::<Java>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
@@ -246,7 +249,8 @@ impl LangRef<TType> for Lang {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Lang>()
+        debug_assert_eq!(std::any::type_name::<Java>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

@@ -3,9 +3,9 @@ use hyper_diff::decompressed_tree_store::SimpleZsTree;
 use hyper_diff::mappings::DefaultMappingStore;
 use hyper_diff::matchers::Decompressible;
 use hyper_diff::matchers::optimal::zs::ZsMatcher;
+use hyperast_gen_ts_java::TStore;
 use hyperast_gen_ts_java::legion_with_refs::JavaTreeGen;
 use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
-use hyperast_gen_ts_java::types::TStore;
 
 fn compare_simple_tree_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("LegionTree");

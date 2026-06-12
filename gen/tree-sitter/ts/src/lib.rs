@@ -1,7 +1,14 @@
+//! HyperAST generator for the TypeScript language using TreeSitter.
+//!
+//! wraps tree-sitter-typescript
+
 #[cfg(feature = "impl")]
 pub mod legion;
 
-pub mod types;
+pub(crate) mod types;
+
+pub use types::Type;
+pub use types::{Lang, TIdN};
 
 #[cfg(feature = "legion")]
 mod tnode {

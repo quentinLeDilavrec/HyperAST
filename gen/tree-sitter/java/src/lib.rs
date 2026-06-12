@@ -1,4 +1,6 @@
-#![recursion_limit = "4096"]
+//! HyperAST generator for the Java programming language using TreeSitter.
+//!
+//! wraps tree-sitter-java
 
 #[cfg(all(feature = "impl", feature = "bevy"))]
 pub mod bevy;
@@ -7,7 +9,16 @@ pub mod compat;
 #[cfg(feature = "impl")]
 pub mod legion_with_refs; // TODO rename and move to a module for construction
 
-pub mod types;
+pub(crate) mod types;
+
+#[cfg(not(feature = "alt_grammar"))]
+pub use types::Type;
+#[cfg(not(feature = "alt_grammar"))]
+pub use types::{Lang, Role, TIdN, TStore};
+
+#[cfg(not(feature = "alt_grammar"))]
+#[doc(hidden)]
+pub use types::TType;
 
 #[cfg(all(feature = "impl", feature = "impact"))]
 pub mod impact;

@@ -1,3 +1,7 @@
+//! HyperAST generator for the C++ programming language using TreeSitter.
+//!
+//! wraps tree-sitter-cpp
+
 #[cfg(all(feature = "impl_intern", feature = "legion"))]
 pub mod legion;
 
@@ -6,12 +10,18 @@ pub mod legion;
 mod legion_ts_simp;
 
 #[cfg(not(feature = "alt_grammar"))]
-pub mod types;
+pub(crate) mod types;
 
 #[cfg(feature = "alt_grammar")]
-pub mod types_alt;
+pub(crate) mod types_alt;
 #[cfg(feature = "alt_grammar")]
-pub use types_alt as types;
+pub(crate) use types_alt as types;
+
+pub use types::Type;
+pub use types::{Lang, Role, TIdN, TStore};
+
+#[doc(hidden)]
+pub use types::TType;
 
 #[cfg(feature = "impl_intern")]
 #[cfg(test)]

@@ -265,7 +265,7 @@ pub fn per_blob_nospaces<TS>(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    use hyperast_gen_ts_java::types::TStore;
+    use hyperast_gen_ts_java::TStore;
     multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
@@ -322,7 +322,7 @@ pub fn per_blob_cached<TS>(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    use hyperast_gen_ts_java::types::TStore;
+    use hyperast_gen_ts_java::TStore;
     multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
@@ -772,7 +772,7 @@ pub fn avg_sub_first(repo: hyperast_vcs_git::git::Repo, commit: &str, depth: usi
     let stores = &repositories
         .processor
         .main_stores
-        .with_ts::<hyperast_gen_ts_java::types::TStore>();
+        .with_ts::<hyperast_gen_ts_java::TStore>();
 
     let mut repeat = 100;
     let mut count = 0;

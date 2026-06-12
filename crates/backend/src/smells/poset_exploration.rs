@@ -534,7 +534,7 @@ fn test_match_for_removes_not_matching() {
     ) @_root"#
         .as_bytes();
     use hyperast_gen_ts_tsquery as t_gen;
-    let mut query_store = hyperast::store::SimpleStores::<t_gen::types::TStore>::default();
+    let mut query_store = hyperast::store::SimpleStores::<t_gen::TStore>::default();
     let mut md_cache = Default::default();
     let mut tree_gen = t_gen::no_fmt_legion::TsQueryTreeGen::new(&mut query_store, &mut md_cache);
 

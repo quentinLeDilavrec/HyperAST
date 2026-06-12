@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
 use hyperast::tree_gen::utils_ts::TsEnableTS;
-use hyperast::types::{
-    AnyType, HyperType, LangRef, NodeId, TypeStore, TypeTrait, TypeU16, TypedNodeId, UniformNodeId,
-};
+use hyperast::types::{AnyType, TypeU16};
+use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
+use hyperast::types::{NodeId, UniformNodeId};
 
 #[cfg(feature = "impl")]
 mod legion_impls {
@@ -150,24 +150,16 @@ impl Default for TStore {
     }
 }
 
-type TypeInternalSize = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct T(TypeInternalSize);
-
 #[derive(Debug)]
 pub struct Lang;
 pub type C = Lang;
 
 impl C {
     pub const INST: C = Lang;
-}
-
-pub fn as_any(t: &Type) -> AnyType {
-    let t = <C as hyperast::types::Lang<Type>>::to_u16(*t);
-    let t = <C as hyperast::types::Lang<Type>>::make(t);
-    let t: &'static dyn HyperType = t;
-    t.into()
+    pub const fn name() -> &'static str {
+        // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
+        "hyperast_gen_ts_c::types::Lang"
+    }
 }
 
 impl LangRef<AnyType> for C {
@@ -182,7 +174,8 @@ impl LangRef<AnyType> for C {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<C>()
+        debug_assert_eq!(std::any::type_name::<C>(), Self::name());
+        Self::name()
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
@@ -210,7 +203,8 @@ impl LangRef<Type> for C {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<C>()
+        debug_assert_eq!(std::any::type_name::<C>(), Self::name());
+        Self::name()
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
@@ -228,7 +222,8 @@ impl LangRef<TType> for Lang {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Lang>()
+        debug_assert_eq!(std::any::type_name::<Lang>(), Self::name());
+        Self::name()
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

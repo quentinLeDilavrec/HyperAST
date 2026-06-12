@@ -2,7 +2,8 @@ use std::io::{Write, stdout};
 
 use hyperast::store::SimpleStores;
 
-use crate::{legion::TsQueryTreeGen, types::TStore};
+use crate::TStore;
+use crate::legion::TsQueryTreeGen;
 
 #[test]
 fn simple() {
@@ -48,14 +49,9 @@ fn run(text: &[u8]) {
 mod auto;
 mod search;
 
-fn cpp_tree(
-    text: &[u8],
-) -> (
-    SimpleStores<hyperast_gen_ts_cpp::types::TStore>,
-    legion::Entity,
-) {
+fn cpp_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_cpp::TStore>, legion::Entity) {
+    use hyperast_gen_ts_cpp::TStore;
     use hyperast_gen_ts_cpp::legion::CppTreeGen;
-    use hyperast_gen_ts_cpp::types::TStore;
     let tree = match hyperast_gen_ts_cpp::legion::tree_sitter_parse(text) {
         Ok(t) => t,
         Err(t) => t,
@@ -72,14 +68,9 @@ fn cpp_tree(
     // );
     (stores, entity)
 }
-fn xml_tree(
-    text: &[u8],
-) -> (
-    SimpleStores<hyperast_gen_ts_xml::types::TStore>,
-    legion::Entity,
-) {
+fn xml_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_xml::TStore>, legion::Entity) {
+    use hyperast_gen_ts_xml::TStore;
     use hyperast_gen_ts_xml::legion::XmlTreeGen;
-    use hyperast_gen_ts_xml::types::TStore;
     let tree = match hyperast_gen_ts_xml::legion::tree_sitter_parse_xml(text) {
         Ok(t) => t,
         Err(t) => t,

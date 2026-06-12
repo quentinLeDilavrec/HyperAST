@@ -5,8 +5,8 @@ use egui_addon::code_editor;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
 
-type Cpp = hyperast_gen_ts_cpp::types::Type;
-type Java = hyperast_gen_ts_java::types::Type;
+type Cpp = hyperast_gen_ts_cpp::Type;
+type Java = hyperast_gen_ts_java::Type;
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct Repo {

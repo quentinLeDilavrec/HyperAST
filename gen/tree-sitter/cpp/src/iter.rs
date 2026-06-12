@@ -1,4 +1,4 @@
-use crate::types::TIdN;
+use crate::TIdN;
 use hyperast::position::{TreePath, TreePathMut};
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::types::{Childrn, HyperAST, NodeId, Tree, TypedNodeStore, WithChildren};

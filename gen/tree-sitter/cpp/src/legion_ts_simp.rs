@@ -2,7 +2,8 @@ use hyperast::nodes::{SyntaxSerializer, TextSerializer};
 use hyperast::store::SimpleStores;
 use hyperast::tree_gen::{self, utils_ts};
 
-use crate::types::{TStore, Type};
+use crate::TStore;
+use crate::Type;
 
 // type CppGen<'store, 'b> = tree_gen::zipped_ts_simp::TsTreeGen<'store, 'store, crate::types::TStore>;
 
@@ -50,7 +51,7 @@ fn simple0() {
 #[test]
 fn simple1() {
     use tree_gen::zipped_ts_simp1::TsTreeGen;
-    type CppGen<'store, 'b, More> = TsTreeGen<'store, 'store, crate::types::TStore, More, true>;
+    type CppGen<'store, 'b, More> = TsTreeGen<'store, 'store, crate::TStore, More, true>;
     let mut stores = Default::default();
     let mut md_cache = Default::default();
     let mut r#gen = CppGen::new(&mut stores, &mut md_cache);
@@ -73,7 +74,7 @@ fn simple1() {
 #[test]
 fn no_goto_parent() {
     use tree_gen::zipped_ts_no_goto_parent::TsTreeGen;
-    type CppGen<'store, 'b, More> = TsTreeGen<'store, 'store, crate::types::TStore, More, true>;
+    type CppGen<'store, 'b, More> = TsTreeGen<'store, 'store, crate::TStore, More, true>;
     let mut stores = Default::default();
     let mut md_cache = Default::default();
     let mut r#gen = CppGen::new(&mut stores, &mut md_cache);
@@ -96,7 +97,7 @@ fn no_goto_parent() {
 #[test]
 fn no_goto_parent_a() {
     use tree_gen::zipped_ts_no_goto_parent_a::TsTreeGen;
-    type CppGen<'store, 'b, More> = TsTreeGen<'store, 'store, crate::types::TStore, More, true>;
+    type CppGen<'store, 'b, More> = TsTreeGen<'store, 'store, crate::TStore, More, true>;
     let mut stores = Default::default();
     let mut md_cache = Default::default();
     let mut r#gen = CppGen::new(&mut stores, &mut md_cache);

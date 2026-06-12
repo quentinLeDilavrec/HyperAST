@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use hyperast::tree_gen::utils_ts::{TsEnableTS, TsType};
-use hyperast::types::{AnyType, HyperType, LangRef, TypeStore, TypeTrait, TypeU16, TypedNodeId};
+use hyperast::types::{AnyType, TypeU16};
+use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
 use hyperast::types::{NodeId, UniformNodeId};
 
 #[cfg(feature = "legion")]
@@ -112,14 +113,14 @@ impl Default for TStore {
     }
 }
 
-type TypeInternalSize = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct T(TypeInternalSize);
-
 #[derive(Debug)]
 pub struct Lang;
 pub type Ts = Lang;
+
+impl Lang {
+    pub const NAME: &'static str = "hyperast_gen_ts_ts::types::Lang";
+    // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
+}
 
 impl LangRef<AnyType> for Ts {
     fn make(&self, _t: u16) -> &'static AnyType {
@@ -133,7 +134,8 @@ impl LangRef<AnyType> for Ts {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Ts>()
+        debug_assert_eq!(std::any::type_name::<Ts>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
@@ -160,7 +162,8 @@ impl LangRef<Type> for Ts {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Ts>()
+        debug_assert_eq!(std::any::type_name::<Ts>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
@@ -178,7 +181,8 @@ impl LangRef<TType> for Lang {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Lang>()
+        debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

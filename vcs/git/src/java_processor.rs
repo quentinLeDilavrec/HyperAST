@@ -10,7 +10,7 @@ use hyperast::hashed::{IndexingHashBuilder as _, MetaDataHashsBuilder as _};
 use hyperast::store::nodes::legion::{RawHAST, subtree_builder};
 use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast_gen_ts_java::legion_with_refs::{self, Acc};
-use hyperast_gen_ts_java::types::{TStore, Type};
+use hyperast_gen_ts_java::{TStore, Type};
 
 use crate::git::BasicGitObject;
 use crate::java::JavaAcc;
@@ -27,7 +27,7 @@ pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
         .collect()
 }
 
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>;
+pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_java::TStore>;
 
 type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>;
 
@@ -96,7 +96,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
                     if let Some(acc) = &mut w.scripting_acc {
                         // SAFETY: this side should be fine, issue when unerasing
                         let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
-                        acc.acc::<_, hyperast_gen_ts_java::types::TType, _>(
+                        acc.acc::<_, hyperast_gen_ts_java::TType, _>(
                             store,
                             Type::Directory,
                             id.into(),
@@ -167,12 +167,8 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
             if let Some(acc) = &mut w.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
                 let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
-                acc.acc::<_, hyperast_gen_ts_java::types::TType, _>(
-                    store,
-                    Type::Directory,
-                    id.into(),
-                )
-                .unwrap();
+                acc.acc::<_, hyperast_gen_ts_java::TType, _>(store, Type::Directory, id.into())
+                    .unwrap();
             }
             None
         }
@@ -212,7 +208,7 @@ fn make(
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
     let kind = Type::Directory;
-    let interned_kind = hyperast_gen_ts_java::types::TStore::intern(kind);
+    let interned_kind = hyperast_gen_ts_java::TStore::intern(kind);
     let label_id = label_store.get_or_insert(acc.primary.name.clone());
 
     let primary = acc
@@ -298,7 +294,7 @@ fn make(
     #[cfg(feature = "impact")]
     let ana = compute_ana();
 
-    let mut dyn_builder = subtree_builder::<hyperast_gen_ts_java::types::TStore>(interned_kind);
+    let mut dyn_builder = subtree_builder::<hyperast_gen_ts_java::TStore>(interned_kind);
 
     add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
     let children_is_empty = primary.children.is_empty();
@@ -705,14 +701,14 @@ impl RepositoryProcessor {
         let mut md_cache = Default::default();
         let stores = self
             .main_stores
-            .mut_with_ts::<hyperast_gen_ts_java::types::TStore>();
+            .mut_with_ts::<hyperast_gen_ts_java::TStore>();
 
-        let mut java_tree_gen = java_tree_gen::JavaTreeGen::<
-            hyperast_gen_ts_java::types::TStore,
-            _,
-            _,
-        >::new(stores, &mut md_cache)
-        .with_line_break(line_break);
+        let mut java_tree_gen =
+            java_tree_gen::JavaTreeGen::<hyperast_gen_ts_java::TStore, _, _>::new(
+                stores,
+                &mut md_cache,
+            )
+            .with_line_break(line_break);
         crate::java::handle_java_file(&mut java_tree_gen, name, text)
             .map(|x| x.node)
             .map_err(|e| {
@@ -760,7 +756,7 @@ impl RepositoryProcessor {
                 let dedup = &mut java_proc.cache.dedup;
                 let stores = self
                     .main_stores
-                    .mut_with_ts::<hyperast_gen_ts_java::types::TStore>();
+                    .mut_with_ts::<hyperast_gen_ts_java::TStore>();
                 // let java_tree_gen =
                 //     java_tree_gen::JavaTreeGen::new(stores, md_cache).with_line_break(line_break);
                 #[cfg(not(feature = "tsg"))]
@@ -791,7 +787,7 @@ impl RepositoryProcessor {
                             functions,
                         };
                         let mut java_tree_gen = java_tree_gen::JavaTreeGen::<
-                            hyperast_gen_ts_java::types::TStore,
+                            hyperast_gen_ts_java::TStore,
                             _,
                             _,
                         >::with_preprocessing_and_dedup(
@@ -866,7 +862,7 @@ impl RepositoryProcessor {
         if let Some(acc) = &mut w.scripting_acc {
             // SAFETY: this side should be fine, issue when unerasing
             let store = unsafe { self.main_stores.erase_ts_unchecked() };
-            acc.acc::<_, hyperast_gen_ts_java::types::TType, _>(store, Type::Directory, id.into())
+            acc.acc::<_, hyperast_gen_ts_java::TType, _>(store, Type::Directory, id.into())
                 .unwrap();
             // prepro_acc(
             //     acc,

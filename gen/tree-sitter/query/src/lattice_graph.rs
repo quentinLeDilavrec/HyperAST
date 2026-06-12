@@ -413,7 +413,7 @@ impl TopStats {
 
 fn top_stats<Q: hyperast::position::position_accessors::SolvedPosition<IdN>, E>(
     lattice: &Graph<Q, E>,
-    stores: &hyperast::store::SimpleStores<crate::types::TStore>,
+    stores: &hyperast::store::SimpleStores<crate::TStore>,
     uniqs: &HashSet<NodeIndex>,
     topo_numbers: &crate::lattice_graph::TopoNumbers<num::BigUint>,
     node_id: NodeIndex,
@@ -541,7 +541,7 @@ impl PatternStats {
 }
 
 pub fn pattern_stats(
-    stores: &hyperast::store::SimpleStores<crate::types::TStore>,
+    stores: &hyperast::store::SimpleStores<crate::TStore>,
     id: IdNQ,
 ) -> PatternStats {
     use hyperast::types::{WithSerialization, WithStats};

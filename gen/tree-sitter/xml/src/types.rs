@@ -1,10 +1,9 @@
-use std::{fmt::Display, u16};
+use std::fmt::Display;
 
 use hyperast::tree_gen::{TsEnableTS, TsType};
-use hyperast::types::TypeStore;
-use hyperast::types::{
-    AnyType, HyperType, LangRef, NodeId, TypeTrait, TypeU16, TypedNodeId, UniformNodeId,
-};
+use hyperast::types::{AnyType, TypeU16};
+use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
+use hyperast::types::{NodeId, UniformNodeId};
 
 impl hyperast::types::ETypeStore for TStore {
     type Ty2 = Type;
@@ -109,6 +108,7 @@ fn id_for_node_kind(_kind: &str, _named: bool) -> u16 {
     unimplemented!("need treesitter grammar")
 }
 
+#[cfg(test)]
 pub fn as_any(t: &Type) -> AnyType {
     let t = <Xml as hyperast::types::Lang<Type>>::to_u16(*t);
     let t = <Xml as hyperast::types::Lang<Type>>::make(t);
@@ -163,15 +163,15 @@ impl<IdN: Clone + Eq + UniformNodeId> TypedNodeId for TIdN<IdN> {
     }
 }
 
-type TypeInternalSize = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct T(TypeInternalSize);
-
 #[derive(Debug)]
 pub struct Lang;
 
 pub type Xml = Lang;
+
+impl Lang {
+    pub const NAME: &'static str = "hyperast_gen_ts_xml::types::Lang";
+    // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
+}
 
 impl hyperast::types::Lang<Type> for Xml {
     const INST: Self = Lang;
@@ -185,7 +185,8 @@ impl hyperast::types::Lang<Type> for Xml {
 
 impl LangRef<Type> for Xml {
     fn name(&self) -> &'static str {
-        std::any::type_name::<Xml>()
+        debug_assert_eq!(std::any::type_name::<Xml>(), Self::NAME);
+        Self::NAME
     }
 
     fn make(&self, t: u16) -> &'static Type {
@@ -220,7 +221,8 @@ impl LangRef<Type> for Xml {
 
 impl LangRef<AnyType> for Xml {
     fn name(&self) -> &'static str {
-        std::any::type_name::<Xml>()
+        debug_assert_eq!(std::any::type_name::<Xml>(), Self::NAME);
+        Self::NAME
     }
 
     fn make(&self, _t: u16) -> &'static AnyType {
@@ -255,7 +257,8 @@ impl LangRef<hyperast::types::TypeU16<Self>> for Lang {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<Lang>()
+        debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

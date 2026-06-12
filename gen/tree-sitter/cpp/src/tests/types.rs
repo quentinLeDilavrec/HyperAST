@@ -3,9 +3,9 @@
 fn type_test_generic_eq() {
     use hyperast::types::HyperType;
 
-    let k = crate::types::Type::FunctionDefinition;
-    let k0 = crate::types::Type::FunctionDefinition;
-    let k1 = crate::types::Type::EnumSpecifier;
+    let k = crate::Type::FunctionDefinition;
+    let k0 = crate::Type::FunctionDefinition;
+    let k1 = crate::Type::EnumSpecifier;
     assert!(k.eq(&k));
     assert!(k.eq(&k0));
     assert!(k0.eq(&k));
@@ -20,9 +20,9 @@ fn type_test_generic_eq() {
     assert!(!k.generic_eq(&k1));
     assert!(!k1.generic_eq(&k));
 
-    let ak = crate::types::as_any(&crate::types::Type::FunctionDefinition);
-    let ak0 = crate::types::as_any(&crate::types::Type::FunctionDefinition);
-    let ak1 = crate::types::as_any(&crate::types::Type::EnumSpecifier);
+    let ak = crate::types::as_any(&crate::Type::FunctionDefinition);
+    let ak0 = crate::types::as_any(&crate::Type::FunctionDefinition);
+    let ak1 = crate::types::as_any(&crate::Type::EnumSpecifier);
 
     assert!(ak.generic_eq(&ak));
     assert!(ak.generic_eq(&ak0));

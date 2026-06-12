@@ -11,7 +11,7 @@ use hyperast::store::nodes::legion::RawHAST;
 use hyperast::tree_gen::Accumulator;
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
-use hyperast_gen_ts_xml::types::Type;
+use hyperast_gen_ts_xml::Type;
 
 use crate::Processor;
 use crate::StackEle;
@@ -24,7 +24,7 @@ use crate::processing::erased::{
 };
 use crate::processing::{CacheHolding, InFiles, ObjectName, erased::ParametrizedCommitProc2};
 
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::types::TStore>;
+pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
 
 /// RMS: Resursive Module Search
 /// FFWD: Fast ForWarD to java directories without looking at maven stuff
@@ -56,7 +56,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             prep_scripting
                 .map(|x| {
                     hyperast::scripting::Prepro::<
-                        RawHAST<hyperast_gen_ts_java::types::TStore>,
+                        RawHAST<hyperast_gen_ts_java::TStore>,
                         &hyperast_gen_ts_java::legion_with_refs::Acc,
                     >::from(x.clone())
                 })
@@ -139,7 +139,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
             if let Some(acc) = &mut w.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
                 let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
-                let child: hyperast::scripting::SubtreeHandle<hyperast_gen_ts_xml::types::TType> =
+                let child: hyperast::scripting::SubtreeHandle<hyperast_gen_ts_xml::TType> =
                     id.into();
                 acc.acc(store, Type::Directory, child).unwrap();
             }
@@ -175,7 +175,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                     prep_scripting
                         .map(|x| {
                             hyperast::scripting::Prepro::<
-                                RawHAST<hyperast_gen_ts_java::types::TStore>,
+                                RawHAST<hyperast_gen_ts_java::TStore>,
                                 &hyperast_gen_ts_java::legion_with_refs::Acc,
                             >::from(x.clone())
                         })
@@ -212,12 +212,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             if let Some(acc) = &mut w.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
                 let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
-                acc.acc::<_, hyperast_gen_ts_xml::types::TType, _>(
-                    store,
-                    Type::Directory,
-                    id.into(),
-                )
-                .unwrap();
+                acc.acc::<_, hyperast_gen_ts_xml::TType, _>(store, Type::Directory, id.into())
+                    .unwrap();
             }
             return;
         }
@@ -238,12 +234,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             if let Some(acc) = &mut parent_acc.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
                 let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
-                acc.acc::<_, hyperast_gen_ts_java::types::TType, _>(
-                    store,
-                    Type::Directory,
-                    id.into(),
-                )
-                .unwrap();
+                acc.acc::<_, hyperast_gen_ts_java::TType, _>(store, Type::Directory, id.into())
+                    .unwrap();
             }
             return;
         }
@@ -270,12 +262,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             if let Some(acc) = &mut parent_acc.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
                 let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
-                acc.acc::<_, hyperast_gen_ts_java::types::TType, _>(
-                    store,
-                    Type::Directory,
-                    id.into(),
-                )
-                .unwrap();
+                acc.acc::<_, hyperast_gen_ts_java::TType, _>(store, Type::Directory, id.into())
+                    .unwrap();
             }
         }
         // check if module or src/main/java or src/test/java
@@ -329,7 +317,7 @@ impl MavenModuleAcc {
         mut self,
         prep_scripting: Option<
             &hyperast::scripting::Prepro<
-                RawHAST<hyperast_gen_ts_java::types::TStore>,
+                RawHAST<hyperast_gen_ts_java::TStore>,
                 &hyperast_gen_ts_java::legion_with_refs::Acc,
             >,
         >,
@@ -337,7 +325,7 @@ impl MavenModuleAcc {
         if let Some(more) = prep_scripting {
             log::info!("prep_scripting");
             use hyperast::tree_gen::Prepro;
-            match more.preprocessing(hyperast_gen_ts_java::types::Type::Directory) {
+            match more.preprocessing(hyperast_gen_ts_java::Type::Directory) {
                 Ok(acc) => self.scripting_acc = Some(acc),
                 Err(err) => {
                     log::error!("error when handling maven modules {}", err);
@@ -373,7 +361,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
     let label_store = &mut stores.label_store;
     use hyperast::store::nodes::legion::eq_node;
     let kind = Type::MavenDirectory;
-    let interned_kind = hyperast_gen_ts_xml::types::TStore::intern(kind);
+    let interned_kind = hyperast_gen_ts_xml::TStore::intern(kind);
     let label_id = label_store.get_or_insert(acc.primary.name.clone());
 
     let primary = acc
@@ -418,7 +406,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
     log::info!("make mm {} {}", &primary.name, primary.children.len());
     assert_eq!(primary.children_names.len(), primary.children.len());
     let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(
-        hyperast_gen_ts_xml::types::Lang,
+        hyperast_gen_ts_xml::Lang,
     );
     let children_is_empty = primary.children.is_empty();
     if !acc.status.is_empty() {

@@ -8,7 +8,7 @@ use hyperast::types::LabelStore as _;
 use hyperast_gen_ts_java::language;
 use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
 use hyperast_gen_ts_java::legion_with_refs::{FNode, JavaTreeGen, Local, MD, MDCache};
-use hyperast_gen_ts_java::types::{Lang, TStore, Type};
+use hyperast_gen_ts_java::{Lang, TStore, Type};
 use hyperast_vcs_git::java::JavaAcc;
 
 pub fn iter_dirs(root_buggy: &std::path::Path) -> impl Iterator<Item = std::fs::DirEntry> + use<> {

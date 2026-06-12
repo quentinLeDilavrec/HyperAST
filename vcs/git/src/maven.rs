@@ -11,7 +11,7 @@ use hyperast::tree_gen::SubTreeMetrics;
 use hyperast::types::{Childrn, LabelStore as _, Labeled, Tree, Typed, WithChildren};
 use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
-use hyperast_gen_ts_xml::types::{TStore, Type};
+use hyperast_gen_ts_xml::{TStore, Type};
 
 use crate::{
     Accumulator, BasicDirAcc, DefaultMetrics, PROPAGATE_ERROR_ON_BAD_CST_NODE, ParseErr,
@@ -433,7 +433,7 @@ impl<'a, T: TreePathMut<NodeIdentifier, u16> + Debug + Clone> Iterator for IterM
     }
 }
 
-type XmlIdN = hyperast_gen_ts_xml::types::TIdN<NodeIdentifier>;
+type XmlIdN = hyperast_gen_ts_xml::TIdN<NodeIdentifier>;
 type XmlNode<'a> = hyperast::store::nodes::legion::HashedNodeRef<'a, XmlIdN>;
 
 impl<'a, T: TreePath<NodeIdentifier>> IterMavenModules<'a, T> {

@@ -21,8 +21,10 @@ use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
 use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
 use hyperast::types::{ETypeStore as _, LabelStore as LabelStoreTrait};
 
+use crate::TIdN;
 use crate::TNode;
-use crate::types::{TIdN, TsQueryEnabledTypeStore, Type};
+use crate::Type;
+use crate::types::TsQueryEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 
@@ -405,7 +407,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
     }
 }
 
-impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
+impl<'stores> TsQueryTreeGen<'stores, '_, crate::TStore> {
     pub fn build_then_insert(
         &mut self,
         _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
@@ -470,7 +472,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
         }
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
-        let interned_kind = crate::types::TStore::intern(acc.simple.kind);
+        let interned_kind = crate::TStore::intern(acc.simple.kind);
         let hashs = acc.metrics.hashs;
         let size = acc.metrics.size + 1;
         let height = acc.metrics.height + 1;
@@ -504,7 +506,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
             use hyperast::store::nodes::compo;
             let hashs = hbuilder.build();
 
-            let mut dyn_builder = subtree_builder::<crate::types::TStore>(interned_kind);
+            let mut dyn_builder = subtree_builder::<crate::TStore>(interned_kind);
             dyn_builder.add(hashs);
             dyn_builder.add(compo::BytesLen(
                 (acc.end_byte - acc.start_byte).try_into().unwrap(),
@@ -543,7 +545,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
     /// Cannot be used to build a new node.
     /// Only take self as shared ref and check if the would be created node would already exist
     pub fn try_build(
-        stores: &'stores SimpleStores<crate::types::TStore>,
+        stores: &'stores SimpleStores<crate::TStore>,
         _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
         t: Type,
         l: Option<LabelIdentifier>,
@@ -600,7 +602,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::types::TStore> {
         }
         let node_store = &stores.node_store;
         let label_store = &stores.label_store;
-        let interned_kind = crate::types::TStore::intern(acc.simple.kind);
+        let interned_kind = crate::TStore::intern(acc.simple.kind);
         let hashs = acc.metrics.hashs;
         let size_no_spaces = acc.metrics.size_no_spaces + 1;
 

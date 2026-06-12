@@ -114,8 +114,8 @@ fn match_xml() {
     println!("{}", TextSerializer::new(&code_store, pat));
     let q0 = "(element (STag (Name) @id (#eq? @id \"artifactId\")))".to_string();
     let (query_store, query) = crate::search::ts_query(q0.as_bytes());
-    use hyperast_gen_ts_xml::types::Type as Xml;
-    type XmlTIdN = hyperast_gen_ts_xml::types::TIdN<NodeIdentifier>;
+    use hyperast_gen_ts_xml::Type as Xml;
+    type XmlTIdN = hyperast_gen_ts_xml::TIdN<NodeIdentifier>;
     use hyperast_gen_ts_xml::iter::IterAll as XmlIter;
     let path = hyperast::position::StructuralPosition::new(code);
     let prepared_matcher = crate::search::PreparedMatcher::<Xml>::new(&query_store, query);

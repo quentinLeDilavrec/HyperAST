@@ -12,7 +12,7 @@ pub struct SynthConfig {
 pub fn synth<P>(
     timeout: &crate::Timeout,
     inst: &[P],
-    stores: &hyperast::store::SimpleStores<hyperast_gen_ts_java::types::TStore>,
+    stores: &hyperast::store::SimpleStores<hyperast_gen_ts_java::TStore>,
     meta_gen: &str,
     meta_simp: &str,
     config: &SynthConfig,
@@ -35,7 +35,7 @@ where
 
     use hyperast_gen_ts_tsquery::code2query::QueryLattice;
     let query_poset = {
-        let b = QueryLattice::builder::<ts_gen::types::TStore, ts_gen::types::TIdN<_>, _>(
+        let b = QueryLattice::builder::<ts_gen::TStore, ts_gen::TIdN<_>, _>(
             stores,
             inst.iter().copied(),
             &meta_gen,

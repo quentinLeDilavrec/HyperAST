@@ -24,7 +24,7 @@ use crate::search::try_ts_query;
 // use crate::legion as qgen; // includes indentation, such as spaces and new lines
 use crate::no_fmt_legion as qgen; // ignores spaces, new lines,...
 
-type QStore = SimpleStores<crate::types::TStore>;
+type QStore = SimpleStores<crate::TStore>;
 
 type IdN = NodeIdentifier;
 type Idx = u16;
@@ -1934,13 +1934,13 @@ where
     use hyperast::position::structural_pos::StructuralPosition as Pos;
     let path = Pos::new(query);
     let prepared_matcher =
-        crate::search::PreparedMatcher::<crate::types::Type>::new(&query_store1, query1);
+        crate::search::PreparedMatcher::<crate::Type>::new(&query_store1, query1);
 
     let mut per_label = std::collections::HashMap::<String, Vec<(String, Pos<_, _>)>>::default();
 
     for e in crate::iter::IterAll::new(&query_store, path, query) {
-        let capts = prepared_matcher
-            .is_matching_and_capture::<_, crate::types::TIdN<_>>(&query_store, e.node());
+        let capts =
+            prepared_matcher.is_matching_and_capture::<_, crate::TIdN<_>>(&query_store, e.node());
         let Some(capts) = capts else { continue };
         dbg!(&capts);
         let l_l = (prepared_matcher.captures.iter())
@@ -2040,9 +2040,9 @@ fn simp_focus(
             use hyperast::types::LabelStore as _;
             let mty_l = query_store.label_store.get_or_insert("");
             let mut query_tree_gen = qgen::TsQueryTreeGen::new(query_store, &mut md_cache);
-            use crate::types::Type::NamedNode;
+            use crate::Type::NamedNode;
             let new_q = query_tree_gen.build_then_insert(query, NamedNode, None, new_q);
-            use crate::types::Type::Program;
+            use crate::Type::Program;
             let new_q = query_tree_gen.build_then_insert(query, Program, Some(mty_l), vec![new_q]);
             new_q
         })
@@ -2092,7 +2092,7 @@ fn simp_positional_eq(
     use hyperast::types::LabelStore as _;
     let mty_l = query_store.label_store.get_or_insert("");
     let mut query_tree_gen = qgen::TsQueryTreeGen::new(query_store, &mut md_cache);
-    use crate::types::Type::Program;
+    use crate::Type::Program;
     let new_q = query_tree_gen.build_then_insert(query, Program, Some(mty_l), new_q);
 
     // eprintln!(

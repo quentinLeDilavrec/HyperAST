@@ -9,7 +9,7 @@ use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{HyperAST, TypedNodeStore};
 use hyperast::types::{NodeId, UniformNodeId};
 
-use crate::types::Type;
+use crate::Type;
 
 pub struct IterDeclarations<'a, T, HAST> {
     stores: &'a HAST,
@@ -18,7 +18,7 @@ pub struct IterDeclarations<'a, T, HAST> {
 }
 
 enum Id<IdN> {
-    Java(crate::types::TIdN<IdN>),
+    Java(crate::TIdN<IdN>),
     Other(IdN),
 }
 
@@ -234,7 +234,7 @@ impl<T, HAST> Iterator for IterDeclarations<'_, T, HAST> {
 impl<'a, T: TreePath<NodeIdentifier, u16>, HAST: HyperAST<IdN = NodeIdentifier>>
     IterDeclarations<'a, T, HAST>
 where
-    HAST::NS: TypedNodeStore<crate::types::TIdN<HAST::IdN>>,
+    HAST::NS: TypedNodeStore<crate::TIdN<HAST::IdN>>,
 {
     pub fn new(stores: &'a HAST, path: T, root: NodeIdentifier) -> Self {
         let root = if let Some(tid) = TypedNodeStore::try_typed(stores.node_store(), &root) {

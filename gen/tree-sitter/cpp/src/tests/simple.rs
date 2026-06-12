@@ -39,7 +39,7 @@ pub(crate) fn cpp_preproc_call_decl_test() {
     let precomp: &[&str] = &["(translation_unit)"];
     let (_, query) =
         hyperast_tsquery::Query::with_precomputed(query, crate::language(), precomp).unwrap();
-    let mut stores = hyperast::store::SimpleStores::<crate::types::TStore>::default();
+    let mut stores = hyperast::store::SimpleStores::<crate::TStore>::default();
     let mut md_cache = Default::default();
     let mut cpp_tree_gen = crate::legion::CppTreeGen::new(&mut stores, &mut md_cache);
 

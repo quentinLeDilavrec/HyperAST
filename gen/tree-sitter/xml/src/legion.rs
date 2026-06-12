@@ -23,7 +23,9 @@ use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
 use hyperast::types::LabelStore as LabelStoreTrait;
 
 use crate::TNode;
-use crate::types::{TStore, Type, XmlEnabledTypeStore};
+use crate::TStore;
+use crate::Type;
+use crate::types::XmlEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

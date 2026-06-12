@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use hyperast::tree_gen::{TsEnableTS, TsType};
-use hyperast::types::{AnyType, HyperType, LangRef, TypeStore, TypeTrait, TypeU16, TypedNodeId};
+use hyperast::types::{AnyType, TypeU16};
+use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
 use hyperast::types::{NodeId, UniformNodeId};
 
 impl hyperast::types::ETypeStore for TStore {
@@ -143,14 +144,14 @@ impl Default for TStore {
     }
 }
 
-type TypeInternalSize = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct T(TypeInternalSize);
-
 #[derive(Debug)]
 pub struct Lang;
 pub type TsQuery = Lang;
+
+impl Lang {
+    pub const NAME: &'static str = "hyperast_gen_ts_tsquery::types::Lang";
+    // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
+}
 
 impl LangRef<AnyType> for TsQuery {
     fn make(&self, t: u16) -> &'static AnyType {
@@ -164,7 +165,8 @@ impl LangRef<AnyType> for TsQuery {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<TsQuery>()
+        debug_assert_eq!(std::any::type_name::<TsQuery>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
@@ -191,7 +193,8 @@ impl LangRef<Type> for TsQuery {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<TsQuery>()
+        debug_assert_eq!(std::any::type_name::<TsQuery>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
@@ -211,7 +214,8 @@ impl LangRef<TType> for TsQuery {
     }
 
     fn name(&self) -> &'static str {
-        std::any::type_name::<TsQuery>()
+        debug_assert_eq!(std::any::type_name::<TsQuery>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

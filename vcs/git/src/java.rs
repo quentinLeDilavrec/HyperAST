@@ -10,7 +10,7 @@ use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 use crate::java_processor::SimpleStores;
 use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 use hyperast_gen_ts_java::legion_with_refs::PartialAnalysis;
-use hyperast_gen_ts_java::types::{TStore, Type};
+use hyperast_gen_ts_java::{TStore, Type};
 
 pub(crate) fn handle_java_file<'stores, 'cache, 'b: 'stores, More>(
     tree_gen: &mut java_tree_gen::JavaTreeGen<

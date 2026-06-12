@@ -1,4 +1,11 @@
-pub mod types;
+//! HyperAST generator for the TreeSitter query language TreeSitter.
+//!
+//! wraps tree-sitter-query
+
+pub(crate) mod types;
+
+pub use types::Type;
+pub use types::{Lang, TIdN, TStore};
 
 #[cfg(feature = "impl")]
 pub mod legion;

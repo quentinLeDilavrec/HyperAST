@@ -35,11 +35,11 @@ const C4: &str = r#"int f() {
     return b + b;
 }"#;
 
-type XmlTIdN = hyperast_gen_ts_xml::types::TIdN<NodeIdentifier>;
-type CppTIdN = hyperast_gen_ts_cpp::types::TIdN<NodeIdentifier>;
+type XmlTIdN = hyperast_gen_ts_xml::TIdN<NodeIdentifier>;
+type CppTIdN = hyperast_gen_ts_cpp::TIdN<NodeIdentifier>;
 
-type Cpp = hyperast_gen_ts_cpp::types::Type;
-type Xml = hyperast_gen_ts_xml::types::Type;
+type Cpp = hyperast_gen_ts_cpp::Type;
+type Xml = hyperast_gen_ts_xml::Type;
 
 // Possible useful stuff:
 // - test if subtree is conforming to ts query

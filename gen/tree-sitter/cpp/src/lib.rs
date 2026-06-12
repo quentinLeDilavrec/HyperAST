@@ -17,8 +17,7 @@ pub(crate) mod types_alt;
 #[cfg(feature = "alt_grammar")]
 pub(crate) use types_alt as types;
 
-pub use types::Type;
-pub use types::{Lang, Role, TIdN, TStore};
+pub use types::{Lang, Role, TIdN, TStore, Type};
 
 #[doc(hidden)]
 pub use types::TType;

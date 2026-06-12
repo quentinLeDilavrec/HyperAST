@@ -32,7 +32,7 @@ use hyperast::types::Role;
 use crate::TNode;
 use crate::TStore;
 use crate::Type;
-use crate::types::CppEnabledTypeStore;
+use crate::types::impls::CppEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

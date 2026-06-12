@@ -20,9 +20,9 @@ fn type_test_generic_eq() {
     assert!(!k.generic_eq(&k1));
     assert!(!k1.generic_eq(&k));
 
-    let ak = crate::types::as_any(&crate::Type::FunctionDefinition);
-    let ak0 = crate::types::as_any(&crate::Type::FunctionDefinition);
-    let ak1 = crate::types::as_any(&crate::Type::EnumSpecifier);
+    let ak = crate::types::impls::as_any(&crate::Type::FunctionDefinition);
+    let ak0 = crate::types::impls::as_any(&crate::Type::FunctionDefinition);
+    let ak1 = crate::types::impls::as_any(&crate::Type::EnumSpecifier);
 
     assert!(ak.generic_eq(&ak));
     assert!(ak.generic_eq(&ak0));

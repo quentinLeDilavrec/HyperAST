@@ -203,10 +203,7 @@ where
         );
         let labeled = node.has_label();
         Acc {
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             labeled,
             start_byte: node.start_byte(),
@@ -282,10 +279,7 @@ where
             metrics: Default::default(),
             padding_start: global.sum_byte_length(),
             indentation: indent,
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             role: Default::default(),
             precomp_queries: Default::default(),

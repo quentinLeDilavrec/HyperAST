@@ -137,10 +137,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
         let kind = TS::obtain_type(node);
         let labeled = node.has_label();
         Acc {
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             labeled,
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
@@ -187,10 +184,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
             end_byte: node.end_byte(),
             metrics: Default::default(),
             padding_start: global.sum_byte_length(),
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
         }
     }
 

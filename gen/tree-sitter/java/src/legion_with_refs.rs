@@ -323,10 +323,7 @@ where
             None
         };
         Acc {
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             labeled,
             start_byte: node.start_byte(),
@@ -431,10 +428,7 @@ where
             mcc: Mcc::new(&kind),
             padding_start: global.sum_byte_length(),
             indentation: indent,
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             role: Default::default(),
             precomp_queries: Default::default(),
@@ -864,11 +858,11 @@ where
 
         let hashable = &metrics.hashs.most_discriminating();
 
-        let label_id = label.as_ref().map(|label| {
+        let label_id = label.as_deref().map(|label| {
             // Some notable type can contain very different labels,
             // they might benefit from a particular storing (like a blob storage, even using git's object database )
             // eg. acc.simple.kind == Type::Comment and acc.simple.kind.is_literal()
-            stores.label_store.get_or_insert(label.as_str())
+            stores.label_store.get_or_insert(label)
         });
         let eq = eq_node(&interned_kind, label_id.as_ref(), &acc.simple.children);
 

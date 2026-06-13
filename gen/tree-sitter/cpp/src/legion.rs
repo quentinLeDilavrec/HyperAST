@@ -257,10 +257,7 @@ where
         let labeled = node.has_label();
         let ana = self.build_ana(&kind);
         Acc {
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             labeled,
             start_byte: node.start_byte(),
@@ -370,10 +367,7 @@ where
             ana: self.build_ana(&kind),
             padding_start: global.sum_byte_length(),
             indentation: indent,
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             viz_cs_count: 0,
             no_space: vec![],
             role: Default::default(),

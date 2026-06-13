@@ -20,7 +20,7 @@ pub trait HashKind: Copy + Deref {
     fn label() -> Self;
 }
 
-/// TODO handle roles in a polyglote way
+/// TODO handle roles in a polyglot way
 macro_rules! role_impl {
     (
         $( $t:ident => $s:expr, )+
@@ -1465,7 +1465,7 @@ mod exp {
             Self: Sized;
     }
 
-    mod polyglote {
+    mod polyglot {
         /// has statements
         struct Block;
         /// has a name

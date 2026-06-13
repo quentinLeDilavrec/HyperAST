@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "crates/hyper_ast",
     "crates/hyper_diff",
-    "lib/polyglote",
+    "lib/polyglot",
     "crates/tsquery",
     "gen/tree-sitter/*",
     "lib/egui_addon",
@@ -32,7 +32,7 @@ default-members = [
     # "crates/ref-mining-evaluation",
     "benchmark_diffs",
     "lib/egui_addon",
-    "lib/polyglote",
+    "lib/polyglot",
     "crates/tsquery",
 ]
 
@@ -44,7 +44,7 @@ hyper_diff = { path = "./crates/hyper_diff" }
 hyperast = { path = "./crates/hyper_ast", default-features = false }
 hyperast_tsquery = { path = "./crates/tsquery" }
 hyperast_vcs_git = { path = "./vcs/git" }
-polyglote = { path = "./lib/polyglote" }
+polyglot = { path = "./lib/polyglot" }
 
 hyperast_gen_ts_cpp = { path = "./gen/tree-sitter/cpp" }
 hyperast_gen_ts_java = { path = "./gen/tree-sitter/java" }

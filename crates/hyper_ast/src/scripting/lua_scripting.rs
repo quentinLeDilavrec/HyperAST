@@ -288,7 +288,7 @@ impl<T: HyperType + Send + Sync + 'static> mlua::UserData for SubtreeHandle<T> {
             let n = crate::types::NodeStore::resolve(&store.node_store, id);
             if s == "is_comment" {
                 // let ty = n.try_get_type().unwrap();
-                // TODO make a subtree handle on the consumer side to enable polyglote
+                // TODO make a subtree handle on the consumer side to enable polyglot
                 let ty = n.get_component::<T>().unwrap();
                 let b = ty.as_shared() == Shared::Comment;
                 return b.into_lua(lua);

@@ -219,7 +219,7 @@ pub fn smells(
     let dst_tr = commit_dst.ast_root;
     let with_spaces_stores = &repositories.processor.main_stores;
 
-    // NOTE temporary solution, will be fixed when adding more polyglote facilities
+    // NOTE temporary solution, will be fixed when adding more polyglot facilities
     use hyperast_gen_ts_java as ts_gen;
     let sss: &hyperast::store::SimpleStores<ts_gen::TStore> = with_spaces_stores.with_ts();
 
@@ -1165,7 +1165,7 @@ mod test_gen {
         let dst_tr = commit_dst.ast_root;
         let with_spaces_stores = &repositories.processor.main_stores;
 
-        // NOTE temporary solution, will be fixed when adding more polyglote facilities
+        // NOTE temporary solution, will be fixed when adding more polyglot facilities
         use hyperast_gen_ts_java as ts_gen;
         let sss: &hyperast::store::SimpleStores<ts_gen::TStore> = with_spaces_stores.with_ts();
 

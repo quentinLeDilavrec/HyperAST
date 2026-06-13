@@ -1200,7 +1200,7 @@ dependencies = [
  "num",
  "once_cell",
  "petgraph 0.7.1",
- "polyglote",
+ "polyglot",
  "reqwest",
  "rerun",
  "rhai",
@@ -6849,7 +6849,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "polyglote"
+name = "polyglot"
 version = "0.5.0"
 dependencies = [
  "derive_deref",

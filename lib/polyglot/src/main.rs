@@ -133,7 +133,7 @@ pub fn sanitize_string(name: &str, escape: bool) -> String {
 }
 
 use macr::Lang;
-use polyglote::{camel_case, preprocess_aux};
+use polyglot::{camel_case, preprocess_aux};
 // use macroquad::miniquad::conf::{LinuxBackend, Platform};
 use tree_sitter::Language;
 

@@ -8,7 +8,7 @@ use rerun::external::{arrow, re_types};
 pub fn log_languages() -> Result<(), Box<dyn std::error::Error>> {
     let rec = rerun::RecordingStream::global(rerun::StoreKind::Recording).unwrap();
 
-    let lang = polyglote::Lang {
+    let lang = polyglot::Lang {
         language: hyperast_gen_ts_java::language(),
         name: "java",
         node_types: hyperast_gen_ts_java::node_types(),
@@ -16,14 +16,14 @@ pub fn log_languages() -> Result<(), Box<dyn std::error::Error>> {
         tags: "",
         injects: "",
     };
-    let types = polyglote::preprocess_aux(&lang)?;
+    let types = polyglot::preprocess_aux(&lang)?;
 
     eprintln!("{}", types);
 
     log_3dgraph_language(&rec, &lang, &types)?;
     log_2dgraph_language(&rec, &lang, &types)?;
 
-    let lang = polyglote::Lang {
+    let lang = polyglot::Lang {
         language: hyperast_gen_ts_cpp::language(),
         name: "cpp",
         node_types: hyperast_gen_ts_cpp::node_types(),
@@ -31,14 +31,14 @@ pub fn log_languages() -> Result<(), Box<dyn std::error::Error>> {
         tags: "",
         injects: "",
     };
-    let types = polyglote::preprocess_aux(&lang)?;
+    let types = polyglot::preprocess_aux(&lang)?;
 
     eprintln!("{}", types);
 
     log_3dgraph_language(&rec, &lang, &types)?;
     log_2dgraph_language(&rec, &lang, &types)?;
 
-    let lang = polyglote::Lang {
+    let lang = polyglot::Lang {
         language: hyperast_gen_ts_tsquery::language(),
         name: "tsquery",
         node_types: hyperast_gen_ts_tsquery::node_types(),
@@ -46,7 +46,7 @@ pub fn log_languages() -> Result<(), Box<dyn std::error::Error>> {
         tags: "",
         injects: "",
     };
-    let types = polyglote::preprocess_aux(&lang)?;
+    let types = polyglot::preprocess_aux(&lang)?;
 
     eprintln!("{}", types);
 
@@ -58,8 +58,8 @@ pub fn log_languages() -> Result<(), Box<dyn std::error::Error>> {
 
 fn log_2dgraph_language(
     rec: &rerun::RecordingStream,
-    lang: &polyglote::Lang,
-    types: &polyglote::preprocess::TypeSys,
+    lang: &polyglot::Lang,
+    types: &polyglot::preprocess::TypeSys,
 ) -> rerun::RecordingStreamResult<()> {
     let path = &["language", lang.name].map(|x| x.into())[..];
     fn split_f(
@@ -103,8 +103,8 @@ fn log_2dgraph_language(
 
 fn log_3dgraph_language(
     rec: &rerun::RecordingStream,
-    lang: &polyglote::Lang,
-    types: &polyglote::preprocess::TypeSys,
+    lang: &polyglot::Lang,
+    types: &polyglot::preprocess::TypeSys,
 ) -> rerun::RecordingStreamResult<()> {
     let mut map = Map {
         map: std::collections::HashMap::default(),

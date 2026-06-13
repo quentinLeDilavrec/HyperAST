@@ -16,7 +16,7 @@ hyper_diff = { workspace = true }
 hyperast_vcs_git = { workspace = true }
 hyperast_gen_ts_tsquery = { workspace = true, features = ["synth_par", "impl"] }
 hyperast_tsquery = { workspace = true }
-polyglote = { workspace = true, optional = true }
+polyglot = { workspace = true, optional = true }
 
 log = { version = "0.4.6" }
 
@@ -146,7 +146,7 @@ lattice=[
     "dep:sux", "sux?/serde",
     "dep:lender",
 ]
-rerun = ["dep:rerun", "dep:polyglote"]
+rerun = ["dep:rerun", "dep:polyglot"]
 subtree-stats = ["hyperast_gen_ts_java/subtree-stats"]
 alt_grammar = ["hyperast_gen_ts_cpp/impl_alt_grammar"]
 collab = ["dep:autosurgeon", "dep:automerge"]

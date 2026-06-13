@@ -29,4 +29,4 @@ This document describes the architecture of the project. It is suppose to be hig
 
 - **lib/egui_addon** small addon of functionalities used in hyper_app
 
-- **lib/polyglote** generates node types from tree-sitter grammars
+- **lib/polyglot** generates node types from tree-sitter grammars

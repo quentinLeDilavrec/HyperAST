@@ -1,7 +1,7 @@
 use strum_macros::AsRefStr;
 use tree_sitter::Language;
 
-use polyglote::LanguageCompo;
+use polyglot::LanguageCompo;
 
 macro_rules! mk_enum {
     ( $( $camel:ident ),* ) => {

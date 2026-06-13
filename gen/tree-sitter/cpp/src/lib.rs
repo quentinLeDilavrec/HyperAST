@@ -2,15 +2,17 @@
 //!
 //! wraps tree-sitter-cpp
 
-cfg_if::cfg_if! { if #[cfg(feature = "alt_grammar")] {
+cfg_if::cfg_if! { if #[cfg(all(feature = "alt_grammar", feature = "types"))] {
     pub(crate) mod types_alt;
     pub(crate) use types_alt as types;
-} else {
+} else if #[cfg(feature = "types")] {
     pub(crate) mod types;
 }}
 
+#[cfg(feature = "types")]
 pub use types::{Lang, Role, TIdN, TStore, Type};
 
+#[cfg(feature = "types")]
 #[doc(hidden)]
 pub use types::TType;
 
@@ -25,7 +27,7 @@ cfg_if::cfg_if! { if #[cfg(feature = "legion")] {
     pub mod iter;
 }}
 
-#[cfg(feature = "impl_intern")]
+#[cfg(feature = "ts")]
 pub fn language() -> tree_sitter::Language {
     cfg_if::cfg_if! { if #[cfg(feature = "alt_grammar")] {
         tree_sitter::Language::new(tree_sitter_cpp_alt::LANGUAGE)
@@ -34,7 +36,7 @@ pub fn language() -> tree_sitter::Language {
     }}
 }
 
-#[cfg(feature = "impl_intern")]
+#[cfg(feature = "ts")]
 pub fn node_types() -> &'static str {
     cfg_if::cfg_if! { if #[cfg(feature = "alt_grammar")] {
         tree_sitter_cpp_alt::NODE_TYPES

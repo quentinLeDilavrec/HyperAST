@@ -14,7 +14,7 @@ hyperast_gen_ts_java = { workspace = true }
 hyperast_gen_ts_xml = { workspace = true }
 hyper_diff = { workspace = true }
 hyperast_vcs_git = { workspace = true }
-hyperast_gen_ts_tsquery = { workspace = true, features = ["synth_par"] }
+hyperast_gen_ts_tsquery = { workspace = true, features = ["synth_par", "impl"] }
 hyperast_tsquery = { workspace = true }
 polyglote = { workspace = true, optional = true }
 

@@ -36,16 +36,22 @@ test-log = "0.2"
 
 [features]
 default = ["impl"]
-legion = ["hyperast/legion", "dep:legion"]
+
+impl = ["impl_intern", "ts"]
 impl_intern = [
+    "types",
     "hyperast/jemalloc",
     "legion",
     "hyperast/native",
     "dep:hashbrown",
     "hashbrown?/ahash",
+]
+types = []
+legion = ["hyperast/legion", "dep:legion"]
+ts = [
     "dep:tree-sitter",
+    "dep:tree-sitter-cpp",
     "hyperast/ts",
 ]
-impl = ["impl_intern", "dep:tree-sitter-cpp"]
 alt_grammar = []
 impl_alt_grammar = ["alt_grammar", "impl_intern", "dep:tree-sitter-cpp_alt"]

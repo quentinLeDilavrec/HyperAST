@@ -431,6 +431,7 @@ impl<C: super::parser::TreeCursor> PrePost2<C> {
     }
 }
 
+#[cfg(feature = "legion")]
 pub fn make_leaf<TS>(
     node_store: &mut crate::store::nodes::legion::NodeStoreInner,
     label_store: &mut crate::store::labels::LabelStore,

@@ -25,13 +25,19 @@ pretty_assertions = "1.0.0"
 
 [features]
 default = ["impl"]
-legion = ["hyperast/legion", "dep:legion"]
 impl = [
+    "types",
     "hyperast/jemalloc",
     "legion",
     "hyperast/native",
     "dep:hashbrown",
     "hashbrown?/ahash",
+    "hyperast/ts",
+    "ts"
+]
+types = []
+legion = ["hyperast/legion", "dep:legion"]
+ts = [
     "dep:tree-sitter",
     "dep:tree-sitter-xml",
     "hyperast/ts",

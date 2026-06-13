@@ -81,26 +81,33 @@ harness = false
 [features]
 default = ["impl"]
 
-legion = ["hyperast/legion", "dep:legion"]
-impact = [
-    "dep:string-interner",
-]
 # TODO cleanly separate features, for now impl needs it
 impl = [
+    "types",
     "hyperast/jemalloc",
     "legion",
     "hyperast/native",
     "dep:hashbrown",
     "hashbrown?/ahash",
+    "ts",
+    "scripting",
+    "hyperast_gen_ts_tsquery/impl",
+]
+types = []
+legion = ["hyperast/legion", "dep:legion"]
+ts = [
     "dep:tree-sitter",
     "dep:tree-sitter-java",
+    "hyperast_gen_ts_tsquery/ts",
     "hyperast/ts",
-    "scripting",
 ]
 tsg = [
     # "dep:tree-sitter-graph",
     # "dep:stack-graphs",
     # "dep:tree-sitter-stack-graphs",
+]
+impact = [
+    "dep:string-interner",
 ]
 subtree-stats = ["hyperast/subtree-stats"]
 scripting = ["hyperast/scripting"]

@@ -73,11 +73,24 @@ default = [
 legion = ["dep:legion"]
 hecs = ["dep:hecs"]
 bevy_ecs = ["dep:bevy_ecs"]
-web = ["getrandom/js", "dep:string-interner", "dep:hashbrown"]
-native = ["dep:string-interner", "dep:hashbrown", "hashbrown?/ahash"]
+web = [
+    "getrandom/js",
+    "dep:string-interner",
+    "dep:hashbrown",
+]
+native = [
+    "dep:string-interner",
+    "dep:hashbrown",
+    "hashbrown?/ahash",
+]
 jemalloc = ["jemallocator", "jemalloc-ctl"]
 ts_type = []
-ts = ["ts_type", "dep:tree-sitter"]
+ts = [
+    "ts_type",
+    "dep:tree-sitter",
+    "dep:string-interner",
+    "dep:hashbrown",
+]
 serialize = ["serde"]
 scripting = ["dep:rhai", "dep:mlua"]
 subtree-stats = []

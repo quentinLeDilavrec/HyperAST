@@ -654,24 +654,24 @@ pub trait TsType: crate::types::HyperType + Copy {
 #[cfg(feature = "ts")]
 pub mod utils_ts;
 
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 mod zipped_ts;
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 mod zipped_ts0;
 #[doc(hidden)]
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 pub mod zipped_ts_no_goto_parent;
 #[doc(hidden)]
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 pub mod zipped_ts_no_goto_parent_a;
 #[doc(hidden)]
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 pub mod zipped_ts_simp;
 #[doc(hidden)]
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 pub mod zipped_ts_simp0;
 #[doc(hidden)]
-#[cfg(feature = "ts")]
+#[cfg(all(feature = "ts", feature = "legion"))]
 pub mod zipped_ts_simp1;
 
 pub(crate) fn things_after_last_lb<'b>(lb: &[u8], spaces: &'b [u8]) -> Option<&'b [u8]> {

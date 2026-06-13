@@ -49,7 +49,7 @@ polyglote = { path = "./lib/polyglote" }
 hyperast_gen_ts_cpp = { path = "./gen/tree-sitter/cpp" }
 hyperast_gen_ts_java = { path = "./gen/tree-sitter/java" }
 hyperast_gen_ts_xml = { path = "./gen/tree-sitter/xml" }
-hyperast_gen_ts_tsquery = { path = "./gen/tree-sitter/query" }
+hyperast_gen_ts_tsquery = { path = "./gen/tree-sitter/query", default-features = false }
 hyperast_gen_ts_ts = { path = "./gen/tree-sitter/ts" }
 
 legion = { version = "^0.4.0" }

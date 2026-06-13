@@ -2,10 +2,14 @@
 //!
 //! wraps tree-sitter-query
 
+cfg_if::cfg_if! {if #[cfg(feature = "types")] {
 pub(crate) mod types;
-
 pub use types::Type;
 pub use types::{Lang, TIdN, TStore};
+
+#[doc(hidden)]
+pub use types::TType;
+}}
 
 #[cfg(feature = "impl")]
 pub mod legion;
@@ -143,17 +147,17 @@ where
     }
 }
 
-#[cfg(feature = "impl")]
+#[cfg(feature = "ts")]
 pub fn tree_sitter_parse(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
     hyperast::tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
 }
 
-#[cfg(feature = "impl")]
+#[cfg(feature = "ts")]
 pub fn language() -> tree_sitter::Language {
     tree_sitter_query::language()
 }
 
-#[cfg(feature = "impl")]
+#[cfg(feature = "ts")]
 pub fn node_types() -> &'static str {
     tree_sitter_query::NODE_TYPES
 }

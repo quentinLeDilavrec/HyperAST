@@ -48,16 +48,23 @@ harness = false
 
 [features]
 default = ["impl"]
-legion = ["hyperast/legion", "dep:legion"]
+
 impl = [
+    "types",
     "hyperast/jemalloc",
     "legion",
     "dep:hashbrown",
     "hyperast/native",
     "hashbrown?/ahash",
+    "dep:hyperast_tsquery",
+    "ts",
+]
+types = []
+legion = ["hyperast/legion", "dep:legion"]
+ts = [
     "dep:tree-sitter",
     "dep:tree-sitter-query",
-    "dep:hyperast_tsquery",
+    "hyperast/ts",
 ]
 synth_par = ["dep:rayon", "hashbrown?/rayon"]
-lattice = ["dep:petgraph"]
+lattice = ["dep:petgraph", "dep:hyperast_tsquery"]

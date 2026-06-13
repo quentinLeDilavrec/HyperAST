@@ -31,13 +31,18 @@ env_logger = "0.11.3"
 
 [features]
 default = ["impl"]
-legion = ["hyperast/legion", "dep:legion"]
 impl = [
+    "types",
     "hyperast/jemalloc",
     "legion",
     "hyperast/native",
     "dep:hashbrown",
     "hashbrown?/ahash",
+    "ts",
+]
+types = []
+legion = ["hyperast/legion", "dep:legion"]
+ts = [
     "dep:tree-sitter",
     "dep:tree-sitter-c",
     "hyperast/ts",

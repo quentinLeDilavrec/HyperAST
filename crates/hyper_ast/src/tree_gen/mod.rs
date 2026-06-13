@@ -472,20 +472,20 @@ enum P<Acc> {
 
 #[cfg(feature = "ts")]
 impl<Acc> P<Acc> {
-    fn s(&self) -> &str {
-        match self {
-            P::ManualyHidden => "ManualyHidden",
-            P::BothHidden => "BothHidden",
-            P::Hidden(_) => "Hidden",
-            P::Visible(_) => "Visible",
-        }
-    }
-    fn is_both_hidden(&self) -> bool {
-        match self {
-            P::BothHidden => true,
-            _ => false,
-        }
-    }
+    // fn s(&self) -> &str {
+    //     match self {
+    //         P::ManualyHidden => "ManualyHidden",
+    //         P::BothHidden => "BothHidden",
+    //         P::Hidden(_) => "Hidden",
+    //         P::Visible(_) => "Visible",
+    //     }
+    // }
+    // fn is_both_hidden(&self) -> bool {
+    //     match self {
+    //         P::BothHidden => true,
+    //         _ => false,
+    //     }
+    // }
     fn unwrap(self) -> Acc {
         match self {
             P::ManualyHidden => panic!(),
@@ -655,24 +655,7 @@ pub trait TsType: crate::types::HyperType + Copy {
 pub mod utils_ts;
 
 #[cfg(all(feature = "ts", feature = "legion"))]
-mod zipped_ts;
-#[cfg(all(feature = "ts", feature = "legion"))]
-mod zipped_ts0;
-#[doc(hidden)]
-#[cfg(all(feature = "ts", feature = "legion"))]
-pub mod zipped_ts_no_goto_parent;
-#[doc(hidden)]
-#[cfg(all(feature = "ts", feature = "legion"))]
-pub mod zipped_ts_no_goto_parent_a;
-#[doc(hidden)]
-#[cfg(all(feature = "ts", feature = "legion"))]
-pub mod zipped_ts_simp;
-#[doc(hidden)]
-#[cfg(all(feature = "ts", feature = "legion"))]
-pub mod zipped_ts_simp0;
-#[doc(hidden)]
-#[cfg(all(feature = "ts", feature = "legion"))]
-pub mod zipped_ts_simp1;
+pub mod zipped_ts;
 
 pub(crate) fn things_after_last_lb<'b>(lb: &[u8], spaces: &'b [u8]) -> Option<&'b [u8]> {
     spaces

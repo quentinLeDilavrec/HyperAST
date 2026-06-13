@@ -29,7 +29,7 @@ use hyperast::types::{LabelStore as _, Role};
 
 use crate::TNode;
 use crate::Type;
-use crate::types::CEnabledTypeStore;
+use crate::types::impls::CEnabledTypeStore;
 
 pub type LabelIdentifier = hyperast::store::labels::DefaultLabelIdentifier;
 

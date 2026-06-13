@@ -38,6 +38,8 @@ tree-sitter-java = "0.23.0"
 hyperast_gen_ts_xml = { workspace = true }
 criterion = { workspace = true }
 
+polyglot = { path="../../../lib/polyglot" }
+
 [lib]
 bench = false
 
@@ -45,6 +47,9 @@ bench = false
 name = "capture_names"
 harness = false
 
+[[example]]
+name = "regen_tsquery_types"
+path = "bin/regen_tsquery_types.rs"
 
 [features]
 default = ["impl"]

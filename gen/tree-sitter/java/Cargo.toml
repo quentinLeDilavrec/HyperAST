@@ -42,6 +42,8 @@ criterion = { workspace = true }
 hyperast_tsquery = { workspace = true }
 hyperast_gen_ts_tsquery = { workspace = true }
 
+polyglot = { path="../../../lib/polyglot" }
+
 [[example]]
 name = "querying"
 required-features = ["impl", "tsg", "all_examples"]
@@ -77,6 +79,10 @@ harness = false
 [[bench]]
 name = "querying_precompute_repeat4"
 harness = false
+
+[[example]] # NOTE it's an helper bin dressed as an example to access dev-dependencies
+name = "regen_java_types"
+path = "bin/regen_java_types.rs"
 
 [features]
 default = ["impl"]

@@ -23,6 +23,13 @@ legion = { workspace = true, optional = true }
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 
+polyglot = { path="../../../lib/polyglot" }
+
+[[example]] # NOTE it's an helper bin dressed as an example to access dev-dependencies
+name = "regen_xml_types"
+path = "bin/regen_xml_types.rs"
+
+
 [features]
 default = ["impl"]
 impl = [

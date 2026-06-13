@@ -1,5 +1,4 @@
 //! Definition of the Java tree-sitter node types.
-// TODO auto generate the variants, conversions, and predicates
 
 use hyperast::tree_gen::TsEnableTS;
 
@@ -20,279 +19,59 @@ pub struct TIdN<IdN>(IdN);
 
 pub type TType = hyperast::types::TypeU16<Lang>;
 
-#[repr(u16)]
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub enum Type {
-    End,
-    Dot,
-    DQuote,
-    _StringToken1,
-    EscapeSequence,
-    Star,
-    Plus,
-    QMark,
-    Identifier,
-    Identifier_,
-    Inderscore,
-    At,
-    Comment,
-    LBracket,
-    RBracket,
-    LParen,
-    RParen,
-    Slash,
-    Colon,
-    Bang,
-    Sharp,
-    PredicateType,
-    Program,
-    _Definition,
-    _GroupExpression,
-    _NamedNodeExpression,
-    _String,
-    Quantifier,
-    _ImmediateIdentifier,
-    _NodeIdentifier,
-    Capture,
-    String,
-    Parameters,
-    List,
-    Grouping,
-    AnonymousNode,
-    NamedNode,
-    _FieldName,
-    FieldDefinition,
-    NegatedField,
-    Predicate,
-    ProgramRepeat1,
-    _StringRepeat1,
-    ParametersRepeat1,
-    ListRepeat1,
-    GroupingRepeat1,
-    NamedNodeRepeat1,
-    Directory = TStore::DIRECTORY,
-    Spaces = TStore::SPACES,
-    _ERROR = TStore::_ERROR,
-    ERROR = TStore::ERROR,
+// do not hesitate to extend this macro
+macro_rules! declare_type {
+    ( $($t:ident = $s:literal);* $(;)? ) => {
+        #[repr(u16)]
+        #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+        pub enum Type {
+            $( $t, )*
+            Directory = TStore::DIRECTORY,
+            Spaces = TStore::SPACES,
+            _ERROR = TStore::_ERROR,
+            ERROR = TStore::ERROR,
+        }
+        impl Type {
+            pub fn from_u16(t: u16) -> Type {
+                match t {
+                    TStore::DIRECTORY => Type::Directory,
+                    TStore::SPACES => Type::Spaces,
+                    TStore::_ERROR => Type::_ERROR,
+                    TStore::ERROR => Type::ERROR,
+                    x => S_T_L[x as usize],
+                }
+            }
+            #[allow(unreachable_patterns)]
+            pub fn from_str(t: &str) -> Option<Type> {
+                Some(match t {
+                    $( $s => Type::$t, )*
+                    "Directory" => Type::Directory,
+                    "Spaces" => Type::Spaces,
+                    "_ERROR" => Type::_ERROR,
+                    "ERROR" => Type::ERROR,
+                    _ => return None,
+                })
+            }
+            pub fn to_str(&self) -> &'static str {
+                match self {
+                    $( Type::$t => $s, )*
+                    Type::Directory => "Directory",
+                    Type::Spaces => "Spaces",
+                    Type::_ERROR => "_ERROR",
+                    Type::ERROR => "ERROR",
+                }
+            }
+        }
+
+        const S_T_L: &[Type] = &[
+            $( Type::$t, )*
+        ];
+    };
 }
 
-impl Type {
-    pub fn from_u16(t: u16) -> Type {
-        match t {
-            0u16 => Type::End,
-            1u16 => Type::Dot,
-            2u16 => Type::DQuote,
-            3u16 => Type::_StringToken1,
-            4u16 => Type::EscapeSequence,
-            5u16 => Type::Star,
-            6u16 => Type::Plus,
-            7u16 => Type::QMark,
-            8u16 => Type::Identifier,
-            9u16 => Type::Identifier_,
-            10u16 => Type::Inderscore,
-            11u16 => Type::At,
-            12u16 => Type::Comment,
-            13u16 => Type::LBracket,
-            14u16 => Type::RBracket,
-            15u16 => Type::LParen,
-            16u16 => Type::RParen,
-            17u16 => Type::Slash,
-            18u16 => Type::Colon,
-            19u16 => Type::Bang,
-            20u16 => Type::Sharp,
-            21u16 => Type::PredicateType,
-            22u16 => Type::Program,
-            23u16 => Type::_Definition,
-            24u16 => Type::_GroupExpression,
-            25u16 => Type::_NamedNodeExpression,
-            26u16 => Type::_String,
-            27u16 => Type::Quantifier,
-            28u16 => Type::_ImmediateIdentifier,
-            29u16 => Type::_NodeIdentifier,
-            30u16 => Type::Capture,
-            31u16 => Type::String,
-            32u16 => Type::Parameters,
-            33u16 => Type::List,
-            34u16 => Type::Grouping,
-            35u16 => Type::AnonymousNode,
-            36u16 => Type::NamedNode,
-            37u16 => Type::_FieldName,
-            38u16 => Type::FieldDefinition,
-            39u16 => Type::NegatedField,
-            40u16 => Type::Predicate,
-            41u16 => Type::ProgramRepeat1,
-            42u16 => Type::_StringRepeat1,
-            43u16 => Type::ParametersRepeat1,
-            44u16 => Type::ListRepeat1,
-            45u16 => Type::GroupingRepeat1,
-            46u16 => Type::NamedNodeRepeat1,
-            TStore::DIRECTORY => Type::Directory,
-            TStore::SPACES => Type::Spaces,
-            TStore::_ERROR => Type::_ERROR,
-            TStore::ERROR => Type::ERROR,
-            x => panic!("{}", x),
-        }
-    }
-    #[allow(unreachable_patterns)]
-    pub fn from_str(t: &str) -> Option<Type> {
-        Some(match t {
-            "end" => Type::End,
-            "." => Type::Dot,
-            "\"" => Type::DQuote,
-            "_string_token1" => Type::_StringToken1,
-            "escape_sequence" => Type::EscapeSequence,
-            "*" => Type::Star,
-            "+" => Type::Plus,
-            "?" => Type::QMark,
-            "identifier" => Type::Identifier,
-            "identifier" => Type::Identifier_,
-            "_" => Type::Inderscore,
-            "@" => Type::At,
-            "comment" => Type::Comment,
-            "[" => Type::LBracket,
-            "]" => Type::RBracket,
-            "(" => Type::LParen,
-            ")" => Type::RParen,
-            "/" => Type::Slash,
-            ":" => Type::Colon,
-            "!" => Type::Bang,
-            "#" => Type::Sharp,
-            "predicate_type" => Type::PredicateType,
-            "program" => Type::Program,
-            "_definition" => Type::_Definition,
-            "_group_expression" => Type::_GroupExpression,
-            "_named_node_expression" => Type::_NamedNodeExpression,
-            "_string" => Type::_String,
-            "quantifier" => Type::Quantifier,
-            "_immediate_identifier" => Type::_ImmediateIdentifier,
-            "_node_identifier" => Type::_NodeIdentifier,
-            "capture" => Type::Capture,
-            "string" => Type::String,
-            "parameters" => Type::Parameters,
-            "list" => Type::List,
-            "grouping" => Type::Grouping,
-            "anonymous_node" => Type::AnonymousNode,
-            "named_node" => Type::NamedNode,
-            "_field_name" => Type::_FieldName,
-            "field_definition" => Type::FieldDefinition,
-            "negated_field" => Type::NegatedField,
-            "predicate" => Type::Predicate,
-            "program_repeat1" => Type::ProgramRepeat1,
-            "_string_repeat1" => Type::_StringRepeat1,
-            "parameters_repeat1" => Type::ParametersRepeat1,
-            "list_repeat1" => Type::ListRepeat1,
-            "grouping_repeat1" => Type::GroupingRepeat1,
-            "named_node_repeat1" => Type::NamedNodeRepeat1,
-            "Directory" => Type::Directory,
-            "Spaces" => Type::Spaces,
-            "_ERROR" => Type::_ERROR,
-            "ERROR" => Type::ERROR,
-            _ => return None,
-        })
-    }
-    pub fn to_str(&self) -> &'static str {
-        match self {
-            Type::End => "end",
-            Type::Dot => ".",
-            Type::DQuote => "\"",
-            Type::_StringToken1 => "_string_token1",
-            Type::EscapeSequence => "escape_sequence",
-            Type::Star => "*",
-            Type::Plus => "+",
-            Type::QMark => "?",
-            Type::Identifier => "identifier",
-            Type::Identifier_ => "identifier",
-            Type::Inderscore => "_",
-            Type::At => "@",
-            Type::Comment => "comment",
-            Type::LBracket => "[",
-            Type::RBracket => "]",
-            Type::LParen => "(",
-            Type::RParen => ")",
-            Type::Slash => "/",
-            Type::Colon => ":",
-            Type::Bang => "!",
-            Type::Sharp => "#",
-            Type::PredicateType => "predicate_type",
-            Type::Program => "program",
-            Type::_Definition => "_definition",
-            Type::_GroupExpression => "_group_expression",
-            Type::_NamedNodeExpression => "_named_node_expression",
-            Type::_String => "_string",
-            Type::Quantifier => "quantifier",
-            Type::_ImmediateIdentifier => "_immediate_identifier",
-            Type::_NodeIdentifier => "_node_identifier",
-            Type::Capture => "capture",
-            Type::String => "string",
-            Type::Parameters => "parameters",
-            Type::List => "list",
-            Type::Grouping => "grouping",
-            Type::AnonymousNode => "anonymous_node",
-            Type::NamedNode => "named_node",
-            Type::_FieldName => "_field_name",
-            Type::FieldDefinition => "field_definition",
-            Type::NegatedField => "negated_field",
-            Type::Predicate => "predicate",
-            Type::ProgramRepeat1 => "program_repeat1",
-            Type::_StringRepeat1 => "_string_repeat1",
-            Type::ParametersRepeat1 => "parameters_repeat1",
-            Type::ListRepeat1 => "list_repeat1",
-            Type::GroupingRepeat1 => "grouping_repeat1",
-            Type::NamedNodeRepeat1 => "named_node_repeat1",
-            Type::Directory => "Directory",
-            Type::Spaces => "Spaces",
-            Type::_ERROR => "_ERROR",
-            Type::ERROR => "ERROR",
-        }
-    }
-}
+use more::is;
 
-const S_T_L: &[Type] = &[
-    Type::End,
-    Type::Dot,
-    Type::DQuote,
-    Type::_StringToken1,
-    Type::EscapeSequence,
-    Type::Star,
-    Type::Plus,
-    Type::QMark,
-    Type::Identifier,
-    Type::Identifier_,
-    Type::Inderscore,
-    Type::At,
-    Type::Comment,
-    Type::LBracket,
-    Type::RBracket,
-    Type::LParen,
-    Type::RParen,
-    Type::Slash,
-    Type::Colon,
-    Type::Bang,
-    Type::Sharp,
-    Type::PredicateType,
-    Type::Program,
-    Type::_Definition,
-    Type::_GroupExpression,
-    Type::_NamedNodeExpression,
-    Type::_String,
-    Type::Quantifier,
-    Type::_ImmediateIdentifier,
-    Type::_NodeIdentifier,
-    Type::Capture,
-    Type::String,
-    Type::Parameters,
-    Type::List,
-    Type::Grouping,
-    Type::AnonymousNode,
-    Type::NamedNode,
-    Type::_FieldName,
-    Type::FieldDefinition,
-    Type::NegatedField,
-    Type::Predicate,
-    Type::ProgramRepeat1,
-    Type::_StringRepeat1,
-    Type::ParametersRepeat1,
-    Type::ListRepeat1,
-    Type::GroupingRepeat1,
-    Type::NamedNodeRepeat1,
-];
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/types/generated.rs"
+));

@@ -2,6 +2,7 @@
 //! Long term they should be gathered from other sources automatically.
 
 use super::Type;
+use hyperast::types::TypeTrait;
 
 impl Type {
     pub(crate) fn is_error(&self) -> bool {
@@ -402,7 +403,6 @@ macro_rules! is {
     }
 };
 }
-use hyperast::types::TypeTrait;
 pub(super) use is;
 macro_rules! ty {
 ($e:expr,

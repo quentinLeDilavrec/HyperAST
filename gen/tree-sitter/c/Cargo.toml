@@ -29,6 +29,12 @@ serde = { version = "1.0.130" }
 pretty_assertions = "1.0.0"
 env_logger = "0.11.3"
 
+polyglot = { path="../../../lib/polyglot" }
+
+[[example]] # NOTE it's an helper bin dressed as an example to access dev-dependencies
+name = "regen_c_types"
+path = "bin/regen_c_types.rs"
+
 [features]
 default = ["impl"]
 impl = [

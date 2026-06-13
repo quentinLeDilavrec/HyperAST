@@ -2,6 +2,7 @@
 #![allow(unused)]
 use num::ToPrimitive as _;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use crate::compat::HashMap;
 use crate::full::FullNode;
@@ -10,10 +11,11 @@ use crate::nodes::Space;
 use crate::store::SimpleStores;
 use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
-use crate::store::nodes::legion::NodeIdentifier;
 use crate::store::nodes::legion::RawHAST;
 use crate::store::nodes::legion::eq_node;
+use crate::store::nodes::legion::{DedupMap, NodeIdentifier};
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
+use crate::tree_gen::{TsEnableTS, TsType};
 use crate::types::LabelStore as _;
 use crate::types::Role;
 use crate::types::{ETypeStore, HyperType};
@@ -38,6 +40,7 @@ pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 pub struct TsTreeGen<'store, 'cache, TS, More = (), const HIDDEN_NODES: bool = false> {
     pub line_break: Vec<u8>,
     pub stores: &'store mut SimpleStores<TS>,
+    pub dedup: Option<&'store mut DedupMap>,
     pub md_cache: &'cache mut MDCache,
     pub more: More,
 }
@@ -188,25 +191,72 @@ where
     TS::Ty2: TsType,
 {
     pub fn new(stores: &'store mut SimpleStores<TS>, md_cache: &'cache mut MDCache) -> Self {
+        Self::with_preprocessing(stores, md_cache, Default::default())
+    }
+}
+
+impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
+    pub fn with_preprocessing(
+        stores: &'stores mut SimpleStores<TS>,
+        md_cache: &'cache mut MDCache,
+        more: More,
+    ) -> Self {
         Self {
             line_break: "\n".as_bytes().to_vec(),
+            dedup: None,
             stores,
             md_cache,
-            more: Default::default(),
+            more,
+        }
+    }
+    /// Replaces the default dedup map when deriving different data.
+    /// Be cautious when replacing the default dedup map,
+    /// as it breaks the referential equlity being equivalent to the structural equality.
+    /// Otherwise, everything else is great !
+    /// In the future use multiple dedup maps when we can guarantee valid nesting,
+    ///   e.g., additional Derived Data on files can reuse subtrees of things inside files, but directories and files must be added without merging with the others
+    ///    (it should also be possible to compute markers to provide similar guarantees, e.g. a DD only on classes can reuse children that do not contain classes).
+    /// Could also make the eq consider the derived data, but to avoid breaking the incrementality we would still need some kind of marker for each context
+    pub fn with_preprocessing_and_dedup(
+        stores: &'stores mut SimpleStores<TS>,
+        dedup: &'stores mut DedupMap,
+        md_cache: &'cache mut MDCache,
+        more: More,
+    ) -> Self {
+        Self {
+            line_break: "\n".as_bytes().to_vec(),
+            dedup: Some(dedup),
+            stores,
+            md_cache,
+            more,
         }
     }
 }
 
-pub trait TsEnableTS: ETypeStore
-where
-    Self::Ty2: TsType,
+impl<'stores, 'cache, TS, More, const HIDDEN_NODES: bool>
+    TsTreeGen<'stores, 'cache, TS, More, HIDDEN_NODES>
 {
-    fn obtain_type<N: super::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
+    pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
+        TsTreeGen {
+            line_break,
+            dedup: self.dedup,
+            stores: self.stores,
+            md_cache: self.md_cache,
+            more: self.more,
+        }
+    }
 }
 
-pub trait TsType: HyperType + Copy {
-    fn spaces() -> Self;
-    fn is_repeat(&self) -> bool;
+impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
+    pub fn without_hidden_nodes(self) -> TsTreeGen<'stores, 'cache, TS, More, false> {
+        TsTreeGen {
+            line_break: self.line_break,
+            dedup: self.dedup,
+            stores: self.stores,
+            md_cache: self.md_cache,
+            more: self.more,
+        }
+    }
 }
 
 impl<TS, More> TsTreeGen<'_, '_, TS, More>
@@ -245,10 +295,7 @@ where
         );
         let labeled = node.has_label();
         Acc {
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             labeled,
             start_byte: node.start_byte(),
@@ -305,7 +352,7 @@ where
     ) -> Self::Acc {
         let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
-        let indent = compute_indentation(
+        let indentation = compute_indentation(
             &self.line_break,
             text,
             node.start_byte(),
@@ -318,11 +365,8 @@ where
             end_byte: node.end_byte(),
             metrics: Default::default(),
             padding_start: global.sum_byte_length(),
-            indentation: indent,
-            simple: BasicAccumulator {
-                kind,
-                children: vec![],
-            },
+            indentation,
+            simple: BasicAccumulator::new(kind),
             no_space: vec![],
             role: Default::default(),
             precomp_queries: Default::default(),
@@ -462,18 +506,29 @@ where
         mut acc: Self::Acc,
         label: Option<String>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+        let type_store = self.stores.type_store;
+        let label_store = &mut self.stores.label_store;
+        let node_store = &mut self.stores.node_store;
+        let more = &mut self.more;
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
         let metrics = acc.metrics.finalize(&interned_kind, &label);
 
         let hashable = &metrics.hashs.most_discriminating();
 
-        let label_id = label
-            .as_deref()
-            .map(|l| self.stores.label_store.get_or_insert(l));
+        // Some notable type can contain very different labels,
+        // they might benefit from a particular storing (like a blob storage, even using git's object database )
+        // eg. acc.simple.kind == Type::Comment and acc.simple.kind.is_literal()
+        let label_id = label.as_deref().map(|l| label_store.get_or_insert(l));
+
         let eq = eq_node(&interned_kind, label_id.as_ref(), &acc.simple.children);
 
-        let insertion = self.stores.node_store.prepare_insertion(hashable, eq);
+        #[cfg(feature = "subtree-stats")]
+        (node_store.inner.stats()).add_height_non_dedup(metrics.height);
+
+        let dedup = self.dedup.as_mut();
+        let dedup = dedup.map_or(&mut node_store.dedup, |x| &mut x.0);
+        let insertion = node_store.inner.prepare_insertion(dedup, hashable, eq);
 
         let local = if let Some(compressed_node) = insertion.occupied_id() {
             let md = self.md_cache.get(&compressed_node).unwrap();
@@ -497,26 +552,26 @@ where
 
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();
             let bytes_len = compo::BytesLen(byte_len);
-            let vacant = insertion.vacant();
-            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
-            {
-                let node_store = &*vacant.1.1;
-                let stores = SimpleStores {
-                    type_store: self.stores.type_store,
-                    label_store: &self.stores.label_store,
-                    node_store,
-                };
-                let more = &self.more;
-                // TsTreeGen::<_, _, HIDDEN_NODES>::custom_dd(stores, more, &mut dyn_builder, &mut acc, label);
+            let children_is_empty = acc.simple.children.is_empty();
 
-                todo!("AAA"); //acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
-                if More::ENABLED {
-                    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
-                }
+            let vacant = insertion.vacant();
+            let node_store = &*vacant.1.1;
+            let stores = SimpleStores {
+                type_store,
+                label_store: &*label_store,
+                node_store,
+            };
+
+            if More::ENABLED {
+                acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
             }
 
-            let children_is_empty = acc.simple.children.is_empty();
+            let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(bytes_len);
+
+            if More::ENABLED {
+                add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
+            }
 
             let current_role = Option::take(&mut acc.role.current);
             acc.role.add_md(&mut dyn_builder);

@@ -57,10 +57,7 @@ fn xml_tree_sitter_simple2() {
           ";
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse_xml(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse_xml(text);
     println!("{}", tree.root_node().to_sexp());
 }
 
@@ -69,10 +66,7 @@ fn xml_tree_sitter_on_pom() {
     let path: PathBuf = Path::new("src/tests/pom.xml.test").to_path_buf();
 
     let text = std::fs::read(path).unwrap();
-    let tree = match tree_sitter_parse_xml(&text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse_xml(&text);
     println!("{:#?}", tree.root_node().to_sexp());
 }
 
@@ -81,10 +75,7 @@ fn hyperast_on_pom() {
     let path: PathBuf = Path::new("src/tests/pom.xml.test").to_path_buf();
 
     let text = std::fs::read(path).unwrap();
-    let tree = match tree_sitter_parse_xml(&text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse_xml(&text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::<TStore>::default();
     let mut tree_gen = XmlTreeGen::new(&mut stores);
@@ -112,10 +103,7 @@ fn xml_issue_cdata() {
 </project>"#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse_xml(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse_xml(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::<TStore>::default();
     let mut tree_gen = XmlTreeGen {

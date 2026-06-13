@@ -15,10 +15,7 @@ void read_string(char *buf) {
 #[test]
 pub(crate) fn cpp_preproc_call_decl_test() {
     let text = EX.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -43,10 +40,7 @@ pub(crate) fn cpp_preproc_call_decl_test() {
     let mut md_cache = Default::default();
     let mut cpp_tree_gen = crate::legion::CppTreeGen::new(&mut stores, &mut md_cache);
 
-    let tree = match crate::legion::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = crate::legion::tree_sitter_parse(text);
     log::trace!("sexp:\n{}", tree.root_node().to_sexp());
     let full_node = cpp_tree_gen.generate_file(b"", text, tree.walk());
     log::trace!(
@@ -77,10 +71,7 @@ static EX2: &str = r#"
 #[test]
 pub(crate) fn cpp_multi_repeat_incomplete_test() {
     let text = EX2.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -124,10 +115,7 @@ pub(crate) fn cpp_multi_repeat_incomplete_test() {
 #[test_log::test]
 pub(crate) fn cpp_parsing_error_test() {
     let text = EX_ISSUE_MISSING_NODE.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -144,10 +132,7 @@ pub(crate) fn cpp_parsing_error_test() {
 #[test_log::test]
 pub(crate) fn cpp_parsing_missing_systemd_dbus_cred_c_test() {
     let text = EX_ISSUE_MISSING_NODE2.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -163,10 +148,7 @@ pub(crate) fn cpp_parsing_missing_systemd_dbus_cred_c_test() {
 #[test_log::test]
 pub(crate) fn cpp_parsing_missing_systemd_pam_systemd_c_test() {
     let text = EX_ISSUE_MISSING_NODE3.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -273,10 +255,7 @@ int main(int argl, int* argv) {
 }"#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -306,10 +285,7 @@ ACK(aa, int, LOG_FAC(~0));
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -341,10 +317,7 @@ f.value < s;
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -376,10 +349,7 @@ void f() {
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -411,10 +381,7 @@ void f() {
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -449,10 +416,7 @@ ScaleFactor ScalingFunction<KNPK>::apply() const {
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -500,10 +464,7 @@ void f() {}
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -552,10 +513,7 @@ __attribute__((__may_alias__))
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -591,10 +549,7 @@ struct TBEntry {};
 "#;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -622,10 +577,7 @@ pub(crate) fn cpp_def_bl_test() {
         let source_code1 = CODE_DEF_BL_SHRINK;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -651,10 +603,7 @@ pub(crate) fn cpp_char_literal_test() {
         let source_code1 = CODE_CHAR_LIT;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -705,10 +654,7 @@ pub(crate) fn cpp_asm_test() {
         let source_code1 = CODE_ASM;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -740,10 +686,7 @@ pub(crate) fn cpp_op_test() {
         let source_code1 = CODE_OP;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -787,10 +730,7 @@ pub(crate) fn cpp_3_test() {
         let source_code1 = CODE_MACRO_SEMICOLON;
         source_code1.as_bytes()
     };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();

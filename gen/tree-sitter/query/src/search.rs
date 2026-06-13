@@ -317,12 +317,12 @@ pub fn try_ts_query(
 ) -> Option<QueryFullNode> {
     let mut query_tree_gen = TsQueryTreeGen::new(stores, md_cache);
     let mut f = |t: &tree_sitter::Tree| query_tree_gen.generate_file(b"", text, t.walk());
-    match crate::legion::tree_sitter_parse(text) {
-        Ok(t) => Some(f(&t)),
-        Err(t) => {
-            let n = f(&t);
-            on_err(n, &t)
-        }
+    let tree = crate::legion::tree_sitter_parse(text);
+    if tree.root_node().has_error() {
+        let n = f(&tree);
+        on_err(n, &tree)
+    } else {
+        Some(f(&tree))
     }
 }
 

@@ -37,10 +37,7 @@ fn prep_default(
     let mut md_cache = Default::default();
     let mut java_tree_gen = legion_with_refs::JavaTreeGen::new(&mut stores, &mut md_cache);
 
-    let tree = match legion_with_refs::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = legion_with_refs::tree_sitter_parse(text);
     let full_node = java_tree_gen.generate_file(name.as_bytes(), text, tree.walk());
 
     (query, stores, full_node.local.compressed_node)
@@ -67,10 +64,7 @@ fn prep_precomputed(
     let more = hyperast_tsquery::PreparedQuerying::<_, _, _>::from(&precomp);
     let mut java_tree_gen = JavaTreeGen::with_preprocessing(&mut stores, &mut md_cache, more);
 
-    let tree = match legion_with_refs::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = legion_with_refs::tree_sitter_parse(text);
     let full_node = java_tree_gen.generate_file(name.as_bytes(), text, tree.walk());
 
     (query, stores, full_node.local.compressed_node)
@@ -177,12 +171,9 @@ fn compare_querying_group(c: &mut Criterion) {
                 let roots: Vec<_> = f
                     .iter()
                     .map(|(name, text)| {
-                        let tree = match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(
+                        let tree = hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(
                             text.as_bytes(),
-                        ) {
-                            Ok(t) => t,
-                            Err(t) => t,
-                        };
+                        );
                         let full_node = java_tree_gen.generate_file(
                             name.to_str().unwrap().as_bytes(),
                             text.as_bytes(),
@@ -223,13 +214,9 @@ fn compare_querying_group(c: &mut Criterion) {
                     let roots: Vec<_> = f
                         .iter()
                         .map(|(name, text)| {
-                            let tree =
-                                match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(
-                                    text.as_bytes(),
-                                ) {
-                                    Ok(t) => t,
-                                    Err(t) => t,
-                                };
+                            let tree = hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(
+                                text.as_bytes(),
+                            );
                             let full_node = java_tree_gen.generate_file(
                                 name.to_str().unwrap().as_bytes(),
                                 text.as_bytes(),

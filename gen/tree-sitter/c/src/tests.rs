@@ -29,10 +29,7 @@ pub(crate) fn cpp_tree_sitter_simple() {
 #[test]
 pub(crate) fn cpp_simple_test() {
     let text = { EX.as_bytes() };
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();

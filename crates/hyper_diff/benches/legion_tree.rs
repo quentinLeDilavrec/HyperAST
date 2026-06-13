@@ -26,15 +26,9 @@ fn compare_simple_tree_group(c: &mut Criterion) {
     let pairs = PAIRS
         .into_iter()
         .map(|(src, dst)| {
-            let tree = match tree_sitter_parse(src) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = tree_sitter_parse(src);
             let src = java_tree_gen.generate_file(b"", src, tree.walk());
-            let tree = match tree_sitter_parse(dst) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = tree_sitter_parse(dst);
             let dst = java_tree_gen.generate_file(b"", dst, tree.walk());
 
             (src.local, dst.local)

@@ -27,10 +27,7 @@ pub struct AccMock {
 // With these mocks we do not build an HyperAST, we just access the data that would be used
 pub(crate) fn cpp_parsing_error_zipper_mock_test() {
     let text = EX_ISSUE_MISSING_NODE.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut cursor = hyperast::tree_gen::utils_ts::TTreeCursor::<true>(tree.walk());
     let mut tree_gen = CppTreeGenMock(());
@@ -45,10 +42,7 @@ pub(crate) fn cpp_parsing_error_zipper_mock_test() {
 // With these mocks we do not build an HyperAST, we just access the data that would be used
 pub(crate) fn cpp_parsing_error_zipper_it_mock_test() {
     let text = EX_ISSUE_MISSING_NODE.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let cursor = hyperast::tree_gen::utils_ts::TTreeCursor::<true>(tree.walk());
     let mut tree_gen = CppTreeGenMock(());

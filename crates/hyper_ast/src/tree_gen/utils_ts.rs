@@ -2,22 +2,13 @@ use crate::tree_gen::parser::Node;
 
 pub use super::TsEnableTS;
 pub use super::TsType;
-pub fn tree_sitter_parse(
-    text: &[u8],
-    language: &tree_sitter::Language,
-) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
+pub fn tree_sitter_parse(text: &[u8], language: &tree_sitter::Language) -> tree_sitter::Tree {
     let mut parser = tree_sitter::Parser::new();
-    // TODO see if a timeout of a cancellation flag could be useful
+    // TODO see if a timeout or a cancellation flag could be useful
     // const MINUTE: u64 = 60 * 1000 * 1000;
-    // parser.set_timeout_micros(timeout_micros);
-    // parser.set_cancellation_flag(flag);
     parser.set_language(language).unwrap();
-    let tree = parser.parse(text, None).unwrap();
-    if tree.root_node().has_error() {
-        Err(tree)
-    } else {
-        Ok(tree)
-    }
+    // language is set and rest is deprecated, no reason to return None.
+    parser.parse(text, None).unwrap_or_else(|| unreachable!())
 }
 
 use super::parser::Visibility;

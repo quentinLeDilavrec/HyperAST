@@ -538,10 +538,7 @@ fn test_match_for_removes_not_matching() {
     let mut md_cache = Default::default();
     let mut tree_gen = t_gen::no_fmt_legion::TsQueryTreeGen::new(&mut query_store, &mut md_cache);
 
-    let tree = match t_gen::no_fmt_legion::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = t_gen::no_fmt_legion::tree_sitter_parse(text);
     println!("{}", tree.root_node().to_sexp());
     let cid = meta_simp.capture_index_for_name("rm").unwrap();
     let full_node = tree_gen.generate_file(b"", text, tree.walk());

@@ -89,10 +89,7 @@ mod structure {
         let mut md_cache = Default::default();
         let mut java_tree_gen = JavaTreeGen::new(&mut stores, &mut md_cache);
 
-        let tree = match tree_sitter_parse(text) {
-            Ok(t) => t,
-            Err(t) => t,
-        };
+        let tree = tree_sitter_parse(text);
         println!("{}", tree.root_node().to_sexp());
         let full_node = java_tree_gen.generate_file(b"", text, tree.walk());
 
@@ -145,10 +142,7 @@ mod structure {
         let mut md_cache = Default::default();
         let mut java_tree_gen = JavaTreeGen::new(&mut stores, &mut md_cache);
 
-        let tree = match tree_sitter_parse(text) {
-            Ok(t) => t,
-            Err(t) => t,
-        };
+        let tree = tree_sitter_parse(text);
         println!("{}", tree.root_node().to_sexp());
         let full_node = java_tree_gen.generate_file(b"", text, tree.walk());
 

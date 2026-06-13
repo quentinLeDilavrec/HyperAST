@@ -10,10 +10,7 @@ use super::EX_ISSUE_MISSING_NODE;
 #[test_log::test]
 pub(crate) fn cpp_parsing_error_it_test() {
     let text = EX_ISSUE_MISSING_NODE.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();

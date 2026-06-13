@@ -339,7 +339,7 @@ impl<'store, 'cache, TS, More> CTreeGen<'store, 'cache, TS, More, true> {
     }
 }
 
-pub fn tree_sitter_parse(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
+pub fn tree_sitter_parse(text: &[u8]) -> tree_sitter::Tree {
     tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
 }
 
@@ -385,7 +385,7 @@ where
         }
     }
 
-    pub fn tree_sitter_parse(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
+    pub fn tree_sitter_parse(text: &[u8]) -> tree_sitter::Tree {
         tree_sitter_parse(text)
     }
 

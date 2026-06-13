@@ -114,10 +114,7 @@ fn preps_default(
     let roots: Vec<_> = f
         .iter()
         .map(|(name, text)| {
-            let tree = match legion_with_refs::tree_sitter_parse(text.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = legion_with_refs::tree_sitter_parse(text.as_bytes());
             let full_node = java_tree_gen.generate_file(
                 name.to_str().unwrap().as_bytes(),
                 text.as_bytes(),
@@ -152,10 +149,7 @@ fn preps_precomputed(
         .iter()
         .map(|(name, text)| {
             let name = &name.to_str().unwrap();
-            let tree = match legion_with_refs::tree_sitter_parse(text.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = legion_with_refs::tree_sitter_parse(text.as_bytes());
             log::trace!("preprocess file: {}", name);
             let full_node =
                 java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk());

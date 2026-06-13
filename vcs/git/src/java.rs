@@ -30,22 +30,17 @@ where
     let time = std::time::Instant::now();
     let tree = java_tree_gen::tree_sitter_parse(text);
     let parsing_time = time.elapsed();
-    let tree = match tree {
-        Ok(tree) => tree,
-        Err(tree) => {
-            log::warn!("bad CST: {:?}", name.try_str());
-            log::debug!("{}", tree.root_node().to_sexp());
-            if PROPAGATE_ERROR_ON_BAD_CST_NODE {
-                return Err(FailedParsing {
-                    parsing_time,
-                    tree,
-                    error: "CST contains parsing errors",
-                });
-            } else {
-                tree
-            }
+    if tree.root_node().has_error() {
+        log::warn!("bad CST: {:?}", name.try_str());
+        log::debug!("{}", tree.root_node().to_sexp());
+        if PROPAGATE_ERROR_ON_BAD_CST_NODE {
+            return Err(FailedParsing {
+                parsing_time,
+                tree,
+                error: "CST contains parsing errors",
+            });
         }
-    };
+    }
     let node = tree_gen.generate_file(&name.as_bytes(), text, tree.walk());
     let processing_time = time.elapsed() - parsing_time;
     Ok(SuccessProcessing {

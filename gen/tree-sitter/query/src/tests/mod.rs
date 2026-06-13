@@ -21,10 +21,7 @@ fn run(text: &[u8]) {
         md_cache: &mut md_cache,
     };
 
-    let tree = match crate::legion::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = crate::legion::tree_sitter_parse(text);
     println!("{}", tree.root_node().to_sexp());
     let full_node = java_tree_gen.generate_file(b"", text, tree.walk());
 
@@ -52,10 +49,7 @@ mod search;
 fn cpp_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_cpp::TStore>, legion::Entity) {
     use hyperast_gen_ts_cpp::TStore;
     use hyperast_gen_ts_cpp::legion::CppTreeGen;
-    let tree = match hyperast_gen_ts_cpp::legion::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = hyperast_gen_ts_cpp::legion::tree_sitter_parse(text);
     // println!("{:#?}", tree.root_node().to_sexp());
     let mut stores: SimpleStores<TStore> = SimpleStores::default();
     let mut md_cache = Default::default();
@@ -71,10 +65,7 @@ fn cpp_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_cpp::TStore>, legion::
 fn xml_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_xml::TStore>, legion::Entity) {
     use hyperast_gen_ts_xml::TStore;
     use hyperast_gen_ts_xml::legion::XmlTreeGen;
-    let tree = match hyperast_gen_ts_xml::legion::tree_sitter_parse_xml(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = hyperast_gen_ts_xml::legion::tree_sitter_parse_xml(text);
     // println!("{:#?}", tree.root_node().to_sexp());
     let mut stores: SimpleStores<TStore> = SimpleStores::default();
     let mut tree_gen = XmlTreeGen {

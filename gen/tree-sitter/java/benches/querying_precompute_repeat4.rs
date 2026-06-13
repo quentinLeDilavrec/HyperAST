@@ -210,11 +210,7 @@ fn preps_default(
     let roots: Vec<_> = f
         .iter()
         .map(|(name, text)| {
-            let tree =
-                match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(text.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+            let tree = hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(text.as_bytes());
             log::trace!("preprocess file: {}", name.to_str().unwrap());
             let full_node = java_tree_gen.generate_file(
                 name.to_str().unwrap().as_bytes(),
@@ -251,11 +247,7 @@ fn preps_precomputed(
         .map(|(name, text)| {
             let name = &name.to_str().unwrap();
             dbg!(name);
-            let tree =
-                match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(text.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+            let tree = hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(text.as_bytes());
             log::trace!("preprocess file: {}", name);
             let full_node =
                 java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk());

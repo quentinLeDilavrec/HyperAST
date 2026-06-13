@@ -870,13 +870,11 @@ mod tests {
         let mut query_store = SimpleStores::<TStore>::default();
         let mut md_cache = Default::default();
         let mut query_tree_gen = TsQueryTreeGen::new(&mut query_store, &mut md_cache);
-        let tree = match crate::tree_sitter_parse(text.as_bytes()) {
-            Ok(t) => t,
-            Err(t) => {
-                log::warn!("Error parsing query: {}", t.root_node().to_sexp());
-                return Err(());
-            }
-        };
+        let tree = crate::tree_sitter_parse(text.as_bytes());
+        if tree.root_node().has_error() {
+            log::warn!("Error parsing query: {}", tree.root_node().to_sexp());
+            return Err(());
+        }
         let full_node = query_tree_gen.generate_file(b"", text.as_bytes(), tree.walk());
         let root = full_node.local.compressed_node;
         let p = PP::<_, _>::new(&query_store, root);

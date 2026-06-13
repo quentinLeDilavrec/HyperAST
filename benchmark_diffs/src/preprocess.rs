@@ -35,10 +35,7 @@ fn parse_unchecked<'b: 'stores, 'stores>(
     stores: &'stores mut SimpleStores<TStore>,
     md_cache: &'_ mut MDCache,
 ) -> FNode {
-    let tree = match tree_sitter_parse(content.as_bytes()) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(content.as_bytes());
     let mut java_tree_gen = JavaTreeGen::new(stores, md_cache);
     let full_node1 = java_tree_gen.generate_file(name.as_bytes(), content.as_bytes(), tree.walk());
     full_node1
@@ -73,25 +70,17 @@ impl JavaPreprocessFileSys {
         dbg!(language().node_kind_count());
         let mut java_tree_gen = JavaTreeGen::new(&mut self.main_stores, &mut self.java_md_cache)
             .set_line_break(line_break);
-        let full_node = match tree_sitter_parse(text.as_bytes()) {
-            Ok(tree) => {
-                Ok(java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk()))
-            }
-            Err(tree) => {
-                dbg!(&tree);
-                eprintln!("{}", tree.root_node().to_sexp());
-                Err(java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk()))
-            }
+        let tree = tree_sitter_parse(text.as_bytes());
+        let full_node = java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk());
+        if tree.root_node().has_error() {
+            eprintln!("{}", tree.root_node().to_sexp());
         };
-        if let Ok(full_node) = full_node {
-            //parse(&text, &name, &mut java_tree_gen) {
-            let full_node = full_node.local;
-            self.java_md_cache
-                .insert(full_node.compressed_node, MD::from(full_node.clone()));
-            let name = self.main_stores.label_store.get_or_insert(name);
-            assert!(!w.primary.children_names.contains(&name));
-            w.push(name, full_node);
-        }
+        let full_node = full_node.local;
+        self.java_md_cache
+            .insert(full_node.compressed_node, MD::from(full_node.clone()));
+        let name = self.main_stores.label_store.get_or_insert(name);
+        assert!(!w.primary.children_names.contains(&name));
+        w.push(name, full_node);
     }
 
     /// oid : Oid of a dir such that */src/main/java/ or */src/test/java/
@@ -118,10 +107,7 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
             let name = x.file_name();
             let name = name.to_string_lossy();
             let name: &str = &name;
-            let tree = match tree_sitter_parse(file.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = tree_sitter_parse(file.as_bytes());
 
             let line_break = if file.as_bytes().contains(&b'\r') {
                 "\r\n".as_bytes().to_vec()

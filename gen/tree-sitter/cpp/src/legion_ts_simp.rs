@@ -12,10 +12,7 @@ fn medium() {
     let mut md_cache = Default::default();
     let mut r#gen = CppGen::new(&mut stores, &mut md_cache);
     let text = EXAMPLE_SPACING;
-    let tree = match utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language()) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language());
     eprintln!("{}", tree.root_node().to_sexp());
     let name = b"";
     let f = r#gen.generate_file(name, text.as_bytes(), tree.walk());
@@ -33,10 +30,7 @@ fn not_simple() {
     let mut md_cache = Default::default();
     let mut r#gen = crate::legion::CppTreeGen::new(&mut stores, &mut md_cache);
     let text = EXAMPLE_SPACING;
-    let tree = match utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language()) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language());
     eprintln!("{}", tree.root_node().to_sexp());
     let name = b"";
     let f = r#gen.generate_file(name, text.as_bytes(), tree.walk());

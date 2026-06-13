@@ -13,10 +13,7 @@ use super::EX_ISSUE_MISSING_NODE2;
 #[test_log::test]
 pub(crate) fn cpp_parsing_error_prepost_test() {
     let text = EX_ISSUE_MISSING_NODE.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let cursor = hyperast::tree_gen::utils_ts::TTreeCursor::<true>(tree.walk());
     let mut prepost = hyperast::tree_gen::utils_ts::PrePost2::new(cursor);
@@ -111,10 +108,7 @@ pub(crate) fn cpp_parsing_error_prepost_test() {
 #[test_log::test]
 pub(crate) fn cpp_parsing_error2_prepost_test() {
     let text = EX_ISSUE_MISSING_NODE2.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let cursor = hyperast::tree_gen::utils_ts::TTreeCursor::<true>(tree.walk());
     let mut prepost = hyperast::tree_gen::utils_ts::PrePost2::new(cursor);
@@ -239,10 +233,7 @@ pub(crate) fn cpp_parsing_error2_prepost_test() {
 #[test_log::test]
 pub(crate) fn cpp_parsing_error3_prepost_test() {
     let text = EX_ISSUE_MISSING_NODE3.as_bytes();
-    let tree = match tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let cursor = hyperast::tree_gen::utils_ts::TTreeCursor::<true>(tree.walk());
     let mut prepost = hyperast::tree_gen::utils_ts::PrePost2::new(cursor);

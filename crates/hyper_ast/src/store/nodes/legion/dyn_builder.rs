@@ -130,9 +130,7 @@ impl EntityBuilder {
     #[doc(hidden)]
     pub fn with_lang<L: Component>(l: L) -> Self {
         assert_eq!(size_of::<L>(), 0);
-        let mut s = Self {
-            inner: Default::default(),
-        };
+        let mut s = Self::new();
         s.add(l);
         s
     }

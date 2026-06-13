@@ -41,25 +41,9 @@ where
     More: tree_gen::Prepro<SimpleStores>,
     More: tree_gen::PreproTSG<SimpleStores, Acc = cpp_tree_gen::Acc>,
 {
-    // handling the parsing explicitly in this function is a good idea
-    // to control complex stuff like timeout, instead of the call on next line
-    // let tree_sitter_parse = cpp_tree_gen::CppTreeGen::<TStore>::tree_sitter_parse(text);
-
-    let mut parser = tree_sitter::Parser::new();
-    // TODO see if a timeout of a cancellation flag could be useful
-    // const MINUTE: u64 = 60 * 1000 * 1000;
-    // parser.set_timeout_micros(MINUTE);
-    // parser.set_cancellation_flag(flag);
-    parser
-        .set_language(&hyperast_gen_ts_cpp::language())
-        .unwrap();
     let time = std::time::Instant::now();
-    let tree = parser.parse(text, None);
+    let tree = tree_gen::utils_ts::tree_sitter_parse(text, &hyperast_gen_ts_cpp::language());
     let parsing_time = time.elapsed();
-    let Some(tree) = tree else {
-        unimplemented!("You set a timeout or an cancel flag, so it now requires special handling.")
-        // return FileProcessingResult::ParsingTimedout(parsing_time)
-    };
     if tree.root_node().has_error() {
         log::warn!("bad CST: {:?}", name.try_str());
         if PROPAGATE_ERROR_ON_BAD_CST_NODE {

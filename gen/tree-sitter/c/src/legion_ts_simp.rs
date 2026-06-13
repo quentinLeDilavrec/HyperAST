@@ -12,10 +12,6 @@ fn medium() {
     let mut r#gen = CGen::new(&mut stores, &mut md_cache);
     let text = EX;
     let tree = utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language());
-    let tree = match tree {
-        Ok(t) => t,
-        Err(t) => t,
-    };
     eprintln!("{}", tree.root_node().to_sexp());
     let name = b"";
     let f = r#gen.generate_file(name, text.as_bytes(), tree.walk());
@@ -29,10 +25,7 @@ fn not_simple() {
     let mut md_cache = Default::default();
     let mut r#gen = crate::legion::CTreeGen::new(&mut stores, &mut md_cache);
     let text = EX;
-    let tree = match utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language()) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language());
     eprintln!("{}", tree.root_node().to_sexp());
     let name = b"";
     let f = r#gen.generate_file(name, text.as_bytes(), tree.walk());

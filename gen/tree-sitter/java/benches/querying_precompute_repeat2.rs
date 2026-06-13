@@ -48,10 +48,7 @@ fn preps_default(
     let roots: Vec<_> = f
         .iter()
         .map(|(name, text)| {
-            let tree = match tree_sitter_parse(text.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = tree_sitter_parse(text.as_bytes());
             let full_node = java_tree_gen.generate_file(
                 name.to_str().unwrap().as_bytes(),
                 text.as_bytes(),
@@ -84,10 +81,7 @@ fn preps_precomputed(
     let roots: Vec<_> = f
         .iter()
         .map(|(name, text)| {
-            let tree = match tree_sitter_parse(text.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+            let tree = tree_sitter_parse(text.as_bytes());
             let full_node = java_tree_gen.generate_file(
                 name.to_str().unwrap().as_bytes(),
                 text.as_bytes(),

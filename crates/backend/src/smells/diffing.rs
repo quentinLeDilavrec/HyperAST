@@ -898,20 +898,12 @@ mod tests {
         let mut md_cache = Default::default();
         let mut java_tree_gen =
             hyperast_gen_ts_java::legion_with_refs::JavaTreeGen::new(&mut stores, &mut md_cache);
-        let tree =
-            match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(BEFORE2.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+        let tree = hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(BEFORE2.as_bytes());
         let src_tr = java_tree_gen
             .generate_file("".as_bytes(), BEFORE2.as_bytes(), tree.walk())
             .local
             .compressed_node;
-        let tree =
-            match hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(AFTER2.as_bytes()) {
-                Ok(t) => t,
-                Err(t) => t,
-            };
+        let tree = hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse(AFTER2.as_bytes());
         let dst_tr = java_tree_gen
             .generate_file("".as_bytes(), AFTER2.as_bytes(), tree.walk())
             .local

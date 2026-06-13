@@ -472,20 +472,6 @@ enum P<Acc> {
 
 #[cfg(feature = "ts")]
 impl<Acc> P<Acc> {
-    // fn s(&self) -> &str {
-    //     match self {
-    //         P::ManualyHidden => "ManualyHidden",
-    //         P::BothHidden => "BothHidden",
-    //         P::Hidden(_) => "Hidden",
-    //         P::Visible(_) => "Visible",
-    //     }
-    // }
-    // fn is_both_hidden(&self) -> bool {
-    //     match self {
-    //         P::BothHidden => true,
-    //         _ => false,
-    //     }
-    // }
     fn unwrap(self) -> Acc {
         match self {
             P::ManualyHidden => panic!(),

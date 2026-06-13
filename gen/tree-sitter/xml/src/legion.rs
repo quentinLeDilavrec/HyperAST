@@ -214,7 +214,7 @@ impl<TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'_, TS> {
     }
 }
 
-pub fn tree_sitter_parse_xml(text: &[u8]) -> Result<tree_sitter::Tree, tree_sitter::Tree> {
+pub fn tree_sitter_parse_xml(text: &[u8]) -> tree_sitter::Tree {
     hyperast::tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
 }
 

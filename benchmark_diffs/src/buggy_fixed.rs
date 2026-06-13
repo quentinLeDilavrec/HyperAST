@@ -561,19 +561,13 @@ mod test {
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
             let full_node1 = {
-                let tree = match parse_xml(buggy.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(buggy.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), buggy.as_bytes(), tree.walk());
                 full_node1
             };
             let full_node2 = {
-                let tree = match parse_xml(fixed.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(fixed.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), fixed.as_bytes(), tree.walk());
                 full_node1
@@ -679,19 +673,13 @@ mod test {
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
             let full_node1 = {
-                let tree = match parse_xml(buggy.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(buggy.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), buggy.as_bytes(), tree.walk());
                 full_node1
             };
             let full_node2 = {
-                let tree = match parse_xml(fixed.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(fixed.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), fixed.as_bytes(), tree.walk());
                 full_node1
@@ -800,19 +788,13 @@ mod test {
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
             let full_node1 = {
-                let tree = match parse_xml(buggy.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(buggy.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), buggy.as_bytes(), tree.walk());
                 full_node1
             };
             let full_node2 = {
-                let tree = match parse_xml(fixed.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(fixed.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), fixed.as_bytes(), tree.walk());
                 full_node1
@@ -1000,17 +982,11 @@ mod test {
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let full_node1 = {
-                let tree = match parse_xml(buggy.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(buggy.as_bytes());
                 tree_gen.generate_file("pom.xml".as_bytes(), buggy.as_bytes(), tree.walk())
             };
             let full_node2 = {
-                let tree = match parse_xml(fixed.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(fixed.as_bytes());
                 tree_gen.generate_file("pom.xml".as_bytes(), fixed.as_bytes(), tree.walk())
             };
             (full_node1, full_node2)
@@ -1117,19 +1093,13 @@ mod test {
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
             let full_node1 = {
-                let tree = match parse_xml(buggy.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(buggy.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), buggy.as_bytes(), tree.walk());
                 full_node1
             };
             let full_node2 = {
-                let tree = match parse_xml(fixed.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(fixed.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), fixed.as_bytes(), tree.walk());
                 full_node1
@@ -1216,19 +1186,13 @@ mod test {
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
             let full_node1 = {
-                let tree = match parse_xml(buggy.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(buggy.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), buggy.as_bytes(), tree.walk());
                 full_node1
             };
             let full_node2 = {
-                let tree = match parse_xml(fixed.as_bytes()) {
-                    Ok(t) => t,
-                    Err(t) => t,
-                };
+                let tree = parse_xml(fixed.as_bytes());
                 let full_node1 =
                     tree_gen.generate_file("".as_bytes(), fixed.as_bytes(), tree.walk());
                 full_node1

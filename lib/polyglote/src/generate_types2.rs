@@ -1,43 +1,15 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use heck::ToUpperCamelCase;
 use proc_macro2::Ident;
 use quote::{format_ident, quote};
 
+use crate::generate_types::BijectiveFormatedIdentifier as _;
 use crate::keywords::{AdditionalKeyword, CppKeyword, JavaKeyword};
 use crate::preprocess::{DChildren, Fields, Hidden, MultipleChildren, RequiredChildren};
 use crate::preprocess::{Named, SubTypes};
 
 use super::*;
-
-pub trait BijectiveFormatedIdentifier: ToOwned {
-    /// Convert this type to camel case.
-    fn try_format_ident(&self, dup_count: u8) -> Option<Self::Owned>;
-}
-impl BijectiveFormatedIdentifier for str {
-    fn try_format_ident(&self, dup_count: u8) -> Option<Self::Owned> {
-        let mut camel_case = heck::ToUpperCamelCase::to_upper_camel_case(self);
-        let trimmed = self.trim_start_matches(|c| c == '_');
-        if camel_case.is_empty() {
-            if trimmed.is_empty() && !self.is_empty() {
-                // return Some(self.to_owned())
-                return None;
-            }
-            return None;
-        }
-        let u_count = self.len() - trimmed.len();
-        if u_count > 0 {
-            camel_case.insert_str(0, &"_".repeat(u_count));
-        }
-        if !heck::ToSnakeCase::to_snake_case(&camel_case as &str).eq(trimmed) {
-            return None;
-        }
-        if dup_count > 0 {
-            camel_case.push_str(&"_".repeat(dup_count as usize));
-        }
-        Some(camel_case)
-    }
-}
 
 pub fn serialize_types(typesys: &TypeSys) {
     let res = process_types_into_tokens(typesys);
@@ -53,6 +25,7 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
     let mut cat_from_u16 = quote! {};
     let mut from_str = quote! {};
     let mut to_str = quote! {};
+    let mut to_pair = quote! {};
     let mut as_vec_toks = quote! {};
     let mut hidden_toks = quote! {};
     let mut hidden_toks_pred = quote! {};
@@ -64,7 +37,7 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
     let mut named_pred = quote! {};
 
     let mut alias_dedup = HashMap::<hecs::Entity, Ident>::default();
-    let mut leafs = HM::default();
+    let mut leafs = generate_types::HM::default();
     <JavaKeyword as strum::IntoEnumIterator>::iter().for_each(|x| {
         leafs.unamed.insert(x.to_string(), format!("{:?}", x));
     });
@@ -74,7 +47,6 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
     <AdditionalKeyword as strum::IntoEnumIterator>::iter().for_each(|x| {
         leafs.unamed.insert(x.to_string(), format!("{:?}", x));
     });
-    let mut count = 0;
 
     let mut dup_map = HashMap::<hecs::Entity, u8>::default();
 
@@ -82,6 +54,7 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
         let i = i as u16;
         let v = typesys.types.entity(*e).unwrap();
         let t = v.get::<&preprocess::T>().unwrap().0.to_string();
+
         let dup_count = {
             let count = dup_map.entry(*e).or_insert(0);
             let dup_count = *count;
@@ -89,12 +62,16 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
             dup_count
         };
 
-        // if let Some(kind) = alias_dedup.get(e) {
-        //     from_u16.extend(quote! {
-        //         #i => Type::#kind,
-        //     });
-        //     continue;
-        // }
+        if t == "URI" {
+            dbg!(
+                &t,
+                v.get::<&Named>().is_none(),
+                v.get::<&SubTypes>().is_some(),
+                v.get::<&Fields>().is_some(),
+                v.get::<&DChildren>().is_some(),
+                dup_count,
+            );
+        }
 
         if v.get::<&Named>().is_none() {
             // leaf/token
@@ -135,7 +112,7 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
             if v.has::<Hidden>() {
                 hidden_toks.extend(q);
                 hidden_toks_pred.extend(quote! {
-                    Type::#kind => true,
+                    #kind,
                 });
                 cat_from_u16.extend(quote! {
                     #i => TypeEnum::Hidden(Hidden::#kind),
@@ -164,6 +141,9 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
             });
             from_str.extend(quote! {
                 #raw => Type::#kind,
+            });
+            to_pair.extend(quote! {
+                #kind = #raw;
             });
             alias_dedup.insert(*e, kind);
         } else if let Some(st) = v.get::<&SubTypes>() {
@@ -200,13 +180,13 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
                 }
             }
             hidden_toks_pred.extend(quote! {
-                Type::#kind => true,
+                #kind,
             });
             supertype_pred.extend(quote! {
-               Type::#kind => true,
+               #kind,
             });
             named_pred.extend(quote! {
-               Type::#kind => true,
+               #kind,
             });
             if camel_case.is_none() {
                 abstract_toks.extend(quote! {
@@ -236,6 +216,9 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
             });
             from_str.extend(quote! {
                 #raw => Type::#kind,
+            });
+            to_pair.extend(quote! {
+                #kind = #raw;
             });
             alias_dedup.insert(*e, kind);
         } else if let Some(fields) = v.get::<&Fields>() {
@@ -375,7 +358,10 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
                 #raw => Type::#kind,
             });
             named_pred.extend(quote! {
-               Type::#kind => true,
+               #kind,
+            });
+            to_pair.extend(quote! {
+                #kind = #raw;
             });
             alias_dedup.insert(*e, kind);
         } else if let Some(cs) = v.get::<&DChildren>() {
@@ -458,18 +444,30 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
                 #raw => Type::#kind,
             });
             named_pred.extend(quote! {
-               Type::#kind => true,
+               #kind,
+            });
+            to_pair.extend(quote! {
+                #kind = #raw;
             });
             alias_dedup.insert(*e, kind);
         } else {
             let camel_case = t.try_format_ident(dup_count);
             let kind = format_ident!(
                 "{}",
-                &camel_case
-                    .clone()
-                    .unwrap_or_else(|| t.to_upper_camel_case())
+                &camel_case.clone().unwrap_or_else(|| {
+                    let mut s = t.to_upper_camel_case();
+                    if dup_count > 0 {
+                        s.push_str(&"_".repeat(dup_count as usize));
+                    }
+                    s
+                })
             );
             let raw = t.clone();
+
+            if t == "URI" {
+                dbg!(&t, &raw, &kind, dup_count,);
+            }
+
             if camel_case.is_none() {
                 concrete_toks.extend(quote! {
                     // #[strum(serialize = #raw)]
@@ -503,283 +501,37 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
                 #raw => Type::#kind,
             });
             named_pred.extend(quote! {
-               Type::#kind => true,
+               #kind,
+            });
+            to_pair.extend(quote! {
+                #kind = #raw;
             });
             alias_dedup.insert(*e, kind);
         }
-        // let v = self.abstract_types.entity(*e).unwrap();
-        // writeln!(f, "{:?}: {:?}", t, e)?;
-        // if v.get::<&Named>().is_some() {
-        //     writeln!(f, "\tnamed")?;
-        // }
-        // if let Some(st) = v.get::<&SubTypes>() {
-        //     writeln!(f, "\tsubtypes: {:?}", st.0)?;
-        // }
-        // if let Some(fi) = v.get::<&Fields>() {
-        //     writeln!(f, "\tfields: {:?}", fi.0)?;
-        // }
-        // if let Some(cs) = v.get::<&DChildren>() {
-        //     writeln!(f, "\tchildren: {:?}", cs.0)?;
-        // }
-        count += 1;
     }
 
-    let len = typesys.list.len() as u16;
-    dbg!(count, len);
-
     let res = quote! {
-        // enum TypeEnum {
-        //     Keyword(Keyword),
-        //     Concrete(Concrete),
-        //     WithFields(WithFields),
-        //     Abstract(Abstract),
-        //     Hidden(Hidden),
-        //     OutOfBound,
-        // }
-        // enum Hidden {
-        //     #hidden_toks
-        // }
-        // enum Keyword {
-        //     #keyword_toks
-        // }
-        // /// Type of nodes actually stored
-        // /// ie. what should be stored on CST nodes
-        // /// but anyway encode it as a number
-        // /// and it would be better to take the smallest numbers for concrete nodes
-        // /// to facilitate convertion
-        // enum Concrete {
-        //     #concrete_toks
-        //     // #named_concrete_types_toks
-        // }
-        // enum WithFields {
-        //     #with_field_toks
-        // }
-        // enum Abstract {
-        //     #abstract_toks
-        // }
-        // pub fn from_u16(t: u16) -> TypeResult {
-        //     match t {
-        //         #cat_from_u16
-        //         #len => TypeEnum::ERROR
-        //     }
-        // }
-        // const COUNT: usize = #count;
-        // const TS2Enum: &[()] = [
-        //     #as_vec_toks
-        // ];
-
-        #[repr(u16)]
-        #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-        pub enum Type {
-            #merged
-            Directory = TStore::DIRECTORY,
-            Spaces = TStore::SPACES,
-            _ERROR = TStore::_ERROR,
-            ERROR = TStore::ERROR,
+        declare_type!{
+            #to_pair
         }
         impl Type {
-            pub fn from_u16(t: u16) -> Type {
-                match t {
-                    #from_u16
-                    //#len => Type::ERROR,
-                    TStore::DIRECTORY => Type::Directory,
-                    TStore::SPACES => Type::Spaces,
-                    TStore::_ERROR => Type::_ERROR,
-                    TStore::ERROR => Type::ERROR,
-                    x => panic!("{}",x),
-                }
-            }
-            #[allow(unreachable_patterns)]
-            pub fn from_str(t: &str) -> Option<Type> {
-                Some(match t {
-                    #from_str
-                    "Directory" => Type::Directory,
-                    "Spaces" => Type::Spaces,
-                    "_ERROR" => Type::_ERROR,
-                    "ERROR" => Type::ERROR,
-                    _ => return None,
-                })
-            }
-            pub fn to_str(&self) -> &'static str {
-                match self {
-                    #to_str
-                    Type::Directory => "Directory",
-                    Type::Spaces => "Spaces",
-                    Type::_ERROR => "_ERROR",
-                    Type::ERROR => "ERROR",
-                }
-            }
             pub fn is_hidden(&self) -> bool {
-                match self {
+                is!(self,
                     #hidden_toks_pred
-                    _ => false,
-                }
+                )
             }
             pub fn is_supertype(&self) -> bool {
-                match self {
+                is!(self,
                     #supertype_pred
-                    _ => false,
-                }
+                )
             }
             pub fn is_named(&self) -> bool {
-                match self {
+                is!(self,
                     #named_pred
-                    _ => false,
-                }
+                )
             }
 
         }
-        // /// all types
-        // enum Types {
-        //     #types_toks
-        // }
-        // impl Types {
-        //     // pub fn parse_xml(t: &str) -> Self {
-        //     //     match t {
-        //     //         #into_types_toks
-        //     //     }
-        //     // }
-        // }
-        // mod abstract_types {
-        //     #abstract_types_toks
-        // }
     };
     res
-}
-
-pub fn serialize_types2(typesys: &TypeSys) {
-    let mut concrete_types_toks = quote! {};
-    let mut abstract_types_toks = quote! {};
-    let mut types_toks = quote! {};
-    let mut into_types_toks = quote! {};
-    let mut leafs = HM::default();
-    let mut count = 0;
-
-    for (t, e) in &typesys.index {
-        let v = typesys.types.entity(*e).unwrap();
-
-        if v.get::<&Named>().is_none() {
-            // leaf/token
-            let k = leafs.fmt(t, |k| format!("cpp_TS{}", &k.to_upper_camel_case()));
-            let kind = format_ident!("{}", &k);
-            let raw = t.clone();
-
-            concrete_types_toks.extend(quote! {
-                #[strum(serialize = #raw)]
-                #kind,
-            });
-            types_toks.extend(quote! {
-                #[strum(serialize = #raw)]
-                #kind,
-            });
-            into_types_toks.extend(quote! {
-                #raw => #kind,
-            });
-        } else if let Some(st) = v.get::<&SubTypes>() {
-            let kind = format_ident!("cpp_{}", &t.to_upper_camel_case());
-            let raw = t.clone();
-            let mut sub_toks = quote! {};
-            for e in &st.0 {
-                let v = typesys.types.entity(*e).unwrap();
-                let t = &v.get::<&preprocess::T>().unwrap().0;
-                let kind = format_ident!("{}", &t.to_upper_camel_case());
-                let raw = t.clone();
-                sub_toks.extend(quote! {
-                    #[strum(serialize = #raw)]
-                    #kind,
-                });
-            }
-            let ty = quote! {
-                enum #kind {
-                    #sub_toks
-                }
-            };
-            abstract_types_toks.extend(ty);
-            types_toks.extend(quote! {
-                #[strum(serialize = #raw)]
-                #kind,
-            });
-            into_types_toks.extend(quote! {
-                #raw => #kind,
-            });
-        } else {
-            let kind = format_ident!("cpp_{}", &t.to_upper_camel_case());
-            let raw = t.clone();
-            concrete_types_toks.extend(quote! {
-                #[strum(serialize = #raw)]
-                #kind,
-            });
-            types_toks.extend(quote! {
-                #[strum(serialize = #raw)]
-                #kind,
-            });
-            into_types_toks.extend(quote! {
-                #raw => #kind,
-            });
-        }
-        // let v = self.abstract_types.entity(*e).unwrap();
-        // writeln!(f, "{:?}: {:?}", t, e)?;
-        // if v.get::<&Named>().is_some() {
-        //     writeln!(f, "\tnamed")?;
-        // }
-        // if let Some(st) = v.get::<&SubTypes>() {
-        //     writeln!(f, "\tsubtypes: {:?}", st.0)?;
-        // }
-        // if let Some(fi) = v.get::<&Fields>() {
-        //     writeln!(f, "\tfields: {:?}", fi.0)?;
-        // }
-        // if let Some(cs) = v.get::<&DChildren>() {
-        //     writeln!(f, "\tchildren: {:?}", cs.0)?;
-        // }
-        count += 1;
-    }
-    dbg!(count);
-
-    let res = quote! {
-        /// Type of nodes actually stored
-        /// ie. what should be stored on CST nodes
-        /// but anyway encode it as a number
-        /// and it would be better to take the smallest numbers for concrete nodes
-        /// to facilitate convertion
-        enum ConcreteTypes {
-            #concrete_types_toks
-        }
-        /// all types
-        enum Types {
-            #types_toks
-        }
-        impl Types {
-            pub fn parse_xml(t: &str) -> Self {
-                match t {
-                    #into_types_toks
-                }
-            }
-        }
-        mod abstract_types {
-            #abstract_types_toks
-        }
-    };
-    println!("{}", res);
-    let res = syn::parse_file(&res.to_string()).unwrap();
-    let res = prettyplease::unparse(&res);
-    println!("{}", res);
-}
-
-#[derive(Default)]
-pub(crate) struct HM {
-    pub(crate) unamed: BTreeMap<String, String>,
-    pub(crate) esc_c: u32,
-}
-
-impl HM {
-    pub(crate) fn fmt(&mut self, x: &str, f: impl Fn(&str) -> String) -> String {
-        if let Some(v) = self.unamed.get(x) {
-            v.to_string()
-        } else {
-            let value = f(&self.esc_c.to_string());
-            self.unamed.insert(x.to_string(), value);
-            self.esc_c += 1;
-            self.unamed.get(x).unwrap().to_string()
-        }
-    }
 }

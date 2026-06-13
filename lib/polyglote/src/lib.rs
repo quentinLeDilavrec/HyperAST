@@ -1,4 +1,5 @@
 pub mod generate_types;
+pub mod generate_types2;
 mod keywords;
 pub mod preprocess;
 pub mod ts_metadata;
@@ -64,6 +65,51 @@ pub fn preprocess_aux(lang: &impl LanguageCompo) -> Result<TypeSys, std::io::Err
     let hi = hi.is_empty().not().then_some(hi);
     let _ = lang.injects(); // TODO process injections
     _preprocess_aux(lang.name(), lang.language(), lang.node_types(), tags, hi)
+}
+
+/// Generates the type system for the given language using macros.
+///
+/// # Arguments
+///
+/// * `lang` - The language component to generate for.
+/// * `out_path` - The path to write the generated code to.
+/// * `command` - The command used to regenerate the code (used in the header comment).
+pub fn generate_with_macros(
+    lang: impl LanguageCompo,
+    out_path: std::path::PathBuf,
+    command: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let types = preprocess_aux(&lang)?;
+    println!("{}", types);
+    println!("{}", types.display_with_macros());
+
+    if !out_path.exists() {
+        return Err(format!("{} does not exist", out_path.display()).into());
+    }
+
+    if !std::fs::read(&out_path)?.trim_ascii().is_empty() {
+        return Err(format!(
+            "{} is not empty, empty it first yourself before regenerating to avoid mistakes",
+            out_path.display()
+        )
+        .into());
+    }
+
+    // TODO check dirty committing state,
+    // taking inspiration from https://github.com/rust-lang/cargo/blob/fc06365c652a3e422a91eea3561373aa18d9a1cc/src/cargo/ops/fix/mod.rs#L222
+
+    println!("regenerating {}...", out_path.display());
+
+    let header = format!(
+        "// This is generated code! regenerate using:\n// `{}`",
+        command
+    );
+    let code = format!("{}", types.display_with_macros())
+        .replace("\"; ", "\";\n    ")
+        .replace(" =\n    ", " = ");
+    let code = format!("{}\n\n{}", header, code);
+    std::fs::write(&out_path, code)?;
+    Ok(())
 }
 
 fn _preprocess_aux(

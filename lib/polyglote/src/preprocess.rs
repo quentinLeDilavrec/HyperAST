@@ -203,6 +203,24 @@ impl Display for TypeSys {
         write!(f, "{}", prettyplease::unparse(&res))
     }
 }
+impl TypeSys {
+    pub fn display_with_macros(&self) -> impl Display {
+        struct DisplayWithMacros<'a>(&'a TypeSys);
+        impl<'a> Display for DisplayWithMacros<'a> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let toks = crate::generate_types2::process_types_into_tokens(self.0);
+                let res = syn::parse_file(&toks.to_string())
+                    .map_err(|err| {
+                        eprintln!("{}", toks.to_string());
+                        err
+                    })
+                    .unwrap();
+                write!(f, "{}", prettyplease::unparse(&res))
+            }
+        }
+        DisplayWithMacros(self)
+    }
+}
 
 macro_rules! as_ref {
     ($t:ty) => {

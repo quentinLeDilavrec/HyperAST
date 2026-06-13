@@ -90,13 +90,13 @@ where
             while let Some(_) = gen_next(&mut state, &mut pre_post) {}
         } else if IT_VARIANT == 2 {
             let it = ZippedTreeGenIt::new(&mut state, pre_post);
-            // using the iterator
+            // consuming the iterator
             it.for_each(|_| ());
         }
     }
 }
 
-// keep variant while trying them
+// keep variants while trying them
 const IT_VARIANT: usize = 2;
 
 #[derive(PartialEq, Eq)]
@@ -172,7 +172,6 @@ where
 #[doc(hidden)]
 pub fn gen_next_aux<Slf: ZippedTreeGen + ?Sized>(
     state: &mut ZippedTreeGenAux<'_, Slf>,
-    //
     visibility: Visibility,
     has: &mut Has,
     cursor: Option<&Slf::TreeCursor<'_>>,
@@ -195,10 +194,6 @@ where
 
 fn gen_pre<Slf: ZippedTreeGen + ?Sized>(
     state: &mut ZippedTreeGenAux<'_, Slf>,
-    // tree_gen: &mut Slf,
-    // text: &Slf::Text,
-    // stack: &mut Parents<Slf::Acc>,
-    // global: &mut Slf::Global,
     cursor: &Slf::TreeCursor<'_>,
     visibility: Visibility,
     has: &mut Has,

@@ -523,7 +523,7 @@ impl<'stores, 'cache, 'acc, TS: JavaEnabledTypeStore + 'static, More, const HIDD
         }
     }
 
-    pub fn with_line_break(self, line_break: Vec<u8>) -> Self {
+    pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
         JavaTreeGen {
             line_break: self.line_break,
             stores: self.stores,

@@ -708,7 +708,7 @@ impl RepositoryProcessor {
                 stores,
                 &mut md_cache,
             )
-            .with_line_break(line_break);
+            .set_line_break(line_break);
         crate::java::handle_java_file(&mut java_tree_gen, name, text)
             .map(|x| x.node)
             .map_err(|e| {
@@ -793,7 +793,7 @@ impl RepositoryProcessor {
                         >::with_preprocessing_and_dedup(
                             stores, dedup, md_cache, more
                         )
-                        .with_line_break(line_break);
+                        .set_line_break(line_break);
                         crate::java::handle_java_file(&mut java_tree_gen, n, t)
                     }
                 } else if let Some(precomp) = &java_proc.parameter.prepro {
@@ -803,7 +803,7 @@ impl RepositoryProcessor {
                         java_tree_gen::JavaTreeGen::with_preprocessing_and_dedup(
                             stores, dedup, md_cache, more,
                         )
-                        .with_line_break(line_break);
+                        .set_line_break(line_break);
                     crate::java::handle_java_file(&mut java_tree_gen, n, t)
                 } else if let Some(more) = &java_proc.query {
                     let more = &more.0;
@@ -812,11 +812,11 @@ impl RepositoryProcessor {
                         java_tree_gen::JavaTreeGen::with_preprocessing_and_dedup(
                             stores, dedup, md_cache, more,
                         )
-                        .with_line_break(line_break);
+                        .set_line_break(line_break);
                     crate::java::handle_java_file::<_>(&mut java_tree_gen, n, t)
                 } else {
                     let mut java_tree_gen = java_tree_gen::JavaTreeGen::new(stores, md_cache)
-                        .with_line_break(line_break);
+                        .set_line_break(line_break);
                     crate::java::handle_java_file(&mut java_tree_gen, n, t)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;

@@ -519,7 +519,7 @@ where
         }
     }
 
-    pub fn with_line_break(self, line_break: Vec<u8>) -> Self {
+    pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
         CppTreeGen {
             line_break,
             dedup: self.dedup,

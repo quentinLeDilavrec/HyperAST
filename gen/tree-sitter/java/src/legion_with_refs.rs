@@ -581,21 +581,7 @@ impl<'stores, 'cache, TS: JavaEnabledTypeStore + 'static, More>
 impl<'stores, 'cache, TS: JavaEnabledTypeStore + 'static, More, const HIDDEN_NODES: bool>
     JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, More, HIDDEN_NODES>
 {
-    pub fn with_more<M>(
-        self,
-        more: M,
-    ) -> JavaTreeGen<'stores, 'cache, TS, SimpleStores<TS>, M, HIDDEN_NODES> {
-        JavaTreeGen {
-            line_break: self.line_break,
-            dedup: self.dedup,
-            stores: self.stores,
-            md_cache: self.md_cache,
-            more,
-            _p: self._p,
-        }
-    }
-
-    pub fn with_line_break(self, line_break: Vec<u8>) -> Self {
+    pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
         JavaTreeGen {
             line_break,
             dedup: self.dedup,

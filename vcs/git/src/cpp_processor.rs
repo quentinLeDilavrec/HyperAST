@@ -332,11 +332,11 @@ impl RepositoryProcessor {
                     let mut cpp_tree_gen = cpp_gen::CppTreeGen::with_preprocessing_and_dedup(
                         stores, dedup, md_cache, more,
                     )
-                    .with_line_break(line_break);
+                    .set_line_break(line_break);
                     crate::cpp::handle_cpp_file::<_>(&mut cpp_tree_gen, n, t)
                 } else {
                     let mut cpp_tree_gen =
-                        cpp_gen::CppTreeGen::new(stores, md_cache).with_line_break(line_break);
+                        cpp_gen::CppTreeGen::new(stores, md_cache).set_line_break(line_break);
                     crate::cpp::handle_cpp_file(&mut cpp_tree_gen, n, t)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;

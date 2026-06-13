@@ -72,7 +72,7 @@ impl JavaPreprocessFileSys {
         dbg!(Lang::TE.len());
         dbg!(language().node_kind_count());
         let mut java_tree_gen = JavaTreeGen::new(&mut self.main_stores, &mut self.java_md_cache)
-            .with_line_break(line_break);
+            .set_line_break(line_break);
         let full_node = match tree_sitter_parse(text.as_bytes()) {
             Ok(tree) => {
                 Ok(java_tree_gen.generate_file(name.as_bytes(), text.as_bytes(), tree.walk()))
@@ -130,7 +130,7 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
             };
             let mut java_tree_gen =
                 JavaTreeGen::new(&mut java_gen.main_stores, &mut java_gen.java_md_cache)
-                    .with_line_break(line_break);
+                    .set_line_break(line_break);
             let full_node =
                 java_tree_gen.generate_file(name.as_bytes(), file.as_bytes(), tree.walk());
 

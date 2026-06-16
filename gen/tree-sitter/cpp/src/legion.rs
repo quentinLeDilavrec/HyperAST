@@ -10,6 +10,7 @@ use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::eq_node;
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen;
+use hyperast::tree_gen::TsType;
 use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast::tree_gen::parser::Node as _;
 use hyperast::tree_gen::parser::TreeCursor;
@@ -63,7 +64,6 @@ pub type MDCache = HashMap<NodeIdentifier, MD>;
 // they can be qualitative metadata .eg a hash or they can be quantitative .eg lines of code
 pub struct MD {
     pub metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
-    pub ana: Option<PartialAnalysis>,
     pub precomp_queries: PrecompQueries,
 }
 
@@ -71,7 +71,6 @@ impl From<Local> for MD {
     fn from(x: Local) -> Self {
         MD {
             metrics: x.metrics,
-            ana: x.ana,
             precomp_queries: x.precomp_queries,
         }
     }
@@ -80,13 +79,11 @@ impl From<Local> for MD {
 impl MD {
     pub fn local(&self, compressed_node: NodeIdentifier) -> Local {
         let md = self;
-        let ana = md.ana.clone();
         let metrics = md.metrics;
         let precomp_queries = md.precomp_queries;
         Local {
             compressed_node,
             metrics,
-            ana,
             role: None,
             precomp_queries,
             viz_cs_count: 0,
@@ -106,7 +103,6 @@ type PrecompQueries = u16;
 pub struct Local {
     pub compressed_node: NodeIdentifier,
     pub metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
-    pub ana: Option<PartialAnalysis>,
     pub role: Option<Role>,
     pub precomp_queries: PrecompQueries,
     pub viz_cs_count: u32,
@@ -149,8 +145,6 @@ pub struct Acc {
     precomp_queries: PrecompQueries,
     /// number of visible children (by tree-sitter definition)
     viz_cs_count: u32,
-    /// aggregate of name resolution analysis (for now deprecated)
-    ana: Option<PartialAnalysis>,
 }
 
 pub type FNode = FullNode<BasicGlobalData, Local>;
@@ -220,7 +214,6 @@ impl Debug for Acc {
             .field("start_byte", &self.start_byte)
             .field("end_byte", &self.end_byte)
             .field("metrics", &self.metrics)
-            .field("ana", &self.ana)
             .field("padding_start", &self.padding_start)
             .field("indentation", &self.indentation)
             .finish()
@@ -255,7 +248,6 @@ where
             &parent_indentation,
         );
         let labeled = node.has_label();
-        let ana = self.build_ana(&kind);
         Acc {
             simple: BasicAccumulator::new(kind),
             no_space: vec![],
@@ -264,7 +256,6 @@ where
             end_byte: node.end_byte(),
             viz_cs_count: 0,
             metrics: Default::default(),
-            ana,
             padding_start: 0,
             indentation: indent,
             role: Default::default(),
@@ -307,6 +298,15 @@ where
             // needed to avoid breaking invariant, as the node has no span:
             // `is_parent_hidden && parent.end_byte() <= acc.begin_byte()`
             return PreResult::Skip;
+        }
+        if kind.is_hidden() && node.start_byte() == node.end_byte() {
+            log::trace!(
+                "Empty hidden node: {:?} {}-{}",
+                kind,
+                node.start_byte(),
+                node.end_byte()
+            );
+            return PreResult::Ignore;
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
@@ -364,7 +364,6 @@ where
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
             metrics: Default::default(),
-            ana: self.build_ana(&kind),
             padding_start: global.sum_byte_length(),
             indentation: indent,
             simple: BasicAccumulator::new(kind),
@@ -546,7 +545,6 @@ where
         Local {
             compressed_node,
             metrics,
-            ana: Default::default(),
             role: None,
             precomp_queries: Default::default(),
             viz_cs_count: 0,
@@ -574,7 +572,6 @@ where
         Local {
             compressed_node,
             metrics,
-            ana: Default::default(),
             role: None,
             precomp_queries: Default::default(),
             viz_cs_count: 0,
@@ -641,14 +638,6 @@ where
 
         self.make(&mut global, acc, label)
     }
-
-    fn build_ana(&mut self, kind: &Type) -> Option<PartialAnalysis> {
-        if kind == &Type::TranslationUnit {
-            Some(PartialAnalysis {})
-        } else {
-            None
-        }
-    }
 }
 
 impl<'stores, TS, More, const HIDDEN_NODES: bool> TreeGen
@@ -684,7 +673,6 @@ where
 
         let local = if let Some(compressed_node) = insertion.occupied_id() {
             let md = self.md_cache.get(&compressed_node).unwrap();
-            let ana = md.ana.clone();
             debug_assert_eq!(metrics.height, md.metrics.height);
             debug_assert_eq!(metrics.size, md.metrics.size);
             debug_assert_eq!(metrics.size_no_spaces, md.metrics.size_no_spaces);
@@ -699,7 +687,6 @@ where
             Local {
                 compressed_node,
                 metrics,
-                ana,
                 role: acc.role.current,
                 precomp_queries,
                 viz_cs_count,
@@ -755,14 +742,12 @@ where
                 compressed_node,
                 MD {
                     metrics,
-                    ana: acc.ana.clone(),
                     precomp_queries: acc.precomp_queries,
                 },
             );
             Local {
                 compressed_node,
                 metrics,
-                ana: acc.ana,
                 role: current_role,
                 precomp_queries: acc.precomp_queries,
                 viz_cs_count,

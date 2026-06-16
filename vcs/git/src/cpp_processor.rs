@@ -451,8 +451,6 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
 
     let mut dyn_builder = subtree_builder::<hyperast_gen_ts_cpp::TStore>(interned_kind);
 
-    let ana = None;
-
     add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
 
     let children_is_empty = primary.children.is_empty();
@@ -469,7 +467,6 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
         node_id,
         cpp_gen::MD {
             metrics,
-            ana: None,
             precomp_queries: acc.precomp_queries,
         },
     );
@@ -477,7 +474,6 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
     let full_node = cpp_gen::Local {
         compressed_node: node_id,
         metrics,
-        ana,
         role: None,
         precomp_queries: acc.precomp_queries,
         viz_cs_count: 0,

@@ -146,7 +146,7 @@ impl<TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'_, TS> {
             return PreResult::Skip;
         };
         let mut acc = self.pre(text, &node, stack, global);
-        if kind == Type::AttValue {
+        if kind.is_leaf() {
             acc.labeled = true;
             return PreResult::SkipChildren(acc);
         }

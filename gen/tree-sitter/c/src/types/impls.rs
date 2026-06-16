@@ -48,6 +48,10 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
         fn is_repeat(&self) -> bool {
             self.is_repeat()
         }
+
+        fn is_leaf(self) -> bool {
+            false
+        }
     }
 
     impl TypeStore for TStore {

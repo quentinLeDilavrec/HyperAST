@@ -49,6 +49,10 @@ impl TsType for Type {
     fn is_repeat(&self) -> bool {
         self.is_repeat()
     }
+
+    fn is_leaf(self) -> bool {
+        self == Type::RawStringLiteral
+    }
 }
 
 impl TypeStore for TStore {

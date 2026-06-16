@@ -634,6 +634,9 @@ where
 pub trait TsType: crate::types::HyperType + Copy {
     fn spaces() -> Self;
     fn is_repeat(&self) -> bool;
+    /// returns true if current node should be treated as a leaf node,
+    /// i.e. we skip generating children and set the label with the content of the span
+    fn is_leaf(self) -> bool;
 }
 
 /// utils for generating code with tree-sitter

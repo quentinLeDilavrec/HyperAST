@@ -288,7 +288,7 @@ where
             }
         }
         if node.0.is_missing() {
-            log::info!(
+            log::trace!(
                 "Missing node: {:?} {}-{}",
                 kind,
                 node.start_byte(),
@@ -319,7 +319,7 @@ where
                 }
             }
         }
-        if kind == Type::RawStringLiteral {
+        if kind.is_leaf() {
             acc.labeled = true;
             return PreResult::SkipChildren(acc);
         }

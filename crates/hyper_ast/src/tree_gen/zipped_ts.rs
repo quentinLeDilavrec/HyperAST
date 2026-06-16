@@ -341,6 +341,10 @@ where
                 }
             }
         }
+        if kind.is_leaf() {
+            acc.labeled = true;
+            return PreResult::SkipChildren(acc);
+        }
         PreResult::Ok(acc)
     }
     fn pre(

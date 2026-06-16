@@ -43,6 +43,10 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
         fn is_repeat(&self) -> bool {
             self.is_repeat()
         }
+
+        fn is_leaf(self) -> bool {
+            false
+        }
     }
 
     impl hyperast::types::ETypeStore for TStore {

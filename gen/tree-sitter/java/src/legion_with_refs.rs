@@ -383,7 +383,7 @@ where
                 }
             }
         }
-        if kind == Type::StringLiteral {
+        if kind.is_leaf() {
             acc.labeled = true;
             return PreResult::SkipChildren(acc);
         }

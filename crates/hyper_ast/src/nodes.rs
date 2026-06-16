@@ -487,6 +487,8 @@ impl<W: std::io::Write> std::fmt::Write for IoOut<W> {
     }
 }
 
+// TODO replace all SimpleSerializer variants with meta-queries (introduced to serialize TreeSitter queries)
+
 pub type StructureSerializer<'a, 'b, IdN, HAST> =
     SimpleSerializer<'a, IdN, HAST, true, false, false, false>;
 pub type LabelSerializer<'a, 'b, IdN, HAST> =
@@ -950,7 +952,6 @@ where
         use crate::types::Labeled;
         use crate::types::WithChildren;
         let b = self.stores.resolve(id);
-        // let kind = (self.stores.type_store(), b);
         let kind = self.stores.resolve_type(id);
         let label = b.try_get_label();
         let children = b.children();

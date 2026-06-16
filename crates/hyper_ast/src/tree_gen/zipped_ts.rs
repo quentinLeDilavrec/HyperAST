@@ -570,20 +570,19 @@ where
                 node_store,
             };
 
-            if More::ENABLED {
-                acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
-            }
-
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(bytes_len);
 
             if More::ENABLED {
+                acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
                 add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
             }
 
             let current_role = Option::take(&mut acc.role.current);
             acc.role.add_md(&mut dyn_builder);
 
+            #[cfg(feature = "subtree-stats")]
+            (vacant.1.1.stats()).add_height_dedup(metrics.height, metrics.hashs);
             let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
             hashs.persist(&mut dyn_builder);
 

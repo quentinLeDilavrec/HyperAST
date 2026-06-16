@@ -908,15 +908,13 @@ where
                 label_store: &stores.label_store,
                 node_store,
             };
-            if More::ENABLED {
-                acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
-            }
             let children_is_empty = acc.simple.children.is_empty();
 
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(bytes_len);
 
             if More::ENABLED {
+                acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
                 tree_gen::add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
             }
             if More::GRAPHING {
@@ -1107,6 +1105,7 @@ where
             acc.push(full_node);
         }
         let post = {
+            let more = &mut self.more;
             let node_store = &mut self.stores.node_store.inner;
             let label_store = &mut self.stores.label_store;
             let label_id = l;
@@ -1152,7 +1151,6 @@ where
                     label_store: &self.stores.label_store,
                 };
 
-                acc.precomp_queries |= self.more.match_precomp_queries(stores, &acc, label);
                 let children_is_empty = acc.simple.children.is_empty();
 
                 let mut dyn_builder = subtree_builder::<TS>(interned_kind);
@@ -1167,7 +1165,11 @@ where
                     dyn_builder.add(label_id);
                 }
                 if More::ENABLED {
+                    acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label);
                     tree_gen::add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
+                }
+                if More::GRAPHING {
+                    more.compute_tsg(stores, &acc, label.as_deref()).unwrap();
                 }
                 #[cfg(feature = "impact")]
                 reference_analysis::add_md_ref_ana(

@@ -217,8 +217,8 @@ impl CompoRegister for World {
     }
 }
 
-pub type RawHAST<'hast, 'acc, TS> =
-    crate::store::SimpleStores<TS, &'hast NodeStoreInner, &'acc crate::store::labels::LabelStore>;
+pub type RawHAST<'hast, TS> =
+    crate::store::SimpleStores<TS, &'hast NodeStoreInner, &'hast crate::store::labels::LabelStore>;
 
 pub fn subtree_builder<TS: crate::types::ETypeStore>(ty: TS::Ty) -> dyn_builder::EntityBuilder
 where

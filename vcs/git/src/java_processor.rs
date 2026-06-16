@@ -420,7 +420,7 @@ struct TsgErzedSettings {
 #[cfg(feature = "tsg")]
 type ErazedTSG = Box<dyn std::any::Any + Send + Sync>;
 
-type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, 'a, TS>, Acc>;
+type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, TS>, Acc>;
 
 impl crate::processing::erased::Parametrized for JavaProcessorHolder {
     type T = Parameter;

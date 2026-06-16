@@ -9,7 +9,7 @@ use crate::{git::fetch_github_repository, preprocessed::PreProcessedRepository};
 #[cfg(feature = "impact")]
 use std::env;
 
-use hyperast::store::labels::LabelStore;
+use hyperast::store::nodes::legion::RawHAST;
 #[cfg(feature = "impact")]
 use hyperast::utils::memusage;
 
@@ -175,37 +175,17 @@ fn test_tsg_incr_inner_classes() -> std::result::Result<(), Box<dyn std::error::
         let language = hyperast_gen_ts_java::language();
 
         let mut file = tree_sitter_graph::ast::File::<
-            hyperast_tsquery::QueryMatcher<
-                hyperast::store::SimpleStores<
-                    TStore,
-                    &hyperast::store::nodes::legion::NodeStoreInner,
-                    &LabelStore,
-                >,
-                &Acc,
-            >,
+            hyperast_tsquery::QueryMatcher<RawHAST<TStore>, &Acc>,
         >::new(language.clone());
 
-        let query_source: ExtQ<
-            hyperast::store::SimpleStores<
-                TStore,
-                &hyperast::store::nodes::legion::NodeStoreInner,
-                &LabelStore,
-            >,
-            &Acc,
-        > = {
+        let query_source: ExtQ<RawHAST<TStore>, &Acc> = {
             let x: &[&str] = &[];
             ExtQ::new(language.clone(), Box::new(x), source.len())
         };
-        tree_sitter_graph::parser::Parser::<
-            ExtQ<
-                hyperast::store::SimpleStores<
-                    TStore,
-                    &hyperast::store::nodes::legion::NodeStoreInner,
-                    &LabelStore,
-                >,
-                &Acc,
-            >,
-        >::with_ext(query_source, source)
+        tree_sitter_graph::parser::Parser::<ExtQ<RawHAST<TStore>, &Acc>>::with_ext(
+            query_source,
+            source,
+        )
         .parse_into_file(&mut file)
         .unwrap();
         use tree_sitter_graph::GenQuery;

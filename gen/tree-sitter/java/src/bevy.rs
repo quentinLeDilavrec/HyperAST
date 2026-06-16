@@ -310,7 +310,7 @@ where
     ) -> PreResult<Self::Acc> {
         let node = &cursor.node();
         let kind = TS::obtain_type(node);
-        if should_get_hidden_nodes() {
+        if !should_get_hidden_nodes() {
             if kind.is_repeat() {
                 return PreResult::Ignore;
             } else if kind == Type::_UnannotatedType

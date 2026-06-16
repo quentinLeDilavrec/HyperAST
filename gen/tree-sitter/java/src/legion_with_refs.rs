@@ -268,23 +268,6 @@ impl<S> Debug for Acc<S> {
     }
 }
 
-/// enables recovering of hidden nodes from tree-sitter
-#[cfg(not(debug_assertions))]
-const HIDDEN_NODES: bool = true;
-/// enables recovering of hidden nodes from tree-sitter
-// NOTE static mut allows me to change it in unit tests
-#[cfg(debug_assertions)]
-pub static mut HIDDEN_NODES: bool = true;
-
-#[cfg(not(debug_assertions))]
-const fn should_get_hidden_nodes() -> bool {
-    HIDDEN_NODES
-}
-#[cfg(debug_assertions)]
-pub(crate) fn should_get_hidden_nodes() -> bool {
-    unsafe { HIDDEN_NODES }
-}
-
 /// Implements [`ZippedTreeGen`] to offer a visitor for Java generation
 impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen
     for JavaTreeGen<'_, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>
@@ -353,7 +336,7 @@ where
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
         };
-        if should_get_hidden_nodes() {
+        if !HIDDEN_NODES {
             if kind == Type::_UnannotatedType
                 || kind == Type::_VariableDeclaratorList
                 || kind == Type::_VariableDeclaratorId
@@ -369,8 +352,30 @@ where
                 return PreResult::Ignore;
             }
         }
+        if (!HIDDEN_NODES && kind.is_hidden()) || kind.is_repeat() {
+            return PreResult::Ignore;
+        }
         if node.0.is_missing() {
+            log::trace!(
+                "Missing node: {:?} {}-{}",
+                kind,
+                node.start_byte(),
+                node.end_byte()
+            );
+
+            // must skip missing nodes, i.e., leafs added by tree-sitter to fix CST,
+            // needed to avoid breaking invariant, as the node has no span:
+            // `is_parent_hidden && parent.end_byte() <= acc.begin_byte()`
             return PreResult::Skip;
+        }
+        if kind.is_hidden() && node.start_byte() == node.end_byte() {
+            log::trace!(
+                "Ignoring empty hidden node: {:?} {}-{}",
+                kind,
+                node.start_byte(),
+                node.end_byte()
+            );
+            return PreResult::Ignore;
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper

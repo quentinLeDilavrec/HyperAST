@@ -275,15 +275,16 @@ where
             log::warn!("Failed to obtain type of cpp node");
             return PreResult::Skip;
         };
-        if HIDDEN_NODES {
-            if kind.is_repeat() {
-                // dbg!(kind);
-                if stack.parent().unwrap().simple.children.len() < 1024
-                    && stack.parent().unwrap().viz_cs_count < 1024
-                {
-                    return PreResult::Ignore;
-                }
-            } else if kind.is_hidden() {
+        if !HIDDEN_NODES {
+            if kind.is_hidden() {
+                return PreResult::Ignore;
+            }
+        }
+        if kind.is_repeat() {
+            // dbg!(kind);
+            if stack.parent().unwrap().simple.children.len() < 1024
+                && stack.parent().unwrap().viz_cs_count < 1024
+            {
                 return PreResult::Ignore;
             }
         }

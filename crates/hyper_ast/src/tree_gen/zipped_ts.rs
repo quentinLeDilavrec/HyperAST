@@ -263,7 +263,7 @@ impl<TS, More> TsTreeGen<'_, '_, TS, More>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
 }
 
@@ -271,12 +271,12 @@ impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS,
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     type Stores = SimpleStores<TS>;
     type Text = [u8];
     type Node<'b> = TNode<'b>;
-    type TreeCursor<'b> = TTreeCursor<'b>;
+    type TreeCursor<'b> = TTreeCursor<'b, HIDDEN_NODES>;
 
     fn stores(&mut self) -> &mut Self::Stores {
         self.stores
@@ -317,18 +317,30 @@ where
     ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
-        if HIDDEN_NODES && (kind.is_hidden() || kind.is_repeat()) {
-            // dbg!(kind);
-            // return PreResult::Ignore;
+        if (!HIDDEN_NODES && kind.is_hidden()) || kind.is_repeat() {
+            return PreResult::Ignore;
         }
         if node.0.is_missing() {
-            // dbg!(kind);
-            // dbg!(node.0.start_byte());
-            // dbg!(node.0.end_byte());
+            log::trace!(
+                "Missing node: {:?} {}-{}",
+                kind,
+                node.start_byte(),
+                node.end_byte()
+            );
+
             // must skip missing nodes, i.e., leafs added by tree-sitter to fix CST,
-            // needed to avoid breaking invarient, as the node has no span:
+            // needed to avoid breaking invariant, as the node has no span:
             // `is_parent_hidden && parent.end_byte() <= acc.begin_byte()`
             return PreResult::Skip;
+        }
+        if kind.is_hidden() && node.start_byte() == node.end_byte() {
+            log::trace!(
+                "Ignoring empty hidden node: {:?} {}-{}",
+                kind,
+                node.start_byte(),
+                node.end_byte()
+            );
+            return PreResult::Ignore;
         }
         let mut acc = self.pre(text, &node, stack, global);
         // TODO replace with wrapper
@@ -622,7 +634,7 @@ where
 
 impl<TS: ETypeStore, More, const HIDDEN_NODES: bool> TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
-    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     fn custom_dd(
         stores: RawHAST<TS>,

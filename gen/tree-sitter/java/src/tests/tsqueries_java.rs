@@ -29,7 +29,6 @@ fn test_immediate_pred2() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    unsafe { crate::legion_with_refs::HIDDEN_NODES = true };
     let query = r#"(program
   (class_declaration
     name: (identifier) @name
@@ -61,7 +60,6 @@ fn test_return_null_with_prepro() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    unsafe { crate::legion_with_refs::HIDDEN_NODES = true };
     let query = r#"(return_statement (null_literal))"#;
     let prepro = [r#"(return_statement)"#, "(null_literal)"];
     let text = r#"
@@ -81,7 +79,6 @@ fn test_to_much_matches() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(log::LevelFilter::Trace))
         .unwrap();
-    unsafe { crate::legion_with_refs::HIDDEN_NODES = true };
     let query = r#"(try_statement
   (block
     (expression_statement

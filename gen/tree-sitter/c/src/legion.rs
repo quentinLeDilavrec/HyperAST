@@ -227,7 +227,7 @@ where
         let Some(kind) = TS::try_obtain_type(&node) else {
             return PreResult::Skip;
         };
-        if HIDDEN_NODES {
+        if !HIDDEN_NODES {
             if kind.is_repeat() {
                 return PreResult::Ignore;
             } else if kind.is_hidden() {

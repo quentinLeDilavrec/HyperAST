@@ -191,12 +191,7 @@ impl<TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'_, TS> {
         text: &[u8],
         acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
-        let spacing = get_spacing(
-            acc.padding_start,
-            acc.start_byte,
-            text,
-            parent.indentation(),
-        );
+        let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
             parent.push(FullNode {
                 global: global.simple(),
@@ -275,12 +270,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         let mut init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
 
-        let spacing = get_spacing(
-            init.padding_start,
-            init.start_byte,
-            text,
-            init.indentation(),
-        );
+        let spacing = get_spacing(init.padding_start, init.start_byte, text);
         if let Some(spacing) = spacing {
             global.down();
             init.start_byte = 0;
@@ -297,12 +287,7 @@ impl<'a, TS: XmlEnabledTypeStore> XmlTreeGen<'a, TS> {
         let mut acc = stack.finalize();
 
         if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(
-                global.sum_byte_length(),
-                text.len(),
-                text,
-                acc.indentation(),
-            );
+            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
             if let Some(spacing) = spacing {
                 global.right();
                 acc.push(FullNode {

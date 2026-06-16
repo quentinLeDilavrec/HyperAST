@@ -26,12 +26,7 @@ pub(crate) fn cpp_parsing_error_it_test() {
     let mut init = tree_gen.init_val(text, &hyperast::tree_gen::utils_ts::TNode(cursor.node()));
     let cursor = hyperast::tree_gen::utils_ts::TTreeCursor(cursor);
 
-    let spacing = hyperast::tree_gen::get_spacing(
-        init.padding_start,
-        init.start_byte,
-        text,
-        hyperast::tree_gen::AccIndentation::indentation(&init),
-    );
+    let spacing = hyperast::tree_gen::get_spacing(init.padding_start, init.start_byte, text);
     use hyperast::tree_gen::GlobalData;
     if let Some(spacing) = spacing {
         global.down();

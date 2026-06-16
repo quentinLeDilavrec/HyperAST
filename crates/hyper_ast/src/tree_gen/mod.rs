@@ -729,12 +729,7 @@ pub fn get_spacing(
     }
 }
 
-pub fn try_get_spacing(
-    padding_start: usize,
-    pos: usize,
-    text: &[u8],
-    _parent_indentation: &Spaces,
-) -> Option<Vec<u8>> {
+pub fn try_get_spacing(padding_start: usize, pos: usize, text: &[u8]) -> Option<Vec<u8>> {
     // ) -> Option<Spaces> {
     if padding_start != pos {
         let spaces = &text[padding_start..pos];

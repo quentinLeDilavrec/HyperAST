@@ -382,33 +382,16 @@ where
         text: &[u8],
         mut acc: Self::Acc,
     ) -> <Self::Acc as Accumulator>::Node {
-        let spacing = get_spacing(
-            acc.padding_start,
-            acc.start_byte,
-            text,
-            parent.indentation(),
-        );
+        let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if global.sum_byte_length() < acc.end_byte {
-            // only create an error node if tree-sitter is skipping non-whitespaces
-            if tree_gen::try_get_spacing(
-                global.sum_byte_length(),
-                acc.end_byte,
-                text,
-                parent.indentation(),
-            )
-            .is_none()
-            {
+            // Only create an error node if tree-sitter is skipping non-whitespaces.
+            // the error node takes the span to realign for next leaf node
+            if tree_gen::try_get_spacing(global.sum_byte_length(), acc.end_byte, text).is_none() {
                 let local = self.make_error(&text[global.sum_byte_length()..acc.end_byte]);
                 acc.push(FullNode {
                     global: global.simple(),
                     local,
                 });
-                // dbg!(
-                //     global.sum_byte_length(),
-                //     acc.start_byte,
-                //     acc.end_byte,
-                //     acc.simple.kind.as_static_str()
-                // );
                 global.set_sum_byte_length(acc.end_byte);
             }
         }
@@ -593,12 +576,7 @@ where
         let mut init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
 
-        let spacing = get_spacing(
-            init.padding_start,
-            init.start_byte,
-            text,
-            init.indentation(),
-        );
+        let spacing = get_spacing(init.padding_start, init.start_byte, text);
         if let Some(spacing) = spacing {
             global.down();
             global.set_sum_byte_length(init.start_byte);
@@ -615,12 +593,7 @@ where
         let mut acc = stack.finalize();
 
         if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(
-                global.sum_byte_length(),
-                text.len(),
-                text,
-                acc.indentation(),
-            );
+            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
             if let Some(spacing) = spacing {
                 global.right();
                 acc.push(FullNode {

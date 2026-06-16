@@ -209,7 +209,10 @@ impl<U> SubTreeMetrics<U> {
     }
 }
 
-impl<U: crate::hashed::ComputableNodeHashs> SubTreeMetrics<U> {
+impl<U: crate::hashed::ComputableNodeHashs> SubTreeMetrics<U>
+where
+    U::Hash: std::hash::Hash + Copy,
+{
     pub fn finalize<K: ?Sized + std::hash::Hash, L: ?Sized + std::hash::Hash>(
         self,
         k: &K,

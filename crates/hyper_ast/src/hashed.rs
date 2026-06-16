@@ -22,6 +22,7 @@ pub trait NodeHashs {
     fn hash(&self, kind: &Self::Kind) -> Self::Hash;
     fn acc(&mut self, other: &Self);
 }
+
 pub trait ComputableNodeHashs: NodeHashs {
     fn prepare<T: ?Sized + Hash>(t: &T) -> Self::Hash;
     fn compute(
@@ -41,11 +42,11 @@ pub struct SyntaxNodeHashs<T: PrimInt> {
     pub syntax: T,
 }
 
-pub trait IndexingHashBuilder<H: NodeHashs> {
+pub trait IndexingHashBuilder<H> {
     fn new<K: ?Sized + Hash, L: ?Sized + Hash>(hashs: H, k: &K, l: &L, size: impl PrimInt) -> Self;
-    fn most_discriminating(&self) -> H::Hash;
+    fn most_discriminating(&self) -> impl Hash + Copy;
 }
-pub trait MetaDataHashsBuilder<H: NodeHashs>: IndexingHashBuilder<H> {
+pub trait MetaDataHashsBuilder<H>: IndexingHashBuilder<H> {
     fn build(self) -> H;
 }
 
@@ -57,7 +58,10 @@ pub struct HashesBuilder<H: NodeHashs> {
     hashs: H,
 }
 
-impl<H: ComputableNodeHashs> IndexingHashBuilder<H> for HashesBuilder<H> {
+impl<H: ComputableNodeHashs> IndexingHashBuilder<H> for HashesBuilder<H>
+where
+    H::Hash: Hash + Copy,
+{
     /// use size ignoring spaces to stay consistent with other AST approaches, i.e. those not tracking spaces
     fn new<K: ?Sized + Hash, L: ?Sized + Hash>(hashs: H, k: &K, l: &L, size: impl PrimInt) -> Self {
         // TODO redo a better builder
@@ -73,8 +77,8 @@ impl<H: ComputableNodeHashs> IndexingHashBuilder<H> for HashesBuilder<H> {
             hashs,
         }
     }
-
-    fn most_discriminating(&self) -> <H as NodeHashs>::Hash {
+    /// the exact hash returned should be opaque, to give more flexibility to implementations
+    fn most_discriminating(&self) -> impl Hash + Copy {
         self.h0
     }
 }
@@ -130,7 +134,7 @@ impl HashKind for SyntaxNodeHashsKinds {
     }
 }
 
-impl<T: PrimInt + WrappingAdd> NodeHashs for SyntaxNodeHashs<T> {
+impl<T: PrimInt + WrappingAdd + Hash> NodeHashs for SyntaxNodeHashs<T> {
     type Kind = SyntaxNodeHashsKinds;
     type Hash = T;
     fn hash(&self, kind: &Self::Kind) -> T {

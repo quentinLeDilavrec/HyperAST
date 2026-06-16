@@ -391,29 +391,31 @@ where
 
     fn post(
         &mut self,
-        parent: &mut Self::Acc,
+        mut acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
         acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
-        let spacing = get_spacing(
-            acc.padding_start,
-            acc.start_byte,
-            text,
-            parent.indentation(),
-        );
+        let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
+        if global.sum_byte_length() < acc.end_byte {
+            // It's an issue with TreeSitter and the grammar you are using, it rarely append, I have only seen C++ goes that bad.
+            // Look at the Cpp generator for one way to handle this.
+            panic!(
+                "It's bad your skipping non-whitespace characters, you should choose a way of handling this."
+            )
+            // TODO for maximum resilience, should be handled by default, but it looks like a bug from TreeSitter.
+        }
         if let Some(spacing) = spacing {
             let local = self.make_spacing(spacing);
-            debug_assert_ne!(parent.simple.children.len(), 0, "{:?}", parent.simple);
-            parent.push(FullNode {
+            // debug_assert_ne!(parent.simple.children.len(), 0, "{:?}", parent.simple);
+            acc_node(FullNode {
                 global: global.simple(),
                 local,
             });
         }
         let label = if acc.labeled {
-            std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
-                .ok()
-                .map(|x| x.to_string())
+            let label = &text[acc.start_byte..acc.end_byte];
+            std::str::from_utf8(label).ok().map(|x| x.to_string())
         } else {
             None
         };
@@ -425,7 +427,7 @@ impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More,
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     fn make_spacing(&mut self, spacing: Vec<u8>) -> Local<TS::Ty2> {
         let kind = TS::Ty2::spaces();
@@ -465,12 +467,7 @@ where
         let mut init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
 
-        let spacing = get_spacing(
-            init.padding_start,
-            init.start_byte,
-            text,
-            init.indentation(),
-        );
+        let spacing = get_spacing(init.padding_start, init.start_byte, text);
         if let Some(spacing) = spacing {
             global.down();
             global.set_sum_byte_length(init.start_byte);
@@ -487,12 +484,7 @@ where
         let mut acc = stack.finalize();
 
         if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(
-                global.sum_byte_length(),
-                text.len(),
-                text,
-                acc.indentation(),
-            );
+            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
             if let Some(spacing) = spacing {
                 global.right();
                 acc.push(FullNode {
@@ -512,7 +504,7 @@ impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: for<'t> super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
+    More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
     type Acc = Acc<TS::Ty2>;
     type Global = SpacedGlobalData<'store>;

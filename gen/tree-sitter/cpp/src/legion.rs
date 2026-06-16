@@ -377,7 +377,7 @@ where
 
     fn post(
         &mut self,
-        parent: &mut Self::Acc,
+        mut acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
         mut acc: Self::Acc,
@@ -398,7 +398,7 @@ where
         if let Some(spacing) = spacing {
             let local = self.make_spacing(spacing);
             // debug_assert_ne!(parent.simple.children.len(), 0, "{:?}", parent.simple);
-            parent.push(FullNode {
+            acc_node(FullNode {
                 global: global.simple(),
                 local,
             });

@@ -190,7 +190,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
 
     fn post(
         &mut self,
-        _parent: &mut Self::Acc,
+        _acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
         acc: Self::Acc,

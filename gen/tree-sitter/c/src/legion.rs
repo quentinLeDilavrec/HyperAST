@@ -256,6 +256,7 @@ where
         }
         PreResult::Ok(acc)
     }
+
     fn pre(
         &mut self,
         text: &[u8],
@@ -288,7 +289,7 @@ where
 
     fn post(
         &mut self,
-        parent: &mut Self::Acc,
+        mut acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
         acc: Self::Acc,
@@ -296,7 +297,7 @@ where
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
             let local = self.make_spacing(spacing);
-            parent.push(FullNode {
+            acc_node(FullNode {
                 global: global.simple(),
                 local,
             });

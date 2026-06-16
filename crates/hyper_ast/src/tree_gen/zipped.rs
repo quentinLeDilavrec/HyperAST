@@ -53,6 +53,20 @@ where
         global: &mut Self::Global,
     ) -> Self::Acc;
 
+    /// Called when going up
+    fn _post(
+        &mut self,
+        parent: &mut Self::Acc,
+        global: &mut Self::Global,
+        text: &Self::Text,
+        acc: Self::Acc,
+    ) {
+        // WARNING: do not use information from `parent` to build nodes
+        // HyperAST assumes a node must not depend on its parent
+        let node = self.post(|node| parent.push(node), global, text, acc);
+        self.acc(parent, node);
+    }
+
     fn acc(&mut self, parent: &mut Self::Acc, full_node: <Self::Acc as Accumulator>::Node) {
         parent.push(full_node);
     }
@@ -60,7 +74,7 @@ where
     /// Called when going up
     fn post(
         &mut self,
-        parent: &mut Self::Acc,
+        acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &Self::Text,
         acc: Self::Acc,
@@ -162,26 +176,26 @@ where
     let (cursor, has) = pre_post.current();
 
     // NOTE aux function is for testing purposes
-    if let Some(value) = gen_next_aux(state, visibility, has, cursor) {
-        return value;
-    }
+    let Some(_) = gen_next_aux(state, visibility, has, cursor) else {
+        return None;
+    };
     assert_eq!(state.stack.len(), pre_post.stack.len());
     Some(())
 }
 
-#[doc(hidden)]
+#[doc(hidden)] // for testing purposes
 pub fn gen_next_aux<Slf: ZippedTreeGen + ?Sized>(
     state: &mut ZippedTreeGenAux<'_, Slf>,
     visibility: Visibility,
     has: &mut Has,
     cursor: Option<&Slf::TreeCursor<'_>>,
-) -> Option<Option<()>>
+) -> Option<()>
 where
     Slf::Global: TotalBytesGlobalData,
 {
     if *has == Has::Up || *has == Has::Right {
         if state.stack.len() == 0 {
-            return Some(None);
+            return None;
         }
         gen_post(state);
     }
@@ -189,7 +203,7 @@ where
         let cursor = cursor.unwrap();
         gen_pre(state, cursor, visibility, has);
     }
-    None
+    Some(())
 }
 
 fn gen_pre<Slf: ZippedTreeGen + ?Sized>(
@@ -251,24 +265,21 @@ where
         global,
     } = state;
     let is_parent_hidden;
-    let full_node: Option<_> = match (stack.pop().unwrap(), stack.parent_mut_with_vis()) {
+    match (stack.pop().unwrap(), stack.parent_mut_with_vis()) {
         (P::Visible(acc), None) => {
             global.up();
             is_parent_hidden = false;
             global.set_sum_byte_length(acc.end_byte());
             stack.push(P::Visible(acc));
-            None
         }
         (_, None) => {
             panic!();
         }
         (P::ManualyHidden, Some((v, _))) => {
             is_parent_hidden = v == Visibility::Hidden;
-            None
         }
         (P::BothHidden, Some((v, _))) => {
             is_parent_hidden = v == Visibility::Hidden;
-            None
         }
         (P::Visible(acc), Some((v, parent))) => {
             is_parent_hidden = v == Visibility::Hidden;
@@ -281,8 +292,7 @@ where
                 panic!()
             }
             global.up();
-            let full_node = Slf::post(tree_gen, parent, global, text, acc);
-            Some(full_node)
+            Slf::_post(tree_gen, parent, global, text, acc);
         }
         (P::Hidden(acc), Some((v, parent))) => {
             is_parent_hidden = v == Visibility::Hidden;
@@ -295,21 +305,14 @@ where
                 log::error!("{} {}", parent.end_byte(), acc.begin_byte());
                 assert!(!acc.has_children());
                 global.up();
-                None
             } else {
                 global.up();
-                let full_node = Slf::post(tree_gen, parent, global, text, acc);
-                Some(full_node)
+                Slf::_post(tree_gen, parent, global, text, acc);
             }
         }
     };
 
     log::trace!("is parent hidden: {}", is_parent_hidden);
-
-    let parent = state.stack.parent_mut().unwrap();
-    if let Some(full_node) = full_node {
-        Slf::acc(state.tree_gen, parent, full_node);
-    }
 }
 
 #[doc(hidden)]

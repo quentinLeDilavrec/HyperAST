@@ -15,6 +15,7 @@ use hyperast::store::nodes::legion::HashedNodeRef;
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen;
+use hyperast::tree_gen::TsType;
 use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
@@ -456,13 +457,13 @@ where
         }
     }
 
-    fn post(
+    fn _post(
         &mut self,
         parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &[u8],
         acc: Self::Acc,
-    ) -> <Self::Acc as Accumulator>::Node {
+    ) {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
             let local = self.make_spacing(spacing);
@@ -481,6 +482,17 @@ where
                     .unwrap();
             }
         }
+        let node = self.post(|n| parent.push(n), global, text, acc);
+        parent.push(node);
+    }
+
+    fn post(
+        &mut self,
+        _acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
+        global: &mut Self::Global,
+        text: &Self::Text,
+        acc: Self::Acc,
+    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let label = if acc.labeled {
             std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
                 .ok()

@@ -3,8 +3,8 @@
 //! No HyperAST is built here.
 //!
 //! The mock implementations of the different traits are at the end of the file
-use hyperast::tree_gen::TotalBytesGlobalData;
 use hyperast::tree_gen::parser::Node as _;
+use hyperast::tree_gen::{Accumulator, TotalBytesGlobalData};
 
 use crate::legion::tree_sitter_parse;
 
@@ -78,9 +78,10 @@ pub(crate) fn cpp_parsing_error_zipper_it_mock_test() {
             node.kind(),
         );
 
-        if let Some(_) = hyperast::tree_gen::zipped::gen_next_aux(it.aux, vis, has, Some(cursor)) {
+        use hyperast::tree_gen::zipped::gen_next_aux;
+        let Some(_) = gen_next_aux(it.aux, vis, has, Some(cursor)) else {
             continue;
-        }
+        };
         assert_eq!(it.aux.stack.len(), it.pre_post.stack.len());
     }
 }
@@ -203,7 +204,7 @@ impl hyperast::tree_gen::ZippedTreeGen for CppTreeGenMock {
 
     fn post(
         &mut self,
-        _parent: &mut Self::Acc,
+        _acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &Self::Text,
         acc: Self::Acc,

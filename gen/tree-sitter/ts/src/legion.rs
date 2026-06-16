@@ -208,14 +208,14 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
 
     fn post(
         &mut self,
-        parent: &mut Self::Acc,
+        mut acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
         acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
-            parent.push(FullNode {
+            acc_node(FullNode {
                 global: global.simple(),
                 local: self.make_spacing(spacing),
             });

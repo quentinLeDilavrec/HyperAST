@@ -10,6 +10,7 @@ use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen;
+use hyperast::tree_gen::TsType;
 use hyperast::tree_gen::parser::Node as _;
 use hyperast::tree_gen::parser::TreeCursor;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
@@ -186,14 +187,14 @@ impl<TS: XmlEnabledTypeStore> ZippedTreeGen for XmlTreeGen<'_, TS> {
 
     fn post(
         &mut self,
-        parent: &mut Self::Acc,
+        mut acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
         acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
-            parent.push(FullNode {
+            acc_node(FullNode {
                 global: global.simple(),
                 local: self.make_spacing(spacing),
             });

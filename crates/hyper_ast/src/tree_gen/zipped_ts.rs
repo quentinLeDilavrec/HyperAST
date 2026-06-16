@@ -15,6 +15,7 @@ use crate::store::nodes::legion::RawHAST;
 use crate::store::nodes::legion::eq_node;
 use crate::store::nodes::legion::{DedupMap, NodeIdentifier};
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
+use crate::tree_gen::handle_file_bounds;
 use crate::tree_gen::{TsEnableTS, TsType};
 use crate::types::LabelStore as _;
 use crate::types::Role;
@@ -406,12 +407,7 @@ where
             // TODO for maximum resilience, should be handled by default, but it looks like a bug from TreeSitter.
         }
         if let Some(spacing) = spacing {
-            let local = self.make_spacing(spacing);
-            // debug_assert_ne!(parent.simple.children.len(), 0, "{:?}", parent.simple);
-            acc_node(FullNode {
-                global: global.simple(),
-                local,
-            });
+            acc_node(self.make_space(global, &spacing).into());
         }
         let label = if acc.labeled {
             let label = &text[acc.start_byte..acc.end_byte];
@@ -429,11 +425,15 @@ where
     TS::Ty2: TsType,
     More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
-    fn make_spacing(&mut self, spacing: Vec<u8>) -> Local<TS::Ty2> {
+    pub(crate) fn make_space(
+        &mut self,
+        global: &<Self as TreeGen>::Global,
+        spacing: &[u8],
+    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = TS::Ty2::spaces();
         let interned_kind = TS::intern(kind);
 
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(spacing).unwrap().to_string();
 
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
@@ -448,12 +448,16 @@ where
             &spacing,
             |_| {},
         );
-        Local {
-            compressed_node,
-            metrics,
-            role: None,
-            precomp_queries: Default::default(),
-            _ty: kind,
+
+        FullNode {
+            global: global.simple(),
+            local: Local {
+                compressed_node,
+                metrics,
+                role: None,
+                precomp_queries: Default::default(),
+                _ty: kind,
+            },
         }
     }
 
@@ -466,33 +470,8 @@ where
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
         let mut init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
-
-        let spacing = get_spacing(init.padding_start, init.start_byte, text);
-        if let Some(spacing) = spacing {
-            global.down();
-            global.set_sum_byte_length(init.start_byte);
-            init.push(FullNode {
-                global: global.simple(),
-                local: self.make_spacing(spacing),
-            });
-            global.right();
-        }
-        let mut stack = init.into();
-
-        self.r#gen(text, &mut stack, &mut xx, &mut global);
-
-        let mut acc = stack.finalize();
-
-        if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
-            if let Some(spacing) = spacing {
-                global.right();
-                acc.push(FullNode {
-                    global: global.simple(),
-                    local: self.make_spacing(spacing),
-                });
-            }
-        }
+        debug_assert_eq!(global.sum_byte_length(), init.padding_start);
+        let mut acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
 
         self.make(&mut global, acc, label)

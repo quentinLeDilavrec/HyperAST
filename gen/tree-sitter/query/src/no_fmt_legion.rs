@@ -11,6 +11,7 @@ use hyperast::store::nodes::legion::{HashedNodeRef, NodeIdentifier};
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen::BasicGlobalData;
 use hyperast::tree_gen::Spaces;
+use hyperast::tree_gen::handle_file_bounds;
 use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
@@ -228,16 +229,9 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
         let init = self.init_val(text, &TNode(cursor.node()));
-        let mut xx = TTreeCursor(cursor);
-
-        let mut stack = init.into();
-
-        self.r#gen(text, &mut stack, &mut xx, &mut global);
-
-        let acc = stack.finalize();
-
+        let xx = TTreeCursor(cursor);
+        let acc = handle_file_bounds(self, text, xx, &mut global, init, |_, _, _| panic!());
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-
         self.make(&mut global, acc, label)
     }
 }

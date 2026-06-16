@@ -636,6 +636,7 @@ where
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
         let mut init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
+        let mut acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
 
         let spacing = get_spacing(
             init.padding_start,

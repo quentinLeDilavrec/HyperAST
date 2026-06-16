@@ -20,11 +20,10 @@ use hyperast::tree_gen::parser::{Node, TreeCursor};
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
 use hyperast::tree_gen::{BasicAccumulator, RoleAcc, SubTreeMetrics};
-use hyperast::tree_gen::{GlobalData as _, TotalBytesGlobalData as _};
 use hyperast::tree_gen::{Parents, PreResult};
 use hyperast::tree_gen::{SpacedGlobalData, StatsGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
-use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+use hyperast::tree_gen::{compute_indentation, get_spacing};
 use hyperast::types::LabelStore as LabelStoreTrait;
 use hyperast::types::{AnyType, NodeStoreExt, TypeTrait, WithHashs, WithStats};
 use hyperast::types::{Role, RoleStore};
@@ -445,7 +444,7 @@ where
     }
 
     fn acc(&mut self, parent: &mut Self::Acc, full_node: <Self::Acc as Accumulator>::Node) {
-        let id = full_node.local.compressed_node;
+        let id = full_node.local().compressed_node;
         let ty = parent.simple.kind;
         parent.push(full_node);
         if let Some(p) = &mut parent.prepro {
@@ -466,21 +465,7 @@ where
     ) {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
-            let local = self.make_spacing(spacing);
-            let id = local.compressed_node;
-            parent.push(FullNode {
-                global: global.simple(),
-                local,
-            });
-
-            if let Some(p) = &mut parent.prepro {
-                // SAFETY: this side should be fine, issue when unerasing
-                let store = unsafe { self.stores.erase_ts_unchecked() };
-                let child: hyperast::scripting::SubtreeHandle<crate::types::TType> = id.into();
-                use hyperast::scripting::Accumulable;
-                p.acc(self.more.scripts(), store, parent.simple.kind, child)
-                    .unwrap();
-            }
+            self.make_space(global, &spacing, parent);
         }
         let node = self.post(|n| parent.push(n), global, text, acc);
         parent.push(node);
@@ -606,7 +591,20 @@ where
     More: tree_gen::Prepro<SimpleStores<TS>>
         + tree_gen::PreproTSG<SimpleStores<TS>, Acc = Acc<More::Scope>>,
 {
-    fn make_spacing(&mut self, spacing: Vec<u8>) -> Local {
+    pub(crate) fn make_space(
+        &mut self,
+        global: &<Self as TreeGen>::Global,
+        spacing: &[u8],
+        acc: &mut <Self as TreeGen>::Acc,
+    ) {
+        let full_node = FullNode {
+            global: global.simple(),
+            local: self.make_spacing(spacing),
+        };
+        self.acc(acc, full_node);
+    }
+
+    fn make_spacing(&mut self, spacing: &[u8]) -> Local {
         let kind = Type::Spaces;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
@@ -677,55 +675,11 @@ where
         cursor: tree_sitter::TreeCursor,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
-        let mut init = self.init_val(text, &TNode(cursor.node()));
-        let mut xx = TTreeCursor(cursor);
+        let init = self.init_val(text, &TNode(cursor.node()));
+        let xx = TTreeCursor(cursor);
+        use hyperast::tree_gen::_handle_file_bounds;
+        let mut acc = _handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
 
-        let spacing = get_spacing(init.padding_start, init.start_byte, text);
-        if let Some(spacing) = spacing {
-            global.down();
-            global.set_sum_byte_length(init.start_byte);
-            let local = self.make_spacing(spacing);
-            let id = local.compressed_node;
-            init.push(FullNode {
-                global: global.simple(),
-                local,
-            });
-            if let Some(p) = &mut init.prepro {
-                // SAFETY: this side should be fine, issue when unerasing
-                let store = unsafe { self.stores.erase_ts_unchecked() };
-                let child: hyperast::scripting::SubtreeHandle<crate::types::TType> = id.into();
-                use hyperast::scripting::Accumulable;
-                p.acc(self.more.scripts(), store, init.simple.kind, child)
-                    .unwrap();
-            }
-            global.right();
-        }
-        let mut stack = init.into();
-
-        self.r#gen(text, &mut stack, &mut xx, &mut global);
-
-        let mut acc = stack.finalize();
-
-        if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
-            if let Some(spacing) = spacing {
-                global.right();
-                let local = self.make_spacing(spacing);
-                let id = local.compressed_node;
-                acc.push(FullNode {
-                    global: global.simple(),
-                    local,
-                });
-                if let Some(p) = &mut acc.prepro {
-                    // SAFETY: this side should be fine, issue when unerasing
-                    let store = unsafe { self.stores.erase_ts_unchecked() };
-                    let child: hyperast::scripting::SubtreeHandle<crate::types::TType> = id.into();
-                    use hyperast::scripting::Accumulable;
-                    p.acc(self.more.scripts(), store, acc.simple.kind, child)
-                        .unwrap();
-                }
-            }
-        }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
 
         use hyperast::types::HyperType;
@@ -770,72 +724,6 @@ where
         }
     }
 }
-
-// fn make_spacing<TS>(
-//     node_store: &mut hyperast::store::nodes::legion::NodeStoreInner,
-//     label_store: &mut hyperast::store::labels::LabelStore,
-//     dedup: &mut hyperast::store::nodes::legion::DedupInner,
-//     kind: TS::Ty,
-//     spacing: &str,
-//     f: impl FnOnce(&mut hyperast::store::nodes::legion::dyn_builder::EntityBuilder),
-// ) -> (NodeIdentifier, SubTreeMetrics<SyntaxNodeHashs<u32>>)
-// where
-//     TS: types::TypeStore,
-// {
-//     let interned_kind = TS::intern(kind);
-//     debug_assert_eq!(kind, TS::resolve(interned_kind));
-//     let bytes_len = spacing.as_bytes().len();
-//     let line_count = spacing
-//         .matches("\n")
-//         .count()
-//         .to_u32()
-//         .expect("too many newlines");
-//     let spacing_id = label_store.get_or_insert(spacing);
-//     let hbuilder: HashesBuilder<SyntaxNodeHashs<u32>> =
-//         HashesBuilder::new(Default::default(), &interned_kind, &spacing, 1);
-//     let hsyntax = hbuilder.most_discriminating();
-//     let hashable = &hsyntax;
-//     let eq = |x: hyperast::store::nodes::legion::EntryRef| {
-//         let t = x.get_component::<TS::Ty>();
-//         if t != Ok(&interned_kind) {
-//             return false;
-//         }
-//         let l = x.get_component::<LabelIdentifier>();
-//         if l != Ok(&spacing_id) {
-//             return false;
-//         }
-//         true
-//     };
-//     let insertion = node_store.prepare_insertion(dedup, &hashable, eq);
-//     let mut hashs = hbuilder.build();
-//     hashs.structt = 0;
-//     hashs.label = 0;
-//     let compressed_node = if let Some(id) = insertion.occupied_id() {
-//         id
-//     } else {
-//         use hyperast::store::nodes::compo;
-//         let vacant = insertion.vacant();
-//         let mut dyn_builder = subtree_builder::<TS>(interned_kind);
-//         dyn_builder.add(compo::BytesLen(bytes_len.try_into().unwrap()));
-//         dyn_builder.add(spacing_id);
-//         dyn_builder.add(hashs);
-//         dyn_builder.add(BloomSize::None);
-//         if line_count != 0 {
-//             dyn_builder.add(compo::LineCount(line_count));
-//         }
-//         f(&mut dyn_builder);
-
-//         NodeStore::insert_built_after_prepare(vacant, dyn_builder.build())
-//     };
-//     let metrics = SubTreeMetrics {
-//         size: 1,
-//         height: 0,
-//         size_no_spaces: 0,
-//         hashs,
-//         line_count,
-//     };
-//     (compressed_node, metrics)
-// }
 
 impl<'stores, TS, More, const HIDDEN_NODES: bool> TreeGen
     for JavaTreeGen<'stores, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>

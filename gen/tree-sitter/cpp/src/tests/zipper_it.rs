@@ -1,5 +1,5 @@
 //! Test the traversal of the tree-sitter CST with the Zipped iterator.
-use hyperast::tree_gen::TotalBytesGlobalData as _;
+use hyperast::tree_gen::{Accumulator as _, TotalBytesGlobalData as _};
 
 use crate::legion::tree_sitter_parse;
 
@@ -31,13 +31,7 @@ pub(crate) fn cpp_parsing_error_it_test() {
     if let Some(spacing) = spacing {
         global.down();
         global.set_sum_byte_length(init.start_byte);
-        hyperast::tree_gen::Accumulator::push(
-            &mut init,
-            hyperast::full::FullNode {
-                global: global.simple(),
-                local: tree_gen.make_spacing(spacing),
-            },
-        );
+        init.push(tree_gen.make_space(&global, &spacing));
         global.right();
     }
     let mut stack = init.into();

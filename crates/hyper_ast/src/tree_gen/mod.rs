@@ -37,9 +37,7 @@ pub trait Accumulator {
 }
 
 pub trait WithByteRange {
-    fn has_children(&self) -> bool {
-        todo!()
-    }
+    fn has_children(&self) -> bool;
     fn begin_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
 }
@@ -272,6 +270,7 @@ impl GlobalData for BasicGlobalData {
 }
 pub trait TotalBytesGlobalData {
     fn set_sum_byte_length(&mut self, sum_byte_length: usize);
+    fn sum_byte_length(&self) -> usize;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -360,6 +359,9 @@ impl<GD> TotalBytesGlobalData for SpacedGlobalData<'_, GD> {
         );
         self.sum_byte_length = sum_byte_length;
     }
+    fn sum_byte_length(&self) -> usize {
+        self.sum_byte_length
+    }
 }
 
 impl<GD: GlobalData> GlobalData for SpacedGlobalData<'_, GD> {
@@ -395,6 +397,17 @@ mod global_stats {
     impl<GD: TotalBytesGlobalData> TotalBytesGlobalData for StatsGlobalData<GD> {
         fn set_sum_byte_length(&mut self, sum_byte_length: usize) {
             self.inner.set_sum_byte_length(sum_byte_length)
+        }
+        fn sum_byte_length(&self) -> usize {
+            self.inner.sum_byte_length()
+        }
+    }
+
+    impl<GD> std::ops::Deref for StatsGlobalData<GD> {
+        type Target = GD;
+
+        fn deref(&self) -> &Self::Target {
+            &self.inner
         }
     }
 
@@ -691,12 +704,8 @@ pub fn try_compute_indentation<'a>(
     }
 }
 
-pub fn get_spacing(
-    padding_start: usize,
-    pos: usize,
-    text: &[u8],
-    _parent_indentation: &Spaces,
-) -> Option<Vec<u8>> {
+// TODO return a slice
+pub fn get_spacing(padding_start: usize, pos: usize, text: &[u8]) -> Option<Vec<u8>> {
     // TODO change debug assert to assert if you want to strictly enforce spaces, issues with other char leaking is often caused by "bad" grammar.
     if padding_start != pos {
         let spaces = &text[padding_start..pos];
@@ -765,6 +774,63 @@ pub fn newline_count(label: &Option<impl AsRef<str>>) -> u32 {
     };
     let r = label.as_ref().matches("\n").count();
     num::ToPrimitive::to_u32(&r).expect("too many newlines")
+}
+
+pub fn handle_file_bounds<G>(
+    g: &mut G,
+    text: &[u8],
+    xx: <G as ZippedTreeGen>::TreeCursor<'_>,
+    global: &mut <G as TreeGen>::Global,
+    init: <G as TreeGen>::Acc,
+    mut make_space: impl FnMut(
+        &mut G,
+        &<G as TreeGen>::Global,
+        &[u8],
+    ) -> <<G as TreeGen>::Acc as Accumulator>::Node,
+) -> <G as TreeGen>::Acc
+where
+    G: ZippedTreeGen<Text = [u8]>,
+    G::Global: TotalBytesGlobalData,
+    <G as TreeGen>::Acc: Accumulator + WithByteRange,
+{
+    _handle_file_bounds(g, text, xx, global, init, |g, global, text, acc| {
+        let node = make_space(g, global, text);
+        acc.push(node);
+    })
+}
+
+#[doc(hidden)]
+pub fn _handle_file_bounds<G>(
+    g: &mut G,
+    text: &[u8],
+    mut xx: <G as ZippedTreeGen>::TreeCursor<'_>,
+    global: &mut <G as TreeGen>::Global,
+    mut init: <G as TreeGen>::Acc,
+    mut make_space: impl FnMut(&mut G, &<G as TreeGen>::Global, &[u8], &mut <G as TreeGen>::Acc),
+) -> <G as TreeGen>::Acc
+where
+    G: ZippedTreeGen<Text = [u8]>,
+    G::Global: TotalBytesGlobalData,
+    <G as TreeGen>::Acc: Accumulator + WithByteRange,
+{
+    let spacing = get_spacing(global.sum_byte_length(), init.begin_byte(), text);
+    if let Some(spacing) = spacing {
+        global.down();
+        global.set_sum_byte_length(init.begin_byte());
+        make_space(g, global, &spacing, &mut init);
+        global.right();
+    }
+    let mut stack = init.into();
+    g.r#gen(text, &mut stack, &mut xx, global);
+    let mut acc = stack.finalize();
+    if has_final_space(&0, global.sum_byte_length(), text) {
+        let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
+        if let Some(spacing) = spacing {
+            global.right();
+            make_space(g, global, &spacing, &mut acc);
+        }
+    }
+    acc
 }
 
 pub fn hash32<T: ?Sized + std::hash::Hash>(t: &T) -> u32 {

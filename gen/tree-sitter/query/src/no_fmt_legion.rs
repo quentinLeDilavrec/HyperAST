@@ -229,15 +229,26 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
         let init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
-
+        use hyperast::tree_gen::GlobalData;
+        let padding_start = global.sum_byte_length();
+        let pos = init.begin_byte();
+        if padding_start != pos {
+            use hyperast::tree_gen::TotalBytesGlobalData;
+            global.down();
+            global.set_sum_byte_length(pos);
+            global.right();
+        }
         let mut stack = init.into();
-
         self.r#gen(text, &mut stack, &mut xx, &mut global);
-
         let acc = stack.finalize();
-
+        if hyperast::tree_gen::has_final_space(&0, global.sum_byte_length(), text) {
+            let padding_start = global.sum_byte_length();
+            let pos = text.len();
+            if padding_start != pos {
+                global.right();
+            }
+        }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-
         self.make(&mut global, acc, label)
     }
 }

@@ -10,19 +10,20 @@ use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::eq_node;
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen;
+use hyperast::tree_gen::TotalBytesGlobalData as _;
 use hyperast::tree_gen::TsType;
 use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::tree_gen::handle_file_bounds;
 use hyperast::tree_gen::parser::Node as _;
 use hyperast::tree_gen::parser::TreeCursor;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
 use hyperast::tree_gen::{AccIndentation, Accumulator, WithByteRange};
 use hyperast::tree_gen::{BasicAccumulator, RoleAcc, SubTreeMetrics};
 use hyperast::tree_gen::{BasicGlobalData, NoOpMore};
-use hyperast::tree_gen::{GlobalData as _, TotalBytesGlobalData as _};
 use hyperast::tree_gen::{Parents, PreResult};
 use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
-use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+use hyperast::tree_gen::{compute_indentation, get_spacing};
 
 use hyperast::full::FullNode;
 use hyperast::nodes::Space;
@@ -396,12 +397,8 @@ where
             }
         }
         if let Some(spacing) = spacing {
-            let local = self.make_spacing(spacing);
             // debug_assert_ne!(parent.simple.children.len(), 0, "{:?}", parent.simple);
-            acc_node(FullNode {
-                global: global.simple(),
-                local,
-            });
+            acc_node(self.make_space(global, &spacing));
         }
         let label = if acc.labeled {
             std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
@@ -506,12 +503,24 @@ where
             _p: std::marker::PhantomData,
         }
     }
-    pub(crate) fn make_spacing(&mut self, spacing: Vec<u8>) -> Local {
+
+    pub(crate) fn make_space(
+        &mut self,
+        global: &<Self as TreeGen>::Global,
+        spacing: &[u8],
+    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+        FullNode {
+            global: global.simple(),
+            local: self.make_spacing(spacing),
+        }
+    }
+
+    pub(crate) fn make_spacing(&mut self, spacing: &[u8]) -> Local {
         let kind = Type::Spaces;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
 
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(spacing).unwrap().to_string();
 
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
@@ -573,43 +582,16 @@ where
         cursor: tree_sitter::TreeCursor,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
-        let mut init = self.init_val(text, &TNode(cursor.node()));
-        let mut xx = TTreeCursor(cursor);
-
-        let spacing = get_spacing(init.padding_start, init.start_byte, text);
-        if let Some(spacing) = spacing {
-            global.down();
-            global.set_sum_byte_length(init.start_byte);
-            init.push(FullNode {
-                global: global.simple(),
-                local: self.make_spacing(spacing),
-            });
-            global.right();
-        }
-        let mut stack = init.into();
-
-        self.r#gen(text, &mut stack, &mut xx, &mut global);
-
-        let mut acc = stack.finalize();
-
-        if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
-            if let Some(spacing) = spacing {
-                global.right();
-                acc.push(FullNode {
-                    global: global.simple(),
-                    local: self.make_spacing(spacing),
-                });
-            }
-        }
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
-
+        let init = self.init_val(text, &TNode(cursor.node()));
+        let xx = TTreeCursor(cursor);
+        debug_assert_eq!(global.sum_byte_length(), init.padding_start);
+        let mut acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
         use hyperast::types::HyperType;
         if !acc.simple.kind.is_file() {
             log::warn!("ignoring parsing error at the root of the file");
             acc.simple.kind = Type::TranslationUnit;
         }
-
+        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
         self.make(&mut global, acc, label)
     }
 }

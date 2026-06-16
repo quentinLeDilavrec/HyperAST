@@ -95,6 +95,9 @@ impl hyperast::tree_gen::TotalBytesGlobalData for GlobalDataMock {
     fn set_sum_byte_length(&mut self, sum_byte_length: usize) {
         self.sum_byte_length = sum_byte_length;
     }
+    fn sum_byte_length(&self) -> usize {
+        self.sum_byte_length
+    }
 }
 impl hyperast::tree_gen::AccIndentation for AccMock {
     fn indentation(&self) -> &hyperast::tree_gen::Spaces {

@@ -12,7 +12,7 @@ use hyperast::store::nodes::legion::NodeIdentifier;
 use hyperast::store::nodes::legion::{eq_node, subtree_builder};
 use hyperast::tree_gen;
 use hyperast::tree_gen::BasicGlobalData;
-use hyperast::tree_gen::GlobalData as _;
+use hyperast::tree_gen::handle_file_bounds;
 use hyperast::tree_gen::parser::Node as _;
 use hyperast::tree_gen::parser::TreeCursor;
 use hyperast::tree_gen::utils_ts::TTreeCursor;
@@ -21,7 +21,7 @@ use hyperast::tree_gen::{BasicAccumulator, SubTreeMetrics};
 use hyperast::tree_gen::{Parents, PreResult};
 use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
-use hyperast::tree_gen::{compute_indentation, get_spacing, has_final_space};
+use hyperast::tree_gen::{compute_indentation, get_spacing};
 use hyperast::types::LabelStore as LabelStoreTrait;
 
 use crate::TNode;
@@ -215,10 +215,7 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if let Some(spacing) = spacing {
-            acc_node(FullNode {
-                global: global.simple(),
-                local: self.make_spacing(spacing),
-            });
+            acc_node(self.make_space(global, &spacing));
         }
         let label = if acc.labeled {
             std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
@@ -232,7 +229,18 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> ZippedTreeGen for TsTreeGen<'store,
 }
 
 impl<'store, 'cache, TS: TsEnabledTypeStore> TsTreeGen<'store, 'cache, TS> {
-    fn make_spacing(&mut self, spacing: Vec<u8>) -> Local {
+    pub(crate) fn make_space(
+        &mut self,
+        global: &<Self as TreeGen>::Global,
+        spacing: &[u8],
+    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+        FullNode {
+            global: global.simple(),
+            local: self.make_spacing(spacing),
+        }
+    }
+
+    fn make_spacing(&mut self, spacing: &[u8]) -> Local {
         let kind = Type::Spaces;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
@@ -288,35 +296,9 @@ impl<'store, 'cache, TS: TsEnabledTypeStore> TsTreeGen<'store, 'cache, TS> {
         cursor: tree_sitter::TreeCursor,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let mut global = Global::from(TextedGlobalData::new(Default::default(), text));
-        let mut init = self.init_val(text, &TNode(cursor.node()));
-        let mut xx = TTreeCursor(cursor);
-
-        let spacing = get_spacing(init.padding_start, init.start_byte, text);
-        if let Some(spacing) = spacing {
-            global.down();
-            init.start_byte = 0;
-            init.push(FullNode {
-                global: global.simple(),
-                local: self.make_spacing(spacing),
-            });
-            global.right();
-        }
-        let mut stack = init.into();
-
-        self.r#gen(text, &mut stack, &mut xx, &mut global);
-
-        let mut acc = stack.finalize();
-
-        if has_final_space(&0, global.sum_byte_length(), text) {
-            let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
-            if let Some(spacing) = spacing {
-                global.right();
-                acc.push(FullNode {
-                    global: global.simple(),
-                    local: self.make_spacing(spacing),
-                });
-            }
-        }
+        let init = self.init_val(text, &TNode(cursor.node()));
+        let xx = TTreeCursor(cursor);
+        let acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
         let full_node = self.make(&mut global, acc, label);
         full_node

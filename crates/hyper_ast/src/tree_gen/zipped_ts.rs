@@ -27,14 +27,13 @@ use super::parser::TreeCursor as _;
 use super::utils_ts::TNode;
 use super::utils_ts::TTreeCursor;
 use super::utils_ts::make_leaf;
-use super::{AccIndentation, Accumulator, WithByteRange};
+use super::{Accumulator, WithByteRange};
 use super::{BasicAccumulator, SubTreeMetrics};
 use super::{BasicGlobalData, GlobalData, Spaces, TotalBytesGlobalData as _};
 use super::{Parents, PreResult};
 use super::{RoleAcc, add_md_precomp_queries};
 use super::{SpacedGlobalData, TextedGlobalData};
 use super::{ZippedTreeGen, get_spacing};
-use super::{compute_indentation, has_final_space};
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 
@@ -107,7 +106,6 @@ pub struct Acc<T> {
     end_byte: usize,
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
     padding_start: usize,
-    indentation: Spaces,
     role: RoleAcc<Role>,
 
     // # non ts specific
@@ -119,12 +117,6 @@ impl<T> Accumulator for Acc<T> {
     type Node = FNode<T>;
     fn push(&mut self, full_node: Self::Node) {
         full_node.local.acc(self);
-    }
-}
-
-impl<T> AccIndentation for Acc<T> {
-    fn indentation(&self) -> &Spaces {
-        &self.indentation
     }
 }
 
@@ -177,7 +169,6 @@ impl<T: Debug> Debug for Acc<T> {
             .field("end_byte", &self.end_byte)
             .field("metrics", &self.metrics)
             .field("padding_start", &self.padding_start)
-            .field("indentation", &self.indentation)
             .finish()
     }
 }
@@ -260,14 +251,6 @@ impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
     }
 }
 
-impl<TS, More> TsTreeGen<'_, '_, TS, More>
-where
-    TS: TsEnableTS,
-    TS::Ty2: TsType,
-    More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
-{
-}
-
 impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
     TS: TsEnableTS,
@@ -285,15 +268,6 @@ where
 
     fn init_val(&mut self, text: &[u8], node: &Self::Node<'_>) -> Self::Acc {
         let kind = TS::obtain_type(node);
-        let parent_indentation = Space::try_format_indentation(&self.line_break)
-            .unwrap_or_else(|| vec![Space::Space; self.line_break.len()]);
-        let indent = compute_indentation(
-            &self.line_break,
-            text,
-            node.start_byte(),
-            0,
-            &parent_indentation,
-        );
         let labeled = node.has_label();
         Acc {
             simple: BasicAccumulator::new(kind),
@@ -303,7 +277,6 @@ where
             end_byte: node.end_byte(),
             metrics: Default::default(),
             padding_start: 0,
-            indentation: indent,
             role: Default::default(),
             precomp_queries: Default::default(),
         }
@@ -367,22 +340,13 @@ where
         stack: &Parents<Self::Acc>,
         global: &mut Self::Global,
     ) -> Self::Acc {
-        let parent_indentation = &stack.parent().unwrap().indentation();
         let kind = TS::obtain_type(node);
-        let indentation = compute_indentation(
-            &self.line_break,
-            text,
-            node.start_byte(),
-            global.sum_byte_length(),
-            parent_indentation,
-        );
         Acc {
             labeled: node.has_label(),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
             metrics: Default::default(),
             padding_start: global.sum_byte_length(),
-            indentation,
             simple: BasicAccumulator::new(kind),
             no_space: vec![],
             role: Default::default(),

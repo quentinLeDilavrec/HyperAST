@@ -448,7 +448,7 @@ pub use global_stats::StatsGlobalData;
 pub trait TreeGen {
     /// Container holding data waiting to be added to the HyperAST
     /// Note: needs WithByteRange to handle hidden node properly, it allows to go back up without using the cursor. When Treesitter is "fixed" change that
-    type Acc: AccIndentation + WithByteRange;
+    type Acc: Accumulator + WithByteRange;
 
     /// Container holding global data used during generation.
     ///

@@ -19,8 +19,7 @@ pub use types::TType;
 cfg_if::cfg_if! { if #[cfg(feature = "legion")] {
     pub mod legion;
 
-    #[cfg(test)]
-    mod legion_ts_simp;
+    pub mod legion_ts_simp;
 
     pub use hyperast::tree_gen::utils_ts::TNode;
 

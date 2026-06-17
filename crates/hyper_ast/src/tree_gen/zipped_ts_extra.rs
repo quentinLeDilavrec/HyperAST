@@ -11,31 +11,34 @@ use crate::nodes::Space;
 use crate::store::SimpleStores;
 use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
+use crate::store::nodes::legion::DedupMap;
+use crate::store::nodes::legion::NodeIdentifier;
 use crate::store::nodes::legion::RawHAST;
 use crate::store::nodes::legion::eq_node;
-use crate::store::nodes::legion::{DedupMap, NodeIdentifier};
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
-use crate::tree_gen::{LocalAcc, handle_file_bounds};
-use crate::tree_gen::{TsEnableTS, TsType};
+
 use crate::types::LabelStore as _;
 use crate::types::Role;
 use crate::types::{ETypeStore, HyperType};
 
+use super::LocalAcc;
 use super::RoleAcc;
 use super::TreeGen;
 use super::ZippedTreeGen;
 use super::add_md_precomp_queries;
 use super::get_spacing;
+use super::handle_file_bounds;
 use super::parser::Node as _;
 use super::parser::TreeCursor as _;
+use super::utils_ts::_make_leaf;
 use super::utils_ts::TNode;
 use super::utils_ts::TTreeCursor;
-use super::utils_ts::make_leaf;
 use super::{Accumulator, WithByteRange};
 use super::{BasicAccumulator, SubTreeMetrics};
 use super::{BasicGlobalData, GlobalData, Spaces, TotalBytesGlobalData as _};
 use super::{Parents, PreResult};
 use super::{SpacedGlobalData, TextedGlobalData};
+use super::{TsEnableTS, TsType};
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 
@@ -182,8 +185,17 @@ pub trait Extra<HAST: crate::types::StoreRefAssoc, Acc: Accumulator> {
         + WithByteRange
         + From<Acc>;
     type Node: From<Acc::Node>;
-    fn node(node: <Acc as Accumulator>::Node) -> Self::Node;
-    fn node_with_acc(node: <Acc as Accumulator>::Node, acc: Self::Acc) -> Self::Node;
+    fn from_cache(
+        &mut self,
+        id: HAST::IdN,
+        node: impl FnOnce() -> <Acc as Accumulator>::Node,
+    ) -> Self::Node;
+    fn to_cache(
+        &mut self,
+        id: HAST::IdN,
+        node: <Acc as Accumulator>::Node,
+        acc: Self::Acc,
+    ) -> Self::Node;
 }
 
 #[derive(Default)]
@@ -195,44 +207,29 @@ impl std::ops::AddAssign for EmptyExtra {
 
 impl<HAST: crate::types::StoreRefAssoc, Acc> Extra<HAST, Acc> for NoOpExtra<HAST::TS, Acc>
 where
-    Acc: Accumulator,
+    Acc: Accumulator<Node = FNode<Local>>,
     Acc: WithByteRange,
 {
     type Acc = super::AccWithExtra<Acc, EmptyExtra>;
     type Node = <Self::Acc as Accumulator>::Node;
-
-    fn node(node: <Acc as Accumulator>::Node) -> Self::Node {
-        node.into()
+    fn from_cache(
+        &mut self,
+        _id: HAST::IdN,
+        otherwise: impl FnOnce() -> <Acc as Accumulator>::Node,
+    ) -> Self::Node {
+        // not caching
+        otherwise().into()
     }
 
-    fn node_with_acc(node: <Acc as Accumulator>::Node, _acc: Self::Acc) -> Self::Node {
+    fn to_cache(
+        &mut self,
+        _id: HAST::IdN,
+        node: <Acc as Accumulator>::Node,
+        acc: Self::Acc,
+    ) -> Self::Node {
         (node, EmptyExtra).into()
     }
 }
-
-// impl<Local> From<FNode<Local>> for FNode<Local, EmptyExtra> {
-//     fn from(node: FNode<Local>) -> Self {
-//         FNode {
-//             global: node.global,
-//             local: LocalWithExtra {
-//                 local: node.local,
-//                 extra: EmptyExtra,
-//             },
-//         }
-//     }
-// }
-
-// impl<Acc, Local> From<(FNode<Local>, Acc)> for FNode<LocalWithExtra<Local, EmptyExtra>> {
-//     fn from((node, acc): (FNode<Local>, Acc)) -> Self {
-//         FNode {
-//             global: node.global,
-//             local: LocalWithExtra {
-//                 local: node.local,
-//                 extra: EmptyExtra,
-//             },
-//         }
-//     }
-// }
 
 impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
     pub fn with_preprocessing(
@@ -455,23 +452,47 @@ where
         let node_store = &mut self.stores.node_store.inner;
         let label_store = &mut self.stores.label_store;
         let line_break = &self.line_break;
-        let (compressed_node, metrics) = make_leaf::<TS>(
+        let f = |h: crate::hashed::HashesBuilder<crate::hashed::SyntaxNodeHashs<u32>>| {
+            use crate::hashed::MetaDataHashsBuilder;
+            let mut h = h.build();
+            h.structt = 0;
+            h.label = 0;
+            h
+        };
+        let (id, res) = _make_leaf::<TS>(
             node_store,
             label_store,
             dedup,
             line_break,
             interned_kind,
             &spacing,
+            f,
             |_| {},
         );
-        More::node(FullNode {
+        let node = |hashs, line_count| FullNode {
             global: global.simple(),
             local: Local {
-                compressed_node,
-                metrics,
+                compressed_node: id,
+                metrics: super::SubTreeMetrics {
+                    size: 1,
+                    height: 0,
+                    size_no_spaces: 0,
+                    hashs,
+                    line_count,
+                },
                 role: None,
             },
-        })
+        };
+        match res {
+            Ok((hashs, line_count)) => self.more.from_cache(id, || node(hashs, line_count)),
+            Err(hashs) => self.more.from_cache(id, || {
+                let line_count = spacing
+                    .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
+                    .count();
+                let line_count = num::cast(line_count).expect("too many newlines");
+                node(hashs(), line_count)
+            }),
+        }
     }
 
     pub fn generate_file(
@@ -547,8 +568,7 @@ where
             //     metrics: metrics.map_hashs(|h| h.build()),
             //     role: acc.role.current,
             // }
-
-            More::node(FullNode {
+            self.more.from_cache(compressed_node, move || FullNode {
                 global: global.simple(),
                 local: Local {
                     compressed_node,
@@ -604,13 +624,14 @@ where
             }
             .add_primary(&mut dyn_builder, interned_kind, label_id);
 
-            let compressed_node = vacant.insert_built(dyn_builder.build());
+            let id = vacant.insert_built(dyn_builder.build());
 
-            More::node_with_acc(
+            self.more.to_cache(
+                id,
                 FullNode {
                     global: global.simple(),
                     local: Local {
-                        compressed_node,
+                        compressed_node: id,
                         metrics,
                         role: current_role,
                     },

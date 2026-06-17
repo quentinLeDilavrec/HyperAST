@@ -25,6 +25,31 @@ fn medium() {
 }
 
 #[test]
+fn medium_extra_bare() {
+    type CppGen<'store, 'b, More> =
+        tree_gen::zipped_ts_extra::TsTreeGen<'store, 'b, TStore, More, true>;
+    let mut stores = Default::default();
+    let mut more = tree_gen::zipped_ts_extra::NoOpExtra::<
+        TStore,
+        tree_gen::zipped_ts_extra::Acc<Type>,
+    >::default();
+    let mut r#gen = CppGen::with_preprocessing(&mut stores, &mut more);
+    let text = EXAMPLE_SPACING;
+    let tree = utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language());
+    eprintln!("{}", tree.root_node().to_sexp());
+    let name = b"";
+    let f = r#gen.generate_file(name, text.as_bytes(), tree.walk());
+    let id = f.local.compressed_node;
+    println!("{}", SyntaxSerializer::new(&stores, id));
+    type SerWithRoles<'a, IdN, HAST> =
+        hyperast::nodes::SimpleSerializer<'a, IdN, HAST, true, false, false, false, true>;
+    println!("{}", SerWithRoles::new(&stores, id));
+    println!("\n{}", TextSerializer::new(&stores, id));
+    assert_eq!(text, TextSerializer::new(&stores, id).to_string());
+    dbg!(&f.local.metrics);
+}
+
+#[test]
 fn not_simple() {
     let mut stores = SimpleStores::<TStore>::default();
     let mut md_cache = Default::default();

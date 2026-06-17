@@ -159,88 +159,137 @@ impl<'acc, T> super::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
-// impl<'store, 'cache, TS: TsEnableTS>
-//     TsTreeGen<'store, 'cache, TS, super::NoOpMore<TS, Acc<TS::Ty2>>, true>
-// where
-//     TS::Ty2: TsType,
-// {
-//     pub fn new(stores: &'store mut SimpleStores<TS>, md_cache: &'cache mut MDCache) -> Self {
-//         Self::with_preprocessing(stores, md_cache, Default::default())
-//     }
-// }
+#[repr(transparent)]
+pub struct NoOpExtra<T, Acc> {
+    md_cache: HashMap<NodeIdentifier, ()>,
+    _phantom: std::marker::PhantomData<(T, Acc)>,
+}
 
-// impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
-//     pub fn with_preprocessing(
-//         stores: &'stores mut SimpleStores<TS>,
-//         md_cache: &'cache mut MDCache,
-//         more: More,
-//     ) -> Self {
-//         Self {
-//             line_break: "\n".as_bytes().to_vec(),
-//             dedup: None,
-//             stores,
-//             md_cache,
-//             more,
-//         }
-//     }
-//     /// Replaces the default dedup map when deriving different data.
-//     /// Be cautious when replacing the default dedup map,
-//     /// as it breaks the referential equlity being equivalent to the structural equality.
-//     /// Otherwise, everything else is great !
-//     /// In the future use multiple dedup maps when we can guarantee valid nesting,
-//     ///   e.g., additional Derived Data on files can reuse subtrees of things inside files, but directories and files must be added without merging with the others
-//     ///    (it should also be possible to compute markers to provide similar guarantees, e.g. a DD only on classes can reuse children that do not contain classes).
-//     /// Could also make the eq consider the derived data, but to avoid breaking the incrementality we would still need some kind of marker for each context
-//     pub fn with_preprocessing_and_dedup(
-//         stores: &'stores mut SimpleStores<TS>,
-//         dedup: &'stores mut DedupMap,
-//         md_cache: &'cache mut MDCache,
-//         more: More,
-//     ) -> Self {
-//         Self {
-//             line_break: "\n".as_bytes().to_vec(),
-//             dedup: Some(dedup),
-//             stores,
-//             md_cache,
-//             more,
-//         }
-//     }
-// }
+impl<T, Acc> Default for NoOpExtra<T, Acc> {
+    fn default() -> Self {
+        Self {
+            md_cache: HashMap::default(),
+            _phantom: Default::default(),
+        }
+    }
+}
 
-// impl<'stores, 'cache, TS, More, const HIDDEN_NODES: bool>
-//     TsTreeGen<'stores, 'cache, TS, More, HIDDEN_NODES>
-// {
-//     pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
-//         TsTreeGen {
-//             line_break,
-//             dedup: self.dedup,
-//             stores: self.stores,
-//             md_cache: self.md_cache,
-//             more: self.more,
-//         }
-//     }
-// }
-
-// impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
-//     pub fn without_hidden_nodes(self) -> TsTreeGen<'stores, 'cache, TS, More, false> {
-//         TsTreeGen {
-//             line_break: self.line_break,
-//             dedup: self.dedup,
-//             stores: self.stores,
-//             md_cache: self.md_cache,
-//             more: self.more,
-//         }
-//     }
-// }
-
-pub trait Extra<HAST: crate::types::StoreRefAssoc, Acc: super::LocalAcc> {
+pub trait Extra<HAST: crate::types::StoreRefAssoc, Acc: Accumulator> {
     type Acc: std::ops::Deref<Target = Acc>
         + std::ops::DerefMut
         + super::WithExtra
         + Accumulator<Node = Self::Node>
         + WithByteRange
         + From<Acc>;
-    type Node: From<FNode<Acc::Local>>;
+    type Node: From<Acc::Node>;
+    fn node(node: <Acc as Accumulator>::Node) -> Self::Node;
+    fn node_with_acc(node: <Acc as Accumulator>::Node, acc: Self::Acc) -> Self::Node;
+}
+
+#[derive(Default)]
+pub struct EmptyExtra;
+
+impl std::ops::AddAssign for EmptyExtra {
+    fn add_assign(&mut self, _: Self) {}
+}
+
+impl<HAST: crate::types::StoreRefAssoc, Acc> Extra<HAST, Acc> for NoOpExtra<HAST::TS, Acc>
+where
+    Acc: Accumulator,
+    Acc: WithByteRange,
+{
+    type Acc = super::AccWithExtra<Acc, EmptyExtra>;
+    type Node = <Self::Acc as Accumulator>::Node;
+
+    fn node(node: <Acc as Accumulator>::Node) -> Self::Node {
+        node.into()
+    }
+
+    fn node_with_acc(node: <Acc as Accumulator>::Node, _acc: Self::Acc) -> Self::Node {
+        (node, EmptyExtra).into()
+    }
+}
+
+// impl<Local> From<FNode<Local>> for FNode<Local, EmptyExtra> {
+//     fn from(node: FNode<Local>) -> Self {
+//         FNode {
+//             global: node.global,
+//             local: LocalWithExtra {
+//                 local: node.local,
+//                 extra: EmptyExtra,
+//             },
+//         }
+//     }
+// }
+
+// impl<Acc, Local> From<(FNode<Local>, Acc)> for FNode<LocalWithExtra<Local, EmptyExtra>> {
+//     fn from((node, acc): (FNode<Local>, Acc)) -> Self {
+//         FNode {
+//             global: node.global,
+//             local: LocalWithExtra {
+//                 local: node.local,
+//                 extra: EmptyExtra,
+//             },
+//         }
+//     }
+// }
+
+impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
+    pub fn with_preprocessing(
+        stores: &'stores mut SimpleStores<TS>,
+        more: &'cache mut More,
+    ) -> Self {
+        Self {
+            line_break: "\n".as_bytes().to_vec(),
+            dedup: None,
+            stores,
+            more,
+        }
+    }
+    /// Replaces the default dedup map when deriving different data.
+    /// Be cautious when replacing the default dedup map,
+    /// as it breaks the referential equality being equivalent to the structural equality.
+    /// Otherwise, everything else is great !
+    /// In the future use multiple dedup maps when we can guarantee valid nesting,
+    ///   e.g., additional Derived Data on files can reuse subtrees of things inside files, but directories and files must be added without merging with the others
+    ///    (it should also be possible to compute markers to provide similar guarantees, e.g. a DD only on classes can reuse children that do not contain classes).
+    /// Could also make the eq consider the derived data, but to avoid breaking the incrementality we would still need some kind of marker for each context
+    pub fn with_extra_and_dedup(
+        stores: &'stores mut SimpleStores<TS>,
+        dedup: &'stores mut DedupMap,
+        more: &'cache mut More,
+    ) -> Self {
+        Self {
+            line_break: "\n".as_bytes().to_vec(),
+            dedup: Some(dedup),
+            stores,
+            more,
+        }
+    }
+}
+
+impl<'stores, 'cache, TS, More, const HIDDEN_NODES: bool>
+    TsTreeGen<'stores, 'cache, TS, More, HIDDEN_NODES>
+{
+    pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
+        TsTreeGen {
+            line_break,
+            dedup: self.dedup,
+            stores: self.stores,
+            more: self.more,
+        }
+    }
+}
+
+impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
+    pub fn without_hidden_nodes(self) -> TsTreeGen<'stores, 'cache, TS, More, false> {
+        TsTreeGen {
+            line_break: self.line_break,
+            dedup: self.dedup,
+            stores: self.stores,
+            more: self.more,
+        }
+    }
 }
 
 impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
@@ -415,15 +464,14 @@ where
             &spacing,
             |_| {},
         );
-        FullNode {
+        More::node(FullNode {
             global: global.simple(),
             local: Local {
                 compressed_node,
                 metrics,
                 role: None,
             },
-        }
-        .into()
+        })
     }
 
     pub fn generate_file(
@@ -482,11 +530,11 @@ where
         let dedup = dedup.map_or(&mut node_store.dedup, |x| &mut x.0);
         let insertion = node_store.inner.prepare_insertion(dedup, hashable, eq);
 
-        let local = if let Some(compressed_node) = insertion.occupied_id() {
-            let mut metrics = metrics.map_hashs(|h| h.build());
-            let own_line_count = super::newline_count(&label);
-            metrics.line_count += own_line_count;
-
+        if let Some(compressed_node) = insertion.occupied_id() {
+            assert_eq!(super::newline_count(&label), 0);
+            // let mut metrics = metrics.map_hashs(|h| h.build());
+            // let own_line_count = super::newline_count(&label);
+            // metrics.line_count += own_line_count;
             // let md = self.md_cache.get(&compressed_node).unwrap();
             // debug_assert_eq!(metrics.height, md.metrics.height);
             // debug_assert_eq!(metrics.size, md.metrics.size);
@@ -494,11 +542,20 @@ where
             // debug_assert_eq!(metrics.hashs.build(), md.metrics.hashs);
             // let metrics = md.metrics;
             // let precomp_queries = md.precomp_queries;
-            Local {
-                compressed_node,
-                metrics,
-                role: acc.role.current,
-            }
+            // Local {
+            //     compressed_node,
+            //     metrics: metrics.map_hashs(|h| h.build()),
+            //     role: acc.role.current,
+            // }
+
+            More::node(FullNode {
+                global: global.simple(),
+                local: Local {
+                    compressed_node,
+                    metrics: metrics.map_hashs(|h| h.build()),
+                    role: acc.role.current,
+                },
+            })
         } else {
             let mut metrics = metrics.map_hashs(|h| h.build());
             let own_line_count = super::newline_count(&label);
@@ -549,17 +606,17 @@ where
 
             let compressed_node = vacant.insert_built(dyn_builder.build());
 
-            Local {
-                compressed_node,
-                metrics,
-                role: current_role,
-            }
-        };
-
-        FullNode {
-            global: global.simple(),
-            local,
+            More::node_with_acc(
+                FullNode {
+                    global: global.simple(),
+                    local: Local {
+                        compressed_node,
+                        metrics,
+                        role: current_role,
+                    },
+                },
+                acc,
+            )
         }
-        .into()
     }
 }

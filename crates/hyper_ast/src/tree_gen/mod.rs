@@ -896,6 +896,15 @@ impl<T, Acc> Default for NoOpMore<T, Acc> {
     }
 }
 
+pub trait WithExtra {
+    type Extra;
+    fn extra(&mut self) -> &mut Self::Extra;
+}
+
+pub struct AccWithExtra<Acc, Extra>(Acc, Extra);
+
+mod extra;
+
 impl<HAST, Acc> More<HAST> for NoOpMore<HAST::TS, Acc>
 where
     HAST: HyperAST + for<'a> types::StoreRefAssoc,

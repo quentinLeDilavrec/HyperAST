@@ -23,8 +23,7 @@ pub mod tsg;
 #[cfg(feature = "impl")]
 pub mod usage;
 
-#[cfg(feature = "impl")]
-#[cfg(test)]
+#[cfg(all(test, feature = "impl"))]
 mod tests;
 
 pub use hyperast::utils;
@@ -34,6 +33,9 @@ pub use hyperast::tree_gen::utils_ts::TNode;
 
 #[cfg(feature = "legion")]
 pub mod iter;
+
+#[cfg(feature = "legion")]
+mod legion_ts_simp;
 
 #[cfg(feature = "ts")]
 pub fn language() -> tree_sitter::Language {

@@ -14,18 +14,17 @@ use crate::store::nodes::compo;
 use crate::store::nodes::legion::DedupMap;
 use crate::store::nodes::legion::NodeIdentifier;
 use crate::store::nodes::legion::RawHAST;
+use crate::store::nodes::legion::dyn_builder::EntityBuilder;
 use crate::store::nodes::legion::eq_node;
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
 
 use crate::types::LabelStore as _;
 use crate::types::Role;
-use crate::types::{ETypeStore, HyperType};
+use crate::types::{ETypeStore, HyperType, StoreRefAssoc};
 
-use super::LocalAcc;
 use super::RoleAcc;
 use super::TreeGen;
 use super::ZippedTreeGen;
-use super::add_md_precomp_queries;
 use super::get_spacing;
 use super::handle_file_bounds;
 use super::parser::Node as _;
@@ -46,12 +45,10 @@ pub struct TsTreeGen<'store, 'cache, TS, Extra = (), const HIDDEN_NODES: bool = 
     pub line_break: Vec<u8>,
     pub stores: &'store mut SimpleStores<TS>,
     pub dedup: Option<&'store mut DedupMap>,
-    pub more: &'cache mut Extra,
+    pub extra: &'cache mut Extra,
 }
 
 pub type Global<'a> = SpacedGlobalData<'a>;
-
-type PrecompQueries = u16;
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -73,8 +70,6 @@ impl Local {
         }
         acc.simple.push(self.compressed_node);
         acc.metrics.acc(self.metrics);
-        // acc.extra += self.extra;
-        // acc.precomp_queries |= self.precomp_queries;
     }
 }
 
@@ -87,15 +82,9 @@ pub struct Acc<T> {
     metrics: SubTreeMetrics<SyntaxNodeHashs<u32>>,
     padding_start: usize,
     role: RoleAcc<Role>,
-    // # non ts specific
-    // precomp_queries: PrecompQueries,
 }
 
 pub type FNode<L> = FullNode<BasicGlobalData, L>;
-
-impl<T> LocalAcc for Acc<T> {
-    type Local = Local;
-}
 
 impl<T> Accumulator for Acc<T> {
     type Node = FNode<Local>;
@@ -162,6 +151,33 @@ impl<'acc, T> super::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
+pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
+    type Acc: std::ops::Deref<Target = Acc>
+        + std::ops::DerefMut
+        + Accumulator<Node = Self::Node>
+        + WithByteRange
+        + From<Acc>;
+    type Node: From<Acc::Node>;
+    fn from_cache(
+        &mut self,
+        id: HAST::IdN,
+        node: impl FnOnce() -> <Acc as Accumulator>::Node,
+    ) -> Self::Node;
+    fn extra(
+        &mut self,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
+        entity: &mut EntityBuilder,
+        acc: &mut Self::Acc,
+        label: Option<&str>,
+    );
+    fn to_cache(
+        &mut self,
+        id: HAST::IdN,
+        node: <Acc as Accumulator>::Node,
+        acc: Self::Acc,
+    ) -> Self::Node;
+}
+
 #[repr(transparent)]
 pub struct NoOpExtra<T, Acc> {
     md_cache: HashMap<NodeIdentifier, ()>,
@@ -177,27 +193,6 @@ impl<T, Acc> Default for NoOpExtra<T, Acc> {
     }
 }
 
-pub trait Extra<HAST: crate::types::StoreRefAssoc, Acc: Accumulator> {
-    type Acc: std::ops::Deref<Target = Acc>
-        + std::ops::DerefMut
-        + super::WithExtra
-        + Accumulator<Node = Self::Node>
-        + WithByteRange
-        + From<Acc>;
-    type Node: From<Acc::Node>;
-    fn from_cache(
-        &mut self,
-        id: HAST::IdN,
-        node: impl FnOnce() -> <Acc as Accumulator>::Node,
-    ) -> Self::Node;
-    fn to_cache(
-        &mut self,
-        id: HAST::IdN,
-        node: <Acc as Accumulator>::Node,
-        acc: Self::Acc,
-    ) -> Self::Node;
-}
-
 #[derive(Default)]
 pub struct EmptyExtra;
 
@@ -205,7 +200,7 @@ impl std::ops::AddAssign for EmptyExtra {
     fn add_assign(&mut self, _: Self) {}
 }
 
-impl<HAST: crate::types::StoreRefAssoc, Acc> Extra<HAST, Acc> for NoOpExtra<HAST::TS, Acc>
+impl<HAST: StoreRefAssoc, Acc> Extra<HAST, Acc> for NoOpExtra<HAST::TS, Acc>
 where
     Acc: Accumulator<Node = FNode<Local>>,
     Acc: WithByteRange,
@@ -220,6 +215,15 @@ where
         // not caching
         otherwise().into()
     }
+    fn extra(
+        &mut self,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
+        entity: &mut EntityBuilder,
+        acc: &mut Self::Acc,
+        label: Option<&str>,
+    ) {
+        // no-op
+    }
 
     fn to_cache(
         &mut self,
@@ -231,16 +235,13 @@ where
     }
 }
 
-impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
-    pub fn with_preprocessing(
-        stores: &'stores mut SimpleStores<TS>,
-        more: &'cache mut More,
-    ) -> Self {
+impl<'stores, 'cache, TS, E> TsTreeGen<'stores, 'cache, TS, E, true> {
+    pub fn with_preprocessing(stores: &'stores mut SimpleStores<TS>, extra: &'cache mut E) -> Self {
         Self {
             line_break: "\n".as_bytes().to_vec(),
             dedup: None,
             stores,
-            more,
+            extra,
         }
     }
     /// Replaces the default dedup map when deriving different data.
@@ -254,46 +255,46 @@ impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
     pub fn with_extra_and_dedup(
         stores: &'stores mut SimpleStores<TS>,
         dedup: &'stores mut DedupMap,
-        more: &'cache mut More,
+        extra: &'cache mut E,
     ) -> Self {
         Self {
             line_break: "\n".as_bytes().to_vec(),
             dedup: Some(dedup),
             stores,
-            more,
+            extra,
         }
     }
 }
 
-impl<'stores, 'cache, TS, More, const HIDDEN_NODES: bool>
-    TsTreeGen<'stores, 'cache, TS, More, HIDDEN_NODES>
+impl<'stores, 'cache, TS, E, const HIDDEN_NODES: bool>
+    TsTreeGen<'stores, 'cache, TS, E, HIDDEN_NODES>
 {
     pub fn set_line_break(self, line_break: Vec<u8>) -> Self {
         TsTreeGen {
             line_break,
             dedup: self.dedup,
             stores: self.stores,
-            more: self.more,
+            extra: self.extra,
         }
     }
 }
 
-impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
-    pub fn without_hidden_nodes(self) -> TsTreeGen<'stores, 'cache, TS, More, false> {
+impl<'stores, 'cache, TS, E> TsTreeGen<'stores, 'cache, TS, E, true> {
+    pub fn without_hidden_nodes(self) -> TsTreeGen<'stores, 'cache, TS, E, false> {
         TsTreeGen {
             line_break: self.line_break,
             dedup: self.dedup,
             stores: self.stores,
-            more: self.more,
+            extra: self.extra,
         }
     }
 }
 
-impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
+impl<TS, E, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, E, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
+    E: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
 {
     type Stores = SimpleStores<TS>;
     type Text = [u8];
@@ -432,11 +433,11 @@ where
     }
 }
 
-impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
+impl<'store, TS, E, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, E, HIDDEN_NODES>
 where
     TS: TsEnableTS,
     TS::Ty2: TsType,
-    More: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
+    E: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
 {
     pub(crate) fn make_space(
         &mut self,
@@ -483,9 +484,10 @@ where
                 role: None,
             },
         };
+        // TODO test perf if lookup fail is costly for not caching spaces
         match res {
-            Ok((hashs, line_count)) => self.more.from_cache(id, || node(hashs, line_count)),
-            Err(hashs) => self.more.from_cache(id, || {
+            Ok((hashs, line_count)) => self.extra.from_cache(id, || node(hashs, line_count)),
+            Err(hashs) => self.extra.from_cache(id, || {
                 let line_count = spacing
                     .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
                     .count();
@@ -530,7 +532,7 @@ where
         let type_store = self.stores.type_store;
         let label_store = &mut self.stores.label_store;
         let node_store = &mut self.stores.node_store;
-        let more = &mut self.more;
+        let more = &mut self.extra;
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
         let metrics = acc.metrics.finalize(&interned_kind, &label);
@@ -552,23 +554,7 @@ where
         let insertion = node_store.inner.prepare_insertion(dedup, hashable, eq);
 
         if let Some(compressed_node) = insertion.occupied_id() {
-            assert_eq!(super::newline_count(&label), 0);
-            // let mut metrics = metrics.map_hashs(|h| h.build());
-            // let own_line_count = super::newline_count(&label);
-            // metrics.line_count += own_line_count;
-            // let md = self.md_cache.get(&compressed_node).unwrap();
-            // debug_assert_eq!(metrics.height, md.metrics.height);
-            // debug_assert_eq!(metrics.size, md.metrics.size);
-            // debug_assert_eq!(metrics.size_no_spaces, md.metrics.size_no_spaces);
-            // debug_assert_eq!(metrics.hashs.build(), md.metrics.hashs);
-            // let metrics = md.metrics;
-            // let precomp_queries = md.precomp_queries;
-            // Local {
-            //     compressed_node,
-            //     metrics: metrics.map_hashs(|h| h.build()),
-            //     role: acc.role.current,
-            // }
-            self.more.from_cache(compressed_node, move || FullNode {
+            self.extra.from_cache(compressed_node, move || FullNode {
                 global: global.simple(),
                 local: Local {
                     compressed_node,
@@ -596,11 +582,6 @@ where
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);
             dyn_builder.add(bytes_len);
 
-            // if More::ENABLED {
-            //     acc.precomp_queries |= more.match_precomp_queries(stores, &acc, label.as_deref());
-            //     add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
-            // }
-
             let current_role = Option::take(&mut acc.role.current);
             RoleAcc {
                 current: None,
@@ -624,9 +605,12 @@ where
             }
             .add_primary(&mut dyn_builder, interned_kind, label_id);
 
+            let label = label.as_deref();
+            self.extra.extra(stores, &mut dyn_builder, &mut acc, label);
+
             let id = vacant.insert_built(dyn_builder.build());
 
-            self.more.to_cache(
+            self.extra.to_cache(
                 id,
                 FullNode {
                     global: global.simple(),

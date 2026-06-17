@@ -21,9 +21,10 @@ pub mod parser;
 
 use std::fmt::Debug;
 
+use crate::hashed::NodeHashs;
+use crate::nodes::Space;
 use crate::store::nodes::EntityBuilder;
-use crate::types::{ETypeStore, HyperAST, HyperASTShared};
-use crate::{hashed::NodeHashs, nodes::Space};
+use crate::types::{ETypeStore, HyperAST, HyperASTShared, StoreRefAssoc};
 
 #[cfg(feature = "ts")]
 use self::parser::Visibility;
@@ -57,6 +58,9 @@ pub trait WithChildren<Id: Clone> {
 // TODO merge with other node traits?
 pub trait WithRole<R> {
     fn role_at(&self, idx: usize) -> Option<R>;
+    fn role(&self) -> Option<R> {
+        todo!()
+    }
 }
 
 pub trait WithLabel {
@@ -175,6 +179,12 @@ impl<U: NodeHashs> SubTreeMetrics<U> {
     }
 }
 
+impl<U: NodeHashs> std::ops::AddAssign for SubTreeMetrics<U> {
+    fn add_assign(&mut self, rhs: Self) {
+        self.acc(rhs);
+    }
+}
+
 impl<U> SubTreeMetrics<U> {
     pub fn map_hashs<V>(self, f: impl Fn(U) -> V) -> SubTreeMetrics<V> {
         SubTreeMetrics {
@@ -204,6 +214,16 @@ impl<U> SubTreeMetrics<U> {
         }
 
         self.hashs
+    }
+}
+
+impl<U: NodeHashs> From<SubTreeMetrics<crate::hashed::HashesBuilder<U>>> for SubTreeMetrics<U>
+where
+    crate::hashed::HashesBuilder<U>: crate::hashed::MetaDataHashsBuilder<U>,
+{
+    fn from(value: SubTreeMetrics<crate::hashed::HashesBuilder<U>>) -> Self {
+        use crate::hashed::MetaDataHashsBuilder;
+        value.map_hashs(|h| h.build())
     }
 }
 
@@ -552,9 +572,9 @@ impl<Acc> Parents<Acc> {
     pub fn parent(&self) -> Option<&Acc> {
         self.0.iter().rev().find_map(|x| x.as_ref().ok())
     }
-    fn parent_mut(&mut self) -> Option<&mut Acc> {
-        self.0.iter_mut().rev().find_map(|x| x.as_mut().ok())
-    }
+    // fn parent_mut(&mut self) -> Option<&mut Acc> {
+    //     self.0.iter_mut().rev().find_map(|x| x.as_mut().ok())
+    // }
     fn parent_mut_with_vis(&mut self) -> Option<(Visibility, &mut Acc)> {
         self.0
             .iter_mut()
@@ -877,17 +897,18 @@ where
 
 pub type PrecompQueries = u16;
 
-pub trait More<HAST: types::StoreRefAssoc> {
+pub trait More<HAST: StoreRefAssoc> {
     type Acc: WithChildren<<HAST as HyperASTShared>::IdN>;
     const ENABLED: bool;
     fn match_precomp_queries(
         &self,
-        stores: <HAST as types::StoreRefAssoc>::S<'_>,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
         acc: &Self::Acc,
         label: Option<&str>,
     ) -> crate::tree_gen::PrecompQueries;
 }
 
+#[repr(transparent)]
 pub struct NoOpMore<T, Acc>(std::marker::PhantomData<(T, Acc)>);
 
 impl<T, Acc> Default for NoOpMore<T, Acc> {
@@ -901,20 +922,21 @@ pub trait WithExtra {
     fn extra(&mut self) -> &mut Self::Extra;
 }
 
+#[derive(Debug)]
 pub struct AccWithExtra<Acc, Extra>(Acc, Extra);
 
 mod extra;
 
 impl<HAST, Acc> More<HAST> for NoOpMore<HAST::TS, Acc>
 where
-    HAST: HyperAST + for<'a> types::StoreRefAssoc,
+    HAST: StoreRefAssoc,
     Acc: WithChildren<HAST::IdN>,
 {
     type Acc = Acc;
     const ENABLED: bool = false;
     fn match_precomp_queries(
         &self,
-        _stores: <HAST as types::StoreRefAssoc>::S<'_>,
+        _stores: <HAST as StoreRefAssoc>::S<'_>,
         _acc: &Acc,
         _label: Option<&str>,
     ) -> PrecompQueries {
@@ -924,13 +946,14 @@ where
 
 impl<HAST, Acc> PreproTSG<HAST> for NoOpMore<HAST::TS, Acc>
 where
-    HAST: HyperAST + for<'a> types::StoreRefAssoc,
+    HAST: StoreRefAssoc,
     Acc: WithChildren<HAST::IdN>,
+    Acc: WithByteRange,
 {
     const GRAPHING: bool = false;
     fn compute_tsg(
         &self,
-        _stores: <HAST as types::StoreRefAssoc>::S<'_>,
+        _stores: <HAST as StoreRefAssoc>::S<'_>,
         _acc: &Self::Acc,
         _label: Option<&str>,
     ) -> Result<usize, String> {
@@ -938,11 +961,11 @@ where
     }
 }
 
-pub trait PreproTSG<HAST: for<'a> types::StoreRefAssoc>: More<HAST> {
+pub trait PreproTSG<HAST: StoreRefAssoc>: More<HAST> {
     const GRAPHING: bool;
     fn compute_tsg(
         &self,
-        stores: <HAST as types::StoreRefAssoc>::S<'_>,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
         acc: &Self::Acc,
         label: Option<&str>,
     ) -> Result<usize, String>;

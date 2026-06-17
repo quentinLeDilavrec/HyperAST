@@ -26,9 +26,8 @@ where
 
     fn init_val(&mut self, text: &Self::Text, node: &Self::Node<'_>) -> Self::Acc;
 
-    /// Can be implemented if you want to skip certain nodes,
-    /// note that skipping only act on the "overlay" tree structure,
-    /// meaning that the content of a skipped node is fed to its parents
+    /// Can be implemented if you want to skip certain nodes.
+    /// You have 3 options to skip nodes, as described in [`PreResult`].
     ///
     /// The default implementation skips nothing.
     ///

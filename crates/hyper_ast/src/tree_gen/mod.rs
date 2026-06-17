@@ -660,6 +660,9 @@ pub trait TsType: crate::types::HyperType + Copy {
 pub mod utils_ts;
 
 #[cfg(all(feature = "ts", feature = "legion"))]
+pub mod zipped_ts_extra;
+
+#[cfg(all(feature = "ts", feature = "legion"))]
 pub mod zipped_ts;
 
 pub(crate) fn things_after_last_lb<'b>(lb: &[u8], spaces: &'b [u8]) -> Option<&'b [u8]> {

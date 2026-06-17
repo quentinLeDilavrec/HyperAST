@@ -422,6 +422,7 @@ impl<C: super::parser::TreeCursor> PrePost2<C> {
     }
 }
 
+// CAUTION do not use for identifiers and literals
 #[cfg(feature = "legion")]
 pub fn make_leaf<TS>(
     node_store: &mut crate::store::nodes::legion::NodeStoreInner,
@@ -430,7 +431,7 @@ pub fn make_leaf<TS>(
     line_break: &[u8],
     kind: TS::Ty,
     text: &str,
-    f: impl FnOnce(&mut crate::store::nodes::legion::dyn_builder::EntityBuilder),
+    g: impl FnOnce(&mut crate::store::nodes::legion::dyn_builder::EntityBuilder),
 ) -> (
     crate::store::nodes::legion::NodeIdentifier,
     super::SubTreeMetrics<crate::hashed::SyntaxNodeHashs<u32>>,
@@ -438,11 +439,66 @@ pub fn make_leaf<TS>(
 where
     TS: crate::types::TypeStore + crate::types::ETypeStore,
 {
+    let f = |h: crate::hashed::HashesBuilder<crate::hashed::SyntaxNodeHashs<u32>>| {
+        use crate::hashed::MetaDataHashsBuilder;
+        let mut h = h.build();
+        h.structt = 0;
+        h.label = 0;
+        h
+    };
+    let (id, res) = _make_leaf::<TS>(node_store, label_store, dedup, line_break, kind, text, f, g);
+    match res {
+        Ok((hashs, line_count)) => (
+            id,
+            super::SubTreeMetrics {
+                size: 1,
+                height: 0,
+                size_no_spaces: 0,
+                hashs,
+                line_count,
+            },
+        ),
+        Err(hashs) => {
+            let line_count = text
+                .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
+                .count();
+            let line_count = num::cast(line_count).expect("too many newlines");
+            let metrics = super::SubTreeMetrics {
+                size: 1,
+                height: 0,
+                size_no_spaces: 0,
+                hashs: hashs(),
+                line_count,
+            };
+            (id, metrics)
+        }
+    }
+}
+
+#[doc(hidden)]
+#[cfg(feature = "legion")]
+pub fn _make_leaf<TS>(
+    node_store: &mut crate::store::nodes::legion::NodeStoreInner,
+    label_store: &mut crate::store::labels::LabelStore,
+    dedup: &mut crate::store::nodes::legion::DedupInner,
+    line_break: &[u8],
+    kind: TS::Ty,
+    text: &str,
+    f: impl FnOnce(
+        crate::hashed::HashesBuilder<crate::hashed::SyntaxNodeHashs<u32>>,
+    ) -> crate::hashed::SyntaxNodeHashs<u32>,
+    g: impl FnOnce(&mut crate::store::nodes::legion::dyn_builder::EntityBuilder),
+) -> (
+    crate::store::nodes::legion::NodeIdentifier,
+    Result<
+        (crate::hashed::SyntaxNodeHashs<u32>, u32),
+        impl FnOnce() -> crate::hashed::SyntaxNodeHashs<u32>,
+    >,
+)
+where
+    TS: crate::types::TypeStore + crate::types::ETypeStore,
+{
     let bytes_len = text.len();
-    let line_count = text
-        .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
-        .count();
-    let line_count = num::ToPrimitive::to_u32(&line_count).expect("too many newlines");
     use crate::types::LabelStore;
     let text_id = label_store.get_or_insert(text);
     use crate::hashed::IndexingHashBuilder;
@@ -463,13 +519,14 @@ where
         true
     };
     let insertion = node_store.prepare_insertion(dedup, &hashable, eq);
-    use crate::hashed::MetaDataHashsBuilder;
-    let mut hashs = hbuilder.build();
-    hashs.structt = 0;
-    hashs.label = 0;
-    let compressed_node = if let Some(id) = insertion.occupied_id() {
-        id
+    if let Some(id) = insertion.occupied_id() {
+        (id, Err(|| f(hbuilder)))
     } else {
+        let line_count = text
+            .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
+            .count();
+        let line_count = num::cast(line_count).expect("too many newlines");
+        let hashs = f(hbuilder);
         use crate::store::nodes::compo;
         let vacant = insertion.vacant();
         let mut dyn_builder = crate::store::nodes::legion::subtree_builder::<TS>(kind);
@@ -480,15 +537,8 @@ where
         if line_count != 0 {
             dyn_builder.add(compo::LineCount(line_count));
         }
-        f(&mut dyn_builder);
-        vacant.insert_built(dyn_builder.build())
-    };
-    let metrics = crate::tree_gen::SubTreeMetrics {
-        size: 1,
-        height: 0,
-        size_no_spaces: 0,
-        hashs,
-        line_count,
-    };
-    (compressed_node, metrics)
+        g(&mut dyn_builder);
+        let compressed_node = vacant.insert_built(dyn_builder.build());
+        (compressed_node, Ok((hashs, line_count)))
+    }
 }

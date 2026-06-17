@@ -553,17 +553,41 @@ where
         let node_store = &mut self.stores.node_store.inner;
         let label_store = &mut self.stores.label_store;
         let line_break = &self.line_break;
-        let (compressed_node, metrics) = tree_gen::utils_ts::make_leaf::<TS>(
+        let (id, res) = tree_gen::utils_ts::_make_leaf::<TS>(
             node_store,
             label_store,
             dedup,
             line_break,
             interned_kind,
             &text,
+            |h| h.build(),
             |_| {},
         );
+        let metrics = match res {
+            Ok((hashs, line_count)) => SubTreeMetrics {
+                size: 1,
+                height: 0,
+                size_no_spaces: 1, // TODO eval
+                hashs,
+                line_count,
+            },
+            Err(hashs) => {
+                let line_count = text
+                    .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
+                    .count();
+                let line_count = num::cast(line_count).expect("too many newlines");
+                let metrics = SubTreeMetrics {
+                    size: 1,
+                    height: 0,
+                    size_no_spaces: 1, // TODO eval
+                    hashs: hashs(),
+                    line_count,
+                };
+                metrics
+            }
+        };
         Local {
-            compressed_node,
+            compressed_node: id,
             metrics,
             role: None,
             precomp_queries: Default::default(),

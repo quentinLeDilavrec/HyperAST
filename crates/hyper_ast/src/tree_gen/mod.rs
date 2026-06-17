@@ -954,6 +954,8 @@ pub struct AccWithExtra<Acc, Extra>(Acc, Extra);
 
 mod extra;
 
+pub mod extra_pattern_precomp;
+
 impl<HAST, Acc> More<HAST> for NoOpMore<HAST::TS, Acc>
 where
     HAST: StoreRefAssoc,

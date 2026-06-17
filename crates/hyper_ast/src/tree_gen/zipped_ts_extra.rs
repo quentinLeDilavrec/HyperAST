@@ -18,11 +18,11 @@ use crate::store::nodes::legion::dyn_builder::EntityBuilder;
 use crate::store::nodes::legion::eq_node;
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
 
-use crate::tree_gen::NoOpMore;
 use crate::types::LabelStore as _;
 use crate::types::Role;
 use crate::types::{ETypeStore, HyperType, StoreRefAssoc};
 
+use super::Extra;
 use super::RoleAcc;
 use super::TreeGen;
 use super::ZippedTreeGen;
@@ -150,36 +150,6 @@ impl<T: Debug> Debug for Acc<T> {
 
 impl<'acc, T> super::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
-}
-
-pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
-    type Acc: std::ops::Deref<Target = Acc>
-        + std::ops::DerefMut
-        + Accumulator<Node = Self::Node>
-        + WithByteRange
-        + From<Acc>;
-    type Node: From<Acc::Node>;
-
-    fn from_cache(
-        &mut self,
-        id: HAST::IdN,
-        or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
-    ) -> Self::Node;
-
-    fn extra(
-        &mut self,
-        stores: <HAST as StoreRefAssoc>::S<'_>,
-        entity: &mut EntityBuilder,
-        acc: &mut Self::Acc,
-        label: Option<&str>,
-    );
-
-    fn to_cache(
-        &mut self,
-        id: HAST::IdN,
-        node: <Acc as Accumulator>::Node,
-        acc: Self::Acc,
-    ) -> Self::Node;
 }
 
 #[repr(transparent)]

@@ -303,7 +303,7 @@ impl hyperast::types::HyperType for Type {
 
     /// ```
     /// # fn main() {
-    /// # use hyperast_gen_ts_cpp::types::Type;
+    /// # use hyperast_gen_ts_cpp::Type;
     /// # use hyperast::types::HyperType;
     /// let k0 = Type::FunctionDefinition.as_static();
     /// let k1 = Type::FunctionDefinition.as_static();

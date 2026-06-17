@@ -18,6 +18,7 @@ use crate::store::nodes::legion::dyn_builder::EntityBuilder;
 use crate::store::nodes::legion::eq_node;
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
 
+use crate::tree_gen::NoOpMore;
 use crate::types::LabelStore as _;
 use crate::types::Role;
 use crate::types::{ETypeStore, HyperType, StoreRefAssoc};
@@ -158,11 +159,13 @@ pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
         + WithByteRange
         + From<Acc>;
     type Node: From<Acc::Node>;
+
     fn from_cache(
         &mut self,
         id: HAST::IdN,
-        node: impl FnOnce() -> <Acc as Accumulator>::Node,
+        or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
     ) -> Self::Node;
+
     fn extra(
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
@@ -170,6 +173,7 @@ pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
         acc: &mut Self::Acc,
         label: Option<&str>,
     );
+
     fn to_cache(
         &mut self,
         id: HAST::IdN,
@@ -180,14 +184,12 @@ pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
 
 #[repr(transparent)]
 pub struct NoOpExtra<T, Acc> {
-    md_cache: HashMap<NodeIdentifier, ()>,
     _phantom: std::marker::PhantomData<(T, Acc)>,
 }
 
 impl<T, Acc> Default for NoOpExtra<T, Acc> {
     fn default() -> Self {
         Self {
-            md_cache: HashMap::default(),
             _phantom: Default::default(),
         }
     }
@@ -210,10 +212,10 @@ where
     fn from_cache(
         &mut self,
         _id: HAST::IdN,
-        otherwise: impl FnOnce() -> <Acc as Accumulator>::Node,
+        or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
     ) -> Self::Node {
         // not caching
-        otherwise().into()
+        or_else().into()
     }
     fn extra(
         &mut self,
@@ -235,8 +237,20 @@ where
     }
 }
 
+impl<'stores, TS, T, Acc> TsTreeGen<'stores, 'static, TS, NoOpExtra<T, Acc>, true> {
+    pub fn bare(stores: &'stores mut SimpleStores<TS>) -> Self {
+        static mut EXTRA: () = ();
+        Self {
+            line_break: "\n".as_bytes().to_vec(),
+            dedup: None,
+            stores,
+            extra: unsafe { std::mem::transmute(&raw mut EXTRA) },
+        }
+    }
+}
+
 impl<'stores, 'cache, TS, E> TsTreeGen<'stores, 'cache, TS, E, true> {
-    pub fn with_preprocessing(stores: &'stores mut SimpleStores<TS>, extra: &'cache mut E) -> Self {
+    pub fn new(stores: &'stores mut SimpleStores<TS>, extra: &'cache mut E) -> Self {
         Self {
             line_break: "\n".as_bytes().to_vec(),
             dedup: None,
@@ -252,7 +266,7 @@ impl<'stores, 'cache, TS, E> TsTreeGen<'stores, 'cache, TS, E, true> {
     ///   e.g., additional Derived Data on files can reuse subtrees of things inside files, but directories and files must be added without merging with the others
     ///    (it should also be possible to compute markers to provide similar guarantees, e.g. a DD only on classes can reuse children that do not contain classes).
     /// Could also make the eq consider the derived data, but to avoid breaking the incrementality we would still need some kind of marker for each context
-    pub fn with_extra_and_dedup(
+    pub fn with_dedup(
         stores: &'stores mut SimpleStores<TS>,
         dedup: &'stores mut DedupMap,
         extra: &'cache mut E,

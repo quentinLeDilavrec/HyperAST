@@ -6,6 +6,7 @@ type SimpleStores = hyperast::store::SimpleStores<TStore>;
 type CppTreeGen<'store, 'cache, HAST, Acc> =
     crate::legion::CppTreeGen<'store, 'cache, TStore, SimpleStores, NoOpMore<HAST, Acc>, true>;
 
+mod legion_ts_simp;
 mod prepro;
 mod simple;
 mod types;

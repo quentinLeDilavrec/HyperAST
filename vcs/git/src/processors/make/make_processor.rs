@@ -4,6 +4,7 @@ use std::path::{Components, PathBuf};
 use git2::{Oid, Repository};
 
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
+use hyperast::store::nodes::legion::dyn_builder::EntityBuilder;
 use hyperast::store::nodes::legion::eq_node;
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
@@ -13,38 +14,41 @@ use crate::Processor;
 use crate::StackEle;
 use crate::git::{BasicGitObject, NamedObject, ObjectType, TypedObject};
 use crate::preprocessed::RepositoryProcessor;
+use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
+use crate::processing::caches::Make as MakeCaches;
+use crate::processing::erased::ParametrizedCommitProc;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::{CommitProcExt, Parametrized};
 use crate::processing::erased::{CommitProcessorHandle, ParametrizedCommitProc2};
-use crate::processing::{CacheHolding, InFiles, ObjectName, ParametrizedCommitProcessorHandle};
+use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::processors::cpp as cpp_processor;
+use crate::utils::drain_filter_strip;
 
-use super::{FullNode, MD, MakeModuleAcc};
-
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
+use super::{FullNode, MD, MakeModuleAcc, SimpleStores};
 
 pub struct MakeProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     prepro: &'b mut RepositoryProcessor,
     repository: &'a Repository,
     stack: Vec<StackEle<Acc>>,
     dir_path: &'c mut Peekable<Components<'c>>,
-    handle: ParametrizedCommitProcessorHandle,
+    handle: PCPHandle,
 }
 
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
     MakeProcessor<'a, 'b, 'c, RMS, FFWD, Acc>
 {
-    pub fn new(
+    pub fn prepare(
         repository: &'a Repository,
         prepro: &'b mut RepositoryProcessor,
         mut dir_path: &'c mut Peekable<Components<'c>>,
         name: &[u8],
         oid: git2::Oid,
-        handle: ParametrizedCommitProcessorHandle,
+        handle: PCPHandle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree, &mut dir_path);
         let name = std::str::from_utf8(&name).unwrap().to_string();
-        let stack = vec![StackEle::new(oid, prepared, Acc::from(name))];
+        let stack = vec![StackEle::new(oid, prepared, name.into())];
         Self {
             stack,
             repository,
@@ -108,18 +112,17 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
 
         let name = self.prepro.main_stores.label_store.get_or_insert(name);
         if self.stack.is_empty() {
-            Some(full_node)
-        } else {
-            let w = &mut self.stack.last_mut().unwrap().acc;
-            assert!(
-                !w.primary.children_names.contains(&name),
-                "{:?} {:?}",
-                w.primary.children_names,
-                name
-            );
-            w.push_submodule(name, full_node);
-            None
+            return Some(full_node);
         }
+        let w = &mut self.stack.last_mut().unwrap().acc;
+        assert!(
+            !w.primary.children_names.contains(&name),
+            "{:?} {:?}",
+            w.primary.children_names,
+            name
+        );
+        w.push_submodule(name, full_node);
+        None
     }
 
     fn stack(&mut self) -> &mut Vec<StackEle<MakeModuleAcc>> {
@@ -257,9 +260,7 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
 
-    let mut dyn_builder = hyperast::store::nodes::legion::dyn_builder::EntityBuilder::with_lang(
-        hyperast_gen_ts_xml::Lang,
-    );
+    let mut dyn_builder = EntityBuilder::with_lang(hyperast_gen_ts_xml::Lang);
 
     let children_is_empty = primary.children.is_empty();
 
@@ -283,7 +284,7 @@ impl RepositoryProcessor {
         parent_acc: &mut MakeModuleAcc,
         name: ObjectName,
         repository: &Repository,
-        parameters: crate::processing::erased::ParametrizedCommitProcessor2Handle<MakefileProc>,
+        parameters: PCP2Handle<MakefileProc>,
     ) -> Result<(), crate::ParseErr> {
         let x = self
             .processing_systems
@@ -340,19 +341,6 @@ impl From<MakeModuleHelper> for MakeModuleAcc {
     }
 }
 
-fn drain_filter_strip(v: &mut Option<Vec<PathBuf>>, name: &[u8]) -> Vec<PathBuf> {
-    let mut new_sub_modules = vec![];
-    let name = std::str::from_utf8(&name).unwrap();
-    if let Some(sub_modules) = v {
-        vec_extract_if_polyfill::MakeExtractIf::extract_if(sub_modules, |x| x.starts_with(name))
-            .for_each(|x| {
-                let x = x.strip_prefix(name).unwrap().to_owned();
-                new_sub_modules.push(x);
-            });
-    }
-    new_sub_modules
-}
-
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     MakeProcessor<'a, 'b, 'c, RMS, FFWD, MakeModuleAcc>
 {
@@ -402,31 +390,21 @@ pub(crate) fn prepare_dir_exploration(
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
-    pub(crate) cpp_handle:
-        crate::processing::erased::ParametrizedCommitProcessor2Handle<cpp_processor::CppProc>,
+    pub(crate) cpp_handle: PCP2Handle<cpp_processor::CppProc>,
 }
-impl From<crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>>
-    for crate::processing::erased::ParametrizedCommitProcessor2Handle<MakefileProc>
-{
-    fn from(
-        value: crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>,
-    ) -> Self {
-        crate::processing::erased::ParametrizedCommitProcessor2Handle(
-            value.0,
-            std::marker::PhantomData,
-        )
+impl From<PCP2Handle<cpp_processor::CppProc>> for Parameter {
+    fn from(cpp_handle: PCP2Handle<cpp_processor::CppProc>) -> Self {
+        Self { cpp_handle }
     }
 }
-impl From<crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>>
-    for crate::processing::erased::ParametrizedCommitProcessor2Handle<cpp_processor::CppProc>
-{
-    fn from(
-        value: crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>,
-    ) -> Self {
-        crate::processing::erased::ParametrizedCommitProcessor2Handle(
-            value.0,
-            std::marker::PhantomData,
-        )
+impl From<PCP2Handle<MakeProc>> for PCP2Handle<MakefileProc> {
+    fn from(value: PCP2Handle<MakeProc>) -> Self {
+        PCP2Handle(value.0, std::marker::PhantomData)
+    }
+}
+impl From<PCP2Handle<MakeProc>> for PCP2Handle<cpp_processor::CppProc> {
+    fn from(value: PCP2Handle<MakeProc>) -> Self {
+        PCP2Handle(value.0, std::marker::PhantomData)
     }
 }
 // #[derive(Default)]
@@ -439,12 +417,9 @@ impl Default for MakefileProcessorHolder {
 
 struct MakefileProc(Option<Parameter>, crate::processing::caches::Makefile);
 
-impl crate::processing::erased::Parametrized for MakefileProcessorHolder {
+impl Parametrized for MakefileProcessorHolder {
     type T = Parameter;
-    fn register_param(
-        &mut self,
-        t: Self::T,
-    ) -> crate::processing::erased::ParametrizedCommitProcessorHandle {
+    fn register_param(&mut self, t: Self::T) -> PCPHandle {
         let l = self
             .0
             .iter()
@@ -458,8 +433,7 @@ impl crate::processing::erased::Parametrized for MakefileProcessorHolder {
             });
         use crate::processing::erased::ConfigParametersHandle;
         use crate::processing::erased::ParametrizedCommitProc;
-        use crate::processing::erased::ParametrizedCommitProcessorHandle;
-        ParametrizedCommitProcessorHandle(self.erased_handle(), ConfigParametersHandle(l))
+        PCPHandle(self.erased_handle(), ConfigParametersHandle(l))
     }
 }
 
@@ -469,7 +443,7 @@ impl crate::processing::erased::CommitProc for MakefileProc {
         &self,
         _repository: &git2::Repository,
         _commit_builder: crate::preprocessed::CommitBuilder,
-        _param_handle: crate::processing::ParametrizedCommitProcessorHandle,
+        _param_handle: PCPHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc> {
         unimplemented!("required for processing at the root of a project")
     }
@@ -528,15 +502,12 @@ impl CacheHolding<crate::processing::caches::Makefile> for MakefileProcessorHold
 pub(crate) struct MakeProcessorHolder(Option<MakeProc>);
 pub(crate) struct MakeProc {
     parameter: Parameter,
-    cache: crate::processing::caches::Make,
+    cache: MakeCaches,
     commits: std::collections::HashMap<git2::Oid, crate::Commit>,
 }
-impl crate::processing::erased::Parametrized for MakeProcessorHolder {
+impl Parametrized for MakeProcessorHolder {
     type T = Parameter;
-    fn register_param(
-        &mut self,
-        t: Self::T,
-    ) -> crate::processing::erased::ParametrizedCommitProcessorHandle {
+    fn register_param(&mut self, t: Self::T) -> PCPHandle {
         let l = self
             .0
             .iter()
@@ -553,15 +524,13 @@ impl crate::processing::erased::Parametrized for MakeProcessorHolder {
                 l
             });
         use crate::processing::erased::ConfigParametersHandle;
-        use crate::processing::erased::ParametrizedCommitProc;
-        use crate::processing::erased::ParametrizedCommitProcessorHandle;
-        ParametrizedCommitProcessorHandle(self.erased_handle(), ConfigParametersHandle(l))
+        PCPHandle(self.erased_handle(), ConfigParametersHandle(l))
     }
 }
 struct PreparedMakeCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: crate::preprocessed::CommitBuilder,
-    pub(crate) handle: ParametrizedCommitProcessorHandle,
+    pub(crate) handle: PCPHandle,
 }
 impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommitProc<'repo> {
     fn process(
@@ -572,7 +541,7 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
         let mut dir_path = dir_path.components().peekable();
         let name = b"";
         // TODO check parameter in self to know it is a recusive module search
-        let root_full_node = MakeProcessor::<true, false, MakeModuleAcc>::new(
+        let root_full_node = MakeProcessor::<true, false, MakeModuleAcc>::prepare(
             self.repository,
             prepro,
             &mut dir_path,
@@ -599,7 +568,7 @@ impl crate::processing::erased::CommitProc for MakeProc {
         &self,
         repository: &'repo git2::Repository,
         commit_builder: crate::preprocessed::CommitBuilder,
-        handle: crate::processing::ParametrizedCommitProcessorHandle,
+        handle: PCPHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc + 'repo> {
         Box::new(PreparedMakeCommitProc {
             repository,
@@ -616,11 +585,13 @@ impl crate::processing::erased::CommitProc for MakeProc {
         self.commits.len()
     }
 
-    fn get_lang_handle(&self, lang: &str) -> Option<ParametrizedCommitProcessorHandle> {
+    fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
         dbg!(self.parameter.cpp_handle.0.0);
         if lang.eq_ignore_ascii_case("cpp") {
-            Some(ParametrizedCommitProcessorHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<cpp_processor::CppProcessorHolder>()),
+            Some(PCPHandle(
+                CommitProcessorHandle(std::any::TypeId::of::<
+                    <cpp_processor::CppProc as CommitProcExt>::Holder,
+                >()),
                 self.parameter.cpp_handle.0,
             ))
         } else if lang.eq_ignore_ascii_case("java") {
@@ -658,20 +629,20 @@ impl crate::processing::erased::ParametrizedCommitProc2 for MakeProcessorHolder 
     }
 }
 
-impl CacheHolding<crate::processing::caches::Make> for MakeProc {
-    fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Make {
+impl CacheHolding<MakeCaches> for MakeProc {
+    fn get_caches_mut(&mut self) -> &mut MakeCaches {
         &mut self.cache
     }
-    fn get_caches(&self) -> &crate::processing::caches::Make {
+    fn get_caches(&self) -> &MakeCaches {
         &self.cache
     }
 }
 
-impl CacheHolding<crate::processing::caches::Make> for MakeProcessorHolder {
-    fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Make {
+impl CacheHolding<MakeCaches> for MakeProcessorHolder {
+    fn get_caches_mut(&mut self) -> &mut MakeCaches {
         &mut self.0.as_mut().unwrap().cache
     }
-    fn get_caches(&self) -> &crate::processing::caches::Make {
+    fn get_caches(&self) -> &MakeCaches {
         &self.0.as_ref().unwrap().cache
     }
 }

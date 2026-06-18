@@ -22,22 +22,23 @@ pub struct ParametrizedCommitProcessor2Handle<T: CommitProcExt>(
     pub ConfigParametersHandle,
     pub(crate) PhantomData<T>,
 );
+use ParametrizedCommitProcessor2Handle as PCP2Handle;
 
-impl<T: CommitProcExt> Eq for ParametrizedCommitProcessor2Handle<T> {}
+impl<T: CommitProcExt> Eq for PCP2Handle<T> {}
 
-impl<T: CommitProcExt> PartialEq for ParametrizedCommitProcessor2Handle<T> {
+impl<T: CommitProcExt> PartialEq for PCP2Handle<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.0 == other.0.0 && self.1 == other.1
     }
 }
 
-impl<T: CommitProcExt> Clone for ParametrizedCommitProcessor2Handle<T> {
+impl<T: CommitProcExt> Clone for PCP2Handle<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<T: CommitProcExt> Copy for ParametrizedCommitProcessor2Handle<T> {}
-impl<T: CommitProcExt> ParametrizedCommitProcessor2Handle<T> {
+impl<T: CommitProcExt> Copy for PCP2Handle<T> {}
+impl<T: CommitProcExt> PCP2Handle<T> {
     #[allow(unused)]
     fn recover_handle(&self) -> ParametrizedCommitProcessorHandle {
         ParametrizedCommitProcessorHandle(
@@ -46,7 +47,7 @@ impl<T: CommitProcExt> ParametrizedCommitProcessor2Handle<T> {
         )
     }
 }
-impl<T: CommitProcExt> Deref for ParametrizedCommitProcessor2Handle<T> {
+impl<T: CommitProcExt> Deref for PCP2Handle<T> {
     type Target = ConfigParametersHandle;
 
     fn deref(&self) -> &Self::Target {
@@ -85,11 +86,11 @@ pub trait CommitProcExt: CommitProc {
     fn register_param(
         h: &mut Self::Holder,
         t: <Self::Holder as Parametrized>::T,
-    ) -> ParametrizedCommitProcessor2Handle<Self>
+    ) -> PCP2Handle<Self>
     where
         Self: Sized,
     {
-        ParametrizedCommitProcessor2Handle(h.register_param(t).1, PhantomData)
+        PCP2Handle(h.register_param(t).1, PhantomData)
     }
 }
 pub trait ParametrizedCommitProc: std::any::Any {

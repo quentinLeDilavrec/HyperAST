@@ -250,12 +250,11 @@ where
             .insert(key, MD::from(full_node.clone()));
         let name = self.prepro.main_stores.label_store.get_or_insert(name);
         if self.stack.is_empty() {
-            Some((full_node, skiped_ana))
-        } else {
-            let w = &mut self.stack.last_mut().unwrap().1;
-            w.push(name, full_node);
-            None
+            return Some((full_node, skiped_ana));
         }
+        let w = &mut self.stack.last_mut().unwrap().1;
+        w.push(name, full_node);
+        None
     }
 
     fn stack(&mut self) -> &mut Vec<(Vec<PathBuf>, Acc)> {

@@ -4,8 +4,23 @@ use crate::Commit;
 use crate::git::Repo;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ConfiguredRepo2;
+use crate::processing::erased::Parametrized;
 use crate::processing::erased::{CommitProcExt, ParametrizedCommitProcessorHandle};
 use crate::processing::{ConfiguredRepoHandle2, RepoConfig};
+
+use crate::processors::java::JavaProc;
+type JavaProcessorHolder = <JavaProc as CommitProcExt>::Holder;
+
+use crate::processors::cpp::CppProc;
+type CppProcessorHolder = <CppProc as CommitProcExt>::Holder;
+
+use crate::processors::make::MakeProc;
+type MakeProcessorHolder = <MakeProc as CommitProcExt>::Holder;
+
+use crate::processors::maven::MavenProc;
+type MavenProcessorHolder = <MavenProc as CommitProcExt>::Holder;
+use crate::processors::maven::PomProc;
+type PomProcessorHolder = <PomProc as CommitProcExt>::Holder;
 
 /// Preprocess git repositories
 /// share most components with PreProcessedRepository
@@ -122,16 +137,14 @@ impl PreProcessedRepositories {
     }
 
     pub fn register_config(&mut self, spec: Repo, config: RepoConfig) -> ConfiguredRepoHandle2 {
-        use crate::processing::erased::Parametrized;
         let r = match config {
             RepoConfig::JavaMaven => {
                 let processor_map = &mut self.processor.processing_systems;
-                let t = crate::processors::java::Parameter::faster();
-                use crate::processors::java::JavaProcessorHolder;
+                let t = <JavaProcessorHolder as Parametrized>::T::faster();
                 let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
                 let java_handle = CommitProcExt::register_param(h_java, t);
                 use crate::processors::maven::PomParameter;
-                use crate::processors::maven::{MavenProcessorHolder, PomProcessorHolder};
+
                 let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
                 let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
                 let h = processor_map.mut_or_default::<MavenProcessorHolder>();
@@ -143,9 +156,8 @@ impl PreProcessedRepositories {
             }
             RepoConfig::Java => {
                 let processor_map = &mut self.processor.processing_systems;
-                use crate::processors::java::JavaProcessorHolder;
                 let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
-                let t = crate::processors::java::Parameter::faster();
+                let t = <JavaProcessorHolder as Parametrized>::T::faster();
                 let config = h_java.register_param(t);
                 ConfiguredRepoHandle2 { spec, config }
             }
@@ -157,13 +169,13 @@ impl PreProcessedRepositories {
                 let h_cpp = self
                     .processor
                     .processing_systems
-                    .mut_or_default::<crate::processors::cpp::CppProcessorHolder>();
-                let cpp_handle = crate::processing::erased::CommitProcExt::register_param(h_cpp, t);
+                    .mut_or_default::<CppProcessorHolder>();
+                let cpp_handle = CommitProcExt::register_param(h_cpp, t);
                 let h = self
                     .processor
                     .processing_systems
-                    .mut_or_default::<crate::processors::make::MakeProcessorHolder>();
-                let config = h.register_param(crate::processors::make::Parameter { cpp_handle });
+                    .mut_or_default::<MakeProcessorHolder>();
+                let config = h.register_param(cpp_handle.into());
                 ConfiguredRepoHandle2 { spec, config }
             }
             _ => todo!(),
@@ -177,13 +189,11 @@ impl PreProcessedRepositories {
         &mut self,
         spec: Repo,
         config: RepoConfig,
-        prepro: std::sync::Arc<str>,
+        prepro: crate::Str,
     ) -> ConfiguredRepoHandle2 {
-        use crate::processing::erased::Parametrized;
         let r = match config {
             RepoConfig::JavaMaven => {
                 let processor_map = &mut self.processor.processing_systems;
-                use crate::processors::java::JavaProcessorHolder;
                 let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
                 let t = crate::processors::java::Parameter {
                     prepro: Some(prepro),
@@ -191,7 +201,6 @@ impl PreProcessedRepositories {
                 };
                 let java_handle = CommitProcExt::register_param(h_java, t);
                 use crate::processors::maven::PomParameter;
-                use crate::processors::maven::{MavenProcessorHolder, PomProcessorHolder};
                 let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
                 let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
                 let h = self
@@ -209,13 +218,13 @@ impl PreProcessedRepositories {
                 let h_cpp = self
                     .processor
                     .processing_systems
-                    .mut_or_default::<crate::processors::cpp::CppProcessorHolder>();
-                let cpp_handle = crate::processing::erased::CommitProcExt::register_param(h_cpp, t);
+                    .mut_or_default::<CppProcessorHolder>();
+                let cpp_handle = CommitProcExt::register_param(h_cpp, t);
                 let h = self
                     .processor
                     .processing_systems
-                    .mut_or_default::<crate::processors::make::MakeProcessorHolder>();
-                let config = h.register_param(crate::processors::make::Parameter { cpp_handle });
+                    .mut_or_default::<MakeProcessorHolder>();
+                let config = h.register_param(cpp_handle.into());
                 ConfiguredRepoHandle2 { spec, config }
             }
             _ => todo!(),
@@ -230,11 +239,9 @@ impl PreProcessedRepositories {
         config: RepoConfig,
         query: &[&str],
     ) -> ConfiguredRepoHandle2 {
-        use crate::processing::erased::Parametrized;
         let r = match config {
             RepoConfig::JavaMaven => {
                 let processor_map = &mut self.processor.processing_systems;
-                use crate::processors::java::JavaProcessorHolder;
                 let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
                 let t = crate::processors::java::Parameter {
                     query: Some(query.into()),
@@ -242,7 +249,6 @@ impl PreProcessedRepositories {
                 };
                 let java_handle = CommitProcExt::register_param(h_java, t);
                 use crate::processors::maven::PomParameter;
-                use crate::processors::maven::{MavenProcessorHolder, PomProcessorHolder};
                 let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
                 let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
                 let h = processor_map.mut_or_default::<MavenProcessorHolder>();
@@ -254,7 +260,6 @@ impl PreProcessedRepositories {
             }
             RepoConfig::Java => {
                 let processor_map = &mut self.processor.processing_systems;
-                use crate::processors::java::JavaProcessorHolder;
                 let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
                 let t = crate::processors::java::Parameter {
                     query: Some(query.into()),
@@ -270,13 +275,13 @@ impl PreProcessedRepositories {
                 let h_cpp = self
                     .processor
                     .processing_systems
-                    .mut_or_default::<crate::processors::cpp::CppProcessorHolder>();
-                let cpp_handle = crate::processing::erased::CommitProcExt::register_param(h_cpp, t);
+                    .mut_or_default::<CppProcessorHolder>();
+                let cpp_handle = CommitProcExt::register_param(h_cpp, t);
                 let h = self
                     .processor
                     .processing_systems
-                    .mut_or_default::<crate::processors::make::MakeProcessorHolder>();
-                let config = h.register_param(crate::processors::make::Parameter { cpp_handle });
+                    .mut_or_default::<MakeProcessorHolder>();
+                let config = h.register_param(cpp_handle.into());
                 ConfiguredRepoHandle2 { spec, config }
             }
             _ => todo!(),
@@ -289,13 +294,11 @@ impl PreProcessedRepositories {
         &mut self,
         repo: Repo,
         config: RepoConfig,
-        tsg: std::sync::Arc<str>,
+        tsg: crate::Str,
     ) -> ConfiguredRepoHandle2 {
-        use crate::processing::erased::Parametrized;
         let r = match config {
             RepoConfig::JavaMaven => {
                 let processor_map = &mut self.processor.processing_systems;
-                use crate::processors::java::JavaProcessorHolder;
                 let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
                 let t = crate::processors::java::Parameter {
                     prepro: None,
@@ -304,7 +307,6 @@ impl PreProcessedRepositories {
                 };
                 let java_handle = CommitProcExt::register_param(h_java, t);
                 use crate::processors::maven::PomParameter;
-                use crate::processors::maven::{MavenProcessorHolder, PomProcessorHolder};
                 let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
                 let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
                 let h = self

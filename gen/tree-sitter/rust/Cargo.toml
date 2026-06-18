@@ -1,0 +1,53 @@
+[package]
+name = "hyperast_gen_ts_rust"
+version = "0.5.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+tree-sitter = { workspace = true, optional = true }
+tree-sitter-rust = { version = "0.23.0", optional = true }
+num = "0.4.0"
+bitvec = "1.0.1"
+cfg-if = "1.0"
+hashbrown = { version = "0.14.5", default-features = false, optional = true }
+log = "0.4.6"
+hyperast = { workspace = true, default-features = false }
+
+libc = "0.2"
+
+legion = { workspace = true, optional = true }
+
+serde = { version = "1.0.130" }
+
+[dev-dependencies]
+pretty_assertions = "1.0.0"
+env_logger = "0.11.3"
+hyperast_tsquery = { workspace = true }
+
+polyglot = { path="../../../lib/polyglot" }
+
+[[example]] # NOTE it's an helper bin dressed as an example to access dev-dependencies
+name = "regen_rust_types"
+path = "bin/regen_rust_types.rs"
+
+[features]
+default = ["impl"]
+impl = [
+    "types",
+    "hyperast/jemalloc",
+    "legion",
+    "hyperast/native",
+    "dep:hashbrown",
+    "hashbrown?/ahash",
+    "ts",
+]
+types = []
+legion = ["hyperast/legion", "dep:legion"]
+ts = [
+    "dep:tree-sitter",
+    "dep:tree-sitter-rust",
+    "hyperast/ts",
+]

@@ -14,6 +14,8 @@ mod test_bevy;
 
 mod test_cases;
 
+mod legion_ts_simp;
+
 #[test]
 fn type_test_generic_eq() {
     use hyperast::types::HyperType;

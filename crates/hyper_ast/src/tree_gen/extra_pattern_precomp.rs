@@ -4,7 +4,6 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use super::zipped_ts_extra::{FNode, Local};
 use super::{AccWithExtra, Accumulator};
 use super::{Extra, WithByteRange, WithExtra};
 use crate::compat::HashMap;
@@ -50,7 +49,7 @@ impl std::ops::AddAssign for PrecompQueries {
 impl<HAST, Acc, More> Extra<HAST, Acc> for PatternPrecompExtra<HAST::IdN, Acc, More>
 where
     HAST: StoreRefAssoc,
-    Acc: Accumulator<Node = FNode<Local>>,
+    Acc: Accumulator,
     Acc: WithByteRange,
     // caching
     HAST::IdN: Hash,
@@ -61,12 +60,16 @@ where
 
     type Node = <Self::Acc as Accumulator>::Node;
 
+    fn _from_cache(&mut self, id: <HAST>::IdN) -> Option<<Self::Acc as WithExtra>::Extra> {
+        self.md_cache.get(&id).cloned()
+    }
+
     fn from_cache(
         &mut self,
         id: HAST::IdN,
         or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
     ) -> Self::Node {
-        let precomp = self.md_cache.get(&id).cloned().unwrap_or_default();
+        let precomp = self._from_cache(id).unwrap_or_default();
         (or_else(), precomp).into()
     }
 
@@ -74,22 +77,33 @@ where
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
         dyn_builder: &mut EntityBuilder,
-        acc: &mut Self::Acc,
+        mut acc: Self::Acc,
         label: Option<&str>,
-    ) {
+    ) -> Self::Acc {
         use super::More;
         acc.extra().0 |=
             More::<HAST>::match_precomp_queries(&self.more, stores, &acc, label.as_deref());
         super::add_md_precomp_queries(dyn_builder, acc.extra().0);
+        acc
+    }
+
+    fn _to_cache(
+        &mut self,
+        id: <HAST>::IdN,
+        extra: <Self::Acc as WithExtra>::Extra,
+    ) -> <Self::Acc as WithExtra>::Extra {
+        self.md_cache.insert(id, extra.clone());
+        extra
     }
 
     fn to_cache(
         &mut self,
         id: HAST::IdN,
         node: <Acc as Accumulator>::Node,
-        mut acc: Self::Acc,
+        acc: Self::Acc,
     ) -> Self::Node {
-        self.md_cache.insert(id, acc.extra().clone());
-        (node, acc.extra().clone()).into()
+        let (_acc, extra) = acc.into();
+        let extra = self._to_cache(id, extra);
+        (node, extra).into()
     }
 }

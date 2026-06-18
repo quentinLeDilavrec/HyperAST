@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 use super::*;
 
 impl<Acc, Extra> WithExtra for AccWithExtra<Acc, Extra> {
@@ -8,7 +10,7 @@ impl<Acc, Extra> WithExtra for AccWithExtra<Acc, Extra> {
     }
 }
 
-impl<Acc, Extra> std::ops::Deref for AccWithExtra<Acc, Extra> {
+impl<Acc, Extra> Deref for AccWithExtra<Acc, Extra> {
     type Target = Acc;
 
     fn deref(&self) -> &Self::Target {
@@ -16,7 +18,7 @@ impl<Acc, Extra> std::ops::Deref for AccWithExtra<Acc, Extra> {
     }
 }
 
-impl<Acc, Extra> std::ops::DerefMut for AccWithExtra<Acc, Extra> {
+impl<Acc, Extra> DerefMut for AccWithExtra<Acc, Extra> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -25,6 +27,26 @@ impl<Acc, Extra> std::ops::DerefMut for AccWithExtra<Acc, Extra> {
 impl<Acc, Extra: Default> From<Acc> for AccWithExtra<Acc, Extra> {
     fn from(acc: Acc) -> Self {
         AccWithExtra(acc, Extra::default())
+    }
+}
+
+impl<Acc, Extra> From<(Acc, Extra)> for AccWithExtra<Acc, Extra> {
+    fn from((acc, extra): (Acc, Extra)) -> Self {
+        AccWithExtra(acc, extra)
+    }
+}
+
+impl<Acc, Extra> Into<(Acc, Extra)> for AccWithExtra<Acc, Extra> {
+    fn into(self) -> (Acc, Extra) {
+        (self.0, self.1)
+    }
+}
+
+impl<Acc, Extra: Default, Extra2: Default> From<Acc>
+    for AccWithExtra<AccWithExtra<Acc, Extra>, Extra2>
+{
+    fn from(acc: Acc) -> Self {
+        AccWithExtra(AccWithExtra(acc, Extra::default()), Extra2::default())
     }
 }
 
@@ -63,7 +85,7 @@ pub struct NodeWithExtra<N, Extra> {
     pub extra: Extra,
 }
 
-impl<N, Extra> std::ops::Deref for NodeWithExtra<N, Extra> {
+impl<N, Extra> Deref for NodeWithExtra<N, Extra> {
     type Target = N;
 
     fn deref(&self) -> &Self::Target {
@@ -74,6 +96,12 @@ impl<N, Extra> std::ops::Deref for NodeWithExtra<N, Extra> {
 impl<N, Extra> From<(N, Extra)> for NodeWithExtra<N, Extra> {
     fn from((node, extra): (N, Extra)) -> Self {
         NodeWithExtra { node, extra }
+    }
+}
+
+impl<N, Extra> Into<(N, Extra)> for NodeWithExtra<N, Extra> {
+    fn into(self) -> (N, Extra) {
+        (self.node, self.extra)
     }
 }
 

@@ -1,10 +1,19 @@
-//! Tree Generators
+//! # Tree Generators
 //!
 //! This module contains facilities to help you build an HyperAST.
+//!
+//! With the simplest abstraction (wrapping the next one):
+//! - [`zipped_ts_extra::TsTreeGen`] wraps the next abstraction,
+//!     such that, you only have to care about defining,
+//!   - the node types of your syntax tree, and
+//!   - your extra metrics by implementing `Extra`.
+//!     - [`extra_chain::ChainedExtra`] provides chaining of extras,
+//!     - [`extra_pattern_precomp::PatternPrecompExtra`] provides pattern precomputing
+//! With the more advanced abstraction:
 //! - [`TreeGen::make`] is where a subtree is pushed in the HyperAST
 //!   - You should also use [`crate::store::nodes::legion::NodeStore::prepare_insertion`]
 //!     to insert subtrees in the HyperAST while deduplicating identical ones
-//! - To visit parsers with a zipper/cursor interface you should implement [`ZippedTreeGen`]
+//! - To visit parsing output with a zipper/cursor interface you should implement [`ZippedTreeGen`]
 //!   - [`crate::parser::TreeCursor`] should be implemented to wrap you parser's interface
 //!
 //!
@@ -676,13 +685,28 @@ pub trait TsType: crate::types::HyperType + Copy {
 #[cfg(feature = "ts")]
 pub mod utils_ts;
 
+/// Allow to define extra derived data
+///
+/// Can be chained with [`extra_chain::ChainedExtra`] when independent
 pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
     type Acc: std::ops::Deref<Target = Acc>
         + std::ops::DerefMut
         + Accumulator<Node = Self::Node>
         + WithByteRange
-        + From<Acc>;
-    type Node: From<Acc::Node>;
+        + WithExtra
+        + From<Acc> // for consumers of Extra
+        // # used to implement `Extra` on `ChainedExtra`
+        + From<(Acc, <Self::Acc as WithExtra>::Extra)>
+        + Into<(Acc, <Self::Acc as WithExtra>::Extra)>;
+    type Node: From<Acc::Node>
+        // # used to implement `Extra` on `ChainedExtra`
+        + From<(<Acc as Accumulator>::Node, <Self::Acc as WithExtra>::Extra)>
+        + Into<(<Acc as Accumulator>::Node, <Self::Acc as WithExtra>::Extra)>;
+
+    #[doc(hidden)] // TODO extract to other trait. Used to implement `Extra` on `ChainedExtra`
+    fn _from_cache(&mut self, _id: HAST::IdN) -> Option<<Self::Acc as WithExtra>::Extra> {
+        None
+    }
 
     fn from_cache(
         &mut self,
@@ -694,9 +718,18 @@ pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
         entity: &mut EntityBuilder,
-        acc: &mut Self::Acc,
+        acc: Self::Acc,
         label: Option<&str>,
-    );
+    ) -> Self::Acc;
+
+    #[doc(hidden)] // TODO extract to other trait. Used to implement `Extra` on `ChainedExtra`
+    fn _to_cache(
+        &mut self,
+        _id: HAST::IdN,
+        extra: <Self::Acc as WithExtra>::Extra,
+    ) -> <Self::Acc as WithExtra>::Extra {
+        extra
+    }
 
     fn to_cache(
         &mut self,
@@ -955,6 +988,8 @@ pub struct AccWithExtra<Acc, Extra>(Acc, Extra);
 mod extra;
 
 pub mod extra_pattern_precomp;
+
+pub mod extra_chain;
 
 impl<HAST, Acc> More<HAST> for NoOpMore<HAST::TS, Acc>
 where

@@ -78,8 +78,8 @@ fn hyperast_on_pom() {
     let tree = tree_sitter_parse(&text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::<TStore>::default();
-    let mut tree_gen = XmlTreeGen::new(&mut stores);
-    let x = tree_gen.generate_file(b"", &text, tree.walk()).local;
+    let mut tree_gen = XmlTreeGen::bare(&mut stores);
+    let x = tree_gen.generate_file(b"", &text, tree.walk()).node.local;
     let id = x.compressed_node;
     use hyperast::nodes;
     println!("{}", nodes::SexpSerializer::new(&stores, id));
@@ -106,11 +106,8 @@ fn xml_issue_cdata() {
     let tree = tree_sitter_parse(text);
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::<TStore>::default();
-    let mut tree_gen = XmlTreeGen {
-        line_break: "\n".as_bytes().to_vec(),
-        stores: &mut stores,
-    };
-    let _x = tree_gen.generate_file(b"", text, tree.walk()).local;
+    let mut tree_gen = XmlTreeGen::bare(&mut stores);
+    let _x = tree_gen.generate_file(b"", text, tree.walk()).node.local;
     // println!("{}", tree.root_node().to_sexp());
 }
 

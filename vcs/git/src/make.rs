@@ -11,11 +11,14 @@ use crate::{
     processing::ObjectName,
 };
 
-pub(crate) fn handle_makefile_file<'a>(
-    tree_gen: &mut XmlTreeGen<'a, TStore>,
+pub(crate) fn handle_makefile_file<'a, E>(
+    tree_gen: &mut XmlTreeGen<'a, 'a, E>,
     name: &ObjectName,
     text: &'a [u8],
-) -> Result<MakeFile, ()> {
+) -> Result<MakeFile, ()>
+where
+    E: hyperast::tree_gen::TsExtra<hyperast::store::SimpleStores<TStore>>,
+{
     log::trace!("not parsing {} bytes long Makefile", text.len()); // TODO parse the makefile
     let text = b"<proj></proj>";
     let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
@@ -27,9 +30,10 @@ pub(crate) fn handle_makefile_file<'a>(
             return Err(());
         }
     }
-    let x = tree_gen
+    let (n, _) = tree_gen
         .generate_file(name.as_bytes(), text, tree.walk())
-        .local;
+        .into();
+    let x = n.local;
     // TODO extract submodules, dependencies and directories. maybe even more ie. artefact id, ...
     let x = MakeFile {
         compressed_node: x.compressed_node,

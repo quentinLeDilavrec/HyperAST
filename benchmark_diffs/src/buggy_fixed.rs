@@ -553,10 +553,7 @@ mod test {
         let buggy = CASE7;
         let fixed = CASE8;
         let mut stores = SimpleStores::<TStore>::default();
-        let mut tree_gen = XmlTreeGen {
-            line_break: "\n".as_bytes().to_vec(),
-            stores: &mut stores,
-        };
+        let mut tree_gen = XmlTreeGen::bare(&mut stores);
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
@@ -665,10 +662,7 @@ mod test {
         let buggy = CASE_SIMPLE;
         let fixed = CASE_SIMPLE;
         let mut stores = SimpleStores::<TStore>::default();
-        let mut tree_gen = XmlTreeGen {
-            line_break: "\n".as_bytes().to_vec(),
-            stores: &mut stores,
-        };
+        let mut tree_gen = XmlTreeGen::bare(&mut stores);
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
@@ -780,10 +774,7 @@ mod test {
         let buggy = CASE_SIMPLE;
         let fixed = CASE_SIMPLE;
         let mut stores = SimpleStores::<TStore>::default();
-        let mut tree_gen = XmlTreeGen {
-            line_break: "\n".as_bytes().to_vec(),
-            stores: &mut stores,
-        };
+        let mut tree_gen = XmlTreeGen::bare(&mut stores);
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
@@ -975,10 +966,7 @@ mod test {
         let buggy = CASE10;
         let fixed = CASE9;
         let mut stores = SimpleStores::<TStore>::default();
-        let mut tree_gen = XmlTreeGen {
-            line_break: "\n".as_bytes().to_vec(),
-            stores: &mut stores,
-        };
+        let mut tree_gen = XmlTreeGen::bare(&mut stores);
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let full_node1 = {
@@ -1085,10 +1073,7 @@ mod test {
         let buggy = CASE12;
         let fixed = CASE11;
         let mut stores = SimpleStores::<TStore>::default();
-        let mut tree_gen = XmlTreeGen {
-            line_break: "\n".as_bytes().to_vec(),
-            stores: &mut stores,
-        };
+        let mut tree_gen = XmlTreeGen::bare(&mut stores);
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;
@@ -1178,10 +1163,7 @@ mod test {
         let buggy = CASE10;
         let fixed = CASE9;
         let mut stores = SimpleStores::<TStore>::default();
-        let mut tree_gen = XmlTreeGen {
-            line_break: "\n".as_bytes().to_vec(),
-            stores: &mut stores,
-        };
+        let mut tree_gen = XmlTreeGen::bare(&mut stores);
         println!("len={}: ", buggy.len());
         let (src_tr, dst_tr) = {
             let tree_gen = &mut tree_gen;

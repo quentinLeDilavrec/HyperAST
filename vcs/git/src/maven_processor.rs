@@ -459,10 +459,8 @@ impl RepositoryProcessor {
                 // let holder = c.mut_or_default::<PomProcessorHolder>();
                 // let pom_proc = holder.with_parameters_mut(parameters.0);
                 // let md_cache = &mut pom_proc.cache.object_map;
-                let mut xml_tree_gen = XmlTreeGen {
-                    line_break,
-                    stores: self.main_stores.mut_with_ts(),
-                };
+                let mut xml_tree_gen = XmlTreeGen::bare(self.main_stores.mut_with_ts()) //
+                    .set_line_break(line_break);
                 crate::maven::handle_pom_file(&mut xml_tree_gen, n, t)
             })?;
         let name = self.intern_object_name(&name);

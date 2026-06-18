@@ -68,11 +68,8 @@ fn xml_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_xml::TStore>, legion::
     let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
     // println!("{:#?}", tree.root_node().to_sexp());
     let mut stores: SimpleStores<TStore> = SimpleStores::default();
-    let mut tree_gen = XmlTreeGen {
-        line_break: "\n".as_bytes().to_vec(),
-        stores: &mut stores,
-    };
-    let x = tree_gen.generate_file(b"", text, tree.walk()).local;
+    let mut tree_gen = XmlTreeGen::bare(&mut stores);
+    let x = tree_gen.generate_file(b"", text, tree.walk()).node.local;
     let entity = x.compressed_node;
     // println!(
     //     "{}",

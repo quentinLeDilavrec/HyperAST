@@ -295,10 +295,7 @@ impl RepositoryProcessor {
             .caching_blob_handler::<crate::processing::file_sys::MakeFile>()
             .handle(oid, repository, &name, parameters, |_c, n, t| {
                 crate::make::handle_makefile_file(
-                    &mut XmlTreeGen {
-                        line_break: "\n".as_bytes().to_vec(),
-                        stores: self.main_stores.mut_with_ts(),
-                    },
+                    &mut XmlTreeGen::bare(self.main_stores.mut_with_ts()),
                     n,
                     t,
                 )

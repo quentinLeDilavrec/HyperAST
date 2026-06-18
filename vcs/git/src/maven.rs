@@ -18,11 +18,14 @@ use crate::{
     SimpleStores, processing::ObjectName,
 };
 
-pub(crate) fn handle_pom_file<'a>(
-    tree_gen: &mut XmlTreeGen<'a, TStore>,
+pub(crate) fn handle_pom_file<'a, E>(
+    tree_gen: &mut XmlTreeGen<'a, 'a, E>,
     name: &ObjectName,
     text: &'a [u8],
-) -> Result<POM, ParseErr> {
+) -> Result<POM, ParseErr>
+where
+    E: hyperast::tree_gen::TsExtra<hyperast::store::SimpleStores<TStore>>,
+{
     let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
     if tree.root_node().has_error() {
         log::warn!("bad CST: {:?}", name.try_str());
@@ -32,9 +35,10 @@ pub(crate) fn handle_pom_file<'a>(
         }
     }
 
-    let x = tree_gen
+    let (n, _) = tree_gen
         .generate_file(name.as_bytes(), text, tree.walk())
-        .local;
+        .into();
+    let x = n.local;
     // TODO extract submodules, dependencies and directories. maybe even more ie. artefact id, ...
     let x = POM {
         compressed_node: x.compressed_node,

@@ -4425,6 +4425,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperast_gen_ts_python"
+version = "0.5.0"
+dependencies = [
+ "bitvec",
+ "cfg-if",
+ "env_logger 0.11.5",
+ "hashbrown 0.14.5",
+ "hyperast",
+ "hyperast_tsquery",
+ "legion",
+ "libc 0.2.171",
+ "log",
+ "num",
+ "polyglot",
+ "pretty_assertions",
+ "serde",
+ "tree-sitter",
+ "tree-sitter-python",
+]
+
+[[package]]
 name = "hyperast_gen_ts_ts"
 version = "0.5.0"
 dependencies = [

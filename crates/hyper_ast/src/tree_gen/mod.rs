@@ -32,8 +32,7 @@ use std::fmt::Debug;
 
 use crate::hashed::NodeHashs;
 use crate::nodes::Space;
-use crate::store::nodes::EntityBuilder as DynBuilder; // TODO rename the base trait
-use crate::store::nodes::legion::dyn_builder::EntityBuilder;
+use crate::store::nodes::GatherAttrErazed; // TODO rename the base trait
 use crate::types::{ETypeStore, HyperAST, HyperASTShared, StoreRefAssoc};
 
 #[cfg(feature = "ts")]
@@ -90,7 +89,7 @@ impl<T, IdN> BasicAccumulator<T, IdN> {
         }
     }
 
-    pub fn add_primary<L, K, EB: DynBuilder>(
+    pub fn add_primary<L, K, EB: GatherAttrErazed>(
         self,
         dyn_builder: &mut EB,
         interned_kind: K,
@@ -127,7 +126,7 @@ impl<T, IdN> BasicAccumulator<T, IdN> {
 }
 
 pub fn add_cs_no_spaces<IdN: 'static + Send + Sync>(
-    dyn_builder: &mut impl DynBuilder,
+    dyn_builder: &mut impl GatherAttrErazed,
     children: Vec<IdN>,
 ) {
     use crate::store::nodes::compo;
@@ -207,7 +206,11 @@ impl<U> SubTreeMetrics<U> {
     }
 
     #[must_use]
-    pub fn add_md_metrics(self, dyn_builder: &mut impl DynBuilder, children_is_empty: bool) -> U {
+    pub fn add_md_metrics(
+        self,
+        dyn_builder: &mut impl GatherAttrErazed,
+        children_is_empty: bool,
+    ) -> U {
         use crate::store::nodes::compo;
         if !children_is_empty {
             dyn_builder.add(compo::Size(self.size));
@@ -625,7 +628,7 @@ impl<R> RoleAcc<R> {
         }
     }
 
-    pub fn add_md<EB: DynBuilder>(self, dyn_builder: &mut EB)
+    pub fn add_md<EB: GatherAttrErazed>(self, dyn_builder: &mut EB)
     where
         R: 'static + std::marker::Send + std::marker::Sync,
     {
@@ -638,7 +641,7 @@ impl<R> RoleAcc<R> {
     }
 }
 
-pub fn add_md_precomp_queries<EB: DynBuilder>(
+pub fn add_md_precomp_queries<EB: GatherAttrErazed>(
     dyn_builder: &mut EB,
     precomp_queries: PrecompQueries,
 ) {
@@ -717,7 +720,7 @@ pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
     fn extra(
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
-        entity: &mut EntityBuilder,
+        entity: &mut impl GatherAttrErazed,
         acc: Self::Acc,
         label: Option<&str>,
     ) -> Self::Acc;

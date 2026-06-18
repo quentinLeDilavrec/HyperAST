@@ -64,11 +64,21 @@ traits_compose! { pub Compo:
     { 'static + Send + Sync }
 }
 
-pub trait EntityBuilder {
+// TODO find a way to protect against overwrites
+/// Runtime defined storing to data.
+///
+/// The objective is to share a common interface between
+/// HyperAST preprocessing of syntax trees and
+/// backend storage solutions, e.g. `legion`.
+pub trait GatherAttrErazed {
+    /// Add `component` to the entity.
+    ///
+    /// If the bundle already contains a component of type `T`,
+    /// it will be dropped and replaced with the most recently added one.
     fn add<T: Compo>(&mut self, component: T) -> &mut Self;
 }
 
-pub trait DerivedData<EB: EntityBuilder>: Sized {
+pub trait DerivedData<EB: GatherAttrErazed>: Sized {
     fn persist(self, builder: &mut EB);
 }
 

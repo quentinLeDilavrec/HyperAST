@@ -6,7 +6,7 @@ use std::ops::AddAssign;
 
 use super::{AccWithExtra, Accumulator};
 use super::{Extra, WithByteRange, WithExtra};
-use crate::store::nodes::legion::dyn_builder::EntityBuilder;
+use crate::store::nodes::GatherAttrErazed;
 use crate::types::StoreRefAssoc;
 
 pub struct ChainedExtra<A, B>(pub A, pub B);
@@ -82,7 +82,7 @@ where
     fn extra(
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
-        dyn_builder: &mut EntityBuilder,
+        dyn_builder: &mut impl GatherAttrErazed,
         acc: Self::Acc,
         label: Option<&str>,
     ) -> Self::Acc {

@@ -9,7 +9,6 @@ use crate::full::FullNode;
 use crate::hashed::{IndexingHashBuilder, MetaDataHashsBuilder, SyntaxNodeHashs};
 use crate::nodes::Space;
 use crate::store::SimpleStores;
-use crate::store::nodes::DefaultNodeStore as NodeStore;
 use crate::store::nodes::compo;
 use crate::store::nodes::legion::DedupMap;
 use crate::store::nodes::legion::NodeIdentifier;
@@ -17,6 +16,7 @@ use crate::store::nodes::legion::RawHAST;
 use crate::store::nodes::legion::dyn_builder::EntityBuilder;
 use crate::store::nodes::legion::eq_node;
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
+use crate::store::nodes::{DefaultNodeStore as NodeStore, GatherAttrErazed};
 
 use crate::types::LabelStore as _;
 use crate::types::Role;
@@ -190,7 +190,7 @@ where
     fn extra(
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
-        entity: &mut EntityBuilder,
+        entity: &mut impl GatherAttrErazed,
         acc: Self::Acc,
         label: Option<&str>,
     ) -> Self::Acc {

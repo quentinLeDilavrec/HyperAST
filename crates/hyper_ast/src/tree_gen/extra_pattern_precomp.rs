@@ -7,7 +7,7 @@ use std::hash::Hash;
 use super::{AccWithExtra, Accumulator};
 use super::{Extra, WithByteRange, WithExtra};
 use crate::compat::HashMap;
-use crate::store::nodes::legion::dyn_builder::EntityBuilder;
+use crate::store::nodes::GatherAttrErazed;
 use crate::types::StoreRefAssoc;
 
 /// Extra data for the pattern pre-computation step.
@@ -76,7 +76,7 @@ where
     fn extra(
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
-        dyn_builder: &mut EntityBuilder,
+        dyn_builder: &mut impl GatherAttrErazed,
         mut acc: Self::Acc,
         label: Option<&str>,
     ) -> Self::Acc {

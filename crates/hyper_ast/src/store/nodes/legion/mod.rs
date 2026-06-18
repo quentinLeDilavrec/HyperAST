@@ -228,6 +228,6 @@ where
     use crate::types::Lang;
     let l = <TS::Ty2 as crate::types::TypeTrait>::Lang::INST;
     let mut builder = dyn_builder::EntityBuilder::with_lang(l);
-    crate::store::nodes::EntityBuilder::add(&mut builder, ty);
+    builder.add(ty);
     builder
 }

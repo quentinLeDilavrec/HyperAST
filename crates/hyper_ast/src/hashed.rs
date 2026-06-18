@@ -5,8 +5,9 @@ use num::traits::WrappingAdd;
 
 use crate::PrimInt;
 use crate::nodes::{CompressedNode, HashSize};
+use crate::store::labels::DefaultLabelIdentifier;
+use crate::store::nodes::{DefaultNodeIdentifier, GatherAttrErazed};
 use crate::types::{AnyType, HashKind, HyperType, NodeId};
-use crate::{store::labels::DefaultLabelIdentifier, store::nodes::DefaultNodeIdentifier};
 
 pub type HashedNode = HashedCompressedNode<
     SyntaxNodeHashs<HashSize>,
@@ -181,7 +182,7 @@ impl MetaDataHashsBuilder<SyntaxNodeHashs<u32>> for HashesBuilder<SyntaxNodeHash
 }
 
 impl SyntaxNodeHashs<u32> {
-    pub fn persist(self, dyn_builder: &mut impl crate::store::nodes::EntityBuilder) {
+    pub fn persist(self, dyn_builder: &mut impl GatherAttrErazed) {
         dyn_builder.add(self);
     }
 }

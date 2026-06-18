@@ -6,6 +6,8 @@ use hyperast::tree_gen::TsEnableTS;
 pub mod impls;
 pub mod more;
 
+pub type Role = hyperast::types::Role;
+
 #[derive(Clone, Copy, Default)]
 pub struct TStore;
 

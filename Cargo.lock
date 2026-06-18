@@ -4433,6 +4433,7 @@ dependencies = [
  "env_logger 0.11.5",
  "hashbrown 0.14.5",
  "hyperast",
+ "hyperast_tsquery",
  "legion",
  "libc 0.2.171",
  "log",

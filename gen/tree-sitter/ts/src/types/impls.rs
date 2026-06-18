@@ -15,6 +15,10 @@ use super::{Lang, Ts};
 use super::{S_T_L, Type};
 
 cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
+    use hyperast::types::RoleStore;
+    use hyperast::types::LangWrapper;
+    use super::Role;
+
     impl TsEnableTS for TStore {
         fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
             n: &N,
@@ -60,16 +64,39 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
     impl TypeStore for TStore {
         type Ty = TypeU16<Ts>;
     }
-    impl TsEnabledTypeStore for TStore {
-        fn resolve(t: Self::Ty) -> Type {
-            t.e()
+
+    // impl TsEnabledTypeStore for TStore {
+    //     fn resolve(t: Self::Ty) -> Type {
+    //         t.e()
+    //     }
+    // }
+
+    impl RoleStore for TStore {
+        type IdF = u16;
+
+        type Role = Role;
+
+        fn resolve_field(_lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
+            let s = crate::language()
+                .field_name_for_id(field_id)
+                .ok_or_else(|| format!("{}", field_id))
+                .unwrap();
+            Role::try_from(s).expect(s)
+        }
+
+        fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
+            let field_name = role.to_string();
+            crate::language()
+                .field_id_for_name(field_name)
+                .unwrap()
+                .into()
         }
     }
 }}
 
-pub trait TsEnabledTypeStore: hyperast::types::ETypeStore<Ty2 = Type> + Clone + TsEnableTS {
-    fn resolve(t: Self::Ty) -> Type;
-}
+// pub trait TsEnabledTypeStore: hyperast::types::ETypeStore<Ty2 = Type> + Clone + TsEnableTS {
+//     fn resolve(t: Self::Ty) -> Type;
+// }
 
 impl Type {
     pub fn resolve(t: u16) -> Self {
@@ -314,15 +341,15 @@ impl HyperType for Type {
     }
 
     fn is_hidden(&self) -> bool {
-        todo!()
+        self.is_hidden()
     }
 
     fn is_supertype(&self) -> bool {
-        todo!()
+        self.is_supertype()
     }
 
     fn is_named(&self) -> bool {
-        todo!()
+        self.is_named()
     }
 
     fn get_lang(&self) -> hyperast::types::LangWrapper<Self>

@@ -16,9 +16,8 @@ cfg_if::cfg_if! { if #[cfg(feature = "types")] {
 #[cfg(all(feature = "impl", feature = "legion"))]
 pub mod legion;
 
-#[cfg(test)]
 #[cfg(all(feature = "impl", feature = "legion"))]
-mod legion_ts_simp;
+pub mod legion_ts_simp;
 
 #[cfg(all(test, feature = "impl"))]
 mod tests;

@@ -102,6 +102,7 @@ use legion::storage::{
     UnknownComponentStorage,
 };
 
+use super::super::GatherAttrErazed;
 use super::*;
 
 /// A builder of entities for a archetypal store, here legion.
@@ -115,6 +116,11 @@ impl Debug for BuiltEntity {
     }
 }
 
+/// Build and entity defined at runtime using a kind of type-indexed association table.
+/// Types are erased to be stored, they are used to index the data.
+/// You can access the data you stored using accessor like a hashmap but the type is the key
+///
+/// See `hyperast::store::nodes::EntityBuilder` for additional explanations
 pub struct EntityBuilder {
     inner: Common<fn() -> Box<dyn UnknownComponentStorage>>,
 }
@@ -135,10 +141,7 @@ impl EntityBuilder {
         s
     }
 
-    /// Add `component` to the entity.
-    ///
-    /// If the bundle already contains a component of type `T`, it will be dropped and replaced with
-    /// the most recently added one.
+    /// See [`super::super::GatherAttrErazed::add`]
     pub fn add<T: Component>(&mut self, component: T) -> &mut Self {
         self._add(component)
     }
@@ -164,11 +167,7 @@ impl EntityBuilder {
     }
 }
 
-impl super::super::EntityBuilder for EntityBuilder {
-    /// Add `component` to the entity.
-    ///
-    /// If the bundle already contains a component of type `T`, it will be dropped and replaced with
-    /// the most recently added one.
+impl GatherAttrErazed for EntityBuilder {
     fn add<T: Component>(&mut self, component: T) -> &mut Self {
         self._add(component)
     }
@@ -637,3 +636,5 @@ fn simple() {
         assert_eq!(Ok(&comp4), entry.get_component::<String>());
     }
 }
+
+// TODO need more tests, it's non trivial, especially memory management

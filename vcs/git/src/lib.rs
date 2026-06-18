@@ -194,7 +194,7 @@ impl<Id, L, M> BasicDirAcc<Id, L, M> {
 impl<Id, L, M> BasicDirAcc<Id, L, M> {
     pub fn persist<K>(
         self,
-        dyn_builder: &mut impl hyperast::store::nodes::EntityBuilder,
+        dyn_builder: &mut impl hyperast::store::nodes::GatherAttrErazed,
         interned_kind: K,
         label_id: L,
     ) -> M

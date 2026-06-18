@@ -5,7 +5,9 @@ pub mod direct_type_ref;
 pub mod extends_package_local;
 pub mod obj_creation;
 
-use crate::{git::fetch_github_repository, preprocessed::PreProcessedRepository};
+use crate::git::fetch_github_repository;
+use crate::preprocessed::PreProcessedRepository;
+
 #[cfg(feature = "impact")]
 use std::env;
 

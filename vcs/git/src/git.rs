@@ -449,18 +449,6 @@ pub(crate) enum BasicGitObject {
     Tree(Oid, ObjectName),
 }
 
-// impl<'a> From<TreeEntry<'a>> for BasicGitObjects {
-//     fn from(x: TreeEntry<'a>) -> Self {
-//         if x.kind().unwrap().eq(&git2::ObjectType::Tree) {
-//             Self::Tree(x.id(), x.name_bytes().to_owned())
-//         } else if x.kind().unwrap().eq(&git2::ObjectType::Blob) {
-//             Self::Blob(x.id(), x.name_bytes().to_owned())
-//         } else {
-//             panic!("{:?} {:?}",x.kind(), x.name_bytes())
-//         }
-//     }
-// }
-
 impl<'a> TryFrom<TreeEntry<'a>> for BasicGitObject {
     type Error = TreeEntry<'a>;
 
@@ -518,36 +506,6 @@ pub trait UniqueObject {
     fn id(&self) -> &Self::Id;
 }
 
-// enum File<'a, 'b, Id> {
-//     File(Id, Vec<u8>, &'a [u8]),
-//     Dir(Id, Vec<u8>, &'b [Id]),
-// }
-// impl<'a, 'b, Id> NamedObject for File<'a, 'b, Id> {
-//     fn name(&self) -> &[u8] {
-//         match self {
-//             File::Dir { 1: name, .. } => name,
-//             File::File { 1: name, .. } => name,
-//         }
-//     }
-// }
-// impl<'a, 'b, Id: Clone> UniqueObject for File<'a, 'b, Id> {
-//     type Id = Id;
-//     fn id(&self) -> &Id {
-//         match self {
-//             File::Dir { 0: id, .. } => id,
-//             File::File { 0: id, .. } => id,
-//         }
-//     }
-// }
-// impl<'a, 'b, Id> TypedObject for File<'a, 'b, Id> {
-//     fn r#type(&self) -> ObjectType {
-//         match self {
-//             File::Dir(..) => ObjectType::Dir,
-//             File::File(..) => ObjectType::File,
-//         }
-//     }
-// }
-
 pub fn read_position(
     repo: &Repository,
     commit: &str,
@@ -556,19 +514,6 @@ pub fn read_position(
     read_position_floating(repo, commit, position, 0).map(|x| x.1)
 }
 
-// let mut before = 0;
-// for _ in 0..border_lines {
-//     let x = text[before..]
-//         .find(|x: char| x == '\n')
-//         .unwrap_or(text.len() - before);
-//     before = before + x + 1;
-//     before = before.min(text.len() - 1)
-// }
-// let mut after = text.len();
-// for _ in 0..border_lines {
-//     let x = text[..after].rfind(|x: char| x == '\n').unwrap_or_default();
-//     after = x;
-// }
 pub fn read_position_floating_lines(
     repo: &Repository,
     commit: &str,

@@ -331,6 +331,6 @@ pub fn initial_lazy_mapping(
     let mappings = mapper.mapping.mappings;
     (
         [mapper_owned.0.decomp, mapper_owned.1.decomp],
-        [mappings, std::default::Default::default()],
+        [mappings, Default::default()],
     )
 }

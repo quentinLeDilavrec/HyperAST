@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::path::{Components, PathBuf};
@@ -5,7 +6,6 @@ use std::path::{Components, PathBuf};
 use git2::{Oid, Repository};
 
 use hyperast::hashed::MetaDataHashsBuilder;
-use hyperast::store::defaults::NodeIdentifier;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::RawHAST;
 use hyperast::tree_gen::Accumulator;
@@ -13,18 +13,26 @@ use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
 use hyperast_gen_ts_xml::Type;
 
+use crate::_auto_configured_line_break;
 use crate::Processor;
 use crate::StackEle;
 use crate::git::{BasicGitObject, NamedObject, ObjectType, TypedObject};
-use crate::maven::{MD, MavenModuleAcc};
+use crate::maven::{FullNode, MD, MavenModuleAcc};
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ParametrizedCommitProcessorHandle;
-use crate::processing::erased::{
-    CommitProcessorHandle, ParametrizedCommitProcessor2Handle as PCP2Handle,
-};
-use crate::processing::{CacheHolding, InFiles, ObjectName, erased::ParametrizedCommitProc2};
+use crate::processing::caches::Maven as MavenCaches;
+use crate::processing::caches::Pom as PomCaches;
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::{CommitProcExt, ParametrizedCommitProc2};
+use crate::processing::erased::{CommitProcessorHandle, ConfigParametersHandle};
+use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::processing::{ParametrizedCommitProcessorHandle, file_sys};
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
+
+type ScriptingPrepro<'a, 'hast> = hyperast::scripting::Prepro<
+    RawHAST<'hast, hyperast_gen_ts_java::TStore>,
+    &'a hyperast_gen_ts_java::legion_with_refs::Acc,
+>;
 
 /// RMS: Resursive Module Search
 /// FFWD: Fast ForWarD to java directories without looking at maven stuff
@@ -54,12 +62,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         let prep_scripting = prep_scripting(prepro, handle.1);
         let acc = acc.init_scripting(
             prep_scripting
-                .map(|x| {
-                    hyperast::scripting::Prepro::<
-                        RawHAST<hyperast_gen_ts_java::TStore>,
-                        &hyperast_gen_ts_java::legion_with_refs::Acc,
-                    >::from(x.clone())
-                })
+                .map(|x| ScriptingPrepro::from(x.clone()))
                 .as_ref(),
         );
         let stack = vec![StackEle::new(oid, prepared, acc)];
@@ -77,36 +80,28 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
     for MavenProcessor<'a, 'b, 'c, RMS, FFWD, MavenModuleAcc>
 {
     fn pre(&mut self, current_dir: BasicGitObject) {
-        match current_dir {
-            BasicGitObject::Tree(oid, name) => {
-                self.handle_tree_cached(name, oid);
-            }
-            BasicGitObject::Blob(oid, name)
-                if !FFWD
-                    && self.dir_path.peek().is_none()
-                    && crate::processing::file_sys::Pom::matches(&name) =>
+        if let BasicGitObject::Tree(oid, name) = current_dir {
+            self.handle_tree_cached(name, oid);
+        } else if let BasicGitObject::Blob(oid, name) = current_dir
+            && !FFWD
+            && self.dir_path.peek().is_none()
+            && file_sys::Pom::matches(&name)
+        {
+            let parent_acc = &mut self.stack.last_mut().unwrap().acc;
+            // TODO find a better conversion, ie. first safe conv to MavenProc handle then into()
+            let parameters = PCP2Handle(ConfigParametersHandle(0), PhantomData);
+            if let Err(err) =
+                self.prepro
+                    .handle_pom(oid, parent_acc, name, &self.repository, parameters)
             {
-                let parent_acc = &mut self.stack.last_mut().unwrap().acc;
-                // TODO find a better conversion, ie. first safe conv to MavenProc handle then into()
-                let parameters = PCP2Handle(
-                    crate::processing::erased::ConfigParametersHandle(0),
-                    // self.handle.1,
-                    PhantomData,
-                );
-                if let Err(err) =
-                    self.prepro
-                        .handle_pom(oid, parent_acc, name, &self.repository, parameters)
-                {
-                    log::debug!("{:?}", err);
-                }
+                log::debug!("{:?}", err);
             }
-            _ => {}
         }
     }
-    fn post(&mut self, oid: Oid, acc: MavenModuleAcc) -> Option<(NodeIdentifier, MD)> {
+    fn post(&mut self, oid: Oid, acc: MavenModuleAcc) -> Option<FullNode> {
         let name = acc.primary.name.clone();
         let full_node = Self::make(acc, self.prepro.main_stores_mut().mut_with_ts());
-        log::info!("tree size: {}", full_node.1.metrics.size);
+        log::info!("tree size: {}", full_node.md.metrics.size);
         self.prepro
             .processing_systems
             .mut_or_default::<MavenProcessorHolder>()
@@ -125,12 +120,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
                 w.primary.children_names,
                 name
             );
-            let id = full_node.0;
-            if full_node
-                .1
-                .status
-                .contains(crate::maven::SemFlag::IsMavenModule)
-            {
+            let id = full_node.id;
+            if full_node.is_maven_module() {
                 w.push_submodule(name, full_node);
             } else {
                 w.push((name, full_node));
@@ -155,7 +146,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     MavenProcessor<'a, 'b, 'c, RMS, FFWD, MavenModuleAcc>
 {
-    fn make(acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeIdentifier, MD) {
+    fn make(acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
         make(acc, stores)
     }
 
@@ -173,12 +164,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 let prep_scripting = prep_scripting(&self.prepro, self.handle.1);
                 let acc = acc.init_scripting(
                     prep_scripting
-                        .map(|x| {
-                            hyperast::scripting::Prepro::<
-                                RawHAST<hyperast_gen_ts_java::TStore>,
-                                &hyperast_gen_ts_java::legion_with_refs::Acc,
-                            >::from(x.clone())
-                        })
+                        .map(|x| ScriptingPrepro::from(x.clone()))
                         .as_ref(),
                 );
                 self.stack.push(StackEle::new(oid, prepared, acc));
@@ -199,12 +185,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name = self.prepro.intern_object_name(&name);
             assert!(!w.primary.children_names.contains(&name));
-            let id = full_node.0;
-            if full_node
-                .1
-                .status
-                .contains(crate::maven::SemFlag::IsMavenModule)
-            {
+            let id = full_node.id;
+            if full_node.is_maven_module() {
                 w.push_submodule(name, full_node);
             } else {
                 w.push((name, full_node));
@@ -283,7 +265,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 // handle as maven module
                 let acc = helper.into_acc().init_scripting(
                     prep_scripting
-                        .map(|x| hyperast::scripting::Prepro::from(x.clone()))
+                        .map(|x| ScriptingPrepro::from(x.clone()))
                         .as_ref(),
                 );
                 self.stack.push(StackEle::new(oid, prepared, acc));
@@ -291,7 +273,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 // search further inside
                 let acc = helper.into_acc().init_scripting(
                     prep_scripting
-                        .map(|x| hyperast::scripting::Prepro::from(x.clone()))
+                        .map(|x| ScriptingPrepro::from(x.clone()))
                         .as_ref(),
                 );
                 self.stack.push(StackEle::new(oid, prepared, acc));
@@ -304,7 +286,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             let prep_scripting = prep_scripting(&self.prepro, self.handle.1);
             let acc = helper.into_acc().init_scripting(
                 prep_scripting
-                    .map(|x| hyperast::scripting::Prepro::from(x.clone()))
+                    .map(|x| ScriptingPrepro::from(x.clone()))
                     .as_ref(),
             );
             self.stack.push(StackEle::new(oid, prepared, acc));
@@ -313,15 +295,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
 }
 
 impl MavenModuleAcc {
-    fn init_scripting(
-        mut self,
-        prep_scripting: Option<
-            &hyperast::scripting::Prepro<
-                RawHAST<hyperast_gen_ts_java::TStore>,
-                &hyperast_gen_ts_java::legion_with_refs::Acc,
-            >,
-        >,
-    ) -> Self {
+    fn init_scripting(mut self, prep_scripting: Option<&ScriptingPrepro>) -> Self {
         if let Some(more) = prep_scripting {
             log::info!("prep_scripting");
             use hyperast::tree_gen::Prepro;
@@ -342,7 +316,7 @@ impl MavenModuleAcc {
 // and use the type in ParametrizedCommitProcessor2Handle to get the Holder
 fn prep_scripting(
     prepro: &RepositoryProcessor,
-    handle: crate::processing::erased::ConfigParametersHandle,
+    handle: ConfigParametersHandle,
 ) -> Option<&std::sync::Arc<str>> {
     prepro
         .processing_systems
@@ -355,7 +329,7 @@ fn prep_scripting(
         .as_ref()
 }
 
-pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeIdentifier, MD) {
+pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
     use hyperast::hashed::IndexingHashBuilder;
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
@@ -400,7 +374,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
             ana,
             status,
         };
-        return (id, md);
+        return FullNode { id, md };
     }
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
@@ -434,7 +408,7 @@ pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> (NodeI
         ana,
         status,
     };
-    (node_id, md)
+    FullNode { id: node_id, md }
 }
 
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
@@ -449,13 +423,9 @@ impl RepositoryProcessor {
     ) -> Result<(), crate::ParseErr> {
         let x = self
             .processing_systems
-            .caching_blob_handler::<crate::processing::file_sys::Pom>()
+            .caching_blob_handler::<file_sys::Pom>()
             .handle(oid, repository, &name, parameters, |_c, n, t| {
-                let line_break = if t.contains(&b'\r') {
-                    "\r\n".as_bytes().to_vec()
-                } else {
-                    "\n".as_bytes().to_vec()
-                };
+                let line_break = _auto_configured_line_break(t);
                 // let holder = c.mut_or_default::<PomProcessorHolder>();
                 // let pom_proc = holder.with_parameters_mut(parameters.0);
                 // let md_cache = &mut pom_proc.cache.object_map;
@@ -530,7 +500,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     {
         let mut children_objects: Vec<_> = tree.collect();
         let p = children_objects.iter().position(|x| match x.r#type() {
-            ObjectType::File => crate::processing::file_sys::Pom::matches(x.name()),
+            ObjectType::File => file_sys::Pom::matches(x.name()),
             ObjectType::Dir => false,
         });
         if let Some(p) = p {
@@ -554,7 +524,7 @@ pub(crate) fn prepare_dir_exploration(
         .collect();
     if dir_path.peek().is_none() {
         let p = children_objects.iter().position(|x| match x {
-            BasicGitObject::Blob(_, n) => crate::processing::file_sys::Pom::matches(&n),
+            BasicGitObject::Blob(_, n) => file_sys::Pom::matches(&n),
             _ => false,
         });
         if let Some(p) = p {
@@ -599,7 +569,7 @@ pub struct PomParameter {}
 
 pub struct PomProc {
     parameter: Option<PomParameter>,
-    cache: crate::processing::caches::Pom,
+    cache: PomCaches,
 }
 impl crate::processing::erased::Parametrized for PomProcessorHolder {
     type T = PomParameter;
@@ -645,52 +615,37 @@ impl crate::processing::erased::CommitProc for PomProc {
     }
 }
 
-impl crate::processing::erased::CommitProcExt for PomProc {
+impl CommitProcExt for PomProc {
     type Holder = PomProcessorHolder;
 }
-impl crate::processing::erased::ParametrizedCommitProc2 for PomProcessorHolder {
+impl ParametrizedCommitProc2 for PomProcessorHolder {
     type Proc = PomProc;
 
-    fn with_parameters_mut(
-        &mut self,
-        parameters: crate::processing::erased::ConfigParametersHandle,
-    ) -> &mut Self::Proc {
+    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
         &mut self.0[parameters.0]
     }
 
-    fn with_parameters(
-        &self,
-        parameters: crate::processing::erased::ConfigParametersHandle,
-    ) -> &Self::Proc {
+    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
         &self.0[parameters.0]
     }
 }
-impl CacheHolding<crate::processing::caches::Pom> for PomProc {
-    fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Pom {
+impl CacheHolding<PomCaches> for PomProc {
+    fn get_caches_mut(&mut self) -> &mut PomCaches {
         &mut self.cache
     }
 
-    fn get_caches(&self) -> &crate::processing::caches::Pom {
+    fn get_caches(&self) -> &PomCaches {
         &self.cache
     }
 }
-// impl CacheHolding<crate::processing::caches::Pom> for PomProcessorHolder {
-//     fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Pom {
-//         &mut self.0.as_mut().unwrap().cache
-//     }
-
-//     fn get_caches(&self) -> &crate::processing::caches::Pom {
-//         &self.0.as_ref().unwrap().cache
-//     }
-// }
 
 // # Maven
 #[derive(Default)]
 pub struct MavenProcessorHolder(Vec<MavenProc>);
 pub struct MavenProc {
     parameter: Parameter,
-    cache: crate::processing::caches::Maven,
-    commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+    cache: MavenCaches,
+    commits: HashMap<git2::Oid, crate::Commit>,
 }
 impl crate::processing::erased::Parametrized for MavenProcessorHolder {
     type T = Parameter;
@@ -747,11 +702,11 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMavenCommi
             .mut_or_default::<MavenProcessorHolder>();
         let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.0);
+        let commit = self.commit_builder.finish(root_full_node.id);
         h.with_parameters_mut(handle.1)
             .commits
             .insert(commit_oid, commit);
-        root_full_node.0
+        root_full_node.id
     }
 }
 
@@ -796,31 +751,25 @@ impl crate::processing::erased::CommitProc for MavenProc {
     }
 }
 
-impl crate::processing::erased::CommitProcExt for MavenProc {
+impl CommitProcExt for MavenProc {
     type Holder = MavenProcessorHolder;
 }
-impl crate::processing::erased::ParametrizedCommitProc2 for MavenProcessorHolder {
+impl ParametrizedCommitProc2 for MavenProcessorHolder {
     type Proc = MavenProc;
 
-    fn with_parameters_mut(
-        &mut self,
-        parameters: crate::processing::erased::ConfigParametersHandle,
-    ) -> &mut Self::Proc {
+    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
         &mut self.0[parameters.0]
     }
 
-    fn with_parameters(
-        &self,
-        parameters: crate::processing::erased::ConfigParametersHandle,
-    ) -> &Self::Proc {
+    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
         &self.0[parameters.0]
     }
 }
-impl CacheHolding<crate::processing::caches::Maven> for MavenProc {
-    fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Maven {
+impl CacheHolding<MavenCaches> for MavenProc {
+    fn get_caches_mut(&mut self) -> &mut MavenCaches {
         &mut self.cache
     }
-    fn get_caches(&self) -> &crate::processing::caches::Maven {
+    fn get_caches(&self) -> &MavenCaches {
         &self.cache
     }
 }

@@ -9,6 +9,7 @@ use hyperast_gen_ts_java::language;
 use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
 use hyperast_gen_ts_java::legion_with_refs::{FNode, JavaTreeGen, Local, MD, MDCache};
 use hyperast_gen_ts_java::{Lang, TStore, Type};
+use hyperast_vcs_git::auto_configured_line_break;
 use hyperast_vcs_git::java::JavaAcc;
 
 pub fn iter_dirs(root_buggy: &std::path::Path) -> impl Iterator<Item = std::fs::DirEntry> + use<> {
@@ -60,11 +61,7 @@ impl JavaPreprocessFileSys {
         }
         let text = file.content();
         let name = file.name();
-        let line_break = if text.as_bytes().contains(&b'\r') {
-            "\r\n".as_bytes().to_vec()
-        } else {
-            "\n".as_bytes().to_vec()
-        };
+        let line_break = auto_configured_line_break(&text);
         use hyperast::types::LLang;
         dbg!(Lang::TE.len());
         dbg!(language().node_kind_count());
@@ -109,11 +106,7 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
             let name: &str = &name;
             let tree = tree_sitter_parse(file.as_bytes());
 
-            let line_break = if file.as_bytes().contains(&b'\r') {
-                "\r\n".as_bytes().to_vec()
-            } else {
-                "\n".as_bytes().to_vec()
-            };
+            let line_break = auto_configured_line_break(&file);
             let mut java_tree_gen =
                 JavaTreeGen::new(&mut java_gen.main_stores, &mut java_gen.java_md_cache)
                     .set_line_break(line_break);

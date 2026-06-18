@@ -2,17 +2,19 @@ use std::collections::{HashMap, HashSet};
 use std::iter::Peekable;
 use std::path::{Components, PathBuf};
 use std::time::{Duration, Instant};
-use std::{todo, usize};
 
 use git2::{Oid, Repository};
 use log::info;
 
-use hyperast::store::{defaults::LabelIdentifier, nodes::DefaultNodeIdentifier as NodeIdentifier};
-use hyperast::types::{AnyType, Childrn, LabelStore as _, WithChildren};
-use hyperast::utils::memusage;
+use hyperast::store::defaults::LabelIdentifier;
+use hyperast::store::nodes::DefaultNodeIdentifier as NodeIdentifier;
+use hyperast::types::LabelStore as _;
+use hyperast::types::{AnyType, Childrn, WithChildren};
 
 use crate::git::{all_commits_between, all_first_parents_between, retrieve_commit};
-use crate::processing::{ConfiguredRepo2, file_sys};
+use crate::processing::ConfiguredRepo2;
+use crate::processing::erased::ProcessorMap;
+use crate::processing::file_sys;
 use crate::{Commit, DefaultMetrics};
 
 /// Preprocess a git repository
@@ -32,7 +34,7 @@ type SimpleStores = hyperast::store::SimpleStores<crate::TStore>;
 #[derive(Default)]
 pub struct RepositoryProcessor {
     pub main_stores: SimpleStores,
-    pub processing_systems: crate::processing::erased::ProcessorMap,
+    pub processing_systems: ProcessorMap,
     pub parsing_time: Duration,
     pub processing_time: Duration,
 }
@@ -91,25 +93,6 @@ impl PreProcessedRepository {
         self.processor.child_by_name(d, name)
     }
 
-    // pub fn first(before: &str, after: &str) -> Diffs {
-    //     todo!()
-    // }
-
-    // pub fn compute_diff(before: &str, after: &str) -> Diffs {
-    //     todo!()
-    // }
-
-    // pub fn compute_impacts(diff: &Diffs) -> Impacts {
-    //     todo!()
-    // }
-
-    // pub fn find_declaration(reff: ExplorableRef) {
-    //     todo!()
-    // }
-
-    // pub fn find_references(decl: ExplorableDecl) {
-    //     todo!()
-    // }
     pub fn child_by_name_with_idx(
         &self,
         d: NodeIdentifier,
@@ -243,35 +226,24 @@ impl PreProcessedRepository {
             dbg!(rw.err());
             return vec![];
         };
-        rw
-            // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-            // .take(40) // TODO make a variable
-            .for_each(|oid| {
-                let oid = oid.unwrap();
-                let c = CommitProcessor::<file_sys::Maven>::handle_commit::<true>(
-                    &mut self.processor,
-                    &repository,
-                    dir_path,
-                    oid,
-                );
-                processing_ordered_commits.push(oid);
-                self.commits.insert(oid, c);
-            });
+        rw.for_each(|oid| {
+            let oid = oid.unwrap();
+            let c = CommitProcessor::<file_sys::Maven>::handle_commit::<true>(
+                &mut self.processor,
+                &repository,
+                dir_path,
+                oid,
+            );
+            processing_ordered_commits.push(oid);
+            self.commits.insert(oid, c);
+        });
         processing_ordered_commits
     }
 
     pub fn check_random_files_reserialization(
         &mut self,
         repository: &mut Repository,
-        // before: &str,
-        // after: &str,
-        // dir_path: &str,
     ) -> (usize, usize) {
-        // log::info!(
-        //     "commits to process: {}",
-        //     all_commits_between(&repository, before, after).map(|x|x.count())
-        // );
-        // let rw = all_commits_between(&repository, before, after);
         let mut oids = HashSet::<_>::default();
         repository
             .odb()
@@ -297,35 +269,25 @@ impl PreProcessedRepository {
         let mut not = 0;
         for oid in oids {
             let blob = repository.find_blob(oid).unwrap();
-            if let Ok(_) = std::str::from_utf8(blob.content()) {
-                // log::debug!("content: {}", z);
-                let text = blob.content();
-                if let Ok(subtree) = self.processor.handle_java_file(&b"".into(), text) {
-                    let out = hyperast::nodes::TextSerializer::new(
-                        &self.processor.main_stores,
-                        subtree.local.compressed_node,
-                    )
-                    .to_string();
-                    println!("{}", out);
-                    if std::str::from_utf8(text).unwrap() == out {
-                        eq += 1;
-                    } else {
-                        not += 1;
-                    }
-                }
+            let Ok(_) = std::str::from_utf8(blob.content()) else {
+                continue;
+            };
+            let text = blob.content();
+            let Ok(subtree) = self.processor.handle_java_file(&b"".into(), text) else {
+                continue;
+            };
+            let out = hyperast::nodes::TextSerializer::new(
+                &self.processor.main_stores,
+                subtree.local.compressed_node,
+            )
+            .to_string();
+            println!("{}", out);
+            if std::str::from_utf8(text).unwrap() == out {
+                eq += 1;
+            } else {
+                not += 1;
             }
         }
-        // let set = HashSet
-        // rw.for_each(|oid| {
-        //     let oid = oid.unwrap();
-
-        //     let commit = repository.find_commit(oid).unwrap();
-        //     let tree = commit.tree().unwrap();
-        //     tree.walk(git2::TreeWalkMode::PreOrder, callback);
-        //     let c = self.handle_java_commit(&repository, dir_path, oid);
-        //     todo!()
-        // })
-        // .collect()
         (eq, not)
     }
 
@@ -445,20 +407,17 @@ impl PreProcessedRepository {
             dbg!(rw.err());
             return vec![];
         };
-        rw
-            // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-            // .take(2)
-            .for_each(|oid| {
-                let oid = oid.unwrap();
-                let c = CommitProcessor::<file_sys::Java>::handle_commit::<false>(
-                    &mut self.processor,
-                    &repository,
-                    dir_path,
-                    oid,
-                );
-                processing_ordered_commits.push(oid);
-                self.commits.insert(oid, c);
-            });
+        rw.for_each(|oid| {
+            let oid = oid.unwrap();
+            let c = CommitProcessor::<file_sys::Java>::handle_commit::<false>(
+                &mut self.processor,
+                &repository,
+                dir_path,
+                oid,
+            );
+            processing_ordered_commits.push(oid);
+            self.commits.insert(oid, c);
+        });
         processing_ordered_commits
     }
 }
@@ -492,20 +451,17 @@ impl PreProcessedRepository {
             dbg!(rw.err());
             return vec![];
         };
-        rw
-            // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-            .take(limit) // TODO make a variable
-            .for_each(|oid| {
-                let oid = oid.unwrap();
-                let c = CommitProcessor::<file_sys::Make>::handle_commit::<false>(
-                    &mut self.processor,
-                    &repository,
-                    dir_path,
-                    oid,
-                );
-                processing_ordered_commits.push(oid);
-                self.commits.insert(oid, c);
-            });
+        rw.take(limit).for_each(|oid| {
+            let oid = oid.unwrap();
+            let c = CommitProcessor::<file_sys::Make>::handle_commit::<false>(
+                &mut self.processor,
+                &repository,
+                dir_path,
+                oid,
+            );
+            processing_ordered_commits.push(oid);
+            self.commits.insert(oid, c);
+        });
         processing_ordered_commits
     }
 
@@ -577,7 +533,7 @@ pub struct CommitBuilder {
     commit_oid: git2::Oid,
     tree_oid: git2::Oid,
     parents: Vec<git2::Oid>,
-    memory_used: hyperast_gen_ts_java::utils::MemoryUsage,
+    memory_used: hyperast::utils::MemoryUsage,
     time: Instant,
 }
 
@@ -591,7 +547,7 @@ impl CommitBuilder {
 
         info!("handle commit: {}", commit_oid);
 
-        let memory_used = memusage();
+        let memory_used = hyperast::utils::memusage();
         let time = Instant::now();
         Self {
             commit_oid,
@@ -612,7 +568,7 @@ impl CommitBuilder {
 
     pub(crate) fn finish(self, ast_root: NodeIdentifier) -> Commit {
         let processing_time = self.time.elapsed().as_nanos();
-        let memory_used = memusage() - self.memory_used;
+        let memory_used = hyperast::utils::memusage() - self.memory_used;
         let memory_used = memory_used.into();
         let tree_oid = self.tree_oid;
         let parents = self.parents;
@@ -626,23 +582,6 @@ impl CommitBuilder {
         }
     }
 }
-
-// #[cfg(feature = "any")]
-// impl CommitProcessor<file_sys::Any> for RepositoryProcessor {
-//     fn handle_module<'a, 'b, const RMS: bool>(
-//         &mut self,
-//         repository: &'a Repository,
-//         dir_path: &'b mut Peekable<Components<'b>>,
-//         name: &[u8],
-//         oid: git2::Oid,
-//     ) -> NodeIdentifier {
-//         let root_full_node = MavenProcessor::<RMS, false, MavenModuleAcc>::new(
-//             repository, self, dir_path, name, oid,
-//         )
-//         .process();
-//         root_full_node.0
-//     }
-// }
 
 impl<H: IdHolder, T> IdHolder for (H, T) {
     type Id = H::Id;
@@ -733,19 +672,6 @@ impl CommitProcessor<file_sys::Make> for RepositoryProcessor {
     }
 }
 
-// impl CommitProcessor<file_sys::Any> for RepositoryProcessor {
-//     type Module = (NodeIdentifier, DefaultMetrics);
-//     fn handle_module<'a, 'b, const RMS: bool>(
-//         &mut self,
-//         _repository: &'a Repository,
-//         _dir_path: &'b mut Peekable<Components<'b>>,
-//         _name: &[u8],
-//         _oid: git2::Oid,
-//     ) -> Self::Module {
-//         todo!("still not sure how to dispatch")
-//     }
-// }
-
 /// plan to work on all languges of the family of typesript ie. ts, js, tsx, jsx
 /// - [ ] ts
 /// - [ ] js
@@ -817,17 +743,11 @@ pub fn child_by_type(
     t: &AnyType,
 ) -> Option<(NodeIdentifier, u16)> {
     let n = stores.node_store.resolve(d);
-    let s = n
-        .children()
-        .unwrap()
-        .iter_children()
-        .enumerate()
-        .find(|(_, x)| {
-            use hyperast::types::HyperAST;
-            stores.resolve_type(x).eq(t)
-        })
-        .map(|(i, x)| (x, i as u16));
-    s
+    let mut children = n.children().unwrap().iter_children().enumerate();
+    children.find_map(|(i, x)| {
+        use hyperast::types::HyperAST;
+        stores.resolve_type(&x).eq(t).then_some((x, i as u16))
+    })
 }
 
 pub fn child_at_path<'a>(
@@ -858,108 +778,4 @@ pub fn child_at_path_tracked<'a>(
         offsets.push(idx as usize);
     }
     Some((d, offsets))
-}
-
-// TODO try to separate processing from caching from git
-#[cfg(test)]
-#[allow(unused)]
-mod experiments {
-    use crate::Accumulator;
-
-    use super::*;
-    use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
-
-    pub struct PreProcessedRepository2 {
-        name: String,
-        pub(crate) main_stores: SimpleStores,
-
-        pub commits: HashMap<git2::Oid, Commit>,
-        pub processing_ordered_commits: Vec<git2::Oid>,
-
-        maven: cache::Maven<(git2::Oid, Vec<u8>)>,
-        pom: cache::Pom<(git2::Oid, Vec<u8>)>,
-        java: cache::Java<(git2::Oid, Vec<u8>)>,
-    }
-
-    impl PreProcessedRepository2 {
-        fn handle_maven_module<'b, const RMS: bool, const FFWD: bool>(
-            &mut self,
-            repository: &Repository,
-            dir_path: &'b mut Peekable<Components<'b>>,
-            name: &[u8],
-            oid: git2::Oid,
-        ) -> <crate::maven::MavenModuleAcc as Accumulator>::Unlabeled {
-            // processor_factory::ffwd::Maven {
-            //     sources: &middle::MiddleWare { repository },
-            //     maven: &mut self.maven,
-            //     pom: &mut self.pom,
-            //     java: &mut self.java,
-            //     dir_path,
-            // };
-            // MavenProcessor::<RMS, FFWD, MavenModuleAcc>::new(repository, self, dir_path, name, oid)
-            //     .process()
-            todo!()
-        }
-    }
-
-    mod middle {
-        use super::*;
-
-        pub struct MiddleWare<'repo> {
-            pub repository: &'repo Repository,
-        }
-    }
-
-    mod cache {
-        use std::collections::BTreeMap;
-
-        use crate::maven::POM;
-
-        use super::*;
-
-        pub struct Maven<Id> {
-            object_map: BTreeMap<
-                Id,
-                (
-                    hyperast::store::nodes::DefaultNodeIdentifier,
-                    crate::maven::MD,
-                ),
-            >,
-        }
-        pub struct Pom<Id> {
-            pub object_map_pom: BTreeMap<Id, POM>,
-        }
-        pub struct Java<Id> {
-            java_md_cache: java_tree_gen::MDCache,
-            object_map_java: BTreeMap<Id, (java_tree_gen::Local,)>,
-        }
-    }
-
-    mod processor_factory {
-        use super::*;
-
-        pub mod ffwd {
-            use super::*;
-            use middle::MiddleWare;
-            pub struct Maven<'a, 'b, 'd, 'c, Id> {
-                pub sources: &'a MiddleWare<'a>,
-                pub maven: &'b mut cache::Maven<Id>,
-                pub pom: &'b mut cache::Pom<Id>,
-                pub java: &'b mut cache::Java<Id>,
-                pub dir_path: &'d mut Peekable<Components<'c>>,
-            }
-            pub struct Java<'a, 'd, 'c, Id> {
-                pub java: &'a mut cache::Java<Id>,
-                pub dir_path: &'d mut Peekable<Components<'c>>,
-            }
-        }
-
-        pub struct Maven<'a, Id> {
-            maven: &'a mut cache::Maven<Id>,
-            pom: &'a mut cache::Pom<Id>,
-            java: &'a mut cache::Java<Id>,
-            // kotlin: &'a mut cached::Kotlin<Id>,
-            // scala: &'a mut cached::Scala<Id>,
-        }
-    }
 }

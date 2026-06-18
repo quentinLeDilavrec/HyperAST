@@ -1,6 +1,4 @@
-use core::panic;
-
-use hyperast::types::{AnyType, HyperType, LangRef, LangWrapper, TypeStore};
+use hyperast::types::{AnyType, HyperType, LangRef, LangWrapper, RoleStore, TypeStore};
 
 #[derive(Clone, Copy)]
 pub struct TStore;
@@ -18,52 +16,50 @@ impl Default for TStore {
     }
 }
 
-impl hyperast::types::RoleStore for TStore {
+impl RoleStore for TStore {
     type IdF = u16;
 
     type Role = hyperast::types::Role;
 
     fn resolve_field(lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
-        match lang.name() {
-            #[cfg(feature = "java")]
-            hyperast_gen_ts_java::Lang::NAME => {
-                let t = hyperast_gen_ts_java::TType::new(hyperast_gen_ts_java::Type::Spaces);
-                hyperast_gen_ts_java::TStore::resolve_field(t.get_lang(), field_id)
-            }
-            #[cfg(feature = "cpp")]
-            hyperast_gen_ts_cpp::Lang::NAME => {
-                let t = hyperast_gen_ts_cpp::TType::new(hyperast_gen_ts_cpp::Type::Spaces);
-                hyperast_gen_ts_cpp::TStore::resolve_field(t.get_lang(), field_id)
-            }
-            #[cfg(feature = "maven")]
-            hyperast_gen_ts_xml::Lang::NAME => {
-                let t = hyperast_gen_ts_xml::TType::new(hyperast_gen_ts_xml::Type::Spaces);
-                hyperast_gen_ts_xml::TStore::resolve_field(t.get_lang(), field_id)
-            }
-            x => panic!("{}", x),
+        let name = lang.name();
+        macro_rules! resolve_field {
+            ($lang:path) => {{
+                use $lang as l;
+                if let l::Lang::NAME = name {
+                    let t = l::TType::new(l::Type::Spaces);
+                    return l::TStore::resolve_field(t.get_lang(), field_id);
+                }
+            }};
         }
+        #[cfg(feature = "java")]
+        resolve_field!(hyperast_gen_ts_java);
+        #[cfg(feature = "cpp")]
+        resolve_field!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "maven")]
+        resolve_field!(hyperast_gen_ts_xml);
+        panic!("unsupported lang: {}", name);
     }
 
     fn intern_role(lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
         // TODO fix that, the lang thing, both parameter and the get_lang() should be respectively extracted and removed
-        match lang.name() {
-            #[cfg(feature = "java")]
-            hyperast_gen_ts_java::Lang::NAME => {
-                let t = hyperast_gen_ts_java::TType::new(hyperast_gen_ts_java::Type::Spaces);
-                hyperast_gen_ts_java::TStore::intern_role(t.get_lang(), role)
-            }
-            #[cfg(feature = "cpp")]
-            hyperast_gen_ts_cpp::Lang::NAME => {
-                let t = hyperast_gen_ts_cpp::TType::new(hyperast_gen_ts_cpp::Type::Spaces);
-                hyperast_gen_ts_cpp::TStore::intern_role(t.get_lang(), role)
-            }
-            #[cfg(feature = "maven")]
-            hyperast_gen_ts_xml::Lang::NAME => {
-                let t = hyperast_gen_ts_xml::TType::new(hyperast_gen_ts_xml::Type::Spaces);
-                hyperast_gen_ts_xml::TStore::intern_role(t.get_lang(), role)
-            }
-            x => panic!("{}", x),
+        let name = lang.name();
+        macro_rules! intern_role {
+            ($lang:path) => {{
+                use $lang as l;
+                if let l::Lang::NAME = name {
+                    let t = l::TType::new(l::Type::Spaces);
+                    return l::TStore::intern_role(t.get_lang(), role);
+                }
+            }};
         }
+        #[cfg(feature = "java")]
+        intern_role!(hyperast_gen_ts_java);
+        #[cfg(feature = "cpp")]
+        intern_role!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "maven")]
+        intern_role!(hyperast_gen_ts_xml);
+        panic!("unsupported lang: {}", name);
     }
 }
 

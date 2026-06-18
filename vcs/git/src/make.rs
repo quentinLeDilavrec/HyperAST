@@ -6,10 +6,9 @@ use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
 use hyperast_gen_ts_xml::TStore;
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
-use crate::{
-    Accumulator, BasicDirAcc, DefaultMetrics, PROPAGATE_ERROR_ON_BAD_CST_NODE,
-    processing::ObjectName,
-};
+use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
+use crate::processing::ObjectName;
+use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub(crate) fn handle_makefile_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,
@@ -94,21 +93,9 @@ impl MakeModuleAcc {
     ) -> Self {
         Self {
             primary: BasicDirAcc::new(name),
-            sub_modules: if sub_modules.is_empty() {
-                None
-            } else {
-                Some(sub_modules)
-            },
-            main_dirs: if main_dirs.is_empty() {
-                None
-            } else {
-                Some(main_dirs)
-            },
-            test_dirs: if test_dirs.is_empty() {
-                None
-            } else {
-                Some(test_dirs)
-            },
+            sub_modules: (!sub_modules.is_empty()).then_some(sub_modules),
+            main_dirs: (!main_dirs.is_empty()).then_some(main_dirs),
+            test_dirs: (!test_dirs.is_empty()).then_some(test_dirs),
         }
     }
 }
@@ -128,10 +115,10 @@ impl MakeModuleAcc {
         self.sub_modules = Some(full_node.submodules.iter().map(|x| x.into()).collect());
         self.primary.metrics.acc(full_node.metrics);
     }
-    pub fn push_submodule(&mut self, name: LabelIdentifier, full_node: (NodeIdentifier, MD)) {
-        self.primary.children.push(full_node.0);
+    pub fn push_submodule(&mut self, name: LabelIdentifier, full_node: FullNode) {
+        self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.1.metrics);
+        self.primary.metrics.acc(full_node.md.metrics);
     }
     pub(crate) fn push_source_file(
         &mut self,
@@ -180,15 +167,21 @@ impl MakeModuleAcc {
     }
 }
 
+#[derive(Clone)]
+pub struct FullNode {
+    pub id: NodeIdentifier,
+    pub md: MD,
+}
+
 impl hyperast::tree_gen::Accumulator for MakeModuleAcc {
-    type Node = (LabelIdentifier, (NodeIdentifier, MD));
+    type Node = (LabelIdentifier, FullNode);
     fn push(&mut self, (name, full_node): Self::Node) {
-        self.primary.children.push(full_node.0);
+        self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.1.metrics);
+        self.primary.metrics.acc(full_node.md.metrics);
     }
 }
 
 impl Accumulator for MakeModuleAcc {
-    type Unlabeled = (NodeIdentifier, MD);
+    type Unlabeled = FullNode;
 }

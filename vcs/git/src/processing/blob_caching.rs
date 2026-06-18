@@ -1,50 +1,47 @@
-use super::CacheHolding;
 use git2::{Oid, Repository};
+use std::marker::PhantomData;
 
-impl crate::processing::erased::ProcessorMap {
+use super::erased::{CommitProcExt, ErasableProcessor, ParametrizedCommitProc2};
+use super::erased::{ParametrizedCommitProcessor2Handle, ProcessorMap};
+use super::{CacheHolding, CachesHolding, ObjectMapper};
+
+impl ProcessorMap {
     pub(crate) fn caching_blob_handler<C>(&mut self) -> CachingBlobWrapper2<'_, C> {
         CachingBlobWrapper2 {
             processors: self,
-            phantom: std::marker::PhantomData,
+            phantom: PhantomData,
         }
     }
 }
 
 pub(crate) struct CachingBlobWrapper2<'cache, C> {
-    pub(crate) processors: &'cache mut crate::processing::erased::ProcessorMap,
-    pub(crate) phantom: std::marker::PhantomData<C>,
+    pub(crate) processors: &'cache mut ProcessorMap,
+    pub(crate) phantom: PhantomData<C>,
 }
 
 impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
-    pub fn handle<
-        T: crate::processing::erased::CommitProcExt,
-        N,
-        E: From<std::str::Utf8Error>,
-        F: FnOnce(
-            &mut crate::processing::erased::ProcessorMap,
-            &N,
-            &[u8],
-        ) -> Result<<Sys::Caches as crate::processing::ObjectMapper>::V, E>,
-    >(
+    pub fn handle<T, N, E, F>(
         &mut self,
         oid: Oid,
         repository: &Repository,
         name: &N,
-        parameters: crate::processing::erased::ParametrizedCommitProcessor2Handle<T>,
+        parameters: ParametrizedCommitProcessor2Handle<T>,
         wrapped: F,
-    ) -> Result<<Sys::Caches as crate::processing::ObjectMapper>::V, E>
+    ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where
-        for<'a> &'a N: TryInto<&'a str>,
-        Sys: crate::processing::CachesHolding,
-        Sys::Caches: 'static + crate::processing::ObjectMapper<K = Oid> + Send + Sync + Default,
-        <Sys::Caches as crate::processing::ObjectMapper>::V: Clone,
-        T::Holder: 'static + crate::processing::erased::ErasableProcessor + Send + Sync,
-        T::Holder: crate::processing::erased::ParametrizedCommitProc2,
-        <T::Holder as crate::processing::erased::ParametrizedCommitProc2>::Proc:
-            crate::processing::CacheHolding<Sys::Caches>,
-        T::Holder: std::default::Default,
+        T: CommitProcExt,
+        E: From<std::str::Utf8Error>,
+        F: FnOnce(&mut ProcessorMap, &N, &[u8]) -> Result<<Sys::Caches as ObjectMapper>::V, E>,
+        //
+        for<'t> &'t N: TryInto<&'t str>,
+        Sys: CachesHolding,
+        Sys::Caches: 'static + ObjectMapper<K = Oid> + Send + Sync + Default,
+        <Sys::Caches as ObjectMapper>::V: Clone,
+        T::Holder: 'static + ErasableProcessor + Send + Sync,
+        T::Holder: Default,
+        T::Holder: ParametrizedCommitProc2,
+        <T::Holder as ParametrizedCommitProc2>::Proc: CacheHolding<Sys::Caches>,
     {
-        use crate::processing::erased::ParametrizedCommitProc2;
         let caches = self.processors.mut_or_default::<T::Holder>();
         let caches = caches.with_parameters_mut(parameters.0);
         let caches = caches.get_caches_mut();
@@ -74,35 +71,28 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         full_node
     }
 
-    pub fn handle2<
-        T: crate::processing::erased::CommitProcExt,
-        N: Clone,
-        E: From<std::str::Utf8Error>,
-        F: FnOnce(
-            &mut crate::processing::erased::ProcessorMap,
-            &N,
-            &[u8],
-        ) -> Result<<Sys::Caches as crate::processing::ObjectMapper>::V, E>,
-    >(
+    pub fn handle2<T, N, E, F>(
         &mut self,
         oid: Oid,
         repository: &Repository,
         name: &N,
-        parameters: crate::processing::erased::ParametrizedCommitProcessor2Handle<T>,
+        parameters: ParametrizedCommitProcessor2Handle<T>,
         wrapped: F,
-    ) -> Result<<Sys::Caches as crate::processing::ObjectMapper>::V, E>
+    ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where
+        T: CommitProcExt,
+        N: Clone,
+        E: From<std::str::Utf8Error>,
+        F: FnOnce(&mut ProcessorMap, &N, &[u8]) -> Result<<Sys::Caches as ObjectMapper>::V, E>,
+        //
         for<'a> &'a N: TryInto<&'a str>,
-        Sys: crate::processing::CachesHolding,
-        Sys::Caches:
-            'static + crate::processing::ObjectMapper<K = (Oid, N)> + Send + Sync + Default,
-        <Sys::Caches as crate::processing::ObjectMapper>::V: Clone,
-        T::Holder: 'static + crate::processing::erased::ErasableProcessor + Default + Send + Sync,
-        T::Holder: crate::processing::erased::ParametrizedCommitProc2,
-        <T::Holder as crate::processing::erased::ParametrizedCommitProc2>::Proc:
-            crate::processing::CacheHolding<Sys::Caches>,
+        Sys: CachesHolding,
+        Sys::Caches: 'static + ObjectMapper<K = (Oid, N)> + Send + Sync + Default,
+        <Sys::Caches as ObjectMapper>::V: Clone,
+        T::Holder: 'static + ErasableProcessor + Default + Send + Sync,
+        T::Holder: ParametrizedCommitProc2,
+        <T::Holder as ParametrizedCommitProc2>::Proc: CacheHolding<Sys::Caches>,
     {
-        use crate::processing::erased::ParametrizedCommitProc2;
         let caches = self.processors.mut_or_default::<T::Holder>();
         let caches = caches.with_parameters_mut(parameters.0);
         let caches = caches.get_caches_mut();

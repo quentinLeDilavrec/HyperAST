@@ -1,10 +1,10 @@
-use hyperast::hashed::SyntaxNodeHashs;
-use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
-use hyperast::tree_gen::{self, SubTreeMetrics};
+use hyperast::store::defaults::LabelIdentifier;
+use hyperast::tree_gen;
 
+use crate::Accumulator;
+use crate::DirPrimary;
 use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
 use crate::processing::ObjectName;
-use crate::{Accumulator, BasicDirAcc};
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use crate::cpp_processor::SimpleStores;
@@ -66,15 +66,14 @@ where
 type PrecompQueries = u16;
 
 pub struct CppAcc {
-    pub(crate) primary:
-        BasicDirAcc<NodeIdentifier, LabelIdentifier, SubTreeMetrics<SyntaxNodeHashs<u32>>>,
+    pub(crate) primary: DirPrimary,
     pub(crate) precomp_queries: PrecompQueries,
 }
 
 impl CppAcc {
     pub(crate) fn new(name: String) -> Self {
         Self {
-            primary: BasicDirAcc::new(name),
+            primary: DirPrimary::new(name),
             precomp_queries: 0,
         }
     }

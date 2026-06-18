@@ -47,11 +47,7 @@ pub struct PreprocessFileSys {
 
 impl PreprocessFileSys {
     fn generator(&mut self, text: &[u8]) -> TreeGen<TStore> {
-        let line_break = if text.contains(&b'\r') {
-            "\r\n".as_bytes().to_vec()
-        } else {
-            "\n".as_bytes().to_vec()
-        };
+        let line_break = auto_configured_line_break(text);
         JavaTreeGen {
             line_break,
             stores: &mut self.main_stores,

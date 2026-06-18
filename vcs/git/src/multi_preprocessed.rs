@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use hyperast::store::nodes::DefaultNodeIdentifier as NodeIdentifier;
-
 use crate::maven::MavenModuleAcc;
 use crate::maven_processor::make;
 use crate::preprocessed::RepositoryProcessor;
@@ -488,10 +486,7 @@ impl PreProcessedRepositories {
     //     Ok(processing_ordered_commits)
     // }
 
-    pub fn make(
-        acc: MavenModuleAcc,
-        stores: &mut SimpleStores,
-    ) -> (NodeIdentifier, crate::maven::MD) {
+    pub fn make(acc: MavenModuleAcc, stores: &mut SimpleStores) -> crate::maven::FullNode {
         make(acc, stores.mut_with_ts())
     }
 }

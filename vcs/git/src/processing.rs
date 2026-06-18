@@ -259,9 +259,6 @@ impl TryInto<String> for ObjectName {
 }
 
 pub(crate) mod caches {
-
-    use hyperast::store::defaults::NodeIdentifier;
-
     use super::ObjectName;
 
     #[derive(Default)]
@@ -327,7 +324,7 @@ pub(crate) mod caches {
 
     #[derive(Default)]
     pub struct Maven {
-        pub object_map: OidMap<(NodeIdentifier, crate::maven::MD)>,
+        pub object_map: OidMap<crate::maven::FullNode>,
     }
 
     #[derive(Default)]
@@ -351,7 +348,7 @@ pub(crate) mod caches {
 
     #[derive(Default)]
     pub struct Make {
-        pub object_map: OidMap<(NodeIdentifier, crate::make::MD)>,
+        pub object_map: OidMap<crate::make::FullNode>,
     }
 
     #[derive(Default)]

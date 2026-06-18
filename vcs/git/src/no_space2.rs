@@ -1,14 +1,15 @@
 use std::ops::Deref;
 
+use hyperast::store::SimpleStores;
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::store::labels::LabelStore;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeStore};
 use hyperast::types::{self, Children};
 use hyperast::types::{NodeId, UniformNodeId};
 
 pub fn as_nospaces<TS>(
-    stores: &hyperast::store::SimpleStores<TS>,
-) -> &hyperast::store::SimpleStores<TS, NoSpaceNodeStoreWrapper, hyperast::store::labels::LabelStore>
-{
+    stores: &SimpleStores<TS>,
+) -> &SimpleStores<TS, NoSpaceNodeStoreWrapper, LabelStore> {
     // SAFETY: The transmute is safe because layouts are the same and we do not modify the data.
     // it would make no sense to add nodes without spaces to an AST with spaces.
     unsafe { std::mem::transmute(stores) }
@@ -24,12 +25,6 @@ pub struct NoSpaceNodeStoreWrapper {
 pub struct NoSpaceNodeStore<NS> {
     pub s: NS,
 }
-
-// impl<'a> From<&'a NodeStore> for NoSpaceNodeStoreWrapper {
-//     fn from(value: &'a NodeStore) -> Self {
-//         NoSpaceNodeStoreWrapper { s: value }
-//     }
-// }
 
 impl<NS> From<NS> for NoSpaceNodeStore<NS> {
     fn from(s: NS) -> Self {
@@ -108,8 +103,6 @@ impl<'a, T> types::WithSerialization for NoSpaceWrapper<'a, T> {
 
 impl<'a, T> types::WithRoles for NoSpaceWrapper<'a, T>
 where
-    // T: hyperast::types::NodeId,
-    // T: hyperast::types::NodeId<IdN = T>,
     T: types::NodeId<IdN = NodeIdentifier>,
 {
     fn role_at<Role: 'static + Copy + Sync + Send>(&self, at: Self::ChildIdx) -> Option<Role> {

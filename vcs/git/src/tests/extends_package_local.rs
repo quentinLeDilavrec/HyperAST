@@ -1,19 +1,21 @@
-use crate::java::handle_java_file;
-use hyperast::position::{Scout, StructuralPosition, StructuralPositionStore, TypedTreePath};
-use hyperast::store::{SimpleStores, nodes::DefaultNodeStore as NodeStore};
-use hyperast::store::{defaults::NodeIdentifier, labels::LabelStore};
-use hyperast::types::{LabelStore as _, Typed};
-use hyperast::types::{NodeId, TypedNodeStore, WithChildren};
-use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
-use hyperast_gen_ts_java::types::{TIdN, Type};
-
 use hyperast::filter::{BF, Bloom, BloomResult};
 use hyperast::impact::BulkHasher;
 use hyperast::impact::serialize::CachedHasher;
 use hyperast::nodes::RefContainer;
+use hyperast::position::{Scout, StructuralPosition, StructuralPositionStore, TypedTreePath};
+use hyperast::store::SimpleStores;
+use hyperast::store::defaults::NodeIdentifier;
+use hyperast::store::labels::LabelStore;
+use hyperast::store::nodes::DefaultNodeStore as NodeStore;
+use hyperast::types::{LabelStore as _, Typed};
+use hyperast::types::{NodeId, TypedNodeStore, WithChildren};
 use hyperast_gen_ts_java::impact::element::{IdentifierFormat, LabelPtr, RefsEnum};
 use hyperast_gen_ts_java::impact::partial_analysis::PartialAnalysis;
 use hyperast_gen_ts_java::impact::usage;
+use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
+use hyperast_gen_ts_java::types::{TIdN, Type};
+
+use crate::java::handle_java_file;
 
 fn run(text: &[u8]) {
     let mut stores = SimpleStores {

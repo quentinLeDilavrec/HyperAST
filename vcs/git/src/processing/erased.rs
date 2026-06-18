@@ -1,4 +1,6 @@
-use std::{any::Any, marker::PhantomData, ops::Deref};
+use std::any::Any;
+use std::marker::PhantomData;
+use std::ops::Deref;
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -116,114 +118,6 @@ impl<T: ParametrizedCommitProc2> ParametrizedCommitProc for T {
     fn get(&self, parameters: ConfigParametersHandle) -> &dyn CommitProc {
         ParametrizedCommitProc2::with_parameters(self, parameters)
     }
-}
-
-#[test]
-#[allow(unused)]
-fn t() {
-    #[derive(Clone, PartialEq, Eq)]
-    struct S(u8);
-    #[derive(Clone, PartialEq, Eq)]
-    struct S0(u8);
-    #[derive(Default)]
-    struct P0(Vec<P>);
-    struct P(S);
-    impl Parametrized for P0 {
-        type T = S;
-        fn register_param(&mut self, t: Self::T) -> ParametrizedCommitProcessorHandle {
-            let l = self.0.iter().position(|x| &x.0 == &t).unwrap_or_else(|| {
-                let l = self.0.len();
-                self.0.push(P(t));
-                l
-            });
-            ParametrizedCommitProcessorHandle(self.erased_handle(), ConfigParametersHandle(l))
-        }
-    }
-    impl CommitProc for P {
-        fn prepare_processing(
-            &self,
-            repository: &git2::Repository,
-            tree_oid: crate::preprocessed::CommitBuilder,
-            param_handle: ParametrizedCommitProcessorHandle,
-        ) -> Box<dyn PreparedCommitProc> {
-            unimplemented!("required for processing at the root of a project")
-        }
-
-        fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {
-            unimplemented!("required for processing at the root of a project")
-        }
-
-        fn commit_count(&self) -> usize {
-            unimplemented!()
-        }
-    }
-    impl ParametrizedCommitProc for P0 {
-        fn get_mut(&mut self, parameters: ConfigParametersHandle) -> &mut dyn CommitProc {
-            &mut self.0[parameters.0]
-        }
-        fn get(&self, parameters: ConfigParametersHandle) -> &dyn CommitProc {
-            &self.0[parameters.0]
-        }
-    }
-
-    pub struct ProcessorMap<V>(std::collections::HashMap<std::any::TypeId, V>);
-    impl<V> Default for ProcessorMap<V> {
-        fn default() -> Self {
-            Self(Default::default())
-        }
-    }
-
-    unsafe impl<V: Send> Send for ProcessorMap<V> {}
-    unsafe impl<V: Sync> Sync for ProcessorMap<V> {}
-
-    // Should not need to be public
-    pub trait ErasableProcessor: Any + ToErasedProc + ParametrizedCommitProc {}
-    pub trait ToErasedProc {
-        fn to_erasable_processor(self: Box<Self>) -> Box<dyn ErasableProcessor>;
-        fn as_mut_any(&mut self) -> &mut dyn Any;
-        fn as_any(&self) -> &dyn Any;
-    }
-
-    impl<T: ErasableProcessor> ToErasedProc for T {
-        fn to_erasable_processor(self: Box<Self>) -> Box<dyn ErasableProcessor> {
-            self
-        }
-        fn as_mut_any(&mut self) -> &mut dyn Any {
-            self
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-    }
-    impl<T> ErasableProcessor for T where T: Any + ParametrizedCommitProc {}
-
-    // NOTE crazy good stuff
-    impl ProcessorMap<Box<dyn ErasableProcessor>> {
-        pub fn by_id(
-            &mut self,
-            id: &std::any::TypeId,
-        ) -> Option<&mut (dyn ErasableProcessor + 'static)> {
-            self.0.get_mut(id).map(|x| x.as_mut())
-        }
-        pub fn mut_or_default<T: 'static + ToErasedProc + Default + Send + Sync>(
-            &mut self,
-        ) -> &mut T {
-            let r = self
-                .0
-                .entry(std::any::TypeId::of::<T>())
-                .or_insert_with(|| Box::new(T::default()).to_erasable_processor());
-            let r = r.as_mut();
-            let r = <dyn Any>::downcast_mut(r.as_mut_any());
-            r.unwrap()
-        }
-    }
-
-    let mut h = ProcessorMap::<Box<dyn ErasableProcessor>>::default();
-    // The registered parameter is type checked
-    let hh = h.mut_or_default::<P0>().register_param(S(42));
-    // You can easily store hh in any collection.
-    // You can easily add a method to CommitProc.
-    h.by_id(&hh.0.0).unwrap().get_mut(hh.1).p();
 }
 
 pub type ProcessorMap = spreaded::ProcessorMap<Box<dyn spreaded::ErasableProcessor>>;

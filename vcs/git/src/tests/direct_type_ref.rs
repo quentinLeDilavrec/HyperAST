@@ -1,6 +1,7 @@
 use hyperast::position::{Scout, StructuralPosition, StructuralPositionStore};
 use hyperast::store::SimpleStores;
-use hyperast::types::{LabelStore as _, NodeId};
+use hyperast::types::LabelStore as _;
+use hyperast::types::NodeId;
 use hyperast_gen_ts_java::impact::element::{IdentifierFormat, LabelPtr, RefsEnum};
 use hyperast_gen_ts_java::impact::partial_analysis::PartialAnalysis;
 use hyperast_gen_ts_java::impact::usage;

@@ -1,5 +1,5 @@
 use hyperast::hashed::NodeHashs;
-use hyperast::store::nodes::GatherAttrErazed;
+use hyperast::store::nodes::{Compo, GatherAttrErazed};
 use hyperast::tree_gen::SubTreeMetrics;
 
 /// Identifying elements and fundamental derived metrics used to accelerate deduplication.
@@ -34,10 +34,10 @@ impl<Id, L, U: NodeHashs> BasicDirAcc<Id, L, SubTreeMetrics<U>> {
 impl<Id, L, M> BasicDirAcc<Id, L, M> {
     pub fn map_metrics<N>(self, f: impl Fn(M) -> N) -> BasicDirAcc<Id, L, N> {
         BasicDirAcc {
+            metrics: f(self.metrics),
             name: self.name,
             children: self.children,
             children_names: self.children_names,
-            metrics: f(self.metrics),
         }
     }
 }
@@ -50,8 +50,8 @@ impl<Id, L, M> BasicDirAcc<Id, L, M> {
         label_id: L,
     ) -> M
     where
-        K: hyperast::store::nodes::Compo,
-        L: hyperast::store::nodes::Compo,
+        K: Compo,
+        L: Compo,
         Id: 'static + Send + Sync,
     {
         dyn_builder.add(interned_kind);

@@ -172,8 +172,8 @@ pub fn windowed_commits_compare(
             }
 
             let stores = &mut preprocessed.processor.main_stores;
-            let src_tr = PreProcessedRepositories::make(src_acc, stores).0;
-            let dst_tr = PreProcessedRepositories::make(dst_acc, stores).0;
+            let src_tr = PreProcessedRepositories::make(src_acc, stores).id;
+            let dst_tr = PreProcessedRepositories::make(dst_acc, stores).id;
 
             let stores = &preprocessed.processor.main_stores;
             let hyperast = hyperast_vcs_git::no_space::as_nospaces(stores);

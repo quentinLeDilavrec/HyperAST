@@ -4,7 +4,7 @@ use std::path::{Components, PathBuf};
 use git2::{Oid, Repository};
 
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
-use hyperast::store::{defaults::NodeIdentifier, nodes::legion::eq_node};
+use hyperast::store::nodes::legion::eq_node;
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
 use hyperast_gen_ts_xml::Type;
@@ -12,13 +12,12 @@ use hyperast_gen_ts_xml::Type;
 use crate::Processor;
 use crate::StackEle;
 use crate::git::{BasicGitObject, NamedObject, ObjectType, TypedObject};
-use crate::make::{MD, MakeModuleAcc};
+use crate::make::{FullNode, MD, MakeModuleAcc};
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::erased::{
-    CommitProcessorHandle, ParametrizedCommitProc2,
-    ParametrizedCommitProcessor2Handle as PCP2Handle,
-};
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::{CommitProcessorHandle, ParametrizedCommitProc2};
 use crate::processing::{CacheHolding, InFiles, ObjectName, ParametrizedCommitProcessorHandle};
+
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
 
 pub struct MakeProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
@@ -58,51 +57,44 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
     for MakeProcessor<'a, 'b, 'c, RMS, FFWD, MakeModuleAcc>
 {
     fn pre(&mut self, current_dir: BasicGitObject) {
-        match current_dir {
+        let (oid, name) = match current_dir {
             BasicGitObject::Tree(oid, name) => {
                 self.handle_tree_cached(name, oid);
+                return;
             }
-            BasicGitObject::Blob(oid, name) => {
-                if FFWD {
-                    return;
-                }
-                if self.dir_path.peek().is_some() {
-                    return;
-                }
-                if crate::processing::file_sys::MakeFile::matches(&name) {
-                    self.prepro
-                        .help_handle_makefile(
-                            oid,
-                            &mut self.stack.last_mut().unwrap().acc,
-                            name,
-                            &self.repository,
-                            PCP2Handle(self.handle.1, std::marker::PhantomData),
-                        )
-                        .unwrap();
-                } else if crate::processing::file_sys::Cpp::matches(&name) {
-                    self.prepro
-                        .help_handle_cpp_file2(
-                            oid,
-                            &mut self.stack.last_mut().unwrap().acc,
-                            &name,
-                            self.repository,
-                            PCP2Handle(self.handle.1, std::marker::PhantomData),
-                        )
-                        .unwrap();
-                // } else if name.ends_with(b".h") || name.ends_with(b".hpp") {
-                //     self.prepro.help_handle_cpp_file2(
-                //         oid,
-                //         &mut self.stack.last_mut().unwrap().acc,
-                //         name,
-                //         self.repository,
-                //     )
-                } else {
-                    log::debug!("not cpp source file {:?}", name.try_str());
-                }
-            }
+            BasicGitObject::Blob(oid, name) => (oid, name),
+        };
+        if FFWD {
+            return;
+        }
+        if self.dir_path.peek().is_some() {
+            return;
+        }
+        if crate::processing::file_sys::MakeFile::matches(&name) {
+            self.prepro
+                .help_handle_makefile(
+                    oid,
+                    &mut self.stack.last_mut().unwrap().acc,
+                    name,
+                    &self.repository,
+                    PCP2Handle(self.handle.1, std::marker::PhantomData),
+                )
+                .unwrap();
+        } else if crate::processing::file_sys::Cpp::matches(&name) {
+            self.prepro
+                .help_handle_cpp_file2(
+                    oid,
+                    &mut self.stack.last_mut().unwrap().acc,
+                    &name,
+                    self.repository,
+                    PCP2Handle(self.handle.1, std::marker::PhantomData),
+                )
+                .unwrap();
+        } else {
+            log::debug!("not cpp source file {:?}", name.try_str());
         }
     }
-    fn post(&mut self, oid: Oid, acc: MakeModuleAcc) -> Option<(NodeIdentifier, MD)> {
+    fn post(&mut self, oid: Oid, acc: MakeModuleAcc) -> Option<FullNode> {
         let name = acc.primary.name.clone();
         let full_node = Self::make(acc, self.prepro.main_stores_mut().mut_with_ts());
         self.prepro
@@ -136,7 +128,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     MakeProcessor<'a, 'b, 'c, RMS, FFWD, MakeModuleAcc>
 {
-    fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdentifier, MD) {
+    fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
         make(acc, stores)
     }
 
@@ -237,7 +229,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     }
 }
 
-pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdentifier, MD) {
+pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
     let kind = Type::Directory;
     let interned_kind = hyperast_gen_ts_xml::TStore::intern(kind);
     let label_id = stores.label_store.get_or_insert(acc.primary.name.clone());
@@ -257,7 +249,8 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdenti
         let metrics = primary
             .metrics
             .map_hashs(|h| MetaDataHashsBuilder::build(h));
-        return (id, MD { metrics });
+        let md = MD { metrics };
+        return FullNode { id, md };
     }
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
@@ -274,10 +267,10 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> (NodeIdenti
     hashs.persist(&mut dyn_builder);
 
     let vacant = insertion.vacant();
-    let node_id = vacant.insert_built(dyn_builder.build());
+    let id = vacant.insert_built(dyn_builder.build());
+    let md = MD { metrics };
 
-    let full_node = (node_id, MD { metrics });
-    full_node
+    FullNode { id, md }
 }
 
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
@@ -592,11 +585,11 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
             .mut_or_default::<MakeProcessorHolder>();
         let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.0);
+        let commit = self.commit_builder.finish(root_full_node.id);
         h.with_parameters_mut(handle.1)
             .commits
             .insert(commit_oid, commit);
-        root_full_node.0
+        root_full_node.id
     }
 }
 

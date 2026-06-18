@@ -1,21 +1,23 @@
 use std::ops::Deref;
 
+use hyperast::store::SimpleStores;
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
+use hyperast::store::labels::LabelStore;
 use hyperast::store::nodes::legion::{HashedNodeRef, NodeStore};
-use hyperast::types::{self, Children};
+use hyperast::store::nodes::{ErasedHolder, PolyglotHolder};
+use hyperast::types;
+use hyperast::types::lending::NLending;
+use hyperast::types::{Children, Tree};
+use hyperast::types::{NStore, WithHashs};
 use hyperast::types::{NodeId, UniformNodeId};
 
 pub fn as_nospaces<'a, TS>(
-    stores: &'a hyperast::store::SimpleStores<TS>,
-) -> hyperast::store::SimpleStores<
-    TS,
-    NoSpaceNodeStoreWrapper<'a>,
-    &'a hyperast::store::labels::LabelStore,
-> {
+    stores: &'a SimpleStores<TS>,
+) -> SimpleStores<TS, NoSpaceNodeStoreWrapper<'a>, &'a LabelStore> {
     let label_store = &stores.label_store;
     let node_store = &stores.node_store;
     let node_store = node_store.into();
-    hyperast::store::SimpleStores {
+    SimpleStores {
         node_store,
         label_store,
         type_store: std::marker::PhantomData,
@@ -143,7 +145,7 @@ impl<'a, T: types::NodeId> types::CLending<'a, u16, T::IdN> for NoSpaceWrapper<'
     type Children = types::ChildrenSlice<'a, T::IdN>;
 }
 
-impl<'a, T: types::NodeId<IdN = NodeIdentifier>> types::WithChildren for NoSpaceWrapper<'a, T> {
+impl<T: types::NodeId<IdN = NodeIdentifier>> types::WithChildren for NoSpaceWrapper<'_, T> {
     type ChildIdx = u16;
 
     fn child_count(&self) -> u16 {
@@ -163,13 +165,12 @@ impl<'a, T: types::NodeId<IdN = NodeIdentifier>> types::WithChildren for NoSpace
 
     fn children(
         &self,
-    ) -> Option<hyperast::types::LendC<'_, Self, Self::ChildIdx, <Self::TreeId as NodeId>::IdN>>
-    {
+    ) -> Option<<Self as types::CLending<'_, Self::ChildIdx, NodeIdentifier>>::Children> {
         self.0.no_spaces().ok()
     }
 }
 
-impl<'a, T> types::WithHashs for NoSpaceWrapper<'a, T> {
+impl<'a, T> WithHashs for NoSpaceWrapper<'a, T> {
     type HK = hyperast::hashed::SyntaxNodeHashsKinds;
     type HP = hyperast::nodes::HashSize;
 
@@ -178,7 +179,7 @@ impl<'a, T> types::WithHashs for NoSpaceWrapper<'a, T> {
     }
 }
 
-impl<'a> hyperast::types::ErasedHolder for NoSpaceWrapper<'a, MIdN<NodeIdentifier>> {
+impl<'a> ErasedHolder for NoSpaceWrapper<'a, MIdN<NodeIdentifier>> {
     fn unerase_ref<T: 'static + Send + Sync>(&self, tid: std::any::TypeId) -> Option<&T> {
         self.0.unerase_ref(tid)
     }
@@ -191,7 +192,7 @@ impl<'a> hyperast::types::ErasedHolder for NoSpaceWrapper<'a, MIdN<NodeIdentifie
     }
 }
 
-impl hyperast::store::nodes::ErasedHolder for NoSpaceWrapper<'_, NodeIdentifier> {
+impl ErasedHolder for NoSpaceWrapper<'_, NodeIdentifier> {
     unsafe fn unerase_ref_unchecked<T: 'static + hyperast::store::nodes::Compo>(
         &self,
         tid: std::any::TypeId,
@@ -204,13 +205,13 @@ impl hyperast::store::nodes::ErasedHolder for NoSpaceWrapper<'_, NodeIdentifier>
     }
 }
 
-impl hyperast::store::nodes::PolyglotHolder for NoSpaceWrapper<'_, NodeIdentifier> {
+impl PolyglotHolder for NoSpaceWrapper<'_, NodeIdentifier> {
     fn lang_id(&self) -> hyperast::store::nodes::LangId {
         self.0.lang_id()
     }
 }
 
-impl types::Tree for NoSpaceWrapper<'_, NodeIdentifier> {
+impl Tree for NoSpaceWrapper<'_, NodeIdentifier> {
     fn has_children(&self) -> bool {
         self.0.has_children()
     }
@@ -220,12 +221,12 @@ impl types::Tree for NoSpaceWrapper<'_, NodeIdentifier> {
     }
 }
 
-impl types::NStore for NoSpaceNodeStoreWrapper<'_> {
+impl NStore for NoSpaceNodeStoreWrapper<'_> {
     type IdN = NodeIdentifier;
     type Idx = u16;
 }
 
-impl<'a> types::lending::NLending<'a, NodeIdentifier> for NoSpaceNodeStoreWrapper<'_> {
+impl<'a> NLending<'a, NodeIdentifier> for NoSpaceNodeStoreWrapper<'_> {
     type N = NoSpaceWrapper<'a, NodeIdentifier>;
 }
 
@@ -235,12 +236,12 @@ impl types::NodeStore<NodeIdentifier> for NoSpaceNodeStoreWrapper<'_> {
     }
 }
 
-impl<'store> types::NStore for &NoSpaceNodeStoreWrapper<'store> {
+impl<'store> NStore for &NoSpaceNodeStoreWrapper<'store> {
     type IdN = NodeIdentifier;
     type Idx = u16;
 }
 
-impl<'a, 'store> types::lending::NLending<'a, NodeIdentifier> for &NoSpaceNodeStoreWrapper<'store> {
+impl<'a, 'store> NLending<'a, NodeIdentifier> for &NoSpaceNodeStoreWrapper<'store> {
     type N = NoSpaceWrapper<'a, NodeIdentifier>;
 }
 

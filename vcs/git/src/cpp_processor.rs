@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::iter::Peekable;
 use std::path::Components;
 use std::sync::Arc;
@@ -16,7 +17,7 @@ use crate::{Processor, StackEle};
 
 use crate::make::MakeModuleAcc;
 use hyperast_gen_ts_cpp::Type;
-use hyperast_gen_ts_cpp::legion::{self as cpp_gen};
+use hyperast_gen_ts_cpp::legion as cpp_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
 
@@ -166,11 +167,8 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
             log::debug!("tree {:?}", name.try_str());
             let tree = self.repository.find_tree(oid).unwrap();
             let prepared: Vec<BasicGitObject> = prepare_dir_exploration(tree);
-            self.stack.push(StackEle::new(
-                oid,
-                prepared,
-                CppAcc::new(name.try_into().unwrap()),
-            ));
+            let acc = CppAcc::new(name.try_into().unwrap());
+            self.stack.push(StackEle::new(oid, prepared, acc));
         }
     }
 }
@@ -185,7 +183,7 @@ pub(crate) struct CppProc {
     parameter: Parameter,
     query: Option<Query>,
     cache: crate::processing::caches::Cpp,
-    commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+    commits: HashMap<git2::Oid, crate::Commit>,
 }
 impl crate::processing::erased::Parametrized for CppProcessorHolder {
     type T = Parameter;
@@ -269,6 +267,7 @@ impl crate::processing::erased::CommitProc for CppProc {
 impl crate::processing::erased::CommitProcExt for CppProc {
     type Holder = CppProcessorHolder;
 }
+
 impl crate::processing::erased::ParametrizedCommitProc2 for CppProcessorHolder {
     type Proc = CppProc;
 
@@ -294,15 +293,6 @@ impl CacheHolding<crate::processing::caches::Cpp> for CppProc {
         &self.cache
     }
 }
-
-// impl CacheHolding<crate::processing::caches::Cpp> for CppProcessorHolder {
-//     fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Cpp {
-//         &mut self.0.as_mut().unwrap().cache
-//     }
-//     fn get_caches(&self) -> &crate::processing::caches::Cpp {
-//         &self.0.as_ref().unwrap().cache
-//     }
-// }
 
 #[cfg(feature = "cpp")]
 impl RepositoryProcessor {

@@ -13,10 +13,12 @@ use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 use hyperast_gen_ts_xml::{TStore, Type};
 
-use crate::{
-    Accumulator, BasicDirAcc, DefaultMetrics, PROPAGATE_ERROR_ON_BAD_CST_NODE, ParseErr,
-    SimpleStores, processing::ObjectName,
-};
+use crate::Accumulator;
+use crate::BasicDirAcc;
+use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
+use crate::ParseErr;
+use crate::processing::ObjectName;
+use crate::{DefaultMetrics, SimpleStores};
 
 pub(crate) fn handle_pom_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,
@@ -109,10 +111,9 @@ impl<'a> IterMavenModules2<'a> {
                 self.offsets.last_mut().unwrap().add_assign(1);
                 x = c;
                 break;
-            } else {
-                self.offsets.pop();
-                self.parents.pop();
             }
+            self.offsets.pop();
+            self.parents.pop();
         }
 
         let b = self
@@ -142,8 +143,8 @@ impl<'a> IterMavenModules2<'a> {
         self.offsets.push(0);
         self.remaining.push(None);
         if b.has_children() {
-            self.remaining
-                .extend(b.children().unwrap().iter_children().rev().map(|x| Some(x)));
+            let cs = b.children().unwrap().iter_children();
+            self.remaining.extend(cs.rev().map(|x| Some(x)));
         }
 
         let contains_pom = b.children().unwrap_or_default().iter_children().any(|x| {
@@ -152,19 +153,20 @@ impl<'a> IterMavenModules2<'a> {
             };
             let n = n.0;
             log::debug!("f {:?}", n.get_type());
-            n.get_type().eq(&Type::Document)
-                && if n.has_label() {
-                    log::debug!(
-                        "f name: {:?}",
-                        self.stores.label_store.resolve(n.get_label_unchecked())
-                    );
-                    self.stores
-                        .label_store
-                        .resolve(n.get_label_unchecked())
-                        .eq("pom.xml")
-                } else {
-                    false
-                }
+            if !n.get_type().eq(&Type::Document) {
+                return false;
+            }
+            if !n.has_label() {
+                return false;
+            }
+            log::debug!(
+                "f name: {:?}",
+                self.stores.label_store.resolve(n.get_label_unchecked())
+            );
+            self.stores
+                .label_store
+                .resolve(n.get_label_unchecked())
+                .eq("pom.xml")
         });
 
         if contains_pom {
@@ -223,25 +225,10 @@ impl MavenModuleAcc {
         test_dirs: Vec<PathBuf>,
     ) -> Self {
         Self {
-            primary: BasicDirAcc::new(name),
-            ana: MavenPartialAnalysis::new(),
-            sub_modules: if sub_modules.is_empty() {
-                None
-            } else {
-                Some(sub_modules)
-            },
-            main_dirs: if main_dirs.is_empty() {
-                None
-            } else {
-                Some(main_dirs)
-            },
-            test_dirs: if test_dirs.is_empty() {
-                None
-            } else {
-                Some(test_dirs)
-            },
-            status: Default::default(),
-            scripting_acc: None,
+            sub_modules: (!sub_modules.is_empty()).then_some(sub_modules),
+            main_dirs: (!main_dirs.is_empty()).then_some(main_dirs),
+            test_dirs: (!test_dirs.is_empty()).then_some(test_dirs),
+            ..Self::new(name)
         }
     }
 }
@@ -271,15 +258,13 @@ impl MavenModuleAcc {
         self.sub_modules = Some(full_node.submodules.iter().map(|x| x.into()).collect());
         self.primary.metrics.acc(full_node.metrics);
     }
-    pub fn push_submodule(&mut self, name: LabelIdentifier, full_node: (NodeIdentifier, MD)) {
-        if full_node.1.status.contains(SemFlag::HoldMavenSubModule)
-            || full_node.1.status.contains(SemFlag::IsMavenModule)
-        {
+    pub fn push_submodule(&mut self, name: LabelIdentifier, full_node: FullNode) {
+        if full_node.hold_maven_submodule() || full_node.is_maven_module() {
             self.status |= SemFlag::HoldMavenSubModule;
         }
-        self.primary.children.push(full_node.0);
+        self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.1.metrics);
+        self.primary.metrics.acc(full_node.md.metrics);
     }
     pub(crate) fn push_source_directory(
         &mut self,
@@ -290,11 +275,8 @@ impl MavenModuleAcc {
         self.primary.children.push(full_node.compressed_node);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(SubTreeMetrics {
-            hashs: full_node.metrics.hashs,
-            size: full_node.metrics.size,
-            height: full_node.metrics.height,
-            size_no_spaces: full_node.metrics.size_no_spaces,
             line_count: 0,
+            ..full_node.metrics
         });
         // TODO ana
         // full_node.2.acc(&Type::Directory, &mut self.ana);
@@ -308,11 +290,8 @@ impl MavenModuleAcc {
         self.primary.children.push(full_node.compressed_node);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(SubTreeMetrics {
-            hashs: full_node.metrics.hashs,
-            size: full_node.metrics.size,
-            height: full_node.metrics.height,
-            size_no_spaces: full_node.metrics.size_no_spaces,
             line_count: 0,
+            ..full_node.metrics
         });
         // TODO ana
         // full_node.2.acc(&Type::Directory, &mut self.ana);
@@ -354,83 +333,81 @@ impl<'a, T: TreePathMut<NodeIdentifier, u16> + Debug + Clone> Iterator for IterM
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (node, offset, children) = self.stack.pop()?;
-            if let Some(children) = children {
-                if offset.to_usize().unwrap() < children.len() {
-                    let child = children[offset.to_usize().unwrap()];
-                    self.path.check(self.stores).unwrap();
-                    {
-                        let b = self
-                            .stores
-                            .node_store
-                            .try_resolve_typed::<XmlIdN>(&node)
-                            .unwrap()
-                            .0;
-                        if b.has_children() {
-                            let len = b.child_count();
-                            let cs = b.children().unwrap();
-                            // println!("children: {:?} {} {:?}", node,cs.len(),cs);
-                            assert!(offset < len);
-                            assert_eq!(child, cs[offset]);
-                        } else {
-                            panic!()
-                        }
-                    }
-                    if offset == 0 {
-                        match self.path.node() {
-                            Some(x) => assert_eq!(*x, node),
-                            None => {}
-                        }
-                        self.path.goto(child, offset);
-                        self.path.check(self.stores).unwrap();
-                    } else {
-                        match self.path.node() {
-                            Some(x) => assert_eq!(*x, children[offset.to_usize().unwrap() - 1]),
-                            None => {}
-                        }
-                        self.path.inc(child);
-                        assert_eq!(*self.path.offset().unwrap(), offset + 1);
-                        self.path.check(self.stores).unwrap_or_else(|_| {
-                            panic!(
-                                "{:?} {} {:?} {:?} {:?}",
-                                node, offset, child, children, self.path
-                            )
-                        });
-                    }
-                    self.stack.push((node, offset + 1, Some(children)));
-                    self.stack.push((child, 0, None));
-                    continue;
-                } else {
-                    self.path.check(self.stores).unwrap();
-                    self.path.pop().expect("should not go higher than root");
-                    self.path.check(self.stores).unwrap();
-                    continue;
-                }
+        let (node, offset, children) = self.stack.pop()?;
+        let Some(children) = children else {
+            return self.when_no_children(node);
+        };
+        if offset.to_usize().unwrap() >= children.len() {
+            self.path.check(self.stores).unwrap();
+            self.path.pop().expect("should not go higher than root");
+            self.path.check(self.stores).unwrap();
+            return self.next();
+        }
+        let child = children[offset.to_usize().unwrap()];
+        self.path.check(self.stores).unwrap();
+        {
+            let b = self
+                .stores
+                .node_store
+                .try_resolve_typed::<XmlIdN>(&node)
+                .unwrap()
+                .0;
+            if b.has_children() {
+                let len = b.child_count();
+                let cs = b.children().unwrap();
+                // println!("children: {:?} {} {:?}", node,cs.len(),cs);
+                assert!(offset < len);
+                assert_eq!(child, cs[offset]);
             } else {
-                let b = self
-                    .stores
-                    .node_store
-                    .try_resolve_typed::<XmlIdN>(&node)
-                    .unwrap()
-                    .0;
-
-                if self.is_dead_end(&b) {
-                    continue;
-                }
-
-                if b.has_children() {
-                    let children = b.children();
-                    self.stack
-                        .push((node, 0, Some(children.unwrap().iter_children().collect())));
-                }
-
-                if self.is_matching(&b) {
-                    self.path.check(self.stores).unwrap();
-                    return Some(self.path.clone());
-                }
+                panic!()
             }
         }
+        if offset == 0 {
+            if let Some(x) = self.path.node() {
+                assert_eq!(*x, node)
+            }
+            self.path.goto(child, offset);
+            self.path.check(self.stores).unwrap();
+        } else {
+            if let Some(x) = self.path.node() {
+                assert_eq!(*x, children[offset.to_usize().unwrap() - 1])
+            }
+            self.path.inc(child);
+            assert_eq!(*self.path.offset().unwrap(), offset + 1);
+            self.path.check(self.stores).unwrap_or_else(|_| {
+                panic!(
+                    "{:?} {} {:?} {:?} {:?}",
+                    node, offset, child, children, self.path
+                )
+            });
+        }
+        self.stack.push((node, offset + 1, Some(children)));
+        self.stack.push((child, 0, None));
+        return self.next();
+    }
+}
+
+impl<'a, T: TreePathMut<NodeIdentifier, u16> + Debug + Clone> IterMavenModules<'a, T> {
+    fn when_no_children(&mut self, node: NodeIdentifier) -> Option<T> {
+        let b = self
+            .stores
+            .node_store
+            .try_resolve_typed::<XmlIdN>(&node)
+            .unwrap()
+            .0;
+        if self.is_dead_end(&b) {
+            return self.next();
+        }
+        if b.has_children() {
+            let children = b.children();
+            self.stack
+                .push((node, 0, Some(children.unwrap().iter_children().collect())));
+        }
+        if self.is_matching(&b) {
+            self.path.check(self.stores).unwrap();
+            return Some(self.path.clone());
+        }
+        return self.next();
     }
 }
 
@@ -460,44 +437,60 @@ impl<'a, T: TreePath<NodeIdentifier>> IterMavenModules<'a, T> {
 
         is_src || t != Type::MavenDirectory
     }
+
     fn is_matching(&self, b: &XmlNode<'a>) -> bool {
-        let contains_pom = b.children().unwrap().iter_children().any(|x| {
-            if let Some(n) = self.stores.node_store.try_resolve_typed::<XmlIdN>(&x) {
-                let n = n.0;
-                log::debug!("f {:?}", n.get_type());
-                n.get_type().eq(&Type::Document)
-                    && if n.has_label() {
-                        log::debug!(
-                            "f name: {:?}",
-                            self.stores.label_store.resolve(n.get_label_unchecked())
-                        );
-                        self.stores
-                            .label_store
-                            .resolve(n.get_label_unchecked())
-                            .eq("pom.xml")
-                    } else {
-                        false
-                    }
-            } else {
-                false
+        b.children().unwrap().iter_children().any(|x| {
+            let Some(n) = self.stores.node_store.try_resolve_typed::<XmlIdN>(&x) else {
+                return false;
+            };
+            let n = n.0;
+            log::debug!("f {:?}", n.get_type());
+            if !n.get_type().eq(&Type::Document) {
+                return false;
             }
-        });
-        contains_pom
+            if !n.has_label() {
+                return false;
+            }
+            log::debug!(
+                "f name: {:?}",
+                self.stores.label_store.resolve(n.get_label_unchecked())
+            );
+            self.stores
+                .label_store
+                .resolve(n.get_label_unchecked())
+                .eq("pom.xml")
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct FullNode {
+    pub id: NodeIdentifier,
+    pub md: MD,
+}
+
+impl FullNode {
+    pub fn is_maven_module(&self) -> bool {
+        self.md.status.contains(SemFlag::IsMavenModule)
+    }
+
+    pub fn hold_maven_submodule(&self) -> bool {
+        self.md.status.contains(SemFlag::HoldMavenSubModule)
     }
 }
 
 impl hyperast::tree_gen::Accumulator for MavenModuleAcc {
-    type Node = (LabelIdentifier, (NodeIdentifier, MD));
+    type Node = (LabelIdentifier, FullNode);
     fn push(&mut self, (name, full_node): Self::Node) {
-        let s = full_node.1.status - SemFlag::IsMavenModule;
+        let s = full_node.md.status - SemFlag::IsMavenModule;
         assert!(!s.contains(SemFlag::IsMavenModule));
         self.status |= s;
-        self.primary.children.push(full_node.0);
+        self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.1.metrics);
+        self.primary.metrics.acc(full_node.md.metrics);
     }
 }
 
 impl Accumulator for MavenModuleAcc {
-    type Unlabeled = (NodeIdentifier, MD);
+    type Unlabeled = FullNode;
 }

@@ -33,7 +33,7 @@ struct Lang;
 
 impl LanguageCompo for Lang {
     fn language(&self) -> tree_sitter::Language {
-        hyperast_gen_ts_ts::language()
+        hyperast_gen_ts_typescript::language()
     }
 
     fn name(&self) -> &str {
@@ -41,6 +41,6 @@ impl LanguageCompo for Lang {
     }
 
     fn node_types(&self) -> &str {
-        hyperast_gen_ts_ts::node_types()
+        hyperast_gen_ts_typescript::node_types()
     }
 }

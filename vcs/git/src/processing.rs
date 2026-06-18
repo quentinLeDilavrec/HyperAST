@@ -324,18 +324,18 @@ pub(crate) mod caches {
 
     #[derive(Default)]
     pub struct Maven {
-        pub object_map: OidMap<crate::maven::FullNode>,
+        pub object_map: OidMap<crate::processors::maven::FullNode>,
     }
 
     #[derive(Default)]
     pub struct Pom {
-        pub object_map: OidMap<crate::maven::POM>,
+        pub object_map: OidMap<crate::processors::maven::POM>,
     }
 
     impl super::ObjectMapper for Pom {
         type K = git2::Oid;
 
-        type V = crate::maven::POM;
+        type V = crate::processors::maven::POM;
 
         fn get(&self, key: &Self::K) -> Option<&Self::V> {
             self.object_map.get(key)
@@ -348,18 +348,18 @@ pub(crate) mod caches {
 
     #[derive(Default)]
     pub struct Make {
-        pub object_map: OidMap<crate::make::FullNode>,
+        pub object_map: OidMap<crate::processors::make::FullNode>,
     }
 
     #[derive(Default)]
     pub struct Makefile {
-        pub object_map: OidMap<crate::make::MakeFile>,
+        pub object_map: OidMap<crate::processors::make::MakeFile>,
     }
 
     impl super::ObjectMapper for Makefile {
         type K = git2::Oid;
 
-        type V = crate::make::MakeFile;
+        type V = crate::processors::make::MakeFile;
 
         fn get(&self, key: &Self::K) -> Option<&Self::V> {
             self.object_map.get(key)

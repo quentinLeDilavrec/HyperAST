@@ -1,5 +1,7 @@
+mod maven_processor;
+
 use num::ToPrimitive;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use std::ops::AddAssign;
 use std::path::PathBuf;
 
@@ -15,10 +17,14 @@ use hyperast_gen_ts_xml::{TStore, Type};
 
 use crate::Accumulator;
 use crate::BasicDirAcc;
+use crate::DefaultMetrics;
 use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
 use crate::ParseErr;
 use crate::processing::ObjectName;
-use crate::{DefaultMetrics, SimpleStores};
+
+pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
+
+pub use maven_processor::*;
 
 pub(crate) fn handle_pom_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,
@@ -26,7 +32,7 @@ pub(crate) fn handle_pom_file<'a, E>(
     text: &'a [u8],
 ) -> Result<POM, ParseErr>
 where
-    E: hyperast::tree_gen::TsExtra<hyperast::store::SimpleStores<TStore>>,
+    E: hyperast::tree_gen::TsExtra<SimpleStores>,
 {
     let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
     if tree.root_node().has_error() {
@@ -70,7 +76,7 @@ pub struct IterMavenModules2<'a> {
 }
 
 impl<'a> Debug for IterMavenModules2<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IterMavenModules")
             .field("parents", &self.parents())
             .field("offsets", &self.offsets())

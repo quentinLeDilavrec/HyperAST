@@ -384,7 +384,7 @@ fn simple_aux(
                 let node_store = &stores.node_store;
                 let n = node_store.resolve(current);
                 use enumset::EnumSet;
-                use hyperast_vcs_git::maven::SemFlag;
+                use hyperast_vcs_git::processors::maven::SemFlag;
                 n.get_component::<Flags<EnumSet<SemFlag>>>()
                     .is_ok_and(|x| x.contains(SemFlag::IsMavenModule))
             });
@@ -394,7 +394,7 @@ fn simple_aux(
                 let node_store = &stores.node_store;
                 let n = node_store.resolve(current);
                 use enumset::EnumSet;
-                use hyperast_vcs_git::maven::SemFlag;
+                use hyperast_vcs_git::processors::maven::SemFlag;
                 n.get_component::<Flags<EnumSet<SemFlag>>>()
                     .is_ok_and(|x| x.contains(SemFlag::HoldMavenSubModule))
             });
@@ -404,7 +404,7 @@ fn simple_aux(
                 let node_store = &stores.node_store;
                 let n = node_store.resolve(current);
                 use enumset::EnumSet;
-                use hyperast_vcs_git::maven::SemFlag;
+                use hyperast_vcs_git::processors::maven::SemFlag;
                 n.get_component::<Flags<EnumSet<SemFlag>>>().is_ok_and(|x| {
                     x.contains(SemFlag::HoldMainFolder) || x.contains(SemFlag::HoldTestFolder)
                 })
@@ -506,7 +506,7 @@ fn simple_aux(
             let node_store = &stores.node_store;
             let n = node_store.resolve(current);
             use enumset::EnumSet;
-            use hyperast_vcs_git::maven::SemFlag;
+            use hyperast_vcs_git::processors::maven::SemFlag;
             n.get_component::<Flags<EnumSet<SemFlag>>>()
                 .is_ok_and(|x| x.contains(SemFlag::IsMavenModule))
         });
@@ -516,7 +516,7 @@ fn simple_aux(
             let node_store = &stores.node_store;
             let n = node_store.resolve(current);
             use enumset::EnumSet;
-            use hyperast_vcs_git::maven::SemFlag;
+            use hyperast_vcs_git::processors::maven::SemFlag;
             n.get_component::<Flags<EnumSet<SemFlag>>>()
                 .is_ok_and(|x| x.contains(SemFlag::HoldMavenSubModule))
         });
@@ -526,7 +526,7 @@ fn simple_aux(
             let node_store = &stores.node_store;
             let n = node_store.resolve(current);
             use enumset::EnumSet;
-            use hyperast_vcs_git::maven::SemFlag;
+            use hyperast_vcs_git::processors::maven::SemFlag;
             n.get_component::<Flags<EnumSet<SemFlag>>>().is_ok_and(|x| {
                 x.contains(SemFlag::HoldMainFolder) || x.contains(SemFlag::HoldTestFolder)
             })

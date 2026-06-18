@@ -1,3 +1,5 @@
+mod java_processor;
+
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::tree_gen;
 
@@ -7,10 +9,14 @@ use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
 use crate::processing::ObjectName;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
-use crate::java_processor::SimpleStores;
 use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 use hyperast_gen_ts_java::legion_with_refs::PartialAnalysis;
 use hyperast_gen_ts_java::{TStore, Type};
+
+pub use java_processor::*;
+pub use java_processor::{JavaProc, JavaProcessorHolder};
+
+pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 
 pub(crate) fn handle_java_file<'stores, 'cache, 'b: 'stores, More>(
     tree_gen: &mut java_tree_gen::JavaTreeGen<'stores, 'cache, TStore, SimpleStores, More>,

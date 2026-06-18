@@ -1,3 +1,5 @@
+mod cpp_processor;
+
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::tree_gen;
 
@@ -7,9 +9,12 @@ use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
 use crate::processing::ObjectName;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
-use crate::cpp_processor::SimpleStores;
 use hyperast_gen_ts_cpp::TStore;
 use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
+
+pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
+
+pub use cpp_processor::*;
 
 // waiting for residual stabilization https://github.com/rust-lang/rust/issues/84277
 // see after the temporary solution

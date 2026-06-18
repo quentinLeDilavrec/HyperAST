@@ -10,7 +10,7 @@ use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use hyperast_vcs_git::processing::ConfiguredRepoHandle2;
 use hyperast_vcs_git::processing::erased::ParametrizedCommitProc2 as _;
 use hyperast_vcs_git::processing::{CacheHolding as _, ConfiguredRepoTrait as _};
-use hyperast_vcs_git::{maven::MavenModuleAcc, maven_processor::MavenProcessorHolder};
+use hyperast_vcs_git::processors::maven::{MavenModuleAcc, MavenProcessorHolder};
 
 use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess};
 use crate::{other_tools, window_combination::write_perfs};
@@ -172,8 +172,9 @@ pub fn windowed_commits_compare(
             }
 
             let stores = &mut preprocessed.processor.main_stores;
-            let src_tr = PreProcessedRepositories::make(src_acc, stores).id;
-            let dst_tr = PreProcessedRepositories::make(dst_acc, stores).id;
+            use hyperast_vcs_git::processors::maven::make;
+            let src_tr = make(src_acc, stores.mut_with_ts()).id;
+            let dst_tr = make(dst_acc, stores.mut_with_ts()).id;
 
             let stores = &preprocessed.processor.main_stores;
             let hyperast = hyperast_vcs_git::no_space::as_nospaces(stores);

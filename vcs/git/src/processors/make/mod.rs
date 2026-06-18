@@ -1,3 +1,5 @@
+mod make_processor;
+
 use std::{fmt::Debug, path::PathBuf};
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
@@ -9,6 +11,8 @@ use hyperast_gen_ts_xml::legion::XmlTreeGen;
 use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
 use crate::processing::ObjectName;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
+
+pub use make_processor::*;
 
 pub(crate) fn handle_makefile_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,

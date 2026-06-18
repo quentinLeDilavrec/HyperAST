@@ -4446,6 +4446,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperast_gen_ts_rust"
+version = "0.5.0"
+dependencies = [
+ "bitvec",
+ "cfg-if",
+ "env_logger 0.11.5",
+ "hashbrown 0.14.5",
+ "hyperast",
+ "hyperast_tsquery",
+ "legion",
+ "libc 0.2.171",
+ "log",
+ "num",
+ "polyglot",
+ "pretty_assertions",
+ "serde",
+ "tree-sitter",
+ "tree-sitter-rust",
+]
+
+[[package]]
 name = "hyperast_gen_ts_ts"
 version = "0.5.0"
 dependencies = [
@@ -10683,6 +10704,16 @@ source = "git+https://github.com/tree-sitter-grammars/tree-sitter-query?rev=d25e
 dependencies = [
  "cc",
  "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-rust"
+version = "0.23.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca8ccb3e3a3495c8a943f6c3fd24c3804c471fd7f4f16087623c7fa4c0068e8a"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
 ]
 
 [[package]]

@@ -463,3 +463,13 @@ pub enum AdditionalKeyword {
     #[strum(serialize = "|}")]
     PipeRBrace,
 }
+
+#[derive(Debug, EnumString, AsRefStr, EnumIter, EnumCount, Display)]
+#[strum(serialize_all = "snake_case")]
+#[derive(Hash, Clone, Copy, PartialEq, Eq)]
+pub enum RustKeyword {
+    #[strum(serialize = "Self")]
+    Selff,
+    #[strum(serialize = "self")]
+    Slf,
+}

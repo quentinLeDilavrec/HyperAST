@@ -5,7 +5,7 @@ use proc_macro2::Ident;
 use quote::{format_ident, quote};
 
 use crate::generate_types::BijectiveFormatedIdentifier as _;
-use crate::keywords::{AdditionalKeyword, CppKeyword, JavaKeyword};
+use crate::keywords::{AdditionalKeyword, CppKeyword, JavaKeyword, RustKeyword};
 use crate::preprocess::{DChildren, Fields, Hidden, MultipleChildren, RequiredChildren};
 use crate::preprocess::{Named, SubTypes};
 
@@ -42,6 +42,9 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
         leafs.unamed.insert(x.to_string(), format!("{:?}", x));
     });
     <CppKeyword as strum::IntoEnumIterator>::iter().for_each(|x| {
+        leafs.unamed.insert(x.to_string(), format!("{:?}", x));
+    });
+    <RustKeyword as strum::IntoEnumIterator>::iter().for_each(|x| {
         leafs.unamed.insert(x.to_string(), format!("{:?}", x));
     });
     <AdditionalKeyword as strum::IntoEnumIterator>::iter().for_each(|x| {
@@ -452,16 +455,18 @@ pub(crate) fn process_types_into_tokens(typesys: &TypeSys) -> proc_macro2::Token
             alias_dedup.insert(*e, kind);
         } else {
             let camel_case = t.try_format_ident(dup_count);
-            let kind = format_ident!(
-                "{}",
-                &camel_case.clone().unwrap_or_else(|| {
+            let kind = if let Some(t) = leafs.unamed.get(&t) {
+                leafs.fmt(&t.clone(), |k| format!("TS{}", &k)).to_owned()
+            } else {
+                camel_case.clone().unwrap_or_else(|| {
                     let mut s = t.to_upper_camel_case();
                     if dup_count > 0 {
                         s.push_str(&"_".repeat(dup_count as usize));
                     }
                     s
                 })
-            );
+            };
+            let kind = format_ident!("{}", &kind);
             let raw = t.clone();
 
             if t == "URI" {

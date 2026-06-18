@@ -199,6 +199,7 @@ impl Debug for TypeSys {
 impl Display for TypeSys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let toks = crate::generate_types::process_types_into_tokens(self);
+        // eprintln!("{}", toks.to_string());
         let res = syn::parse_file(&toks.to_string()).unwrap();
         write!(f, "{}", prettyplease::unparse(&res))
     }

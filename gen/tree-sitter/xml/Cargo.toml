@@ -22,6 +22,7 @@ legion = { workspace = true, optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
+hyperast_tsquery = { workspace = true }
 
 polyglot = { path="../../../lib/polyglot" }
 

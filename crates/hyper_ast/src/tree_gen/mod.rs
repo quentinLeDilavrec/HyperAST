@@ -688,6 +688,22 @@ pub trait TsType: crate::types::HyperType + Copy {
 #[cfg(feature = "ts")]
 pub mod utils_ts;
 
+#[cfg(all(feature = "ts", feature = "legion"))]
+pub trait TsExtra<HAST: StoreRefAssoc>:
+    Extra<HAST, zipped_ts_extra::Acc<<HAST::TS as types::ETypeStore>::Ty2>>
+where
+    HAST::TS: types::ETypeStore,
+{
+}
+
+#[cfg(all(feature = "ts", feature = "legion"))]
+impl<T, HAST: StoreRefAssoc> TsExtra<HAST> for T
+where
+    T: Extra<HAST, zipped_ts_extra::Acc<<HAST::TS as types::ETypeStore>::Ty2>>,
+    HAST::TS: types::ETypeStore,
+{
+}
+
 /// Allow to define extra derived data
 ///
 /// Can be chained with [`extra_chain::ChainedExtra`] when independent
@@ -862,6 +878,7 @@ pub fn newline_count(label: &Option<impl AsRef<str>>) -> u32 {
     num::ToPrimitive::to_u32(&r).expect("too many newlines")
 }
 
+#[cfg(feature = "ts")]
 pub fn handle_file_bounds<G>(
     g: &mut G,
     text: &[u8],
@@ -885,6 +902,7 @@ where
     })
 }
 
+#[cfg(feature = "ts")]
 #[doc(hidden)]
 pub fn _handle_file_bounds<G>(
     g: &mut G,

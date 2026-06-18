@@ -60,12 +60,12 @@ impl TypeStore for &TStore {
     type Ty = TypeU16<Xml>;
 }
 
-#[cfg(feature = "impl")]
-impl XmlEnabledTypeStore for TStore {
-    fn resolve(t: Self::Ty) -> Type {
-        t.e()
-    }
-}
+// #[cfg(feature = "impl")]
+// impl XmlEnabledTypeStore for TStore {
+//     fn resolve(t: Self::Ty) -> Type {
+//         t.e()
+//     }
+// }
 
 // static dynamically initialized once association table between Role and tree_sitter_java Fields
 #[cfg(feature = "impl")]
@@ -125,17 +125,17 @@ pub fn as_any(t: &Type) -> AnyType {
     t.into()
 }
 
-#[cfg(not(feature = "impl"))]
-pub trait XmlEnabledTypeStore: hyperast::types::ETypeStore<Ty2 = Type> {
-    fn resolve(t: Self::Ty) -> Type;
-}
+// #[cfg(not(feature = "impl"))]
+// pub trait XmlEnabledTypeStore: hyperast::types::ETypeStore<Ty2 = Type> {
+//     fn resolve(t: Self::Ty) -> Type;
+// }
 
-#[cfg(feature = "impl")]
-pub trait XmlEnabledTypeStore:
-    hyperast::types::ETypeStore<Ty2 = Type> + hyperast::tree_gen::utils_ts::TsEnableTS
-{
-    fn resolve(t: Self::Ty) -> Type;
-}
+// #[cfg(feature = "impl")]
+// pub trait XmlEnabledTypeStore:
+//     hyperast::types::ETypeStore<Ty2 = Type> + hyperast::tree_gen::utils_ts::TsEnableTS
+// {
+//     fn resolve(t: Self::Ty) -> Type;
+// }
 
 impl<IdN: Clone + Eq + UniformNodeId> NodeId for TIdN<IdN> {
     type IdN = IdN;

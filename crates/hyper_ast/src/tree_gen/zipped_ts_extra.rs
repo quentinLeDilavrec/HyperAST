@@ -191,10 +191,11 @@ where
         &mut self,
         stores: <HAST as StoreRefAssoc>::S<'_>,
         entity: &mut EntityBuilder,
-        acc: &mut Self::Acc,
+        acc: Self::Acc,
         label: Option<&str>,
-    ) {
+    ) -> Self::Acc {
         // no-op
+        acc
     }
 
     fn to_cache(
@@ -394,7 +395,7 @@ where
             // TODO for maximum resilience, should be handled by default, but it looks like a bug from TreeSitter.
         }
         if let Some(spacing) = spacing {
-            parent.push(self.make_space(global, &spacing).into());
+            parent.push(self.make_space(global, &spacing));
         }
         let node = self.post(|n| parent.push(n), global, text, acc);
         parent.push(node);
@@ -590,7 +591,7 @@ where
             .add_primary(&mut dyn_builder, interned_kind, label_id);
 
             let label = label.as_deref();
-            self.extra.extra(stores, &mut dyn_builder, &mut acc, label);
+            acc = self.extra.extra(stores, &mut dyn_builder, acc, label);
 
             let id = vacant.insert_built(dyn_builder.build());
 

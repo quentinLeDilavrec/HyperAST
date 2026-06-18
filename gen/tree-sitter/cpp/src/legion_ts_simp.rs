@@ -20,9 +20,9 @@
 //! precomputing patterns as defined by TreeSitter Queries
 //! ```rust
 //! # use hyperast::tree_gen::utils_ts::tree_sitter_parse;
+//! # use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
 //! # use hyperast_tsquery::{PreparedQuerying, Query};
 //! # use hyperast_gen_ts_cpp::legion_ts_simp::CppTreeGen;
-//! # use hyperast_gen_ts_cpp::legion_ts_simp::PatternPrecompExtra;
 //! # use hyperast_gen_ts_cpp::{Type, TStore};
 //! # type Acc = hyperast::tree_gen::zipped_ts_extra::Acc<Type>;
 //! # let language = hyperast_gen_ts_cpp::language();

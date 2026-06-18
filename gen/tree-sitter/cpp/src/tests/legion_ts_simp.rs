@@ -73,10 +73,10 @@ fn medium_extra_pattern_precomp() {
     let (precomp, _q) = Query::with_precomputed(query, lang, precomp) //
         .unwrap_or_else(|e| panic!("\n{e}"));
     let more = PreparedQuerying::<_, TStore, Acc<Type>>::from(&precomp);
-    let mut more = Precomp::<_, Acc<Type>, _>::from(more);
+    let mut extra = Precomp::<_, Acc<Type>, _>::from(more);
 
     let mut stores = Default::default();
-    let mut r#gen = CppTreeGen::new(&mut stores, &mut more);
+    let mut r#gen = CppTreeGen::new(&mut stores, &mut extra);
     let tree = utils_ts::tree_sitter_parse(text.as_bytes(), &crate::language());
     eprintln!("{}", tree.root_node().to_sexp());
 

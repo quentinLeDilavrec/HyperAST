@@ -8,18 +8,19 @@ use git2::{Oid, Repository};
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen::add_md_precomp_queries;
 
-use crate::cpp::CppAcc;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
+#[cfg(feature = "cpp")]
+use crate::processors::make::MakeModuleAcc;
 use crate::{Processor, StackEle};
 
-use crate::make::MakeModuleAcc;
+// use super::MakeModuleAcc;
+use super::CppAcc;
+use super::SimpleStores;
 use hyperast_gen_ts_cpp::Type;
 use hyperast_gen_ts_cpp::legion as cpp_gen;
-
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
 
 type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<CppProc>;
 
@@ -323,11 +324,11 @@ impl RepositoryProcessor {
                         stores, dedup, md_cache, more,
                     )
                     .set_line_break(line_break);
-                    crate::cpp::handle_cpp_file::<_>(&mut cpp_tree_gen, n, t)
+                    super::handle_cpp_file::<_>(&mut cpp_tree_gen, n, t)
                 } else {
                     let mut cpp_tree_gen =
                         cpp_gen::CppTreeGen::new(stores, md_cache).set_line_break(line_break);
-                    crate::cpp::handle_cpp_file(&mut cpp_tree_gen, n, t)
+                    super::handle_cpp_file(&mut cpp_tree_gen, n, t)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;
 

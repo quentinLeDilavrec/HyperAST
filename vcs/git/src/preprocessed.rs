@@ -599,7 +599,7 @@ impl IdHolder for NodeIdentifier {
 
 #[cfg(feature = "maven")]
 impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
-    type Module = (NodeIdentifier, crate::maven::MD);
+    type Module = (NodeIdentifier, crate::processors::maven::MD);
     fn handle_module<'b, const RMS: bool>(
         &mut self,
         _repository: &Repository,
@@ -624,7 +624,7 @@ impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
 }
 #[cfg(feature = "java")]
 impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
-    type Module = (NodeIdentifier, crate::maven::MD);
+    type Module = (NodeIdentifier, crate::processors::maven::MD);
     fn handle_module<'b, const RMS: bool>(
         &mut self,
         _repository: &Repository,
@@ -648,7 +648,7 @@ impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
 
 #[cfg(feature = "make")]
 impl CommitProcessor<file_sys::Make> for RepositoryProcessor {
-    type Module = (NodeIdentifier, crate::make::MD);
+    type Module = (NodeIdentifier, crate::processors::make::MD);
     fn handle_module<'b, const RMS: bool>(
         &mut self,
         _repository: &Repository,

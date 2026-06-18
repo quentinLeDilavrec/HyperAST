@@ -17,7 +17,6 @@ use crate::_auto_configured_line_break;
 use crate::Processor;
 use crate::StackEle;
 use crate::git::{BasicGitObject, NamedObject, ObjectType, TypedObject};
-use crate::maven::{FullNode, MD, MavenModuleAcc};
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::caches::Maven as MavenCaches;
 use crate::processing::caches::Pom as PomCaches;
@@ -26,8 +25,10 @@ use crate::processing::erased::{CommitProcExt, ParametrizedCommitProc2};
 use crate::processing::erased::{CommitProcessorHandle, ConfigParametersHandle};
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::processing::{ParametrizedCommitProcessorHandle, file_sys};
+use crate::processors::java::{JavaProc, JavaProcessorHolder};
 
-pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
+use super::SimpleStores;
+use super::{FullNode, MD, MavenModuleAcc};
 
 type ScriptingPrepro<'a, 'hast> = hyperast::scripting::Prepro<
     RawHAST<'hast, hyperast_gen_ts_java::TStore>,
@@ -321,7 +322,7 @@ fn prep_scripting(
     prepro
         .processing_systems
         // it is fine but could do better and kind of use MavenHolder
-        .get::<crate::java_processor::JavaProcessorHolder>()
+        .get::<JavaProcessorHolder>()
         .as_ref()?
         .with_parameters(handle)
         .parameter
@@ -329,7 +330,7 @@ fn prep_scripting(
         .as_ref()
 }
 
-pub(crate) fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
+pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
     use hyperast::hashed::IndexingHashBuilder;
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
@@ -431,7 +432,7 @@ impl RepositoryProcessor {
                 // let md_cache = &mut pom_proc.cache.object_map;
                 let mut xml_tree_gen = XmlTreeGen::bare(self.main_stores.mut_with_ts()) //
                     .set_line_break(line_break);
-                crate::maven::handle_pom_file(&mut xml_tree_gen, n, t)
+                super::handle_pom_file(&mut xml_tree_gen, n, t)
             })?;
         let name = self.intern_object_name(&name);
         assert!(!parent_acc.primary.children_names.contains(&name));
@@ -541,12 +542,8 @@ pub(crate) fn prepare_dir_exploration(
 pub struct Parameter {
     // pub(crate) query: Option<std::sync::Arc<[String]>>,
     // pub(crate) prepo: Option<hyperast_scripting::Prepro>,
-    pub java_handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<
-        crate::java_processor::JavaProc,
-    >,
-    pub pom_handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<
-        crate::maven_processor::PomProc,
-    >,
+    pub java_handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>,
+    pub pom_handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<PomProc>,
 }
 
 impl From<PCP2Handle<MavenProc>> for PCP2Handle<PomProc> {
@@ -735,9 +732,7 @@ impl crate::processing::erased::CommitProc for MavenProc {
     fn get_lang_handle(&self, lang: &str) -> Option<ParametrizedCommitProcessorHandle> {
         if lang.eq_ignore_ascii_case("java") {
             Some(ParametrizedCommitProcessorHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<
-                    crate::java_processor::JavaProcessorHolder,
-                >()),
+                CommitProcessorHandle(std::any::TypeId::of::<JavaProcessorHolder>()),
                 self.parameter.java_handle.0,
             ))
         } else if lang.eq_ignore_ascii_case("cpp") {

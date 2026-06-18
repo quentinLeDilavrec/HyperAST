@@ -18,7 +18,6 @@ use hyperast_gen_ts_java::{TStore, Type};
 
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
-use crate::java::JavaAcc;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle;
@@ -32,7 +31,8 @@ use crate::processing::erased::PreparedCommitProc;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::{Processor, StackEle};
 
-pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
+use super::JavaAcc;
+use super::SimpleStores;
 
 type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<JavaProc>;
 
@@ -377,22 +377,22 @@ impl Parameter {
         Self { query, tsg, prepro }
     }
     pub fn fast() -> Self {
-        let query = Some(crate::java_processor::SUB_QUERIES.into());
+        let query = Some(SUB_QUERIES.into());
         let tsg = None;
         let prepro = None;
         Self { query, tsg, prepro }
     }
     pub fn stable() -> Self {
-        let query = Some(crate::java_processor::SUB_QUERIES.into());
+        let query = Some(SUB_QUERIES.into());
         let tsg = None;
-        let prepro = Some(crate::java_processor::PREPRO.into());
+        let prepro = Some(PREPRO.into());
         Self { query, tsg, prepro }
     }
 
     pub fn nightly() -> Self {
-        let query = Some(crate::java_processor::SUB_QUERIES.into());
-        let tsg = Some(crate::java_processor::TSG.into());
-        let prepro = Some(crate::java_processor::PREPRO.into());
+        let query = Some(SUB_QUERIES.into());
+        let tsg = Some(TSG.into());
+        let prepro = Some(PREPRO.into());
         Self { query, tsg, prepro }
     }
 }
@@ -456,6 +456,7 @@ impl Parametrized for JavaProcessorHolder {
     }
 }
 
+#[cfg(feature = "tsg")]
 fn register_param_tsg(t: &Parameter, q: &Arc<str>) -> Option<TsgErzedSettings> {
     use std::ops::Deref;
     let tsg = q.deref();
@@ -670,7 +671,7 @@ impl RepositoryProcessor {
         let mut java_tree_gen =
             java_tree_gen::JavaTreeGen::<TStore, _, _>::new(stores, &mut md_cache)
                 .set_line_break(line_break);
-        crate::java::handle_java_file(&mut java_tree_gen, name, text)
+        super::handle_java_file(&mut java_tree_gen, name, text)
             .map(|x| x.node)
             .map_err(|e| {
                 eprintln!(
@@ -740,7 +741,7 @@ impl RepositoryProcessor {
                                 stores, dedup, md_cache, more,
                             )
                             .set_line_break(line_break);
-                        crate::java::handle_java_file(&mut java_tree_gen, n, t)
+                        super::handle_java_file(&mut java_tree_gen, n, t)
                     }
                 } else if let Some(precomp) = &java_proc.parameter.prepro {
                     let more = hyperast::scripting::Prepro::<_, _>::from_arc(precomp.clone());
@@ -750,7 +751,7 @@ impl RepositoryProcessor {
                             stores, dedup, md_cache, more,
                         )
                         .set_line_break(line_break);
-                    crate::java::handle_java_file(&mut java_tree_gen, n, t)
+                    super::handle_java_file(&mut java_tree_gen, n, t)
                 } else if let Some(more) = &java_proc.query {
                     let more = &more.0;
                     let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
@@ -759,11 +760,11 @@ impl RepositoryProcessor {
                             stores, dedup, md_cache, more,
                         )
                         .set_line_break(line_break);
-                    crate::java::handle_java_file::<_>(&mut java_tree_gen, n, t)
+                    super::handle_java_file::<_>(&mut java_tree_gen, n, t)
                 } else {
                     let mut java_tree_gen = java_tree_gen::JavaTreeGen::new(stores, md_cache)
                         .set_line_break(line_break);
-                    crate::java::handle_java_file(&mut java_tree_gen, n, t)
+                    super::handle_java_file(&mut java_tree_gen, n, t)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;
 

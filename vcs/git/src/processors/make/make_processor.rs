@@ -12,11 +12,13 @@ use hyperast_gen_ts_xml::Type;
 use crate::Processor;
 use crate::StackEle;
 use crate::git::{BasicGitObject, NamedObject, ObjectType, TypedObject};
-use crate::make::{FullNode, MD, MakeModuleAcc};
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::{CommitProcessorHandle, ParametrizedCommitProc2};
 use crate::processing::{CacheHolding, InFiles, ObjectName, ParametrizedCommitProcessorHandle};
+use crate::processors::cpp as cpp_processor;
+
+use super::{FullNode, MD, MakeModuleAcc};
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
 
@@ -287,7 +289,7 @@ impl RepositoryProcessor {
             .processing_systems
             .caching_blob_handler::<crate::processing::file_sys::MakeFile>()
             .handle(oid, repository, &name, parameters, |_c, n, t| {
-                crate::make::handle_makefile_file(
+                super::handle_makefile_file(
                     &mut XmlTreeGen::bare(self.main_stores.mut_with_ts()),
                     n,
                     t,
@@ -400,9 +402,8 @@ pub(crate) fn prepare_dir_exploration(
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
-    pub(crate) cpp_handle: crate::processing::erased::ParametrizedCommitProcessor2Handle<
-        crate::cpp_processor::CppProc,
-    >,
+    pub(crate) cpp_handle:
+        crate::processing::erased::ParametrizedCommitProcessor2Handle<cpp_processor::CppProc>,
 }
 impl From<crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>>
     for crate::processing::erased::ParametrizedCommitProcessor2Handle<MakefileProc>
@@ -417,7 +418,7 @@ impl From<crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc
     }
 }
 impl From<crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>>
-    for crate::processing::erased::ParametrizedCommitProcessor2Handle<crate::cpp_processor::CppProc>
+    for crate::processing::erased::ParametrizedCommitProcessor2Handle<cpp_processor::CppProc>
 {
     fn from(
         value: crate::processing::erased::ParametrizedCommitProcessor2Handle<MakeProc>,
@@ -619,9 +620,7 @@ impl crate::processing::erased::CommitProc for MakeProc {
         dbg!(self.parameter.cpp_handle.0.0);
         if lang.eq_ignore_ascii_case("cpp") {
             Some(ParametrizedCommitProcessorHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<
-                    crate::cpp_processor::CppProcessorHolder,
-                >()),
+                CommitProcessorHandle(std::any::TypeId::of::<cpp_processor::CppProcessorHolder>()),
                 self.parameter.cpp_handle.0,
             ))
         } else if lang.eq_ignore_ascii_case("java") {

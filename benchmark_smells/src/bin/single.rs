@@ -29,7 +29,7 @@ fn single(repo_name: &str, commit: &str, query: &str) {
         hyperast_tsquery::Query::with_precomputed(
             query,
             hyperast_gen_ts_java::language(),
-            hyperast_vcs_git::java_processor::SUB_QUERIES,
+            hyperast_vcs_git::processors::java::SUB_QUERIES,
         )
         .unwrap()
         .1

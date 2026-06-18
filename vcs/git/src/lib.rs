@@ -1,25 +1,14 @@
 #[cfg(feature = "impact")]
 pub mod allrefs;
-pub mod cpp;
 pub mod git;
-pub mod java;
-pub mod make;
-pub mod maven;
 
-#[cfg(feature = "cpp")]
-pub mod cpp_processor;
-#[cfg(feature = "java")]
-pub mod java_processor;
-#[cfg(feature = "make")]
-pub mod make_processor;
-#[cfg(feature = "maven")]
-pub mod maven_processor;
 pub mod multi_preprocessed;
 pub mod no_space;
 pub mod no_space2;
 /// for now only tested on maven repositories with a pom in root.
 pub mod preprocessed;
 pub mod processing;
+pub mod processors;
 
 mod type_store;
 pub use type_store::TStore;

@@ -27,7 +27,6 @@ pub mod tests;
 
 use git::BasicGitObject;
 use git2::Oid;
-use hyperast::store::{defaults::LabelIdentifier, nodes::legion::NodeStoreInner};
 use hyperast::utils::Bytes;
 
 mod type_store;
@@ -35,11 +34,10 @@ mod type_store;
 pub use type_store::TStore;
 
 pub type NodeStore<'a, 'b> = hyperast::store::nodes::legion::NodeStore<
-    &'a mut NodeStoreInner,
+    &'a mut hyperast::store::nodes::legion::NodeStoreInner,
     &'b mut hyperast::store::nodes::legion::DedupMap,
 >;
 
-// pub type SimpleStores<TS> = hyperast::store::SimpleStores<TS, NodeStoreInner>;
 pub type SimpleStores = hyperast::store::SimpleStores<crate::TStore>;
 
 // might also skip
@@ -69,7 +67,11 @@ impl Commit {
     }
 }
 
-trait Accumulator: hyperast::tree_gen::Accumulator<Node = (LabelIdentifier, Self::Unlabeled)> {
+trait Accumulator:
+    hyperast::tree_gen::Accumulator<
+        Node = (hyperast::store::defaults::LabelIdentifier, Self::Unlabeled),
+    >
+{
     type Unlabeled;
 }
 
@@ -149,101 +151,20 @@ pub fn resolve_language(language: &str) -> Option<tree_sitter::Language> {
     }
 }
 
-/// Identifying elements and fundamental derived metrics used to accelerate deduplication.
-/// For example, hashing subtrees accelerates the deduplication process,
-/// but it requires to hash children and it can be done by accumulating hashes iteratively per child (see [`hyperast::hashed::inner_node_hash`]).
-pub struct BasicDirAcc<Id, L, M> {
-    pub name: String,
-    pub children: Vec<Id>,
-    pub children_names: Vec<L>,
-    pub metrics: M,
-}
+mod dir_accumulator;
+use dir_accumulator::BasicDirAcc;
 
-impl<Id, L, M: Default> BasicDirAcc<Id, L, M> {
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            children_names: Default::default(),
-            children: Default::default(),
-            metrics: Default::default(),
-        }
-    }
-}
-
-impl<Id, L, U: hyperast::hashed::NodeHashs>
-    BasicDirAcc<Id, L, hyperast::tree_gen::SubTreeMetrics<U>>
-{
-    pub fn push(&mut self, name: L, id: Id, metrics: hyperast::tree_gen::SubTreeMetrics<U>) {
-        self.children.push(id);
-        self.children_names.push(name);
-        self.metrics.acc(metrics);
-    }
-}
-
-impl<Id, L, M> BasicDirAcc<Id, L, M> {
-    pub fn map_metrics<N>(self, f: impl Fn(M) -> N) -> BasicDirAcc<Id, L, N> {
-        BasicDirAcc {
-            name: self.name,
-            children: self.children,
-            children_names: self.children_names,
-            metrics: f(self.metrics),
-        }
-    }
-}
-
-impl<Id, L, M> BasicDirAcc<Id, L, M> {
-    pub fn persist<K>(
-        self,
-        dyn_builder: &mut impl hyperast::store::nodes::GatherAttrErazed,
-        interned_kind: K,
-        label_id: L,
-    ) -> M
-    where
-        K: hyperast::store::nodes::Compo,
-        L: hyperast::store::nodes::Compo,
-        Id: 'static + Send + Sync,
-    {
-        dyn_builder.add(interned_kind);
-        dyn_builder.add(label_id);
-
-        let children = self.children;
-        let children_names = self.children_names;
-        assert_eq!(children_names.len(), children.len());
-        use hyperast::store::nodes::compo;
-        if children.len() == 1 {
-            dyn_builder.add(compo::CS(children_names.into_boxed_slice()));
-            let Ok(cs) = children.try_into() else {
-                unreachable!();
-            };
-            dyn_builder.add(compo::CS0::<_, 1>(cs));
-        } else if children.len() == 2 {
-            dyn_builder.add(compo::CS(children_names.into_boxed_slice()));
-            let Ok(cs) = children.try_into() else {
-                unreachable!();
-            };
-            dyn_builder.add(compo::CS0::<_, 2>(cs));
-        } else if !children.is_empty() {
-            use compo::CS;
-            dyn_builder.add(CS(children_names.into_boxed_slice()));
-            dyn_builder.add(CS(children.into_boxed_slice()));
-        }
-        self.metrics
-    }
-}
-
-use std::time::Duration;
-
-pub(crate) struct FailedParsing<D = Duration> {
+pub(crate) struct FailedParsing<D = std::time::Duration> {
     pub parsing_time: D,
     pub tree: tree_sitter::Tree,
     pub error: &'static str,
 }
 
-pub(crate) struct SuccessProcessing<N, D = Duration> {
+pub(crate) struct SuccessProcessing<N, D = std::time::Duration> {
     pub parsing_time: D,
     pub processing_time: D,
     pub node: N,
 }
 
-pub(crate) type FileProcessingResult<N, D = Duration> =
+pub(crate) type FileProcessingResult<N, D = std::time::Duration> =
     Result<SuccessProcessing<N, D>, FailedParsing<D>>;

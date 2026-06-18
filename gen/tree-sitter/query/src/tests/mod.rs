@@ -65,7 +65,7 @@ fn cpp_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_cpp::TStore>, legion::
 fn xml_tree(text: &[u8]) -> (SimpleStores<hyperast_gen_ts_xml::TStore>, legion::Entity) {
     use hyperast_gen_ts_xml::TStore;
     use hyperast_gen_ts_xml::legion::XmlTreeGen;
-    let tree = hyperast_gen_ts_xml::legion::tree_sitter_parse_xml(text);
+    let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
     // println!("{:#?}", tree.root_node().to_sexp());
     let mut stores: SimpleStores<TStore> = SimpleStores::default();
     let mut tree_gen = XmlTreeGen {

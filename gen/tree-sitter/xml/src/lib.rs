@@ -31,3 +31,8 @@ pub fn language() -> tree_sitter::Language {
 pub fn node_types() -> &'static str {
     tree_sitter_xml::XML_NODE_TYPES
 }
+
+#[cfg(feature = "ts")]
+pub fn tree_sitter_parse(text: &[u8]) -> tree_sitter::Tree {
+    hyperast::tree_gen::utils_ts::tree_sitter_parse(text, &crate::language())
+}

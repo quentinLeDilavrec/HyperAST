@@ -18,7 +18,7 @@ pub(crate) fn handle_makefile_file<'a>(
 ) -> Result<MakeFile, ()> {
     log::trace!("not parsing {} bytes long Makefile", text.len()); // TODO parse the makefile
     let text = b"<proj></proj>";
-    let tree = hyperast_gen_ts_xml::legion::tree_sitter_parse_xml(text);
+    let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
     if tree.root_node().has_error() {
         log::warn!("bad CST");
         log::debug!("{:?}", name.try_str());

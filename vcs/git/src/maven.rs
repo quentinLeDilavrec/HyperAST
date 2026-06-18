@@ -23,18 +23,15 @@ pub(crate) fn handle_pom_file<'a>(
     name: &ObjectName,
     text: &'a [u8],
 ) -> Result<POM, ParseErr> {
-    let tree = match XmlTreeGen::<TStore>::tree_sitter_parse(text) {
-        Ok(tree) => tree,
-        Err(tree) => {
-            log::warn!("bad CST: {:?}", name.try_str());
-            log::debug!("{}", tree.root_node().to_sexp());
-            if PROPAGATE_ERROR_ON_BAD_CST_NODE {
-                return Err(ParseErr::IllFormed);
-            } else {
-                tree
-            }
+    let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
+    if tree.root_node().has_error() {
+        log::warn!("bad CST: {:?}", name.try_str());
+        log::debug!("{}", tree.root_node().to_sexp());
+        if PROPAGATE_ERROR_ON_BAD_CST_NODE {
+            return Err(ParseErr::IllFormed);
         }
-    };
+    }
+
     let x = tree_gen
         .generate_file(name.as_bytes(), text, tree.walk())
         .local;

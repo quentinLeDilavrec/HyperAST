@@ -482,7 +482,7 @@ mod test {
 
     use hyperast_gen_ts_xml::TStore;
     use hyperast_gen_ts_xml::legion::XmlTreeGen;
-    use hyperast_gen_ts_xml::legion::tree_sitter_parse_xml as parse_xml;
+    use hyperast_gen_ts_xml::tree_sitter_parse as parse_xml;
 
     use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
     use hyper_diff::mappings::{DefaultMultiMappingStore, VecStore};

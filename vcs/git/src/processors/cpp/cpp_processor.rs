@@ -10,15 +10,15 @@ use hyperast::tree_gen::add_md_precomp_queries;
 
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::erased::{Parametrized, ParametrizedCommitProc2};
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 #[cfg(feature = "cpp")]
 use crate::processors::make::MakeModuleAcc;
 use crate::{Processor, StackEle};
 
 // use super::MakeModuleAcc;
-use super::CppAcc;
 use super::SimpleStores;
+use super::{CppAcc, Parameter};
 use hyperast_gen_ts_cpp::Type;
 use hyperast_gen_ts_cpp::legion as cpp_gen;
 
@@ -125,18 +125,17 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), cpp_proc);
         cpp_proc.cache.object_map.insert(key, (full_node.clone(),));
         if self.stack.is_empty() {
-            Some((full_node,))
-        } else {
-            let w = &mut self.stack.last_mut().unwrap().acc;
-            assert!(
-                !w.primary.children_names.contains(&name),
-                "{:?} {:?}",
-                w.primary.children_names,
-                name
-            );
-            w.push(name, full_node.clone());
-            None
+            return Some((full_node,));
         }
+        let w = &mut self.stack.last_mut().unwrap().acc;
+        assert!(
+            !w.primary.children_names.contains(&name),
+            "{:?} {:?}",
+            w.primary.children_names,
+            name
+        );
+        w.push(name, full_node.clone());
+        None
     }
 
     fn stack(&mut self) -> &mut Vec<StackEle<CppAcc>> {
@@ -173,11 +172,6 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
         }
     }
 }
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct Parameter {
-    pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
-}
 #[derive(Default)]
 pub(crate) struct CppProcessorHolder(Vec<CppProc>);
 pub(crate) struct CppProc {
@@ -186,7 +180,7 @@ pub(crate) struct CppProc {
     cache: crate::processing::caches::Cpp,
     commits: HashMap<git2::Oid, crate::Commit>,
 }
-impl crate::processing::erased::Parametrized for CppProcessorHolder {
+impl Parametrized for CppProcessorHolder {
     type T = Parameter;
     fn register_param(
         &mut self,
@@ -229,15 +223,11 @@ impl Eq for Query {}
 
 impl Query {
     fn new<'a>(precomputeds: impl Iterator<Item = &'a str>) -> Self {
-        static DQ: &str = "(_)";
+        use crate::precomp_patterns::only_parse_query_precomp;
+        let language = hyperast_gen_ts_cpp::language();
         let precomputeds = precomputeds.collect::<Vec<_>>();
-        let (precomp, _) = hyperast_tsquery::Query::with_precomputed(
-            DQ,
-            hyperast_gen_ts_cpp::language(),
-            precomputeds.as_slice(),
-        )
-        .unwrap();
-        Self(precomp, precomputeds.join("\n").into())
+        let precomp = only_parse_query_precomp(precomputeds.as_slice(), language);
+        Self(precomp.unwrap(), precomputeds.join("\n").into())
     }
 }
 

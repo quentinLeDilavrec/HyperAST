@@ -5,7 +5,6 @@ use hyperast::tree_gen;
 
 use crate::Accumulator;
 use crate::DirPrimary;
-use crate::PROPAGATE_ERROR_ON_BAD_CST_NODE;
 use crate::processing::ObjectName;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
@@ -14,7 +13,13 @@ use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
 
-pub use cpp_processor::*;
+pub(crate) use cpp_processor::CppProc;
+pub use cpp_processor::SUB_QUERIES; // To remove, at least in the current form
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct Parameter {
+    pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
+}
 
 // waiting for residual stabilization https://github.com/rust-lang/rust/issues/84277
 // see after the temporary solution
@@ -51,7 +56,7 @@ where
     let parsing_time = time.elapsed();
     if tree.root_node().has_error() {
         log::warn!("bad CST: {:?}", name.try_str());
-        if PROPAGATE_ERROR_ON_BAD_CST_NODE {
+        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
             return Err(FailedParsing {
                 parsing_time,
                 tree,

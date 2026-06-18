@@ -94,7 +94,7 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
     let a = std::fs::read_dir(path)
         .unwrap_or_else(|_| panic!("{:?} should be a dir", path))
         .filter_map(|x| x.ok());
-    let mut w = JavaAcc::new("".to_string(), None);
+    let mut w = JavaAcc::root();
     for x in a {
         let Ok(t) = x.file_type() else {
             panic!("no file type")
@@ -162,6 +162,7 @@ pub(crate) struct JavaProcessor<'fs, 'prepro, Acc> {
     prepro: &'prepro mut JavaPreprocessFileSys,
     stack: Vec<(Vec<PathBuf>, Acc)>,
 }
+
 impl<'fs, 'prepro> JavaProcessor<'fs, 'prepro, JavaAcc> {
     fn new(
         prepro: &'prepro mut JavaPreprocessFileSys,
@@ -249,18 +250,17 @@ impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
             .insert(key, MD::from(full_node.clone()));
         let name = self.prepro.main_stores.label_store.get_or_insert(name);
         if self.stack.is_empty() {
-            Some((full_node,))
-        } else {
-            let w = &mut self.stack.last_mut().unwrap().1;
-            assert!(
-                !w.primary.children_names.contains(&name),
-                "{:?} {:?}",
-                w.primary.children_names,
-                name
-            );
-            w.push(name, full_node.clone());
-            None
+            return Some((full_node,));
         }
+        let w = &mut self.stack.last_mut().unwrap().1;
+        assert!(
+            !w.primary.children_names.contains(&name),
+            "{:?} {:?}",
+            w.primary.children_names,
+            name
+        );
+        w.push(name, full_node.clone());
+        None
     }
 
     fn stack(&mut self) -> &mut Vec<(Vec<PathBuf>, JavaAcc)> {

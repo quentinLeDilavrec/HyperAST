@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 pub fn resolve_language(language: &str) -> Option<tree_sitter::Language> {
     match language {
         #[cfg(feature = "java")]
@@ -53,4 +55,19 @@ pub(super) fn _auto_configured_line_break(text: &[u8]) -> Vec<u8> {
     } else {
         "\n".as_bytes().to_vec()
     }
+}
+
+pub(crate) type Str = std::sync::Arc<str>;
+
+pub(crate) fn drain_filter_strip(path: &mut Option<Vec<PathBuf>>, name: &[u8]) -> Vec<PathBuf> {
+    let mut new_paths = vec![];
+    let name = std::str::from_utf8(&name).unwrap();
+    if let Some(paths) = path {
+        vec_extract_if_polyfill::MakeExtractIf::extract_if(paths, |x| x.starts_with(name))
+            .for_each(|x| {
+                let x = x.strip_prefix(name).unwrap().to_owned();
+                new_paths.push(x);
+            });
+    }
+    new_paths
 }

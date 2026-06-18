@@ -15,8 +15,10 @@ pub use type_store::TStore;
 
 mod utils;
 use utils::_auto_configured_line_break;
-use utils::{FailedParsing, FileProcessingResult, ParseErr, SuccessProcessing};
+use utils::{FailedParsing, FileProcessingResult, ParseErr, Str, SuccessProcessing};
 pub use utils::{auto_configured_line_break, resolve_language};
+
+mod precomp_patterns;
 
 #[cfg(test)]
 pub mod tests;

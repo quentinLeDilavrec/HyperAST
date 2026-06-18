@@ -1,5 +1,5 @@
 [package]
-name = "hyperast_gen_ts_ts"
+name = "hyperast_gen_ts_typescript"
 version = "0.5.0"
 edition = "2024"
 
@@ -30,8 +30,8 @@ hyperast_tsquery = { workspace = true }
 polyglot = { path="../../../lib/polyglot" }
 
 [[example]] # NOTE it's an helper bin dressed as an example to access dev-dependencies
-name = "regen_ts_types"
-path = "bin/regen_ts_types.rs"
+name = "regen_typescript_types"
+path = "bin/regen_typescript_types.rs"
 
 [features]
 default = ["impl"]

@@ -146,6 +146,25 @@ impl EntityBuilder {
         self._add(component)
     }
 
+    #[allow(unused)] // need testing
+    #[cfg(test)] // need testing
+    fn get<T: Component>(&self) -> Option<&T> {
+        self.inner.get_by_tid(&TypeId::of::<T>())
+    }
+
+    #[allow(unused)] // need testing
+    #[cfg(test)] // need testing
+    fn get_mut<T: Component>(&mut self) -> Option<&mut T> {
+        self.inner.get_mut::<T>()
+    }
+
+    #[allow(unused)] // need testing
+    #[cfg(test)] // need testing
+    fn mut_or_default<T: Component + Default>(&mut self) -> &mut T {
+        self.inner
+            .mut_or_default::<T>(TypeInfo::of::<T>(), || Box::new(T::Storage::default()))
+    }
+
     pub fn build(self) -> BuiltEntity {
         BuiltEntity { inner: self.inner }
     }
@@ -426,33 +445,49 @@ impl<M> Common<M> {
         self.indices.contains_key(&TypeId::of::<T>())
     }
 
-    fn get_by_tid<T>(&self, tid: &TypeId) -> Option<T> {
+    fn get_by_tid<T>(&self, tid: &TypeId) -> Option<&T> {
         let index = self.indices.get(tid)?;
         let (_, offset, _) = self.inner.info[*index];
         unsafe {
             let storage = self.inner.storage.as_ptr().add(offset).cast::<T>();
-            // Some(T::from_raw(storage))
-            Some(todo!())
+            Some(&*storage)
         }
     }
 
-    // fn get<'a, T: ComponentRefShared<'a>>(&'a self) -> Option<T> {
-    //     let index = self.indices.get(&TypeId::of::<T::Component>())?;
-    //     let (_, offset, _) = self.info[*index];
-    //     unsafe {
-    //         let storage = self.storage.as_ptr().add(offset).cast::<T::Component>();
-    //         Some(T::from_raw(storage))
-    //     }
-    // }
+    fn get_mut<T: Component>(&mut self) -> Option<&mut T> {
+        let index = self.indices.get(&TypeId::of::<T>())?;
+        let (_, offset, _) = self.inner.info[*index];
+        unsafe {
+            let storage = (self.inner.storage.as_ptr()).add(offset).cast::<T>();
+            Some(&mut *storage)
+        }
+    }
 
-    // fn get_mut<'a, T: ComponentRef<'a>>(&'a self) -> Option<T> {
-    //     let index = self.indices.get(&TypeId::of::<T::Component>())?;
-    //     let (_, offset, _) = self.info[*index];
-    //     unsafe {
-    //         let storage = self.storage.as_ptr().add(offset).cast::<T::Component>();
-    //         Some(T::from_raw(storage))
-    //     }
-    // }
+    fn mut_or_default<T: Component + Default>(&mut self, ty: TypeInfo, meta: M) -> &mut T {
+        use hash_map::Entry;
+        match self.indices.entry(ty.id().type_id()) {
+            Entry::Occupied(occupied) => {
+                let index = occupied.get();
+                let (_, offset, _) = self.inner.info[*index];
+                unsafe {
+                    let storage = (self.inner.storage.as_ptr()).add(offset).cast::<T>();
+                    &mut *storage
+                }
+            }
+            Entry::Vacant(vacant) => {
+                let mut component = T::default();
+                let addr = unsafe {
+                    let ptr = (&mut T::default() as *mut T).cast();
+                    self.inner.push(ty, ptr, vacant, meta)
+                };
+                core::mem::forget(component);
+                unsafe {
+                    let storage = addr.cast::<T>();
+                    &mut *storage
+                }
+            }
+        }
+    }
 
     fn component_types(&self) -> impl Iterator<Item = ComponentTypeId> + '_ {
         self.inner.info.iter().map(|(info, _, _)| info.id())
@@ -506,7 +541,7 @@ impl<M> CommonInner<M> {
         (new_storage, layout)
     }
 
-    unsafe fn push(&mut self, ty: TypeInfo, ptr: *mut u8, vacant: VacantEntry, meta: M) {
+    unsafe fn push(&mut self, ty: TypeInfo, ptr: *mut u8, vacant: VacantEntry, meta: M) -> *mut u8 {
         let offset = align(self.cursor, ty.layout().align());
         let end = offset + ty.layout().size();
         if end > self.layout.size() || ty.layout().align() > self.layout.align() {
@@ -534,6 +569,7 @@ impl<M> CommonInner<M> {
         vacant.insert(self.info.len());
         self.info.push((ty, offset, meta));
         self.cursor = end;
+        addr
     }
 }
 fn align(x: usize, alignment: usize) -> usize {

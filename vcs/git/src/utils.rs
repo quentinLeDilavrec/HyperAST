@@ -42,6 +42,16 @@ pub(crate) struct SuccessProcessing<N, D = std::time::Duration> {
     pub node: N,
 }
 
+impl<N, D> SuccessProcessing<N, D> {
+    pub fn map<N2>(self, f: impl FnOnce(N) -> N2) -> SuccessProcessing<N2, D> {
+        SuccessProcessing {
+            parsing_time: self.parsing_time,
+            processing_time: self.processing_time,
+            node: f(self.node),
+        }
+    }
+}
+
 pub(crate) type FileProcessingResult<N, D = std::time::Duration> =
     Result<SuccessProcessing<N, D>, FailedParsing<D>>;
 

@@ -823,10 +823,15 @@ pub fn get_spacing(padding_start: usize, pos: usize, text: &[u8]) -> Option<Vec<
             } else {
                 debug_assert!(
                     *x == b' ' || *x == b'\n' || *x == b'\t' || *x == b'\r',
-                    "{} {} {:?}",
+                    "{} {} {:?}\n-------------\n{}\n-------------\n{}",
                     x,
                     padding_start,
-                    std::str::from_utf8(spaces).unwrap()
+                    std::str::from_utf8(spaces).unwrap(),
+                    std::str::from_utf8(
+                        &text[padding_start.saturating_sub(50)..text.len().min(pos + 50)]
+                    )
+                    .unwrap(),
+                    std::str::from_utf8(&text[..text.len().min(pos + 10)]).unwrap(),
                 )
             }
         });

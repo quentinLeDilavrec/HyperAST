@@ -9,7 +9,9 @@ use hyperast::tree_gen::add_md_precomp_queries;
 
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::{ParametrizedCommitProc2, PreparedCommitProc};
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::processors::java::Query;
 use crate::{Processor, StackEle};
@@ -40,7 +42,7 @@ pub struct PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
 type PythonProcessorHolder = crate::processing::ProcessorHolder<PythonProc>;
 
 impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
-    pub(crate) fn new(
+    pub(crate) fn prepare(
         repository: &'repo Repository,
         prepro: &'prepro mut RepositoryProcessor,
         dir_path: &'d mut Peekable<Components<'c>>,
@@ -200,13 +202,17 @@ impl PartialEq<PythonProc> for Parameter {
 }
 
 impl crate::processing::erased::CommitProc for PythonProc {
-    fn prepare_processing(
+    fn prepare_processing<'repo>(
         &self,
-        _repository: &git2::Repository,
-        _builder: crate::preprocessed::CommitBuilder,
-        _handle: crate::processing::ParametrizedCommitProcessorHandle,
-    ) -> Box<dyn crate::processing::erased::PreparedCommitProc> {
-        unimplemented!("required for processing python at the root of a project")
+        repository: &'repo Repository,
+        commit_builder: crate::preprocessed::CommitBuilder,
+        handle: PCPHandle,
+    ) -> Box<dyn PreparedCommitProc + 'repo> {
+        Box::new(PreparedPythonCommitProc {
+            repository,
+            commit_builder,
+            handle,
+        })
     }
 
     fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {
@@ -223,9 +229,42 @@ impl crate::processing::erased::CommitProc for PythonProc {
     }
 }
 
-// impl crate::processing::erased::CommitProcExt for PythonProc {
-//     type Holder = PythonProcessorHolder;
-// }
+struct PreparedPythonCommitProc<'repo> {
+    repository: &'repo Repository,
+    commit_builder: crate::preprocessed::CommitBuilder,
+    pub(crate) handle: PCPHandle,
+}
+
+impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
+    fn process(
+        self: Box<PreparedPythonCommitProc<'repo>>,
+        prepro: &mut RepositoryProcessor,
+    ) -> hyperast::store::defaults::NodeIdentifier {
+        let dir_path = std::path::PathBuf::from("");
+        let mut dir_path = dir_path.components().peekable();
+        let name = ObjectName::from(b"");
+        // TODO check parameter in self to know it is a recursive module search
+        let root_full_node = PythonProcessor::<PythonAcc>::prepare(
+            self.repository,
+            prepro,
+            &mut dir_path,
+            &name,
+            self.commit_builder.tree_oid(),
+            &PCP2Handle(self.handle.1, std::marker::PhantomData),
+        )
+        .process();
+        let h = prepro
+            .processing_systems
+            .mut_or_default::<PythonProcessorHolder>();
+        let handle = self.handle;
+        let commit_oid = self.commit_builder.commit_oid();
+        let commit = self.commit_builder.finish(root_full_node.0.compressed_node);
+        h.with_parameters_mut(handle.1)
+            .commits
+            .insert(commit_oid, commit);
+        root_full_node.0.compressed_node
+    }
+}
 
 impl CacheHolding<super::caches::Python> for PythonProc {
     fn get_caches_mut(&mut self) -> &mut super::caches::Python {
@@ -285,7 +324,8 @@ impl RepositoryProcessor {
                         use python_gen::PythonTreeGen;
                         let mut tree_gen = PythonTreeGen::bare(stores) //
                             .set_line_break(line_break);
-                        super::handle_python_file(&mut tree_gen, n, t).map(|x| todo!())
+                        super::handle_python_file(&mut tree_gen, n, t)
+                            .map(|x| x.map(|x| (x.node.local, Default::default())))
                     }
                     .map_err(|_| crate::ParseErr::IllFormed)?;
 
@@ -301,7 +341,7 @@ impl RepositoryProcessor {
 
                 let r = r.node;
                 // Ok((r.local.clone(), acc.precomp_queries))
-                todo!()
+                Ok(r)
             })
     }
 
@@ -329,7 +369,8 @@ impl RepositoryProcessor {
         oid: git2::Oid,
         handle: Handle,
     ) -> super::FullNode {
-        PythonProcessor::<PythonAcc>::new(repository, self, dir_path, name, oid, &handle).process()
+        PythonProcessor::<PythonAcc>::prepare(repository, self, dir_path, name, oid, &handle)
+            .process()
     }
 
     pub(crate) fn help_handle_python_folder<'a, 'b, 'c, 'd: 'c>(

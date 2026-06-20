@@ -40,6 +40,10 @@ impl RoleStore for TStore {
         resolve_field!(hyperast_gen_ts_java);
         #[cfg(feature = "cpp")]
         resolve_field!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "c")]
+        resolve_field!(hyperast_gen_ts_c);
+        #[cfg(feature = "python")]
+        resolve_field!(hyperast_gen_ts_python);
         #[cfg(feature = "maven")]
         resolve_field!(hyperast_gen_ts_xml);
         panic!("unsupported lang: {}", name);
@@ -61,6 +65,8 @@ impl RoleStore for TStore {
         intern_role!(hyperast_gen_ts_java);
         #[cfg(feature = "cpp")]
         intern_role!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "python")]
+        intern_role!(hyperast_gen_ts_python);
         #[cfg(feature = "maven")]
         intern_role!(hyperast_gen_ts_xml);
         panic!("unsupported lang: {}", name);
@@ -89,6 +95,7 @@ impl TypeStore for TStore {
         }
         decomp_t!(hyperast_gen_ts_java);
         decomp_t!(hyperast_gen_ts_cpp);
+        decomp_t!(hyperast_gen_ts_python);
         decomp_t!(hyperast_gen_ts_xml);
         None
     }

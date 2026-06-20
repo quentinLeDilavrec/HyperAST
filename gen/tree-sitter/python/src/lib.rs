@@ -11,7 +11,7 @@ pub(crate) mod types;
 #[cfg(feature = "types")]
 pub use types::Type;
 #[cfg(feature = "types")]
-pub use types::{Lang, Role, TIdN, TStore};
+pub use types::{Lang, Role, TIdN, TStore, TType};
 
 #[cfg(feature = "legion")]
 pub use hyperast::tree_gen::utils_ts::TNode;
@@ -25,3 +25,6 @@ pub fn language() -> tree_sitter::Language {
 pub fn node_types() -> &'static str {
     tree_sitter_python::NODE_TYPES
 }
+
+#[cfg(all(test, feature = "legion", feature = "ts"))]
+mod tests;

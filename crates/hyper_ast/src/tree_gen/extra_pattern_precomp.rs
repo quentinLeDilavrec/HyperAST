@@ -53,6 +53,18 @@ impl std::ops::AddAssign for PrecompQueries {
     }
 }
 
+impl PrecompQueries {
+    /// no need to store the full bitset, just consider we cannot skip if there is no precomputed value
+    pub fn is_full(&self) -> bool {
+        self.0 == u16::MAX
+    }
+    /// make a saturated bitset, which is equivalent to having no precomputed values.
+    /// could be used as a niche value.
+    pub fn full() -> Self {
+        Self(u16::MAX)
+    }
+}
+
 impl<HAST, Acc, More> Extra<HAST, Acc> for PatternPrecompExtra<HAST::IdN, Acc, More>
 where
     HAST: StoreRefAssoc,

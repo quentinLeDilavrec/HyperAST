@@ -237,10 +237,15 @@ fn cpp_top_includes_aux(
 #[test]
 fn test_python() {
     let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+
+    let precomp = ["(identifier)", "(integer)", "(module)"].as_slice();
+
     // let repo = crate::git::Forge::Github.repo("pallets", "click");
     let repo = crate::git::Forge::Github.repo("pallets", "flask");
     let config = crate::processing::RepoConfig::Python;
-    let handle = &preprocessed.register_config(repo, config).fetch();
+    // let handle = &preprocessed.register_config(repo, config);
+    let handle = preprocessed.register_config_with_prequeries(repo, config, precomp);
+    let handle = &handle.fetch();
     let commits = preprocessed
         .pre_process_with_limit(
             handle,
@@ -285,12 +290,10 @@ fn python_aux(stores: &crate::SimpleStores, id: hyperast::store::defaults::NodeI
         let pid = query.enabled_pattern_index(m.pattern_index).unwrap();
         dbg!(pid);
         counts[pid as usize] += 1;
-
         let cid = query.capture_index_for_name("a").unwrap();
         for n in m.nodes_for_capture_index(cid) {
             use hyperast::position::structural_pos::CursorHead;
             let p = n.pos.parent();
-            // dbg!(c.index.to_string());
             println!("{}", stores.resolve_type(&p.unwrap()));
             types.insert(stores.resolve_type(&p.unwrap()).to_string());
         }

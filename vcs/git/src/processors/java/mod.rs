@@ -18,14 +18,13 @@ pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 
 mod parameters;
 pub use parameters::Parameter;
-pub(crate) use parameters::Query;
 
 type PrecompQueries = u16;
 
 pub struct JavaProc {
     pub(crate) parameter: Parameter,
     pub height_counts: Vec<u32>,
-    query: Option<parameters::Query>,
+    query: Option<super::Query>,
     #[cfg(feature = "tsg")]
     tsg: Option<parameters::TsgErzedSettings>,
     cache: crate::processing::caches::Java,

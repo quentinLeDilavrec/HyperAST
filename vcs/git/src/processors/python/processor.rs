@@ -6,14 +6,16 @@ use git2::{Oid, Repository};
 
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 
+use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::{ParametrizedCommitProc2, PreparedCommitProc};
 use crate::processing::{CacheHolding, InFiles, ObjectName};
-use crate::processors::java::Query;
+use crate::processors::Query;
 use crate::{Processor, StackEle};
 
 use super::SimpleStores;
@@ -48,7 +50,7 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 
         dir_path: &'d mut Peekable<Components<'c>>,
         name: &ObjectName,
         oid: git2::Oid,
-        parameters: &'d Handle,
+        handle: &'d Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree);
@@ -59,37 +61,10 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 
             repository,
             prepro,
             dir_path,
-            handle: parameters,
+            handle,
         }
     }
 }
-
-pub static SUB_QUERIES: &[&str] = &[
-    r#"(declaration
-    type: (primitive_type) (#EQ? "char")
-)"#,
-    r#"(preproc_if)"#,
-    r#"(call_expression
-    (field_expression
-        (call_expression
-            (qualified_identifier
-                (namespace_identifier) (#EQ? "base")
-                (qualified_identifier
-                    (namespace_identifier) (#EQ? "CommandLine")
-                    (identifier) (#EQ? "ForCurrentProcess")
-                )
-            )
-            (argument_list)
-        )
-        "->"
-        (field_identifier) (#EQ? "HasSwitch")
-    )
-)"#,
-    r#"(qualified_identifier
-    (namespace_identifier) (#EQ? "switches")
-    (identifier)
-)"#,
-];
 
 impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 'c, PythonAcc> {
     fn pre(&mut self, current_object: BasicGitObject) {
@@ -97,20 +72,14 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
             BasicGitObject::Tree(oid, name) => {
                 self.handle_tree_cached(oid, name);
             }
-            BasicGitObject::Blob(oid, name) => {
-                if super::file_sys::Python::matches(&name) {
-                    self.prepro
-                        .help_handle_python_file(
-                            oid,
-                            &mut self.stack.last_mut().unwrap().acc,
-                            &name,
-                            self.repository,
-                            *self.handle,
-                        )
-                        .unwrap();
-                } else {
-                    log::debug!("not a python source file {:?}", name.try_str());
-                }
+            BasicGitObject::Blob(oid, name) if super::file_sys::Python::matches(&name) => {
+                let acc = &mut self.stack.last_mut().unwrap().acc;
+                self.prepro
+                    .help_handle_python_file(oid, acc, &name, self.repository, *self.handle)
+                    .unwrap();
+            }
+            BasicGitObject::Blob(_, name) => {
+                log::debug!("not a python source file {:?}", name.try_str());
             }
         }
     }
@@ -118,10 +87,8 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
         let name = &acc.primary.name;
         let key = (oid, name.as_bytes().into());
         let name = self.prepro.get_or_insert_label(name);
-        let holder = self
-            .prepro
-            .processing_systems
-            .mut_or_default::<PythonProcessorHolder>();
+        let processor_map = &mut self.prepro.processing_systems;
+        let holder = processor_map.mut_or_default::<PythonProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle.0);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
         proc.cache.object_map.insert(key, full_node.clone());
@@ -146,24 +113,16 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
 
 impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> {
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
-        let holder = self
-            .prepro
-            .processing_systems
-            .mut_or_default::<PythonProcessorHolder>();
+        let processor_map = &mut self.prepro.processing_systems;
+        let holder = processor_map.mut_or_default::<PythonProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle.0);
-        if let Some(
-            // (already, skiped_ana)
-            already,
-        ) = proc.cache.object_map.get(&(oid, name.clone()))
-        {
+        if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
             let full_node = already.clone();
-            // let skiped_ana = *skiped_ana;
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name = self.prepro.intern_object_name(&name);
             assert!(!w.primary.children_names.contains(&name));
-            hyperast::tree_gen::Accumulator::push(w, (name, full_node));
-            // w.push(name, full_node, skiped_ana);
+            w.push(name, full_node);
         } else {
             log::debug!("tree {:?}", name.try_str());
             let tree = self.repository.find_tree(oid).unwrap();
@@ -173,6 +132,7 @@ impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> 
         }
     }
 }
+
 pub(crate) struct PythonProc {
     parameter: Parameter,
     query: Option<Query>,
@@ -184,7 +144,7 @@ impl From<Parameter> for PythonProc {
     fn from(t: Parameter) -> Self {
         let query = t.query.as_ref().map(|q| {
             use hyperast_tsquery::ArrayStr;
-            Query::new(q.iter())
+            Query::new(q.iter(), hyperast_gen_ts_python::language())
         });
         PythonProc {
             parameter: t,
@@ -257,11 +217,9 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
             .processing_systems
             .mut_or_default::<PythonProcessorHolder>();
         let handle = self.handle;
-        let commit_oid = self.commit_builder.commit_oid();
+        let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.0.compressed_node);
-        h.with_parameters_mut(handle.1)
-            .commits
-            .insert(commit_oid, commit);
+        h.with_parameters_mut(handle.1).commits.insert(oid, commit);
         root_full_node.0.compressed_node
     }
 }
@@ -286,48 +244,10 @@ impl RepositoryProcessor {
         self.processing_systems
             .caching_blob_handler::<super::file_sys::Python>()
             .handle2(oid, repository, &name, parameters, |c, n, t| {
-                let line_break = if t.contains(&b'\r') { "\r\n" } else { "\n" }
-                    .as_bytes()
-                    .to_vec();
                 let holder = c.mut_or_default::<PythonProcessorHolder>();
                 let proc = holder.with_parameters_mut(parameters.0);
-                let md_cache = &mut proc.cache.md_cache;
-                let dedup = &mut proc.cache.dedup;
                 let stores = self.main_stores.mut_with_ts::<TStore>();
-                let r: crate::utils::SuccessProcessing<super::FullNode> =
-                    if let Some(more) = &proc.query {
-                        let more = &more.0;
-
-                        // use hyperast::store::defaults::NodeIdentifier;
-                        // use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
-                        // type Local = hyperast_gen_ts_python::legion::Local;
-                        // type Acc = hyperast_gen_ts_python::legion::Acc;
-                        // type PrepQuery<'q> = hyperast_tsquery::PreparedQuerying<
-                        //     &'q hyperast_tsquery::Query,
-                        //     TStore,
-                        //     Acc,
-                        // >;
-                        // let more: hyperast_tsquery::PreparedQuerying<_, TStore, Acc> = more.into();
-                        // let mut extra = PatternPrecompExtra::<_, Acc, _>::from(&more);
-                        // let mut tree_gen = python_gen::PythonTreeGen::new(stores, &mut extra)
-                        //     .set_line_break(line_break);
-                        // let tree = hyperast::tree_gen::utils_ts::tree_sitter_parse(
-                        //     t,
-                        //     &hyperast_gen_ts_python::language(),
-                        // );
-                        // eprintln!("{}", tree.root_node().to_sexp());
-
-                        // let f = tree_gen.generate_file(n, t, tree.walk());
-                        todo!()
-                        // super::handle_python_file(&mut tree_gen, n, t).map(|x| todo!())
-                    } else {
-                        use python_gen::PythonTreeGen;
-                        let mut tree_gen = PythonTreeGen::bare(stores) //
-                            .set_line_break(line_break);
-                        super::handle_python_file(&mut tree_gen, n, t)
-                            .map(|x| x.map(|x| (x.node.local, Default::default())))
-                    }
-                    .map_err(|_| crate::ParseErr::IllFormed)?;
+                let r = handle_python_blob_aux(n, t, proc, stores)?;
 
                 self.parsing_time += r.parsing_time;
                 self.processing_time += r.processing_time;
@@ -372,19 +292,37 @@ impl RepositoryProcessor {
         PythonProcessor::<PythonAcc>::prepare(repository, self, dir_path, name, oid, &handle)
             .process()
     }
+}
 
-    pub(crate) fn help_handle_python_folder<'a, 'b, 'c, 'd: 'c>(
-        &'a mut self,
-        repository: &'b Repository,
-        dir_path: &'c mut Peekable<Components<'d>>,
-        oid: Oid,
-        name: &ObjectName,
-        handle: Handle,
-    ) -> <PythonAcc as hyperast::tree_gen::Accumulator>::Node {
-        let full_node = self.handle_python_directory(repository, dir_path, name, oid, handle);
-        let name = self.intern_object_name(name);
-        (name, full_node)
+fn handle_python_blob_aux(
+    n: &ObjectName,
+    t: &[u8],
+    proc: &mut PythonProc,
+    stores: &mut SimpleStores,
+) -> Result<
+    crate::utils::SuccessProcessing<(python_gen::Local, PrecompQueries)>,
+    crate::utils::ParseErr,
+> {
+    let line_break = _auto_configured_line_break(t);
+    let md_cache = &mut proc.cache.md_cache;
+    let dedup = &mut proc.cache.dedup;
+    use python_gen::PythonTreeGen;
+    let r: crate::utils::SuccessProcessing<super::FullNode> = if let Some(more) = &proc.query {
+        let more = &more.0;
+        use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
+        type Acc = hyperast_gen_ts_python::legion::Acc;
+        let more: hyperast_tsquery::PreparedQuerying<_, TStore, Acc> = more.into();
+        let mut extra = PatternPrecompExtra::<_, Acc, _>::from(more);
+        let mut tree_gen = PythonTreeGen::new(stores, &mut extra).set_line_break(line_break);
+        super::handle_python_file(&mut tree_gen, n, t).map(|x| x.map(|x| (x.node.local, x.extra)))
+    } else {
+        let mut tree_gen = PythonTreeGen::bare(stores) //
+            .set_line_break(line_break);
+        super::handle_python_file(&mut tree_gen, n, t)
+            .map(|x| x.map(|x| (x.node.local, Default::default())))
     }
+    .map_err(|_| crate::ParseErr::IllFormed)?;
+    Ok(r)
 }
 
 fn make(acc: PythonAcc, stores: &mut SimpleStores, proc: &mut PythonProc) -> super::FullNode {

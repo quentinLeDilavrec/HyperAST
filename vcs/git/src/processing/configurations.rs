@@ -10,6 +10,7 @@ pub enum ProcessingConfig<P> {
     JavaMaven { limit: usize, dir_path: P },
     CppMake { limit: usize, dir_path: P },
     TsNpm { limit: usize, dir_path: P },
+    Python { limit: usize, dir_path: P },
     Any { limit: usize, dir_path: P },
 }
 
@@ -21,6 +22,7 @@ pub enum RepoConfig {
     CppMake,
     JavaMaven,
     TsNpm,
+    Python,
     Any,
 }
 
@@ -37,10 +39,11 @@ impl std::str::FromStr for RepoConfig {
             "java" => Self::JavaMaven,
             "typescript" => Self::TsNpm,
             "javascript" => Self::TsNpm,
+            "python" => Self::Python,
             "Ts" => Self::TsNpm,
             "ts" => Self::TsNpm,
             "any" => Self::Any,
-            x => return Err(format!("'{}' is not anvailable config", x)),
+            x => return Err(format!("'{}' is not available config", x)),
         })
     }
 }
@@ -61,6 +64,10 @@ impl From<&RepoConfig> for ProcessingConfig<&'static str> {
                 dir_path: "",
             },
             RepoConfig::TsNpm => todo!(),
+            RepoConfig::Python => Self::Python {
+                limit: 3,
+                dir_path: "",
+            },
             RepoConfig::Any => todo!(),
         }
     }

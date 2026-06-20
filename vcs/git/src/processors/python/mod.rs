@@ -53,11 +53,10 @@ impl Accumulator for PythonAcc {
     type Unlabeled = (python_tree_gen::Local, PrecompQueries);
 }
 
-impl hyperast::tree_gen::Accumulator for PythonAcc {
+impl tree_gen::Accumulator for PythonAcc {
     type Node = (LabelIdentifier, (python_tree_gen::Local, PrecompQueries));
-    fn push(&mut self, (name, (full_node, precomp_queries)): Self::Node) {
-        self.primary
-            .push(name, full_node.compressed_node, full_node.metrics);
+    fn push(&mut self, (name, (n, precomp_queries)): Self::Node) {
+        self.primary.push(name, n.compressed_node, n.metrics);
         self.precomp_queries += precomp_queries;
     }
 }
@@ -70,40 +69,19 @@ impl From<String> for PythonAcc {
 
 impl PythonAcc {
     pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: FullNode) {
-        self.primary
-            .push(name, full_node.0.compressed_node, full_node.0.metrics);
+        let id = full_node.0.compressed_node;
+        self.primary.push(name, id, full_node.0.metrics);
         self.precomp_queries += full_node.1;
     }
 }
 
-// waiting for residual stabilization https://github.com/rust-lang/rust/issues/84277
-// see after the temporary solution
-// It is also limiting the usability with more variants
-// enum FileProcessingResult<N, D = Duration> {
-//     FailedParsing {
-//         parsing_time: D,
-//         tree: tree_sitter::Tree,
-//         error: &'static str,
-//     },
-//     // ParsingTimedout(D),
-//     // FailedProcessing {
-//     //     parsing_time: D,
-//     //     processing_time: D,
-//     //     node: N,
-//     // },
-//     Success {
-//         parsing_time: D,
-//         processing_time: D,
-//         node: N,
-//     },
-// }
 pub(crate) fn handle_python_file<'a, E>(
-    tree_gen: &mut hyperast_gen_ts_python::legion::PythonTreeGen<'a, 'a, E>,
+    tree_gen: &mut python_tree_gen::PythonTreeGen<'a, 'a, E>,
     name: &ObjectName,
     text: &'a [u8],
-) -> FileProcessingResult<<E::Acc as hyperast::tree_gen::Accumulator>::Node>
+) -> FileProcessingResult<<E::Acc as tree_gen::Accumulator>::Node>
 where
-    E: hyperast::tree_gen::TsExtra<SimpleStores>,
+    E: tree_gen::TsExtra<SimpleStores>,
 {
     let time = std::time::Instant::now();
     let language = hyperast_gen_ts_python::language();

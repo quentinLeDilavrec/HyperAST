@@ -19,13 +19,13 @@ pub struct Python {
     pub(crate) md_cache: MDCache,
     /// Passed to subtree builder when deriving different data (assumed to be incompatible).
     pub(crate) dedup: hyperast::store::nodes::legion::DedupMap,
-    pub object_map: NamedMap<(Local, PrecompQueries)>,
+    pub object_map: NamedMap<super::FullNode>,
 }
 
 impl ObjectMapper for Python {
     type K = (git2::Oid, ObjectName);
 
-    type V = (Local, PrecompQueries);
+    type V = super::FullNode;
 
     fn get(&self, key: &Self::K) -> Option<&Self::V> {
         self.object_map.get(key)

@@ -237,17 +237,9 @@ impl<'stores, 'cache, TS, E> TsTreeGen<'stores, 'cache, TS, E, true> {
     ///   e.g., additional Derived Data on files can reuse subtrees of things inside files, but directories and files must be added without merging with the others
     ///    (it should also be possible to compute markers to provide similar guarantees, e.g. a DD only on classes can reuse children that do not contain classes).
     /// Could also make the eq consider the derived data, but to avoid breaking the incrementality we would still need some kind of marker for each context
-    pub fn with_dedup(
-        stores: &'stores mut SimpleStores<TS>,
-        dedup: &'stores mut DedupMap,
-        extra: &'cache mut E,
-    ) -> Self {
-        Self {
-            line_break: "\n".as_bytes().to_vec(),
-            dedup: Some(dedup),
-            stores,
-            extra,
-        }
+    pub fn with_dedup(&mut self, dedup: &'stores mut DedupMap) -> &mut Self {
+        self.dedup = Some(dedup);
+        self
     }
 }
 

@@ -3,6 +3,7 @@
 
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::marker::PhantomData;
 
 use super::{AccWithExtra, Accumulator};
 use super::{Extra, WithByteRange, WithExtra};
@@ -14,17 +15,23 @@ use crate::types::StoreRefAssoc;
 ///
 /// More should be an instance of `hyperast_tsquery::PreparedQuerying<&Query, TS, Acc>,`
 pub struct PatternPrecompExtra<IdN, Acc, More> {
-    md_cache: HashMap<IdN, PrecompQueries>,
+    pub md_cache: HashMap<IdN, PrecompQueries>,
     more: More,
-    _phantom: std::marker::PhantomData<Acc>,
+    _phantom: PhantomData<Acc>,
 }
 
 impl<IdN, Acc, More> From<More> for PatternPrecompExtra<IdN, Acc, More> {
-    fn from(value: More) -> Self {
+    fn from(more: More) -> Self {
+        Self::with_cache(more, Default::default())
+    }
+}
+
+impl<IdN, Acc, More> PatternPrecompExtra<IdN, Acc, More> {
+    pub fn with_cache(more: More, md_cache: HashMap<IdN, PrecompQueries>) -> Self {
         Self {
-            md_cache: HashMap::default(),
-            more: value.into(),
-            _phantom: std::marker::PhantomData,
+            md_cache,
+            more,
+            _phantom: PhantomData,
         }
     }
 }

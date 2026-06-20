@@ -12,21 +12,24 @@ pub(crate) use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 use hyperast_gen_ts_java::legion_with_refs::PartialAnalysis;
 use hyperast_gen_ts_java::{TStore, Type};
 
-pub use java_processor::JavaProc;
 pub use java_processor::SUB_QUERIES; // To remove, at least in the current form
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 
-type Str = std::sync::Arc<str>;
-
-#[derive(Clone, PartialEq, Eq, Default)]
-pub struct Parameter {
-    pub query: Option<hyperast_tsquery::ZeroSepArrayStr>,
-    pub tsg: Option<Str>,
-    pub prepro: Option<Str>,
-}
+mod parameters;
+pub use parameters::Parameter;
 
 type PrecompQueries = u16;
+
+pub struct JavaProc {
+    pub(crate) parameter: Parameter,
+    pub height_counts: Vec<u32>,
+    query: Option<parameters::Query>,
+    #[cfg(feature = "tsg")]
+    tsg: Option<parameters::TsgErzedSettings>,
+    cache: crate::processing::caches::Java,
+    commits: crate::processing::caches::OidMap<crate::Commit>,
+}
 
 pub struct JavaAcc {
     /// Identifying elements and fundamental derived metrics used to accelerate deduplication.
@@ -86,7 +89,7 @@ impl JavaAcc {
     }
 }
 
-pub(crate) fn handle_java_file<'stores, 'cache, 'b: 'stores, More>(
+pub(crate) fn handle_java_file1<'stores, 'cache, 'b: 'stores, More>(
     tree_gen: &mut java_tree_gen::JavaTreeGen<'stores, 'cache, TStore, SimpleStores, More>,
     name: &ObjectName,
     text: &'b [u8],
@@ -94,6 +97,37 @@ pub(crate) fn handle_java_file<'stores, 'cache, 'b: 'stores, More>(
 where
     More: tree_gen::Prepro<SimpleStores, Scope = hyperast::scripting::Acc>
         + tree_gen::PreproTSG<SimpleStores, Acc = java_tree_gen::Acc>,
+{
+    let time = std::time::Instant::now();
+    let tree = java_tree_gen::tree_sitter_parse(text);
+    let parsing_time = time.elapsed();
+    if tree.root_node().has_error() {
+        log::warn!("bad CST: {:?}", name.try_str());
+        log::debug!("{}", tree.root_node().to_sexp());
+        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
+            return Err(FailedParsing {
+                parsing_time,
+                tree,
+                error: "CST contains parsing errors",
+            });
+        }
+    }
+    let node = tree_gen.generate_file(&name.as_bytes(), text, tree.walk());
+    let processing_time = time.elapsed() - parsing_time;
+    Ok(SuccessProcessing {
+        parsing_time,
+        processing_time,
+        node,
+    })
+}
+
+pub(crate) fn handle_java_file2<'a, E>(
+    tree_gen: &mut hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen<'a, 'a, E>,
+    name: &ObjectName,
+    text: &'a [u8],
+) -> FileProcessingResult<<E::Acc as hyperast::tree_gen::Accumulator>::Node>
+where
+    E: hyperast::tree_gen::TsExtra<SimpleStores>,
 {
     let time = std::time::Instant::now();
     let tree = java_tree_gen::tree_sitter_parse(text);

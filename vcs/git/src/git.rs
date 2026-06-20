@@ -9,9 +9,10 @@ pub use git2::Oid;
 pub use git2::Repository;
 use git2::{RemoteCallbacks, Revwalk, TreeEntry};
 
-use hyperast::{position::Position, utils::Url};
+use hyperast::position::Position;
+use hyperast::utils::Url;
 
-use crate::processing::ObjectName;
+use crate::processing::{NamedObject, ObjectName, ObjectType, TypedObject, UniqueObject};
 
 pub struct Builder<'a>(git2::Revwalk<'a>, &'a git2::Repository, bool);
 
@@ -443,7 +444,8 @@ fn clone_helper(url: Url, path: &Path, fo: git2::FetchOptions) -> Result<Reposit
     };
     Ok(repository)
 }
-
+// TODO  rename to something like GitOidTypedNamed
+// TODO use GitObjectType
 pub(crate) enum BasicGitObject {
     Blob(Oid, ObjectName),
     Tree(Oid, ObjectName),
@@ -463,10 +465,6 @@ impl<'a> TryFrom<TreeEntry<'a>> for BasicGitObject {
     }
 }
 
-pub trait NamedObject {
-    fn name(&self) -> &ObjectName;
-}
-
 impl NamedObject for BasicGitObject {
     fn name(&self) -> &ObjectName {
         match self {
@@ -483,6 +481,7 @@ impl TypedObject for BasicGitObject {
         }
     }
 }
+
 impl UniqueObject for BasicGitObject {
     type Id = Oid;
     fn id(&self) -> &Oid {
@@ -491,19 +490,6 @@ impl UniqueObject for BasicGitObject {
             BasicGitObject::Blob { 0: id, .. } => id,
         }
     }
-}
-
-pub enum ObjectType {
-    File,
-    Dir,
-}
-
-pub trait TypedObject {
-    fn r#type(&self) -> ObjectType;
-}
-pub trait UniqueObject {
-    type Id: Clone;
-    fn id(&self) -> &Self::Id;
 }
 
 pub fn read_position(

@@ -22,10 +22,7 @@ use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle;
 use crate::processing::caches::Java as JavaCaches;
-use crate::processing::caches::OidMap;
-use crate::processing::erased::CommitProcExt;
 use crate::processing::erased::ConfigParametersHandle;
-use crate::processing::erased::Parametrized;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::PreparedCommitProc;
@@ -33,6 +30,7 @@ use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::{Processor, StackEle};
 
 use super::JavaAcc;
+use super::JavaProc;
 use super::Parameter;
 use super::SimpleStores;
 
@@ -45,6 +43,8 @@ pub struct JavaProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: &'d Handle,
 }
+
+type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
 
 impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     pub(crate) fn prepare(
@@ -383,120 +383,6 @@ impl Parameter {
     }
 }
 
-#[derive(Default)]
-pub struct JavaProcessorHolder(Vec<JavaProc>);
-pub struct JavaProc {
-    pub(crate) parameter: Parameter,
-    pub height_counts: Vec<u32>,
-    query: Option<Query>,
-    #[cfg(feature = "tsg")]
-    tsg: Option<TsgErzedSettings>,
-    cache: JavaCaches,
-    commits: OidMap<crate::Commit>,
-}
-
-#[cfg(feature = "tsg")]
-struct TsgErzedSettings {
-    file: ErazedTSG,
-    fcts: hyperast_tsquery::ErazedFcts,
-}
-
-#[cfg(feature = "tsg")]
-type ErazedTSG = Box<dyn std::any::Any + Send + Sync>;
-
-type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, TS>, Acc>;
-
-impl Parametrized for JavaProcessorHolder {
-    type T = Parameter;
-    fn register_param(&mut self, t: Self::T) -> ParametrizedCommitProcessorHandle {
-        use crate::processing::erased::ParametrizedCommitProc;
-        if let Some(l) = self.0.iter().position(|x| &x.parameter == &t) {
-            return ParametrizedCommitProcessorHandle(
-                self.erased_handle(),
-                ConfigParametersHandle(l),
-            );
-        }
-        let l = self.0.len();
-        let query = t.query.as_ref().map(|q| {
-            use hyperast_tsquery::ArrayStr;
-            Query::new(q.iter())
-        });
-
-        #[cfg(feature = "tsg")]
-        let tsg = if let Some(q) = &t.tsg {
-            register_param_tsg(&t, q)
-        } else {
-            None
-        };
-        let r = JavaProc {
-            parameter: t,
-            height_counts: vec![],
-            query,
-            #[cfg(feature = "tsg")]
-            tsg,
-            cache: Default::default(),
-            commits: Default::default(),
-        };
-        self.0.push(r);
-        ParametrizedCommitProcessorHandle(self.erased_handle(), ConfigParametersHandle(l))
-    }
-}
-
-#[cfg(feature = "tsg")]
-fn register_param_tsg(t: &Parameter, q: &Arc<str>) -> Option<TsgErzedSettings> {
-    use std::ops::Deref;
-    let tsg = q.deref();
-    type ExtQ<'a, HAST, Acc> =
-        hyperast_tsquery::ExtendingStringQuery<M<'a, HAST, Acc>, tree_sitter::Language>;
-
-    let source: &str = tsg;
-    let language = hyperast_gen_ts_java::language();
-
-    let mut file = tree_sitter_graph::ast::File::<M<TStore, &Acc>>::new(language.clone());
-
-    let query_source = if let Some(p) = &t.query {
-        ExtQ::new(language.clone(), Box::new(p.clone()), source.len())
-    } else {
-        let x: &[&str] = &[];
-        ExtQ::new(language.clone(), Box::new(x), source.len())
-    };
-    tree_sitter_graph::parser::Parser::<ExtQ<_, _>>::with_ext(query_source, source)
-        .parse_into_file(&mut file)
-        .unwrap();
-    use tree_sitter_graph::GenQuery;
-
-    M::check(&mut file).unwrap();
-
-    let fcts = hyperast_tsquery::ErazedFcts::new::<hyperast_tsquery::ImmGraph<RawHAST<TStore>, &Acc>>(
-        tree_sitter_graph::functions::Functions::stdlib(),
-    );
-
-    Some(TsgErzedSettings {
-        file: file.as_any(),
-        fcts,
-    })
-}
-
-#[derive(Clone)]
-pub(crate) struct Query(pub(crate) hyperast_tsquery::Query, Arc<str>);
-
-impl PartialEq for Query {
-    fn eq(&self, other: &Self) -> bool {
-        self.1 == other.1
-    }
-}
-impl Eq for Query {}
-
-impl Query {
-    fn new<'a>(precomputeds: impl Iterator<Item = &'a str>) -> Self {
-        use crate::precomp_patterns::only_parse_query_precomp;
-        let language = hyperast_gen_ts_java::language();
-        let precomputeds = precomputeds.collect::<Vec<_>>();
-        let precomp = only_parse_query_precomp(precomputeds.as_slice(), language);
-        Self(precomp.unwrap(), precomputeds.join("\n").into())
-    }
-}
-
 impl crate::processing::erased::CommitProc for JavaProc {
     fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {
         self.commits.get(&commit_oid)
@@ -538,7 +424,7 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
         let dir_path = PathBuf::from("");
         let mut dir_path = dir_path.components().peekable();
         let name = ObjectName::from(b"");
-        // TODO check parameter in self to know it is a recusive module search
+        // TODO check parameter in self to know it is a recursive module search
         let root_full_node = JavaProcessor::<JavaAcc>::prepare(
             self.repository,
             prepro,
@@ -561,21 +447,22 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
     }
 }
 
-impl CommitProcExt for JavaProc {
-    type Holder = JavaProcessorHolder;
-}
+// impl CommitProcExt for JavaProc {
+//     type Holder = JavaProcessorHolder;
+// }
 
-impl ParametrizedCommitProc2 for JavaProcessorHolder {
-    type Proc = JavaProc;
+// impl ParametrizedCommitProc2 for JavaProcessorHolder {
+//     type Proc = JavaProc;
 
-    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
-        &mut self.0[parameters.0]
-    }
+//     fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
+//         &mut self.0[parameters.0]
+//     }
 
-    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
-        &self.0[parameters.0]
-    }
-}
+//     fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
+//         &self.0[parameters.0]
+//     }
+// }
+//
 impl CacheHolding<JavaCaches> for JavaProc {
     fn get_caches_mut(&mut self) -> &mut JavaCaches {
         &mut self.cache
@@ -650,7 +537,7 @@ impl RepositoryProcessor {
         let mut java_tree_gen =
             java_tree_gen::JavaTreeGen::<TStore, _, _>::new(stores, &mut md_cache)
                 .set_line_break(line_break);
-        super::handle_java_file(&mut java_tree_gen, name, text)
+        super::handle_java_file1(&mut java_tree_gen, name, text)
             .map(|x| x.node)
             .map_err(|e| {
                 eprintln!(
@@ -675,7 +562,7 @@ impl RepositoryProcessor {
         (name, full_node)
     }
 
-    fn handle_java_blob(
+    pub(crate) fn handle_java_blob(
         &mut self,
         oid: Oid,
         name: &ObjectName,
@@ -706,7 +593,7 @@ impl RepositoryProcessor {
                     }
                     #[cfg(feature = "tsg")]
                     {
-                        let spec: &tree_sitter_graph::ast::File<M<TStore, &Acc>> =
+                        let spec: &crate::processors::java::parameters::GraphQuery =
                             tsg.file.downcast_ref().unwrap();
                         let query = java_proc.query.as_ref().map(|x| &x.0);
                         let functions = tsg.fcts.clone();
@@ -720,7 +607,7 @@ impl RepositoryProcessor {
                                 stores, dedup, md_cache, more,
                             )
                             .set_line_break(line_break);
-                        super::handle_java_file(&mut java_tree_gen, n, t)
+                        super::handle_java_file1(&mut java_tree_gen, n, t)
                     }
                 } else if let Some(precomp) = &java_proc.parameter.prepro {
                     let more = hyperast::scripting::Prepro::<_, _>::from_arc(precomp.clone());
@@ -730,20 +617,25 @@ impl RepositoryProcessor {
                             stores, dedup, md_cache, more,
                         )
                         .set_line_break(line_break);
-                    super::handle_java_file(&mut java_tree_gen, n, t)
+                    super::handle_java_file1(&mut java_tree_gen, n, t)
                 } else if let Some(more) = &java_proc.query {
                     let more = &more.0;
-                    let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
+                    // let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
+
+                    type Acc = hyperast::tree_gen::zipped_ts_extra::Acc<Type>;
+                    let more = hyperast_tsquery::PreparedQuerying::<_, TStore, Acc>::from(more);
+                    use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
+                    let mut extra = PatternPrecompExtra::<_, Acc, _>::from(more);
+
                     let mut java_tree_gen =
-                        java_tree_gen::JavaTreeGen::with_preprocessing_and_dedup(
-                            stores, dedup, md_cache, more,
-                        )
-                        .set_line_break(line_break);
-                    super::handle_java_file::<_>(&mut java_tree_gen, n, t)
+                        hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen::new(stores, &mut extra)
+                            .set_line_break(line_break);
+                    super::handle_java_file2(&mut java_tree_gen, n, t).map(simp2full)
                 } else {
-                    let mut java_tree_gen = java_tree_gen::JavaTreeGen::new(stores, md_cache)
+                    use hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen;
+                    let mut java_tree_gen = JavaTreeGen::bare(stores) //
                         .set_line_break(line_break);
-                    super::handle_java_file(&mut java_tree_gen, n, t)
+                    super::handle_java_file2(&mut java_tree_gen, n, t).map(empty2full)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;
 
@@ -772,7 +664,7 @@ impl RepositoryProcessor {
             })
     }
 
-    fn help_handle_java_file(
+    pub(crate) fn help_handle_java_file(
         &mut self,
         oid: Oid,
         w: &mut JavaAcc,
@@ -807,14 +699,77 @@ impl RepositoryProcessor {
     }
 }
 
+fn empty2full(
+    x: crate::utils::SuccessProcessing<
+        hyperast::tree_gen::extra::NodeWithExtra<
+            hyperast::full::FullNode<
+                hyperast::tree_gen::BasicGlobalData,
+                hyperast::tree_gen::zipped_ts_extra::Local,
+            >,
+            hyperast::tree_gen::zipped_ts_extra::EmptyExtra,
+        >,
+    >,
+) -> crate::utils::SuccessProcessing<
+    hyperast::full::FullNode<hyperast::tree_gen::StatsGlobalData, java_tree_gen::Local>,
+> {
+    let local: hyperast::tree_gen::zipped_ts_extra::Local = x.node.node.local;
+    let local = java_tree_gen::Local {
+        compressed_node: local.compressed_node,
+        metrics: local.metrics,
+        mcc: hyperast::cyclomatic::Mcc::new(&Type::Program),
+        role: local.role,
+        precomp_queries: Default::default(),
+        stmt_count: 0,
+        member_import_count: 0,
+    };
+    let global = hyperast::tree_gen::StatsGlobalData::new(x.node.node.global);
+    crate::utils::SuccessProcessing {
+        parsing_time: x.parsing_time,
+        processing_time: x.processing_time,
+        node: java_tree_gen::FNode { global, local },
+    }
+}
+
+fn simp2full(
+    x: crate::utils::SuccessProcessing<
+        hyperast::tree_gen::extra::NodeWithExtra<
+            hyperast::full::FullNode<
+                hyperast::tree_gen::BasicGlobalData,
+                hyperast::tree_gen::zipped_ts_extra::Local,
+            >,
+            hyperast::tree_gen::extra_pattern_precomp::PrecompQueries,
+        >,
+    >,
+) -> crate::utils::SuccessProcessing<
+    hyperast::full::FullNode<hyperast::tree_gen::StatsGlobalData, java_tree_gen::Local>,
+> {
+    let extra = x.node.extra;
+    let local: hyperast::tree_gen::zipped_ts_extra::Local = x.node.node.local;
+    let local = java_tree_gen::Local {
+        compressed_node: local.compressed_node,
+        metrics: local.metrics,
+        mcc: hyperast::cyclomatic::Mcc::new(&Type::Program),
+        role: local.role,
+        precomp_queries: extra.0,
+        stmt_count: 0,
+        member_import_count: 0,
+    };
+    let global = hyperast::tree_gen::StatsGlobalData::new(x.node.node.global);
+    crate::utils::SuccessProcessing {
+        parsing_time: x.parsing_time,
+        processing_time: x.processing_time,
+        node: java_tree_gen::FNode { global, local },
+    }
+}
+
 // TODO try to separate processing from caching from git
 #[cfg(test)]
 #[allow(unused)]
 mod experiments {
     use super::*;
     use crate::Accumulator;
-    use crate::git::{NamedObject, ObjectType, TypedObject, UniqueObject};
-    use crate::processing::InFiles;
+    use crate::processing::{InFiles, NamedObject};
+    use crate::processing::{ObjectType, TypedObject, UniqueObject};
 
     pub(crate) struct GitProcessorMiddleWare<'repo, 'prepro, 'd, 'c> {
         repository: &'repo Repository,

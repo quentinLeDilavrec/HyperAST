@@ -10,11 +10,10 @@ use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use hyperast_vcs_git::processing::CacheHolding as _;
 use hyperast_vcs_git::processing::ConfiguredRepoHandle2;
 use hyperast_vcs_git::processing::ConfiguredRepoTrait as _;
-use hyperast_vcs_git::processing::erased::CommitProcExt;
 use hyperast_vcs_git::processing::erased::ParametrizedCommitProc2 as _;
 use hyperast_vcs_git::processors::maven::MavenModuleAcc;
 use hyperast_vcs_git::processors::maven::MavenProc;
-type MavenProcessorHolder = <MavenProc as CommitProcExt>::Holder;
+type MavenProcessorHolder = hyperast_vcs_git::processing::ProcessorHolder<MavenProc>;
 
 use crate::postprocess::{CompressedBfPostProcess, PathJsonPostProcess};
 use crate::{other_tools, window_combination::write_perfs};

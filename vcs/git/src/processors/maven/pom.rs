@@ -8,19 +8,15 @@ use crate::processing::CacheHolding;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::caches::Pom as PomCaches;
-use crate::processing::erased::ConfigParametersHandle;
-use crate::processing::erased::Parametrized;
-use crate::processing::erased::ParametrizedCommitProc;
-use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::erased::CommitProc;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::PreparedCommitProc;
-use crate::processing::erased::{CommitProc, CommitProcExt};
 
 use super::MavenProc;
 use super::POM;
 use super::SimpleStores;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct PomParameter {}
 
 pub struct PomProc {
@@ -28,11 +24,20 @@ pub struct PomProc {
     cache: PomCaches,
 }
 
-impl CommitProcExt for PomProc {
-    type Holder = PomProcessorHolder;
+impl From<PomParameter> for PomProc {
+    fn from(value: PomParameter) -> Self {
+        PomProc {
+            parameter: Some(value),
+            cache: Default::default(),
+        }
+    }
 }
 
-pub struct PomProcessorHolder(Vec<PomProc>);
+impl PartialEq<PomProc> for PomParameter {
+    fn eq(&self, other: &PomProc) -> bool {
+        other.parameter.as_ref() == Some(self)
+    }
+}
 
 pub(crate) fn handle_pom_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,
@@ -64,24 +69,6 @@ where
         test_source_dirs: vec!["src/test/java".to_owned()],
     };
     Ok(x)
-}
-
-impl Parametrized for PomProcessorHolder {
-    type T = PomParameter;
-    fn register_param(&mut self, t: Self::T) -> PCPHandle {
-        let l = (self.0.iter())
-            .position(|x| x.parameter.as_ref() == Some(&t))
-            .unwrap_or_else(|| {
-                let l = self.0.len();
-                self.0.push(PomProc {
-                    parameter: Some(t),
-                    cache: Default::default(),
-                });
-                l
-            });
-        assert_eq!(l, 1);
-        PCPHandle(self.erased_handle(), ConfigParametersHandle(l))
-    }
 }
 
 impl crate::preprocessed::RepositoryProcessor {
@@ -132,18 +119,6 @@ impl CommitProc for PomProc {
     }
 }
 
-impl ParametrizedCommitProc2 for PomProcessorHolder {
-    type Proc = PomProc;
-
-    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
-        &mut self.0[parameters.0]
-    }
-
-    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
-        &self.0[parameters.0]
-    }
-}
-
 impl CacheHolding<PomCaches> for PomProc {
     fn get_caches_mut(&mut self) -> &mut PomCaches {
         &mut self.cache
@@ -157,14 +132,5 @@ impl CacheHolding<PomCaches> for PomProc {
 impl From<PCP2Handle<MavenProc>> for PCP2Handle<PomProc> {
     fn from(value: PCP2Handle<MavenProc>) -> Self {
         PCP2Handle(value.0, PhantomData)
-    }
-}
-
-impl Default for PomProcessorHolder {
-    fn default() -> Self {
-        Self(vec![PomProc {
-            parameter: None,
-            cache: Default::default(),
-        }])
     }
 }

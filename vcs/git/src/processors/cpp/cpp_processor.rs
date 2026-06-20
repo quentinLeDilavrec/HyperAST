@@ -9,8 +9,13 @@ use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen::add_md_precomp_queries;
 
 use crate::git::BasicGitObject;
+use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::erased::{Parametrized, ParametrizedCommitProc2};
+use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
+use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::erased::PreparedCommitProc;
+#[cfg(feature = "cpp")]
+use crate::processing::file_sys;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 #[cfg(feature = "cpp")]
 use crate::processors::make::MakeModuleAcc;
@@ -97,7 +102,7 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
                 self.handle_tree_cached(oid, name);
             }
             BasicGitObject::Blob(oid, name) => {
-                if crate::processing::file_sys::Cpp::matches(&name) {
+                if file_sys::Cpp::matches(&name) {
                     self.prepro
                         .help_handle_cpp_file(
                             oid,
@@ -121,9 +126,9 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
             .prepro
             .processing_systems
             .mut_or_default::<CppProcessorHolder>();
-        let cpp_proc = holder.with_parameters_mut(self.handle.0);
-        let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), cpp_proc);
-        cpp_proc.cache.object_map.insert(key, (full_node.clone(),));
+        let proc = holder.with_parameters_mut(self.handle.0);
+        let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
+        proc.cache.object_map.insert(key, (full_node.clone(),));
         if self.stack.is_empty() {
             return Some((full_node,));
         }
@@ -145,69 +150,55 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
 
 impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
-        let holder = self
-            .prepro
+        let prepro = &mut self.prepro;
+        let holder = prepro
             .processing_systems
             .mut_or_default::<CppProcessorHolder>();
-        let cpp_proc = holder.with_parameters_mut(self.handle.0);
-        if let Some(
-            // (already, skiped_ana)
-            already,
-        ) = cpp_proc.cache.object_map.get(&(oid, name.clone()))
-        {
+        let proc = holder.with_parameters_mut(self.handle.0);
+        if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
-            let full_node = already.clone();
-            // let skiped_ana = *skiped_ana;
+            let (full_node,) = already.clone();
             let w = &mut self.stack.last_mut().unwrap().acc;
-            let name = self.prepro.intern_object_name(&name);
+            let name = prepro.intern_object_name(&name);
             assert!(!w.primary.children_names.contains(&name));
-            hyperast::tree_gen::Accumulator::push(w, (name, full_node));
-            // w.push(name, full_node, skiped_ana);
+            w.push(name, full_node);
         } else {
             log::debug!("tree {:?}", name.try_str());
             let tree = self.repository.find_tree(oid).unwrap();
-            let prepared: Vec<BasicGitObject> = prepare_dir_exploration(tree);
+            let prepared = prepare_dir_exploration(tree);
             let acc = CppAcc::new(name.try_into().unwrap());
             self.stack.push(StackEle::new(oid, prepared, acc));
         }
     }
 }
-#[derive(Default)]
-pub(crate) struct CppProcessorHolder(Vec<CppProc>);
+
+pub(crate) type CppProcessorHolder = crate::processing::ProcessorHolder<CppProc>;
+
 pub(crate) struct CppProc {
     parameter: Parameter,
     query: Option<Query>,
     cache: crate::processing::caches::Cpp,
     commits: HashMap<git2::Oid, crate::Commit>,
 }
-impl Parametrized for CppProcessorHolder {
-    type T = Parameter;
-    fn register_param(
-        &mut self,
-        t: Self::T,
-    ) -> crate::processing::erased::ParametrizedCommitProcessorHandle {
-        use crate::processing::erased::ConfigParametersHandle;
-        use crate::processing::erased::ParametrizedCommitProc;
-        use crate::processing::erased::ParametrizedCommitProcessorHandle;
-        if let Some(l) = self.0.iter().position(|x| &x.parameter == &t) {
-            return ParametrizedCommitProcessorHandle(
-                self.erased_handle(),
-                ConfigParametersHandle(l),
-            );
-        }
-        let l = self.0.len();
-        let query = t.query.as_ref().map(|q| {
+
+impl Into<CppProc> for Parameter {
+    fn into(self) -> CppProc {
+        let query = self.query.as_ref().map(|q| {
             use hyperast_tsquery::ArrayStr;
             Query::new(q.iter())
         });
-        let r = CppProc {
-            parameter: t,
+        CppProc {
+            parameter: self,
             query,
             cache: Default::default(),
             commits: Default::default(),
-        };
-        self.0.push(r);
-        ParametrizedCommitProcessorHandle(self.erased_handle(), ConfigParametersHandle(l))
+        }
+    }
+}
+
+impl PartialEq<CppProc> for Parameter {
+    fn eq(&self, other: &CppProc) -> bool {
+        self == &other.parameter
     }
 }
 
@@ -235,9 +226,9 @@ impl crate::processing::erased::CommitProc for CppProc {
     fn prepare_processing(
         &self,
         _repository: &git2::Repository,
-        _builder: crate::preprocessed::CommitBuilder,
-        _handle: crate::processing::ParametrizedCommitProcessorHandle,
-    ) -> Box<dyn crate::processing::erased::PreparedCommitProc> {
+        _builder: CommitBuilder,
+        _handle: PCPHandle,
+    ) -> Box<dyn PreparedCommitProc> {
         unimplemented!("required for processing cpp at the root of a project")
     }
 
@@ -255,27 +246,6 @@ impl crate::processing::erased::CommitProc for CppProc {
     }
 }
 
-impl crate::processing::erased::CommitProcExt for CppProc {
-    type Holder = CppProcessorHolder;
-}
-
-impl crate::processing::erased::ParametrizedCommitProc2 for CppProcessorHolder {
-    type Proc = CppProc;
-
-    fn with_parameters_mut(
-        &mut self,
-        parameters: crate::processing::erased::ConfigParametersHandle,
-    ) -> &mut Self::Proc {
-        &mut self.0[parameters.0]
-    }
-
-    fn with_parameters(
-        &self,
-        parameters: crate::processing::erased::ConfigParametersHandle,
-    ) -> &Self::Proc {
-        &self.0[parameters.0]
-    }
-}
 impl CacheHolding<crate::processing::caches::Cpp> for CppProc {
     fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Cpp {
         &mut self.cache
@@ -287,54 +257,54 @@ impl CacheHolding<crate::processing::caches::Cpp> for CppProc {
 
 #[cfg(feature = "cpp")]
 impl RepositoryProcessor {
-    fn handle_cpp_blob(
+    pub(crate) fn handle_cpp_blob(
         &mut self,
         oid: Oid,
         name: &ObjectName,
         repository: &Repository,
         parameters: Handle,
     ) -> Result<(cpp_gen::Local,), crate::ParseErr> {
-        self.processing_systems
-            .caching_blob_handler::<crate::processing::file_sys::Cpp>()
-            .handle2(oid, repository, &name, parameters, |c, n, t| {
-                let line_break = if t.contains(&b'\r') { "\r\n" } else { "\n" }
-                    .as_bytes()
-                    .to_vec();
-                let holder = c.mut_or_default::<CppProcessorHolder>();
-                let cpp_proc = holder.with_parameters_mut(parameters.0);
-                let md_cache = &mut cpp_proc.cache.md_cache;
-                let dedup = &mut cpp_proc.cache.dedup;
-                let stores = self
-                    .main_stores
-                    .mut_with_ts::<hyperast_gen_ts_cpp::TStore>();
-                let r = if let Some(more) = &cpp_proc.query {
-                    let more = &more.0;
-                    let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
-                    let mut cpp_tree_gen = cpp_gen::CppTreeGen::with_preprocessing_and_dedup(
-                        stores, dedup, md_cache, more,
-                    )
+        let mut handler = self
+            .processing_systems
+            .caching_blob_handler::<file_sys::Cpp>();
+        handler.handle2(oid, repository, &name, parameters, |c, n, t| {
+            let line_break = crate::_auto_configured_line_break(t);
+            let holder = c.mut_or_default::<CppProcessorHolder>();
+            let cpp_proc = holder.with_parameters_mut(parameters.0);
+            let md_cache = &mut cpp_proc.cache.md_cache;
+            let dedup = &mut cpp_proc.cache.dedup;
+            let stores = self
+                .main_stores
+                .mut_with_ts::<hyperast_gen_ts_cpp::TStore>();
+            let r = if let Some(more) = &cpp_proc.query {
+                let more = &more.0;
+                let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
+                let mut cpp_tree_gen = cpp_gen::CppTreeGen::with_preprocessing_and_dedup(
+                    stores, dedup, md_cache, more,
+                )
+                .set_line_break(line_break);
+                super::handle_cpp_file1::<_>(&mut cpp_tree_gen, n, t)
+            } else {
+                use hyperast_gen_ts_cpp::legion_ts_simp::CppTreeGen;
+                let mut cpp_tree_gen = CppTreeGen::bare(stores) //
                     .set_line_break(line_break);
-                    super::handle_cpp_file::<_>(&mut cpp_tree_gen, n, t)
-                } else {
-                    let mut cpp_tree_gen =
-                        cpp_gen::CppTreeGen::new(stores, md_cache).set_line_break(line_break);
-                    super::handle_cpp_file(&mut cpp_tree_gen, n, t)
-                }
-                .map_err(|_| crate::ParseErr::IllFormed)?;
+                super::handle_cpp_file2(&mut cpp_tree_gen, n, t).map(empty2full)
+            }
+            .map_err(|_| crate::ParseErr::IllFormed)?;
 
-                self.parsing_time += r.parsing_time;
-                self.processing_time += r.processing_time;
-                log::info!(
-                    "parsing, processing, n, f: {} {} {} {}",
-                    self.parsing_time.as_secs(),
-                    self.processing_time.as_secs(),
-                    cpp_proc.cache.md_cache.len(),
-                    cpp_proc.cache.object_map.len()
-                );
+            self.parsing_time += r.parsing_time;
+            self.processing_time += r.processing_time;
+            log::info!(
+                "parsing, processing, n, f: {} {} {} {}",
+                self.parsing_time.as_secs(),
+                self.processing_time.as_secs(),
+                cpp_proc.cache.md_cache.len(),
+                cpp_proc.cache.object_map.len()
+            );
 
-                let r = r.node;
-                Ok((r.local.clone(),))
-            })
+            let r = r.node;
+            Ok((r.local.clone(),))
+        })
     }
 
     pub(crate) fn help_handle_cpp_file(
@@ -392,6 +362,33 @@ impl RepositoryProcessor {
         let full_node = self.handle_cpp_directory(repository, dir_path, name, oid, handle);
         let name = self.intern_object_name(name);
         (name, full_node)
+    }
+}
+
+fn empty2full(
+    x: crate::utils::SuccessProcessing<
+        hyperast::tree_gen::extra::NodeWithExtra<
+            hyperast::full::FullNode<
+                hyperast::tree_gen::BasicGlobalData,
+                hyperast::tree_gen::zipped_ts_extra::Local,
+            >,
+            hyperast::tree_gen::zipped_ts_extra::EmptyExtra,
+        >,
+    >,
+) -> crate::utils::SuccessProcessing<cpp_gen::FNode> {
+    let local: hyperast::tree_gen::zipped_ts_extra::Local = x.node.node.local;
+    let local = cpp_gen::Local {
+        compressed_node: local.compressed_node,
+        metrics: local.metrics,
+        role: local.role,
+        precomp_queries: Default::default(),
+        viz_cs_count: 0,
+    };
+    let global = x.node.node.global;
+    crate::utils::SuccessProcessing {
+        parsing_time: x.parsing_time,
+        processing_time: x.processing_time,
+        node: cpp_gen::FNode { global, local },
     }
 }
 

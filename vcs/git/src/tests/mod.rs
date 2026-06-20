@@ -6,6 +6,7 @@ pub mod extends_package_local;
 pub mod obj_creation;
 
 use crate::git::fetch_github_repository;
+use crate::multi_preprocessed;
 use crate::preprocessed::PreProcessedRepository;
 
 #[cfg(feature = "impact")]
@@ -136,6 +137,101 @@ fn example_process_make_cpp_project() {
         "{}",
         hyperast::nodes::SyntaxSerializer::new(&preprocessed.processor.main_stores, id)
     );
+}
+
+#[test]
+fn test_cpp_top_includes() {
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+    let repo = crate::git::Forge::Github.repo("official-stockfish", "Stockfish");
+    let config = crate::processing::RepoConfig::CppMake;
+    let handle = &preprocessed.register_config(repo, config).fetch();
+    let commits = preprocessed
+        .pre_process_with_limit(
+            handle,
+            "",
+            "587bc647d7d14b53d8625c4446006e23a4acd82a",
+            // "f97c5b6909d22277f28e3dea2f146e9314d634dc", // issue with operator[]('K') = KB;
+            // "src",
+            2,
+        )
+        .unwrap();
+
+    let commitid = commits[0];
+    let id = preprocessed
+        .get_commit(&handle.config, &commitid)
+        .unwrap()
+        .ast_root;
+    // eprintln!(
+    //     "{}",
+    //     hyperast::nodes::SyntaxSerializer::new(&preprocessed.processor.main_stores, id)
+    // );
+    cpp_top_includes_aux(&preprocessed.processor.main_stores, id);
+}
+
+fn cpp_top_includes_aux(
+    // stores: &crate::processors::cpp::SimpleStores,
+    stores: &crate::SimpleStores,
+    id: hyperast::store::defaults::NodeIdentifier,
+) {
+    use hyperast::types::HyperAST;
+    use hyperast_tsquery::Query;
+
+    dbg!();
+
+    let lang = hyperast_gen_ts_cpp::language();
+    let query = "(translation_unit)\n(translation_unit (preproc_include)@a)\n(preproc_include)@b";
+    let precomp = [
+        // "(_declarator/operator_name)",                      // TODO
+        // "(parameter_declaration (_declarator/identifier))", // TODO
+        // "(parameter_declaration declarator: (identifier))", // TODO
+        // "(parameter_declaration type: (type_identifier) declarator: (identifier))", // TODO
+        // "(identifier)",
+        // "(reference_declarator (identifier))",
+        "(type_identifier)",
+        // "(parameter_declaration (type_identifier) (identifier))",
+        // "(primitive_type)",
+    ]
+    .as_slice();
+
+    let (_precomp, query) = Query::with_precomputed(query, lang, precomp) //
+        .unwrap_or_else(|e| panic!("\n{e}"));
+
+    let mut counts = vec![0; query.enabled_pattern_count()];
+    let mut types = std::collections::HashSet::<String>::default();
+
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(id);
+    let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&stores, pos);
+    let mut matches = query.matches(cursor);
+    while let Some(m) = matches.next() {
+        dbg!();
+        let pid = query.enabled_pattern_index(m.pattern_index).unwrap();
+        dbg!(pid);
+        counts[pid as usize] += 1;
+        // for c in m.captures.iter() {
+        //     use hyperast::position::structural_pos::CursorHead;
+        //     let n = c.node;
+        //     let p = n.pos.parent();
+        //     dbg!(c.index.to_string());
+        //     println!("{}", stores.resolve_type(&p.unwrap()))
+        // }
+        let cid = query.capture_index_for_name("b").unwrap();
+        for n in m.nodes_for_capture_index(cid) {
+            use hyperast::position::structural_pos::CursorHead;
+            let p = n.pos.parent();
+            // dbg!(c.index.to_string());
+            println!("{}", stores.resolve_type(&p.unwrap()));
+            types.insert(stores.resolve_type(&p.unwrap()).to_string());
+        }
+    }
+    dbg!(&counts);
+    dbg!(&types);
+    println!("example patters");
+    for t in types {
+        println!("({t} (preproc_include)@root)");
+    }
+    println!("(translation_unit)");
+    println!("(_ (preproc_include))");
+    println!("(preproc_include)");
 }
 
 #[test]

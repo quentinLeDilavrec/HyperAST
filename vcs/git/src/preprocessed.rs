@@ -70,6 +70,15 @@ impl RepositoryProcessor {
     pub fn purge_caches(&mut self) {
         self.processing_systems.clear();
     }
+
+    pub fn intern_object_name<T: std::borrow::Borrow<crate::processing::ObjectName>>(
+        &mut self,
+        name: T,
+    ) -> hyperast::store::defaults::LabelIdentifier {
+        use hyperast::types::LabelStore;
+        let s: &str = name.borrow().try_into().unwrap();
+        self.main_stores.label_store.get_or_insert(s)
+    }
 }
 
 impl PreProcessedRepository {

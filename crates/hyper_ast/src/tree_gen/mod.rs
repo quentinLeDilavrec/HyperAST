@@ -455,7 +455,7 @@ mod global_stats {
     }
 
     impl<GD> StatsGlobalData<GD> {
-        fn new(inner: GD) -> Self {
+        pub fn new(inner: GD) -> Self {
             Self {
                 #[cfg(feature = "subtree-stats")]
                 height_counts: Vec::with_capacity(30),
@@ -1006,7 +1006,7 @@ pub trait WithExtra {
 #[derive(Debug)]
 pub struct AccWithExtra<Acc, Extra>(Acc, Extra);
 
-mod extra;
+pub mod extra;
 
 pub mod extra_pattern_precomp;
 

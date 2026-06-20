@@ -11,10 +11,8 @@ use crate::processors::java::JavaProc;
 type JavaProcessorHolder = ProcessorHolder<JavaProc>;
 use crate::processors::cpp::CppProc;
 type CppProcessorHolder = ProcessorHolder<CppProc>;
-// #[cfg(feature = "python")]
-// use crate::processors::python::PythonProc;
-// #[cfg(feature = "python")]
-// type PythonProcessorHolder = ProcessorHolder<PythonProc>;
+#[cfg(feature = "python")]
+type PythonProcessorHolder = ProcessorHolder<crate::processors::python::PythonProc>;
 use crate::processors::make::MakeProc;
 type MakeProcessorHolder = ProcessorHolder<MakeProc>;
 use crate::processors::maven::MavenProc;
@@ -158,12 +156,12 @@ impl PreProcessedRepositories {
             let h = pr.mut_or_default::<CppProcessorHolder>();
             CommitProcExt::register_param(h, t)
         };
-        // #[cfg(feature = "python")]
-        // let python = |pr: &mut ProcessorMap| {
-        //     let t = crate::processors::python::Parameter::default();
-        //     let h = pr.mut_or_default::<PythonProcessorHolder>();
-        //     CommitProcExt::register_param(h, t)
-        // };
+        #[cfg(feature = "python")]
+        let python = |pr: &mut ProcessorMap| {
+            let t = crate::processors::python::Parameter::default();
+            let h = pr.mut_or_default::<PythonProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
         let r = match config {
             RepoConfig::JavaMaven => {
                 let processor_map = &mut self.processor.processing_systems;
@@ -180,6 +178,11 @@ impl PreProcessedRepositories {
             RepoConfig::Java => {
                 let processor_map = &mut self.processor.processing_systems;
                 let config = java(processor_map).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            RepoConfig::Python => {
+                let processor_map = &mut self.processor.processing_systems;
+                let config = python(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::CppMake => {

@@ -678,6 +678,7 @@ where
 #[cfg(feature = "ts_type")]
 pub trait TsType: crate::types::HyperType + Copy {
     fn spaces() -> Self;
+    fn error() -> Self;
     fn is_repeat(&self) -> bool;
     /// returns true if current node should be treated as a leaf node,
     /// i.e. we skip generating children and set the label with the content of the span

@@ -47,6 +47,10 @@ impl TsType for Type {
         Self::Spaces
     }
 
+    fn error() -> Self {
+        Self::ERROR
+    }
+
     fn is_repeat(&self) -> bool {
         self.is_repeat()
     }

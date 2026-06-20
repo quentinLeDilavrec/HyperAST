@@ -44,6 +44,10 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
             Self::Spaces
         }
 
+        fn error() -> Self {
+            Self::ERROR
+        }
+
         fn is_repeat(&self) -> bool {
             self.is_repeat()
         }

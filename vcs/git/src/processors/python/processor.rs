@@ -6,11 +6,10 @@ use git2::{Oid, Repository};
 
 use hyperast::store::nodes::legion::subtree_builder;
 use hyperast::tree_gen::add_md_precomp_queries;
-use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
-use crate::preprocessed::RepositoryProcessor;
+use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
 use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::{ParametrizedCommitProc2, PreparedCommitProc};
@@ -26,8 +25,7 @@ use hyperast_gen_ts_python::{TStore, Type};
 type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<PythonProc>;
 
 pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
-    tree.iter()
-        .rev()
+    (tree.iter().rev())
         .map(TryInto::try_into)
         .filter_map(|x| x.ok())
         .collect()
@@ -165,7 +163,7 @@ impl crate::processing::erased::CommitProc for PythonProc {
     fn prepare_processing<'repo>(
         &self,
         repository: &'repo Repository,
-        commit_builder: crate::preprocessed::CommitBuilder,
+        commit_builder: CommitBuilder,
         handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
         Box::new(PreparedPythonCommitProc {
@@ -191,7 +189,7 @@ impl crate::processing::erased::CommitProc for PythonProc {
 
 struct PreparedPythonCommitProc<'repo> {
     repository: &'repo Repository,
-    commit_builder: crate::preprocessed::CommitBuilder,
+    commit_builder: CommitBuilder,
     pub(crate) handle: PCPHandle,
 }
 
@@ -204,15 +202,13 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
         let mut dir_path = dir_path.components().peekable();
         let name = ObjectName::from(b"");
         // TODO check parameter in self to know it is a recursive module search
-        let root_full_node = PythonProcessor::<PythonAcc>::prepare(
+        let root_full_node = prepro.handle_python_directory(
             self.repository,
-            prepro,
             &mut dir_path,
             &name,
             self.commit_builder.tree_oid(),
-            &PCP2Handle(self.handle.1, std::marker::PhantomData),
-        )
-        .process();
+            PCP2Handle(self.handle.1, std::marker::PhantomData),
+        );
         let h = prepro
             .processing_systems
             .mut_or_default::<PythonProcessorHolder>();
@@ -247,8 +243,8 @@ impl RepositoryProcessor {
                 let holder = c.mut_or_default::<PythonProcessorHolder>();
                 let proc = holder.with_parameters_mut(parameters.0);
                 let stores = self.main_stores.mut_with_ts::<TStore>();
-                let r = handle_python_blob_aux(n, t, proc, stores)?;
-
+                let r = handle_python_blob_aux(n, t, proc, stores)
+                    .map_err(|_| crate::ParseErr::IllFormed)?;
                 self.parsing_time += r.parsing_time;
                 self.processing_time += r.processing_time;
                 log::info!(
@@ -258,10 +254,7 @@ impl RepositoryProcessor {
                     proc.cache.md_cache.len(),
                     proc.cache.object_map.len()
                 );
-
-                let r = r.node;
-                // Ok((r.local.clone(), acc.precomp_queries))
-                Ok(r)
+                Ok(r.node)
             })
     }
 
@@ -299,30 +292,27 @@ fn handle_python_blob_aux(
     t: &[u8],
     proc: &mut PythonProc,
     stores: &mut SimpleStores,
-) -> Result<
-    crate::utils::SuccessProcessing<(python_gen::Local, PrecompQueries)>,
-    crate::utils::ParseErr,
-> {
-    let line_break = _auto_configured_line_break(t);
-    let md_cache = &mut proc.cache.md_cache;
+) -> Result<crate::utils::SuccessProcessing<super::FullNode>, crate::utils::FailedParsing> {
+    let lb = _auto_configured_line_break(t);
     let dedup = &mut proc.cache.dedup;
+    use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
+    use hyperast_gen_ts_python::legion::Acc;
     use python_gen::PythonTreeGen;
-    let r: crate::utils::SuccessProcessing<super::FullNode> = if let Some(more) = &proc.query {
+    if let Some(more) = &proc.query {
+        let md_cache = std::mem::take(&mut proc.cache.md_cache);
         let more = &more.0;
-        use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
-        type Acc = hyperast_gen_ts_python::legion::Acc;
         let more: hyperast_tsquery::PreparedQuerying<_, TStore, Acc> = more.into();
-        let mut extra = PatternPrecompExtra::<_, Acc, _>::from(more);
-        let mut tree_gen = PythonTreeGen::new(stores, &mut extra).set_line_break(line_break);
-        super::handle_python_file(&mut tree_gen, n, t).map(|x| x.map(|x| (x.node.local, x.extra)))
+        let mut extra = PatternPrecompExtra::<_, Acc, _>::with_cache(more, md_cache);
+        let mut tree_gen = PythonTreeGen::new(stores, &mut extra).set_line_break(lb);
+        let r = super::handle_python_file(tree_gen.with_dedup(dedup), n, t)
+            .map(|x| x.map(|x| (x.node.local, x.extra)));
+        proc.cache.md_cache = extra.md_cache;
+        r
     } else {
-        let mut tree_gen = PythonTreeGen::bare(stores) //
-            .set_line_break(line_break);
-        super::handle_python_file(&mut tree_gen, n, t)
+        let mut tree_gen = PythonTreeGen::bare(stores).set_line_break(lb);
+        super::handle_python_file(tree_gen.with_dedup(dedup), n, t)
             .map(|x| x.map(|x| (x.node.local, Default::default())))
     }
-    .map_err(|_| crate::ParseErr::IllFormed)?;
-    Ok(r)
 }
 
 fn make(acc: PythonAcc, stores: &mut SimpleStores, proc: &mut PythonProc) -> super::FullNode {

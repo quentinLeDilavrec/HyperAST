@@ -2,21 +2,94 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
+use crate::preprocessed::CommitBuilder;
+
+// TODO erase output type from PreparedCommitProc without loosing type information and transparently to implementers
+use hyperast::store::defaults::NodeIdentifier as ProcessorOutput;
+// same but for erasing the store as it is associated with the output type
+use crate::preprocessed::RepositoryProcessor;
+// also erase the commit returned by the commit processor
+use crate::Commit;
+
 #[derive(Clone)]
 #[allow(unused)]
+#[allow(deprecated)]
+/// A config holding arbitrary parameters for a parametrized commit processor.
 pub struct ConfigParameters(std::rc::Rc<dyn std::any::Any>);
-pub trait Parametrized: ParametrizedCommitProc {
-    type T: 'static;
-    // Register a parameter to later be used by the processor,
-    // each identical (structurally) parameter should identify exactly one processor
-    fn register_param(&mut self, t: Self::T) -> ParametrizedCommitProcessorHandle;
+// pub trait Parametrized: ParametrizedCommitProc2 {
+//     type T: 'static;
+//     // Register a parameter to later be used by the processor,
+//     // each identical (structurally) parameter should identify exactly one processor
+//     fn register_param_erazed(&mut self, t: Self::T) -> PCPHandle {
+//         self.register_param(t).erase()
+//     }
+//     fn register_param(&mut self, t: Self::T) -> PCP2Handle<Self::Proc>;
+// }
+
+//
+//
+//
+//
+//
+//
+
+pub struct ProcessorHolder<Proc>(Vec<Proc>);
+impl<Proc> Default for ProcessorHolder<Proc> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
 }
-#[derive(Clone, Copy, Debug)]
-pub struct ConfigParametersHandle(pub usize);
-#[derive(Clone, Copy, Debug)]
-pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
+
+impl<Proc: CommitProcExt> ProcessorHolder<Proc> {
+    pub fn register_param<T: Into<Proc> + PartialEq<Proc>>(&mut self, t: T) -> PCP2Handle<Proc> {
+        let l = self.0.iter().position(|x| t.eq(x)).unwrap_or_else(|| {
+            let l = self.0.len();
+            self.0.push(t.into());
+            l
+        });
+        PCP2Handle(ConfigParametersHandle(l), PhantomData)
+    }
+}
+
+impl<Proc: CommitProcExt + 'static> ParametrizedCommitProc2 for ProcessorHolder<Proc> {
+    type Proc = Proc;
+
+    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
+        &mut self.0[parameters.0]
+    }
+
+    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
+        &self.0[parameters.0]
+    }
+}
+
+//
+//
+//
+//
+//
+
+/// Handle over a commit processor, resulting from type erasure when registering a commit processor.
 #[derive(Clone, Copy, Debug)]
 pub struct CommitProcessorHandle(pub(crate) std::any::TypeId);
+
+/// Handle over a set of configuration parameters for a parametrized commit processor.
+#[derive(Clone, Copy, Debug)]
+pub struct ConfigParametersHandle(
+    /// A unique identifier for the set of configuration parameters.
+    pub usize,
+);
+
+/// Parametrized handle over a commit processor, by composing [`CommitProcessorHandle`] and [`ConfigParametersHandle`].
+///
+/// If you want to easily refer to the specific commit processor type, use [`ParametrizedCommitProcessor2Handle`] instead.
+#[derive(Clone, Copy, Debug)]
+pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
+use ParametrizedCommitProcessorHandle as PCPHandle;
+
+/// Same as `ParametrizedCommitProcessorHandle`, but `CommitProcessorHandle` only exists at compile time.
+///
+/// If you want to store a [`ParametrizedCommitProcessor2Handle`] at runtime, use [`ParametrizedCommitProcessorHandle`] instead.
 #[derive(Debug)]
 pub struct ParametrizedCommitProcessor2Handle<T: CommitProcExt>(
     pub ConfigParametersHandle,
@@ -24,13 +97,13 @@ pub struct ParametrizedCommitProcessor2Handle<T: CommitProcExt>(
 );
 use ParametrizedCommitProcessor2Handle as PCP2Handle;
 
-impl<T: CommitProcExt> Eq for PCP2Handle<T> {}
-
 impl<T: CommitProcExt> PartialEq for PCP2Handle<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.0 == other.0.0 && self.1 == other.1
     }
 }
+
+impl<T: CommitProcExt> Eq for PCP2Handle<T> {}
 
 impl<T: CommitProcExt> Clone for PCP2Handle<T> {
     fn clone(&self) -> Self {
@@ -38,15 +111,16 @@ impl<T: CommitProcExt> Clone for PCP2Handle<T> {
     }
 }
 impl<T: CommitProcExt> Copy for PCP2Handle<T> {}
-impl<T: CommitProcExt> PCP2Handle<T> {
-    #[allow(unused)]
-    fn recover_handle(&self) -> ParametrizedCommitProcessorHandle {
-        ParametrizedCommitProcessorHandle(
-            CommitProcessorHandle(std::any::TypeId::of::<T::Holder>()),
+
+impl<T: CommitProcExt + 'static> PCP2Handle<T> {
+    pub(crate) fn erase(&self) -> PCPHandle {
+        PCPHandle(
+            CommitProcessorHandle(std::any::TypeId::of::<ProcessorHolder<T>>()),
             self.0,
         )
     }
 }
+
 impl<T: CommitProcExt> Deref for PCP2Handle<T> {
     type Target = ConfigParametersHandle;
 
@@ -54,45 +128,48 @@ impl<T: CommitProcExt> Deref for PCP2Handle<T> {
         &self.0
     }
 }
+
 pub trait CommitProc {
-    // TODO remove
+    // TODO remove, just for debugging dynamic dispatch
     fn p(&self) {
         dbg!()
     }
     fn prepare_processing<'repo>(
         &self,
         repository: &'repo git2::Repository,
-        commit_builder: crate::preprocessed::CommitBuilder,
-        param_handle: ParametrizedCommitProcessorHandle,
+        commit_builder: CommitBuilder,
+        param_handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo>;
 
     fn commit_count(&self) -> usize;
-    fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit>;
+    fn get_commit(&self, commit_oid: git2::Oid) -> Option<&Commit>;
+
+    // TODO move it to a separate trait
     fn get_precomp_query(&self) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
         None
     }
-    fn get_lang_handle(&self, _lang: &str) -> Option<ParametrizedCommitProcessorHandle> {
+    fn get_lang_handle(&self, _lang: &str) -> Option<PCPHandle> {
         None
     }
 }
 pub trait PreparedCommitProc {
-    fn process(
-        self: Box<Self>,
-        prepro: &mut crate::preprocessed::RepositoryProcessor,
-    ) -> NodeIdentifier;
+    fn process(self: Box<Self>, prepro: &mut RepositoryProcessor) -> ProcessorOutput;
 }
 pub trait CommitProcExt: CommitProc {
-    type Holder: ParametrizedCommitProc + Parametrized;
+    // type Holder: ParametrizedCommitProc + Parametrized;
     fn register_param(
-        h: &mut Self::Holder,
-        t: <Self::Holder as Parametrized>::T,
+        h: &mut ProcessorHolder<Self>,
+        t: impl Into<Self> + PartialEq<Self>,
     ) -> PCP2Handle<Self>
     where
         Self: Sized,
     {
-        PCP2Handle(h.register_param(t).1, PhantomData)
+        h.register_param(t)
     }
 }
+
+impl<T: CommitProc> CommitProcExt for T {}
+
 pub trait ParametrizedCommitProc: std::any::Any {
     fn erased_handle(&self) -> CommitProcessorHandle
     where
@@ -122,8 +199,7 @@ impl<T: ParametrizedCommitProc2> ParametrizedCommitProc for T {
 }
 
 pub type ProcessorMap = spreaded::ProcessorMap<Box<dyn spreaded::ErasableProcessor>>;
-use hyperast::store::defaults::NodeIdentifier;
-pub use spreaded::ErasableProcessor;
+pub use spreaded::ToErasedProc;
 
 mod spreaded {
     use super::*;
@@ -142,9 +218,6 @@ mod spreaded {
 
     unsafe impl<V> Send for ProcessorMap<V> {}
     unsafe impl<V> Sync for ProcessorMap<V> {}
-
-    // Should not need to be public
-    pub trait ErasableProcessor: Any + ToErasedProc + ParametrizedCommitProc {}
     pub trait ToErasedProc {
         fn to_erasable_processor(self: Box<Self>) -> Box<dyn ErasableProcessor>;
         fn as_mut_any(&mut self) -> &mut dyn Any;
@@ -162,7 +235,12 @@ mod spreaded {
             self
         }
     }
+
+    /// Trait for dynamic dispatch of processors.
+    /// Do not export it in the parent module, keeping it only public internally to this module.
+    pub trait ErasableProcessor: Any + ToErasedProc + ParametrizedCommitProc {}
     impl<T> ErasableProcessor for T where T: Any + ParametrizedCommitProc {}
+
     // NOTE crazy good stuff
     impl ProcessorMap<Box<dyn ErasableProcessor>> {
         pub fn by_id_mut(
@@ -212,26 +290,26 @@ mod spreaded {
         struct S(u8);
         #[derive(Clone, PartialEq, Eq)]
         struct S0(u8);
-        #[derive(Default)]
-        struct P0(Vec<P>);
-        struct P(S);
-        impl Parametrized for P0 {
-            type T = S;
-            fn register_param(&mut self, t: Self::T) -> ParametrizedCommitProcessorHandle {
-                let l = self.0.iter().position(|x| &x.0 == &t).unwrap_or_else(|| {
-                    let l = self.0.len();
-                    self.0.push(P(t));
-                    l
-                });
-                ParametrizedCommitProcessorHandle(self.erased_handle(), ConfigParametersHandle(l))
+
+        impl Into<P> for S {
+            fn into(self) -> P {
+                P(S(self.0))
             }
         }
+
+        impl PartialEq<P> for S {
+            fn eq(&self, other: &P) -> bool {
+                self == &other.0
+            }
+        }
+
+        struct P(S);
         impl CommitProc for P {
             fn prepare_processing(
                 &self,
                 repository: &git2::Repository,
                 tree_oid: crate::preprocessed::CommitBuilder,
-                param_handle: ParametrizedCommitProcessorHandle,
+                param_handle: PCPHandle,
             ) -> Box<dyn PreparedCommitProc> {
                 unimplemented!()
             }
@@ -244,31 +322,14 @@ mod spreaded {
                 unimplemented!()
             }
         }
-        impl CommitProcExt for P {
-            type Holder = P0;
-        }
-        // impl ParametrizedCommitProc for P0 {
-        //     fn get(&mut self, parameters: ConfigParametersHandle) -> &mut dyn CommitProc {
-        //         &mut self.0[parameters.0]
-        //     }
-        // }
 
-        impl ParametrizedCommitProc2 for P0 {
-            type Proc = P;
-            fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
-                &self.0[parameters.0]
-            }
-            fn with_parameters_mut(
-                &mut self,
-                parameters: ConfigParametersHandle,
-            ) -> &mut Self::Proc {
-                &mut self.0[parameters.0]
-            }
-        }
-
+        use super::CommitProcExt;
         let mut h = ProcessorMap::<Box<dyn ErasableProcessor>>::default();
         // The registered parameter is type checked
-        let hh = h.mut_or_default::<P0>().register_param(S(42));
+        let hh = h
+            .mut_or_default::<ProcessorHolder<P>>()
+            .register_param(S(42))
+            .erase();
         // You can easily store hh in any collection.
         // You can easily add a method to CommitProc.
         h.by_id_mut(&hh.0).unwrap().get_mut(hh.1).p();

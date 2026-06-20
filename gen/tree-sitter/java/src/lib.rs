@@ -7,7 +7,7 @@ pub mod bevy;
 #[cfg(feature = "impl")]
 pub mod legion_with_refs; // TODO rename and move to a module for construction
 
-#[cfg(all(test, feature = "legion"))]
+#[cfg(feature = "legion")]
 pub mod legion_ts_simp;
 
 cfg_if::cfg_if! { if #[cfg(feature = "types")] {

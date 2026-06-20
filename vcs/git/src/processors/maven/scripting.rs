@@ -1,10 +1,9 @@
 use hyperast::store::nodes::legion::RawHAST;
 
-use crate::{
-    preprocessed::RepositoryProcessor,
-    processing::erased::{CommitProcExt, ConfigParametersHandle, ParametrizedCommitProc2 as _},
-    processors::{java::JavaProc, maven::MavenModuleAcc},
-};
+use crate::processing::erased::{ConfigParametersHandle, ParametrizedCommitProc2 as _};
+use crate::processors::java::JavaProc;
+use crate::processors::maven::MavenModuleAcc;
+use crate::{preprocessed::RepositoryProcessor, processing::ProcessorHolder};
 
 pub(super) type ScriptingPrepro<'a, 'hast> = hyperast::scripting::Prepro<
     RawHAST<'hast, hyperast_gen_ts_java::TStore>,
@@ -38,7 +37,7 @@ pub(super) fn prep_scripting(
     prepro
         .processing_systems
         // it is fine but could do better and kind of use MavenHolder
-        .get::<<JavaProc as CommitProcExt>::Holder>()
+        .get::<ProcessorHolder<JavaProc>>()
         .as_ref()?
         .with_parameters(handle)
         .parameter

@@ -1,4 +1,5 @@
 mod make_processor;
+mod makefile;
 
 use std::{fmt::Debug, path::PathBuf};
 
@@ -8,12 +9,17 @@ use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
 use crate::processing::ObjectName;
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub(crate) use make_processor::MakeProc;
-// pub use make_processor::Parameter;
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct Parameter {
+    pub(crate) cpp_handle: PCP2Handle<super::cpp::CppProc>,
+}
 
 pub(crate) fn handle_makefile_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,

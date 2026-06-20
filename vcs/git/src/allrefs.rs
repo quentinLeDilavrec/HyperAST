@@ -22,8 +22,8 @@ use crate::{SimpleStores, maven::IterMavenModules, preprocessed::child_by_name_w
 
 const REFERENCES_SERIALIZATION_SUMMARY: bool = false;
 
-/// TODO before enabling, make sure the recusive reference search works, it is often needed for members eg. chained calls.
-/// By recusive search on for example methods, I mean searching for refs to members with type (including ret type) of containing class of prev member.
+/// TODO before enabling, make sure the recursive reference search works, it is often needed for members eg. chained calls.
+/// By recursive search on for example methods, I mean searching for refs to members with type (including ret type) of containing class of prev member.
 const SEARCH_MEMBERS: bool = false;
 
 type JavaIdN = hyperast_gen_ts_java::types::TIdN<NodeIdentifier>;

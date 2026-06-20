@@ -7,6 +7,10 @@ pub struct TStore;
 impl hyperast::store::TyDown<hyperast_gen_ts_cpp::TStore> for TStore {}
 #[cfg(feature = "java")]
 impl hyperast::store::TyDown<hyperast_gen_ts_java::TStore> for TStore {}
+#[cfg(feature = "python")]
+impl hyperast::store::TyDown<hyperast_gen_ts_python::TStore> for TStore {}
+// #[cfg(feature = "file_sys")]
+// impl hyperast::store::TyDown<crate::processors::file_sys::TStore> for TStore {}
 #[cfg(feature = "maven")]
 impl hyperast::store::TyDown<hyperast_gen_ts_xml::TStore> for TStore {}
 

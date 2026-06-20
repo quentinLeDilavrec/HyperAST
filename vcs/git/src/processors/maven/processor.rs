@@ -17,18 +17,16 @@ use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
-use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::caches::Maven as MavenCaches;
+use crate::processing::erased::CommitProc;
 use crate::processing::erased::CommitProcessorHandle;
 use crate::processing::erased::ConfigParametersHandle;
-use crate::processing::erased::Parametrized;
-use crate::processing::erased::ParametrizedCommitProc;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::PreparedCommitProc;
-use crate::processing::erased::{CommitProc, CommitProcExt};
 use crate::processing::file_sys;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::processing::{ParametrizedCommitProcessorHandle as PCPHandle, ProcessorHolder};
 use crate::utils::drain_filter_strip;
 
 use super::JavaProc;
@@ -47,16 +45,28 @@ pub struct MavenProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     handle: PCPHandle,
 }
 
-#[derive(Default)]
-pub struct MavenProcessorHolder(Vec<MavenProc>);
+type MavenProcessorHolder = crate::processing::ProcessorHolder<MavenProc>;
+
 pub struct MavenProc {
     parameter: super::Parameter,
     cache: MavenCaches,
     commits: HashMap<git2::Oid, crate::Commit>,
 }
 
-impl CommitProcExt for MavenProc {
-    type Holder = MavenProcessorHolder;
+impl From<super::Parameter> for MavenProc {
+    fn from(parameter: super::Parameter) -> Self {
+        Self {
+            parameter,
+            cache: MavenCaches::default(),
+            commits: HashMap::default(),
+        }
+    }
+}
+
+impl PartialEq<MavenProc> for super::Parameter {
+    fn eq(&self, other: &MavenProc) -> bool {
+        self == &other.parameter
+    }
 }
 
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
@@ -444,24 +454,6 @@ pub(crate) fn prepare_dir_exploration(
     children_objects
 }
 
-impl Parametrized for MavenProcessorHolder {
-    type T = super::Parameter;
-    fn register_param(&mut self, t: Self::T) -> PCPHandle {
-        let l = (self.0.iter())
-            .position(|x| &x.parameter == &t)
-            .unwrap_or_else(|| {
-                let l = self.0.len();
-                self.0.push(MavenProc {
-                    parameter: t,
-                    cache: Default::default(),
-                    commits: Default::default(),
-                });
-                l
-            });
-        PCPHandle(self.erased_handle(), ConfigParametersHandle(l))
-    }
-}
-
 struct PreparedMavenCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: CommitBuilder,
@@ -476,7 +468,7 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
         let dir_path = PathBuf::from("");
         let mut dir_path = dir_path.components().peekable();
         let name = b"";
-        // TODO check parameter in self to know it is a recusive module search
+        // TODO check parameter in self to know it is a recursive module search
         let root_full_node = MavenProcessor::<true, false, MavenModuleAcc>::prepare(
             self.repository,
             prepro,
@@ -525,7 +517,7 @@ impl CommitProc for MavenProc {
         if lang.eq_ignore_ascii_case("java") {
             // TODO Factorize that
             Some(PCPHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<<JavaProc as CommitProcExt>::Holder>()),
+                CommitProcessorHandle(std::any::TypeId::of::<ProcessorHolder<JavaProc>>()),
                 self.parameter.java_handle.0,
             ))
         } else if lang.eq_ignore_ascii_case("cpp") {
@@ -536,18 +528,6 @@ impl CommitProc for MavenProc {
         } else {
             None
         }
-    }
-}
-
-impl ParametrizedCommitProc2 for MavenProcessorHolder {
-    type Proc = MavenProc;
-
-    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
-        &mut self.0[parameters.0]
-    }
-
-    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
-        &self.0[parameters.0]
     }
 }
 

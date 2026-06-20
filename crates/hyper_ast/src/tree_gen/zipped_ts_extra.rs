@@ -383,16 +383,16 @@ where
         parent: &mut Self::Acc,
         global: &mut Self::Global,
         text: &Self::Text,
-        acc: Self::Acc,
+        mut acc: Self::Acc,
     ) {
         let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
         if global.sum_byte_length() < acc.end_byte {
-            // It's an issue with TreeSitter and the grammar you are using, it rarely append, I have only seen C++ goes that bad.
-            // Look at the Cpp generator for one way to handle this.
-            panic!(
-                "It's bad your skipping non-whitespace characters, you should choose a way of handling this."
-            )
-            // TODO for maximum resilience, should be handled by default, but it looks like a bug from TreeSitter.
+            // Only create an error node if tree-sitter is skipping non-whitespaces.
+            // the error node takes the span to realign for next leaf node
+            if super::try_get_spacing(global.sum_byte_length(), acc.end_byte, text).is_none() {
+                acc.push(self.make_error(global, &text[global.sum_byte_length()..acc.end_byte]));
+                global.set_sum_byte_length(acc.end_byte);
+            }
         }
         if let Some(spacing) = spacing {
             parent.push(self.make_space(global, &spacing));
@@ -474,6 +474,56 @@ where
             Ok((hashs, line_count)) => self.extra.from_cache(id, || node(hashs, line_count)),
             Err(hashs) => self.extra.from_cache(id, || {
                 let line_count = spacing
+                    .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
+                    .count();
+                let line_count = num::cast(line_count).expect("too many newlines");
+                node(hashs(), line_count)
+            }),
+        }
+    }
+
+    fn make_error(
+        &mut self,
+        global: &<Self as TreeGen>::Global,
+        text: &[u8],
+    ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
+        let kind = TS::Ty2::error();
+        let interned_kind = TS::intern(kind);
+        // debug_assert_eq!(kind, TS::resolve(interned_kind));
+        let text = std::str::from_utf8(text).unwrap().to_string();
+        let dedup = &mut self.stores.node_store.dedup;
+        let node_store = &mut self.stores.node_store.inner;
+        let label_store = &mut self.stores.label_store;
+        let line_break = &self.line_break;
+        let (id, res) = super::utils_ts::_make_leaf::<TS>(
+            node_store,
+            label_store,
+            dedup,
+            line_break,
+            interned_kind,
+            &text,
+            |h| h.build(),
+            |_| {},
+        );
+        let node = |hashs, line_count| FullNode {
+            global: global.simple(),
+            local: Local {
+                compressed_node: id,
+                metrics: super::SubTreeMetrics {
+                    size: 1,
+                    height: 0,
+                    size_no_spaces: 0,
+                    hashs,
+                    line_count,
+                },
+                role: None,
+            },
+        };
+        // TODO test perf if lookup fail is costly for not caching spaces
+        match res {
+            Ok((hashs, line_count)) => self.extra.from_cache(id, || node(hashs, line_count)),
+            Err(hashs) => self.extra.from_cache(id, || {
+                let line_count = text
                     .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
                     .count();
                 let line_count = num::cast(line_count).expect("too many newlines");

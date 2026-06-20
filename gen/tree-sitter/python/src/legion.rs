@@ -4,9 +4,12 @@
 
 use hyperast::tree_gen::zipped_ts_extra::TsTreeGen;
 
-use crate::TStore;
+use crate::{TStore, Type};
 
 pub type PythonTreeGen<'store, 'b, Extra> = TsTreeGen<'store, 'b, TStore, Extra, true>;
+
+pub type Local = hyperast::tree_gen::zipped_ts_extra::Local;
+pub type Acc = hyperast::tree_gen::zipped_ts_extra::Acc<Type>;
 
 #[test]
 fn medium_extra_pattern_precomp() {

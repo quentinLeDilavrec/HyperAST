@@ -3,8 +3,8 @@
 pub mod cpp;
 #[cfg(feature = "java")]
 pub mod java;
-// #[cfg(feature = "python")]
-// pub mod python;
+#[cfg(feature = "python")]
+pub mod python;
 
 // # build systems
 #[cfg(feature = "make")]

@@ -11,6 +11,7 @@ git2 = { version = "0.19", features = ["vendored-libgit2", "vendored-openssl"] }
 tree-sitter = { workspace = true }
 hyperast_gen_ts_cpp = { workspace = true, optional = true }
 hyperast_gen_ts_java = { workspace = true, optional = true }
+hyperast_gen_ts_python = { workspace = true, optional = true }
 hyperast_gen_ts_xml = { workspace = true, optional = true }
 hyperast = { workspace = true }
 hyperast_tsquery = { workspace = true }
@@ -58,6 +59,7 @@ ts = []
 # cargo_rust = []
 # cargo = []
 # rust = []
+python = ["dep:hyperast_gen_ts_python"]
 impact = []
 subtree-stats = [
     "hyperast/subtree-stats",

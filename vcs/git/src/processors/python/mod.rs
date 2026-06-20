@@ -16,13 +16,21 @@ use hyperast_gen_ts_python::legion as python_tree_gen;
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 
 pub(crate) use processor::PythonProc;
-pub use processor::SUB_QUERIES; // To remove, at least in the current form
 
 type FullNode = (python_tree_gen::Local, PrecompQueries);
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
     pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
+}
+
+impl Parameter {
+    pub(crate) fn with_query(query: impl Into<hyperast_tsquery::ZeroSepArrayStr>) -> Self {
+        Self {
+            query: Some(query.into()),
+            ..Default::default()
+        }
+    }
 }
 
 type PrecompQueries = tree_gen::extra_pattern_precomp::PrecompQueries;

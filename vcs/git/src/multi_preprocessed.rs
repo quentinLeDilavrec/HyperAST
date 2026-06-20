@@ -312,6 +312,13 @@ impl PreProcessedRepositories {
                 let config = h.register_param(t).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
+            RepoConfig::Python => {
+                let processor_map = &mut self.processor.processing_systems;
+                let h_python = processor_map.mut_or_default::<PythonProcessorHolder>();
+                let t = crate::processors::python::Parameter::with_query(query);
+                let config = h_python.register_param(t).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
             _ => todo!(),
         };
         self.configs.insert(r.spec.clone(), r.config);

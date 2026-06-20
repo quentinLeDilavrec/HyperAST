@@ -2,7 +2,7 @@ use hyperast::store::nodes::legion::RawHAST;
 
 use hyperast_gen_ts_java::legion_with_refs::Acc;
 
-use crate::utils::Str;
+use crate::{processors::Query, utils::Str};
 
 use super::{JavaProc, TStore};
 
@@ -44,7 +44,7 @@ impl PartialEq<JavaProc> for Parameter {
 fn make_proc(t: Parameter) -> JavaProc {
     let query = t.query.as_ref().map(|q| {
         use hyperast_tsquery::ArrayStr;
-        Query::new(q.iter())
+        Query::new(q.iter(), hyperast_gen_ts_java::language())
     });
 
     #[cfg(feature = "tsg")]
@@ -111,23 +111,3 @@ type ErazedTSG = Box<dyn std::any::Any + Send + Sync>;
 type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, TS>, Acc>;
 
 pub type GraphQuery<'a> = tree_sitter_graph::ast::File<M<'a, TStore, &'a Acc>>;
-
-#[derive(Clone)]
-pub(crate) struct Query(pub(crate) hyperast_tsquery::Query, Str);
-
-impl PartialEq for Query {
-    fn eq(&self, other: &Self) -> bool {
-        self.1 == other.1
-    }
-}
-impl Eq for Query {}
-
-impl Query {
-    pub(crate) fn new<'a>(precomputeds: impl Iterator<Item = &'a str>) -> Self {
-        use crate::precomp_patterns::only_parse_query_precomp;
-        let language = hyperast_gen_ts_java::language();
-        let precomputeds = precomputeds.collect::<Vec<_>>();
-        let precomp = only_parse_query_precomp(precomputeds.as_slice(), language);
-        Self(precomp.unwrap(), precomputeds.join("\n").into())
-    }
-}

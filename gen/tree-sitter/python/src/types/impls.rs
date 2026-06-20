@@ -53,7 +53,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
         }
 
         fn is_leaf(self) -> bool {
-            false
+            self == Self::String
         }
     }
 
@@ -359,7 +359,7 @@ impl HyperType for Type {
         From::<&'static dyn LangRef<Self>>::from(&Lang)
     }
     fn lang_ref(&self) -> hyperast::types::LangWrapper<AnyType> {
-        todo!()
+        hyperast::types::LangWrapper::from(&Lang as &(dyn LangRef<AnyType> + 'static))
     }
 }
 impl TypeTrait for Type {

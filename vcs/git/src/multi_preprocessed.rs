@@ -180,6 +180,7 @@ impl PreProcessedRepositories {
                 let config = java(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
+            #[cfg(feature = "python")]
             RepoConfig::Python => {
                 let processor_map = &mut self.processor.processing_systems;
                 let config = python(processor_map).erase();

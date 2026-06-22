@@ -60,12 +60,12 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
     for FileSysProcessor<'a, 'b, 'c, RMS, FFWD, FileSysAcc>
 {
     fn pre(&mut self, current_dir: BasicGitObject) {
-        let (oid, name) = match current_dir {
-            BasicGitObject::Tree(oid, name) => {
-                self.handle_tree_cached(name, oid);
-                return;
-            }
-            BasicGitObject::Blob(oid, name) => (oid, name),
+        log::trace!("pre: {:?}", current_dir.name.try_str().unwrap_or(""));
+        let oid = current_dir.oid;
+        let name = current_dir.name;
+        if current_dir.kind == git2::ObjectType::Tree {
+            self.handle_tree_cached(name, oid);
+            return;
         };
         if FFWD {
             return;

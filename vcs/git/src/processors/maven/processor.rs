@@ -103,13 +103,20 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
     for MavenProcessor<'a, 'b, 'c, RMS, FFWD, MavenModuleAcc>
 {
     fn pre(&mut self, current_dir: BasicGitObject) {
-        if let BasicGitObject::Tree(oid, name) = current_dir {
+        log::trace!("pre: {:?}", current_dir.name.try_str().unwrap_or(""));
+        let oid = current_dir.oid;
+        let name = current_dir.name;
+        if current_dir.kind == git2::ObjectType::Tree {
             self.handle_tree_cached(name, oid);
-        } else if let BasicGitObject::Blob(oid, name) = current_dir
-            && !FFWD
-            && self.dir_path.peek().is_none()
-            && file_sys::Pom::matches(&name)
-        {
+            return;
+        };
+        if FFWD {
+            return;
+        }
+        if self.dir_path.peek().is_some() {
+            return;
+        }
+        if file_sys::Pom::matches(&name) {
             let parent_acc = &mut self.stack.last_mut().unwrap().acc;
             // TODO find a better conversion, ie. first safe conv to MavenProc handle then into()
             let parameters = PCP2Handle(ConfigParametersHandle(0), PhantomData);
@@ -446,9 +453,8 @@ pub(crate) fn prepare_dir_exploration(
         .filter_map(Result::ok)
         .collect::<Vec<_>>();
     if dir_path.peek().is_none() {
-        let p = children_objects.iter().position(|x| match x {
-            BasicGitObject::Blob(_, n) => file_sys::Pom::matches(&n),
-            _ => false,
+        let p = children_objects.iter().position(|x: &BasicGitObject| {
+            git2::ObjectType::Blob == x.kind && file_sys::Pom::matches(&x.name)
         });
         if let Some(p) = p {
             children_objects.swap(0, p); // priority to pom.xml processing

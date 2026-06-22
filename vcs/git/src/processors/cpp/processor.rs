@@ -57,13 +57,12 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> CppProcessor<'repo, 'prepro, 'd,
 
 impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, CppAcc> {
     fn pre(&mut self, current_object: BasicGitObject) {
-        let (oid, name) = match current_object {
-            BasicGitObject::Tree(oid, name) => {
-                self.handle_tree_cached(oid, name);
-                return;
-            }
-            BasicGitObject::Blob(oid, name) => (oid, name),
-        };
+        let oid = current_object.oid;
+        let name = current_object.name;
+        if current_object.kind == git2::ObjectType::Tree {
+            self.handle_tree_cached(oid, name);
+            return;
+        }
         if super::selection::matches(&name) {
             self.prepro
                 .help_handle_cpp_file(

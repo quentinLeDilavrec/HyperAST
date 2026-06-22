@@ -2,8 +2,8 @@
 
 mod caches;
 mod commit_proc;
-mod cpp_processor;
 mod impls;
+mod processor;
 pub mod selection;
 
 use hyperast::store::defaults::LabelIdentifier;

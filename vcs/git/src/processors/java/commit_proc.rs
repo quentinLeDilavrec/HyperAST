@@ -15,7 +15,7 @@ use crate::processing::erased::PreparedCommitProc;
 use super::JavaAcc;
 use super::JavaProc;
 use super::JavaProcessorHolder;
-use super::java_processor::JavaProcessor;
+use super::processor::JavaProcessor;
 
 impl crate::processing::erased::CommitProc for JavaProc {
     fn get_commit(&self, commit_oid: Oid) -> Option<&crate::Commit> {

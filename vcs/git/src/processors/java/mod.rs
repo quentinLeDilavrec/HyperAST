@@ -2,8 +2,8 @@
 
 pub mod caches;
 mod commit_proc;
-mod java_processor;
 mod parameters;
+mod processor;
 pub mod selection;
 
 use hyperast::store::defaults::LabelIdentifier;

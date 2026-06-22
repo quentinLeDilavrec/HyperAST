@@ -18,17 +18,14 @@ pub struct ParametrizedCommitProcessorHandle(
 #[derive(Clone, Copy, Debug)]
 pub struct VersionProcessorHandle(std::any::TypeId);
 #[derive(Debug)]
-pub struct ParametrizedCommitProcessor2Handle<T>(
-    pub ConfigParametersHandle,
-    pub(crate) PhantomData<T>,
-);
-impl<T> Clone for ParametrizedCommitProcessor2Handle<T> {
+pub struct ParametrizedProcessor2Handle<T>(pub ConfigParametersHandle, pub(crate) PhantomData<T>);
+impl<T> Clone for ParametrizedProcessor2Handle<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone(), self.1.clone())
     }
 }
-impl<T> Copy for ParametrizedCommitProcessor2Handle<T> {}
-impl<T: VersionProcExt> ParametrizedCommitProcessor2Handle<T> {
+impl<T> Copy for ParametrizedProcessor2Handle<T> {}
+impl<T: VersionProcExt> ParametrizedProcessor2Handle<T> {
     fn recover_handle(&self) -> ParametrizedCommitProcessorHandle {
         ParametrizedCommitProcessorHandle(
             VersionProcessorHandle(std::any::TypeId::of::<T::Holder>()),
@@ -37,7 +34,7 @@ impl<T: VersionProcExt> ParametrizedCommitProcessor2Handle<T> {
     }
 }
 
-impl<T> Deref for ParametrizedCommitProcessor2Handle<T> {
+impl<T> Deref for ParametrizedProcessor2Handle<T> {
     type Target = ConfigParametersHandle;
 
     fn deref(&self) -> &Self::Target {
@@ -77,11 +74,11 @@ pub trait VersionProcExt: VersionProc<Self::S, Self::V> {
     fn register_param(
         h: &mut Self::Holder,
         t: <Self::Holder as Parametrized<Self::S, Self::V>>::T,
-    ) -> ParametrizedCommitProcessor2Handle<Self>
+    ) -> ParametrizedProcessor2Handle<Self>
     where
         Self: Sized,
     {
-        ParametrizedCommitProcessor2Handle(h.register_param(t).1, PhantomData)
+        ParametrizedProcessor2Handle(h.register_param(t).1, PhantomData)
     }
 }
 

@@ -29,7 +29,8 @@ impl MavenModuleAcc {
 }
 
 // TODO generalize and factor similar preps
-// and use the type in ParametrizedCommitProcessor2Handle to get the Holder
+// and use the type in Parametrized
+//Processor2Handle to get the Holder
 pub(super) fn prep_scripting(
     prepro: &RepositoryProcessor,
     handle: ConfigParametersHandle,

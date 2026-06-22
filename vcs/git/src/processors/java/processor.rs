@@ -20,7 +20,7 @@ use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
 use crate::processing::erased::ConfigParametersHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
-use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::{Processor, StackEle};
 
 use super::JavaProc;
@@ -178,7 +178,8 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
 }
 
 // TODO generalize and factor similar preps
-// and use the type in ParametrizedCommitProcessor2Handle to get the Holder
+// and use the type in Parametrized
+//Processor2Handle to get the Holder
 fn prep_scripting(
     prepro: &RepositoryProcessor,
     handle: ConfigParametersHandle,

@@ -9,7 +9,7 @@ use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
 use crate::processing::ObjectName;
-use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub(crate) use make_processor::MakeProc;

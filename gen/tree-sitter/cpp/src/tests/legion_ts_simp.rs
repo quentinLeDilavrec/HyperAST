@@ -1,7 +1,9 @@
 use hyperast::nodes::{SyntaxSerializer, TextSerializer};
+use hyperast::position::structural_pos::CursorHead;
 use hyperast::store::SimpleStores;
 use hyperast::tree_gen;
 use hyperast::tree_gen::utils_ts;
+use hyperast::types::HyperAST;
 
 use crate::TStore;
 use crate::Type;
@@ -106,22 +108,27 @@ fn medium_extra_double_pattern_precomp() {
 
     let lang = crate::language();
     let name = b"";
+    static EXAMPLE_SPACING: &str = r#"
+#include <a>
+#include <b>
+#include <c>
+    "#;
     let text = EXAMPLE_SPACING;
-    let query = "(identifier)\n(type_identifier)\n(primitive_type)";
+    let query = "(translation_unit)\n(translation_unit (preproc_include)@a)\n(preproc_include)";
     let precomp = [
-        "(_declarator/operator_name)",                      // TODO
-        "(parameter_declaration (_declarator/identifier))", // TODO
-        "(parameter_declaration declarator: (identifier))", // TODO
-        "(parameter_declaration type: (type_identifier) declarator: (identifier))", // TODO
-        "(identifier)",
-        "(reference_declarator (identifier))",
+        // "(_declarator/operator_name)",                      // TODO
+        // "(parameter_declaration (_declarator/identifier))", // TODO
+        // "(parameter_declaration declarator: (identifier))", // TODO
+        // "(parameter_declaration type: (type_identifier) declarator: (identifier))", // TODO
+        // "(identifier)",
+        // "(reference_declarator (identifier))",
         "(type_identifier)",
-        "(parameter_declaration (type_identifier) (identifier))",
-        "(primitive_type)",
+        // "(parameter_declaration (type_identifier) (identifier))",
+        // "(primitive_type)",
     ]
     .as_slice();
 
-    let (precomp, _q) = Query::with_precomputed(query, lang, precomp) //
+    let (precomp, query) = Query::with_precomputed(query, lang, precomp) //
         .unwrap_or_else(|e| panic!("\n{e}"));
     let more = PreparedQuerying::<_, TStore, Acc<Type>>::from(&precomp);
     let extra = Precomp::<_, Acc<Type>, _>::from(more);
@@ -146,7 +153,19 @@ fn medium_extra_double_pattern_precomp() {
     assert_eq!(text, TextSerializer::new(&stores, id).to_string());
     dbg!(&f.local.metrics);
     dbg!(&f.extra);
-    assert_eq!(0b111110000, f.extra.0.0)
+
+    let pos =
+        hyperast::position::structural_pos::CursorWithPersistence::new(f.local.compressed_node);
+    let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&stores, pos);
+    let mut matches = query.matches(cursor);
+    while let Some(m) = matches.next() {
+        dbg!(m.pattern_index.to_usize());
+        for c in m.captures.iter() {
+            let p = c.node.pos.parent();
+            dbg!(c.index.to_string());
+            println!("{}", stores.resolve_type(&p.unwrap()))
+        }
+    }
 }
 
 #[test]

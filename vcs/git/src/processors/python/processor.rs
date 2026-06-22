@@ -87,7 +87,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
         let key = (oid, name.as_bytes().into());
         let name = self.prepro.get_or_insert_label(name);
         let processor_map = &mut self.prepro.processing_systems;
-        let holder = processor_map.mut_or_default::<PythonProcessorHolder>();
+        let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle.0);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
         proc.cache.object_map.insert(key, full_node.clone());
@@ -113,7 +113,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
 impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> {
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
         let processor_map = &mut self.prepro.processing_systems;
-        let holder = processor_map.mut_or_default::<PythonProcessorHolder>();
+        let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle.0);
         if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
@@ -212,7 +212,7 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
         );
         let h = prepro
             .processing_systems
-            .mut_or_default::<PythonProcessorHolder>();
+            .commit_proc_mut::<PythonProcessorHolder>();
         let handle = self.handle;
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
@@ -241,7 +241,7 @@ impl RepositoryProcessor {
         self.processing_systems
             .caching_blob_handler::<super::file_sys::Python>()
             .handle2(oid, repository, &name, parameters, |c, n, t| {
-                let holder = c.mut_or_default::<PythonProcessorHolder>();
+                let holder = c.commit_proc_mut::<PythonProcessorHolder>();
                 let proc = holder.with_parameters_mut(parameters.0);
                 let stores = self.main_stores.mut_with_ts::<TStore>();
                 let r = handle_python_blob_aux(n, t, proc, stores)

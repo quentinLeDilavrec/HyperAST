@@ -511,7 +511,7 @@ impl PreProcessedRepository {
         processing_ordered_commits
     }
 
-    // TODO auto detect and selectect processor,
+    // TODO auto detect and select processor,
     // TODO pass processor as dyn param
     pub fn pre_process_make_project(
         &mut self,
@@ -538,7 +538,7 @@ pub(crate) trait CommitProcessor<Sys> {
     /// In a codebase such module system can help with compile time.
     /// In rust to avoid loosing performances you might have to enable link time optimizations (lto).
     ///
-    /// RMS: Resursive Module Search
+    /// RMS: Recursive Module Search
     fn handle_module<'b, const RMS: bool>(
         &mut self,
         repository: &Repository,
@@ -573,8 +573,8 @@ pub trait IdHolder {
 
 /// Help building a commit, also measure time and memory usage
 ///
-/// WARN the memory usage is actually the diference of heap size between the start and end of processing,
-/// and it would be biased by concurent building (not possible at the time of writing this warning)
+/// WARN the memory usage is actually the difference of heap size between the start and end of processing,
+/// and it would be biased by concurrent building (not possible at the time of writing this warning)
 pub struct CommitBuilder {
     commit_oid: git2::Oid,
     tree_oid: git2::Oid,

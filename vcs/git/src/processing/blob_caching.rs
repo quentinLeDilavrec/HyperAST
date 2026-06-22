@@ -1,11 +1,11 @@
 use git2::{Oid, Repository};
 use std::marker::PhantomData;
 
-use crate::processing::ProcessorHolder;
-
 use super::ParametrizedProcessor2Handle;
-use super::erased::CommitProcExt;
+use super::ProcessorHolder;
+use super::erased::CommitProc;
 use super::erased::ParametrizedCommitProc2;
+use super::erased::ParametrizedProc2 as _;
 use super::erased::ProcessorMap;
 use super::{CacheHolding, CachesHolding, ObjectMapper};
 
@@ -33,7 +33,6 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         wrapped: F,
     ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where
-        T: CommitProcExt,
         E: From<std::str::Utf8Error>,
         F: FnOnce(&mut ProcessorMap, &N, &[u8]) -> Result<<Sys::Caches as ObjectMapper>::V, E>,
         //
@@ -45,8 +44,8 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         T: Send + Sync + 'static,
         T: CacheHolding<Sys::Caches>,
     {
-        let caches = self.processors.mut_or_default::<ProcessorHolder<T>>();
-        let caches = caches.with_parameters_mut(parameters.0);
+        let caches = self.processors.proc_mut::<ProcessorHolder<T>>();
+        let caches = caches.with_parameters_mut0(parameters.0);
         let caches = caches.get_caches_mut();
         use crate::processing::ObjectMapper;
         if let Some(already) = caches.get(&oid) {
@@ -66,8 +65,8 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         if let Ok(x) = &full_node {
             self.processors
                 // .mut_or_default::<Sys::Holder>().get_caches_mut()
-                .mut_or_default::<ProcessorHolder<T>>()
-                .with_parameters_mut(parameters.0)
+                .proc_mut::<ProcessorHolder<T>>()
+                .with_parameters_mut0(parameters.0)
                 .get_caches_mut()
                 .insert(oid, x.clone());
         }
@@ -83,7 +82,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         wrapped: F,
     ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where
-        T: CommitProcExt,
+        T: CommitProc,
         N: Clone,
         E: From<std::str::Utf8Error>,
         F: FnOnce(&mut ProcessorMap, &N, &[u8]) -> Result<<Sys::Caches as ObjectMapper>::V, E>,
@@ -96,7 +95,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         T: Send + Sync + 'static,
         T: CacheHolding<Sys::Caches>,
     {
-        let caches = self.processors.mut_or_default::<ProcessorHolder<T>>();
+        let caches = self.processors.commit_proc_mut::<ProcessorHolder<T>>();
         let caches = caches.with_parameters_mut(parameters.0);
         let caches = caches.get_caches_mut();
         use crate::processing::ObjectMapper;
@@ -130,7 +129,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         let full_node = wrapped(self.processors, &name, text);
         if let Ok(x) = &full_node {
             self.processors
-                .mut_or_default::<ProcessorHolder<T>>()
+                .commit_proc_mut::<ProcessorHolder<T>>()
                 .with_parameters_mut(parameters.0)
                 .get_caches_mut()
                 .insert((oid, name.clone()), x.clone());

@@ -3,14 +3,10 @@ use std::marker::PhantomData;
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
 use crate::ParseErr;
-use crate::preprocessed::CommitBuilder;
 use crate::processing::CacheHolding;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::caches::Pom as PomCaches;
-use crate::processing::erased::CommitProc;
-use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
-use crate::processing::erased::PreparedCommitProc;
 
 use super::MavenProc;
 use super::POM;
@@ -100,24 +96,24 @@ impl crate::preprocessed::RepositoryProcessor {
     }
 }
 
-impl CommitProc for PomProc {
-    fn prepare_processing(
-        &self,
-        _repository: &git2::Repository,
-        _commit_builder: CommitBuilder,
-        _param_handle: PCPHandle,
-    ) -> Box<dyn PreparedCommitProc> {
-        unimplemented!("required for processing at the root of a project")
-    }
+// impl CommitProc for PomProc {
+//     fn prepare_processing(
+//         &self,
+//         _repository: &git2::Repository,
+//         _commit_builder: CommitBuilder,
+//         _param_handle: PCPHandle,
+//     ) -> Box<dyn PreparedCommitProc> {
+//         unimplemented!("required for processing at the root of a project")
+//     }
 
-    fn get_commit(&self, _commit_oid: git2::Oid) -> Option<&crate::Commit> {
-        unimplemented!("required for processing at the root of a project")
-    }
+//     fn get_commit(&self, _commit_oid: git2::Oid) -> Option<&crate::Commit> {
+//         unimplemented!("required for processing at the root of a project")
+//     }
 
-    fn commit_count(&self) -> usize {
-        unimplemented!()
-    }
-}
+//     fn commit_count(&self) -> usize {
+//         unimplemented!()
+//     }
+// }
 
 impl CacheHolding<PomCaches> for PomProc {
     fn get_caches_mut(&mut self) -> &mut PomCaches {

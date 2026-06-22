@@ -63,17 +63,14 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
         let (oid, name) = match current_dir {
             BasicGitObject::Tree(oid, name) => {
                 self.handle_tree_cached(name, oid);
-                dbg!(self.stack.len());
                 return;
             }
             BasicGitObject::Blob(oid, name) => (oid, name),
         };
         if FFWD {
-            dbg!(name.try_str().unwrap());
             return;
         }
         if self.dir_path.peek().is_some() {
-            dbg!(name.try_str().unwrap());
             return;
         }
         self.pre_aux(oid, &name).unwrap();
@@ -82,7 +79,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
         let name = acc.primary.name.clone();
         let full_node = make(acc, self.prepro.main_stores_mut().mut_with_ts());
         let cache = (self.prepro.processing_systems)
-            .mut_or_default::<FileSysProcessorHolder>()
+            .commit_proc_mut::<FileSysProcessorHolder>()
             .with_parameters_mut(self.handle.1)
             .get_caches_mut();
         cache.object_map.insert(oid, full_node.clone());
@@ -128,7 +125,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return;
         }
         let proc = (self.prepro.processing_systems)
-            .mut_or_default::<FileSysProcessorHolder>()
+            .commit_proc_mut::<FileSysProcessorHolder>()
             .with_parameters_mut(self.handle.1);
         if let Some(already) = proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
@@ -148,7 +145,6 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     }
 
     fn pre_aux(&mut self, oid: Oid, name: &ObjectName) -> Result<(), crate::ParseErr> {
-        dbg!(name.try_str().unwrap());
         if crate::processing::file_sys::MakeFile::matches(&name) {
             // TODO reintroduce, but without any build-sys-level analysis
             // self.prepro

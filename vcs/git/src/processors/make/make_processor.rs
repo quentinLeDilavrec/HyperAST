@@ -107,7 +107,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
         let full_node = Self::make(acc, self.prepro.main_stores_mut().mut_with_ts());
         self.prepro
             .processing_systems
-            .mut_or_default::<MakeProcessorHolder>()
+            .commit_proc_mut::<MakeProcessorHolder>()
             .with_parameters_mut(self.handle.1)
             .get_caches_mut()
             .object_map
@@ -161,7 +161,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         let make_proc = self
             .prepro
             .processing_systems
-            .mut_or_default::<MakeProcessorHolder>()
+            .commit_proc_mut::<MakeProcessorHolder>()
             .with_parameters_mut(self.handle.1);
         let cpp_handle = make_proc.parameter.cpp_handle;
         if let Some(already) = make_proc.get_caches_mut().object_map.get(&oid) {
@@ -395,7 +395,7 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
         .process();
         let h = prepro
             .processing_systems
-            .mut_or_default::<MakeProcessorHolder>();
+            .commit_proc_mut::<MakeProcessorHolder>();
         let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);

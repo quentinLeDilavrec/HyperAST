@@ -127,7 +127,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
         log::info!("tree size: {}", full_node.metrics.size);
         self.prepro
             .processing_systems
-            .mut_or_default::<MavenProcessorHolder>()
+            .commit_proc_mut::<MavenProcessorHolder>()
             .with_parameters_mut(self.handle.1)
             .get_caches_mut()
             .object_map
@@ -197,7 +197,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         let maven_proc = self
             .prepro
             .processing_systems
-            .mut_or_default::<MavenProcessorHolder>()
+            .commit_proc_mut::<MavenProcessorHolder>()
             .with_parameters_mut(self.handle.1);
         let java_handle = maven_proc.parameter.java_handle;
         if let Some(already) = maven_proc.get_caches_mut().object_map.get(&oid) {
@@ -484,7 +484,7 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
         .process();
         let h = prepro
             .processing_systems
-            .mut_or_default::<MavenProcessorHolder>();
+            .commit_proc_mut::<MavenProcessorHolder>();
         let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);

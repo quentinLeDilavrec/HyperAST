@@ -107,7 +107,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
         let holder = self
             .prepro
             .processing_systems
-            .mut_or_default::<JavaProcessorHolder>();
+            .commit_proc_mut::<JavaProcessorHolder>();
         let java_proc = holder.with_parameters_mut(self.handle.0);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
         java_proc.cache.object_map.insert(key, full_node.clone());
@@ -141,7 +141,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
 impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     fn handle_dir(&mut self, oid: Oid, name: ObjectName) {
         let java_proc = (self.prepro.processing_systems)
-            .mut_or_default::<JavaProcessorHolder>()
+            .commit_proc_mut::<JavaProcessorHolder>()
             .with_parameters(self.handle.0);
         let k = (oid, name.clone());
         if let Some(already) = java_proc.cache.object_map.get(&k) {
@@ -342,9 +342,9 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
 impl JavaProc {
     pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
         type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
-        let t = crate::processors::java::Parameter::faster();
-        let h = pr.mut_or_default::<JavaProcessorHolder>();
-        crate::processing::erased::CommitProcExt::register_param(h, t)
+        let t = crate::processors::java::Parameter::default();
+        let h = pr.commit_proc_mut::<JavaProcessorHolder>();
+        h.register_param(t)
     }
 }
 
@@ -398,7 +398,7 @@ impl RepositoryProcessor {
             .handle2(oid, repository, name, parameters, |c, n, t| {
                 let line_break = _auto_configured_line_break(t);
 
-                let holder = c.mut_or_default::<JavaProcessorHolder>();
+                let holder = c.commit_proc_mut::<JavaProcessorHolder>();
                 let java_proc = holder.with_parameters_mut(parameters.0);
                 let md_cache = &mut java_proc.cache.md_cache;
                 let dedup = &mut java_proc.cache.dedup;
@@ -620,7 +620,7 @@ mod experiments {
             let holder = self
                 .prepro
                 .processing_systems
-                .mut_or_default::<JavaProcessorHolder>();
+                .commit_proc_mut::<JavaProcessorHolder>();
             let java_proc = holder.with_parameters_mut(self.handle.0);
             let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
             todo!(

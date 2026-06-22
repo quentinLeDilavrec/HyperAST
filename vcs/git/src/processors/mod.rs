@@ -1,3 +1,5 @@
+use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
+
 // # languages
 #[cfg(feature = "cpp")]
 pub mod cpp;
@@ -12,7 +14,54 @@ pub mod make;
 #[cfg(feature = "maven")]
 pub mod maven;
 
-// pub mod file_sys;
+#[cfg(feature = "file_sys")]
+pub mod file_sys;
+
+#[derive(Clone, Debug)]
+pub struct FullNode {
+    pub id: hyperast::store::defaults::NodeIdentifier,
+    pub metrics: crate::DefaultMetrics,
+    pub precomp_queries: PrecompQueries,
+}
+
+impl crate::preprocessed::IdHolder for FullNode {
+    type Id = hyperast::store::defaults::NodeIdentifier;
+    fn id(&self) -> Self::Id {
+        self.id
+    }
+}
+
+pub type Local = hyperast::tree_gen::zipped_ts_extra::Local;
+
+pub type FNode<E = hyperast::tree_gen::zipped_ts_extra::EmptyExtra> =
+    hyperast::tree_gen::extra::NodeWithExtra<hyperast::tree_gen::zipped_ts_extra::FNode<Local>, E>;
+
+impl From<FNode<PrecompQueries>> for FullNode {
+    fn from(full_node: FNode<PrecompQueries>) -> Self {
+        Self {
+            id: full_node.local.compressed_node,
+            metrics: full_node.local.metrics,
+            precomp_queries: full_node.extra,
+        }
+    }
+}
+
+impl From<FNode> for FullNode {
+    fn from(full_node: FNode) -> Self {
+        Self {
+            id: full_node.local.compressed_node,
+            metrics: full_node.local.metrics,
+            precomp_queries: PrecompQueries::full(),
+        }
+    }
+}
+
+fn prepare_dir_exploration(tree: &git2::Tree) -> impl Iterator<Item = crate::git::BasicGitObject> {
+    tree.iter()
+        .rev()
+        .map(TryInto::try_into)
+        .filter_map(|x| x.ok())
+}
 
 #[derive(Clone)]
 pub(crate) struct Query(pub(crate) hyperast_tsquery::Query, crate::Str);

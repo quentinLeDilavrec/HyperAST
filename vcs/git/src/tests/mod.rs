@@ -126,8 +126,9 @@ fn example_process_make_cpp_project() {
     let a = preprocessed.pre_process_make_project_with_limit(
         &mut fetch_github_repository(name),
         "",
-        // "587bc647d7d14b53d8625c4446006e23a4acd82a",
-        "f97c5b6909d22277f28e3dea2f146e9314d634dc", // issue with operator[]('K') = KB;
+        "74a0a73715322608332038f7c0151ddf0609a59a",
+        // "f3bfce353168b03e4fedce515de1898c691f81ec",
+        // "f97c5b6909d22277f28e3dea2f146e9314d634dc", // issue with operator[]('K') = KB;
         "src",
         2,
     );
@@ -263,24 +264,26 @@ fn test_python() {
         .get_commit(&handle.config, &commitid)
         .unwrap()
         .ast_root;
-    python_aux(&preprocessed.processor.main_stores, id);
+    python_aux(&preprocessed.processor.main_stores, id, precomp);
 }
 
-fn python_aux(stores: &crate::SimpleStores, id: hyperast::store::defaults::NodeIdentifier) {
-    use hyperast::types::HyperAST;
+fn python_aux(
+    stores: &crate::SimpleStores,
+    id: hyperast::store::defaults::NodeIdentifier,
+    precomp: &[&str],
+) {
     use hyperast_tsquery::Query;
 
     dbg!();
 
     let lang = hyperast_gen_ts_python::language();
     let query = "(module)\n(identifier)@a\n(primary_expression (integer))";
-    let precomp = ["(identifier)", "(integer)", "(module)"].as_slice();
 
     let (_precomp, query) = Query::with_precomputed(query, lang, precomp) //
         .unwrap_or_else(|e| panic!("\n{e}"));
 
     let mut counts = vec![0; query.enabled_pattern_count()];
-    let mut types = std::collections::HashSet::<String>::default();
+    // let mut types = std::collections::HashSet::<String>::default();
 
     let pos = hyperast::position::structural_pos::CursorWithPersistence::new(id);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&stores, pos);
@@ -290,16 +293,16 @@ fn python_aux(stores: &crate::SimpleStores, id: hyperast::store::defaults::NodeI
         let pid = query.enabled_pattern_index(m.pattern_index).unwrap();
         dbg!(pid);
         counts[pid as usize] += 1;
-        let cid = query.capture_index_for_name("a").unwrap();
-        for n in m.nodes_for_capture_index(cid) {
-            use hyperast::position::structural_pos::CursorHead;
-            let p = n.pos.parent();
-            println!("{}", stores.resolve_type(&p.unwrap()));
-            types.insert(stores.resolve_type(&p.unwrap()).to_string());
-        }
+        // let cid = query.capture_index_for_name("a").unwrap();
+        // for n in m.nodes_for_capture_index(cid) {
+        //     use hyperast::position::structural_pos::CursorHead;
+        //     let p = n.pos.parent();
+        //     println!("{}", stores.resolve_type(&p.unwrap()));
+        //     types.insert(stores.resolve_type(&p.unwrap()).to_string());
+        // }
     }
     dbg!(&counts);
-    dbg!(&types);
+    // dbg!(&types);
 }
 
 #[test]
@@ -418,3 +421,58 @@ public class ClientClass extends ChildClass {
 	private class InnerClass3a {}
 }
 "#;
+
+#[test]
+fn test_file_sys() {
+    // env_logger::builder()
+    //     .parse_env(
+    //         ::test_log::env_logger::Env::default().default_filter_or("hyperast_tsquery=trace"),
+    //     )
+    //     // .target(::test_log::env_logger::Target::Stderr)
+    //     .is_test(true)
+    //     .try_init()
+    //     .unwrap();
+
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+
+    // https://github.com/malivinayak/Multi-Programming/commit/5debb0d755d71f9714d2fcd3e11fdac66d055b4a
+    // https://github.com/numpy/numpy/commit/706b1035187baf72959059cd35ac1f5266e1932c
+    let spec = crate::git::Forge::Github.repo("numpy", "numpy");
+    dbg!();
+    let repo = spec.fetch();
+    dbg!();
+    let config = preprocessed.processor.default_config();
+    let repository = crate::processing::ConfiguredRepo2 { spec, repo, config };
+    let commits = preprocessed
+        .processor
+        .pre_process_with_limit(
+            &repository,
+            "",
+            "706b1035187baf72959059cd35ac1f5266e1932c",
+            2,
+        )
+        .unwrap();
+
+    let commitid = commits[0];
+    let commit = preprocessed.get_commit(&config, &commitid).unwrap();
+    dbg!(std::time::Duration::from_nanos(
+        commit.processing_time as u64
+    ));
+    // let stores = &preprocessed.processor.main_stores;
+    // let id = child_by_name(stores, id, "numpy").unwrap();
+    // let id = child_by_name(stores, id, "core").unwrap();
+    // let id = {
+    //     let n = stores.node_store.resolve(id);
+    //     use hyperast::types::LabelStore;
+    //     use hyperast::types::WithChildren;
+    //     dbg!(n.child_count());
+    //     let default_label_identifier = stores.label_store.get("getlimits.py").unwrap();
+    //     n.get_child_by_name(&default_label_identifier)
+    // }
+    // .unwrap();
+
+    // TODO make it select only file_sys and python nodes
+    // python_aux(stores, id, &[]);
+    // TODO make it select only file_sys and cpp nodes
+    // cpp_top_includes_aux(stores, id);
+}

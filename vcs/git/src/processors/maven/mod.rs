@@ -24,12 +24,27 @@ use crate::DefaultMetrics;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processors::java::JavaProc;
 
-use super::java::java_tree_gen;
-
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 
 pub use processor::MavenProc;
 pub use processor::make;
+
+#[derive(Clone, Debug)]
+pub struct FullNode {
+    pub id: hyperast::store::defaults::NodeIdentifier,
+    pub metrics: crate::DefaultMetrics,
+    pub precomp_queries: super::PrecompQueries,
+    pub(crate) status: EnumSet<SemFlag>,
+    // TODO even if almost everyone is using the defaults, use it
+    pub(crate) ana: MavenPartialAnalysis,
+}
+
+impl crate::preprocessed::IdHolder for FullNode {
+    type Id = hyperast::store::defaults::NodeIdentifier;
+    fn id(&self) -> Self::Id {
+        self.id
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
@@ -48,14 +63,6 @@ pub struct POM {
     test_source_dirs: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct MD {
-    pub(crate) metrics: DefaultMetrics,
-    #[allow(unused)] // TODO needed for scalable module level reference analysis
-    pub(crate) ana: MavenPartialAnalysis,
-    pub(crate) status: EnumSet<SemFlag>,
-}
-
 pub struct MavenModuleAcc {
     pub(crate) primary: crate::DirPrimary,
     pub(crate) ana: MavenPartialAnalysis,
@@ -64,6 +71,7 @@ pub struct MavenModuleAcc {
     pub(crate) test_dirs: Option<Vec<PathBuf>>,
     pub(crate) status: EnumSet<SemFlag>,
     pub(crate) scripting_acc: Option<hyperast::scripting::Acc>,
+    pub(crate) precomp_queries: super::PrecompQueries,
 }
 
 #[derive(enumset::EnumSetType, Debug)]
@@ -84,6 +92,7 @@ impl MavenModuleAcc {
             test_dirs: None,
             status: Default::default(),
             scripting_acc: None,
+            precomp_queries: super::PrecompQueries::default(),
         }
     }
     pub(crate) fn with_content(
@@ -130,15 +139,15 @@ impl MavenModuleAcc {
         }
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.md.metrics);
+        self.primary.metrics.acc(full_node.metrics);
     }
     pub(crate) fn push_source_directory(
         &mut self,
         name: LabelIdentifier,
-        full_node: java_tree_gen::Local,
+        full_node: super::FullNode,
     ) {
         self.status |= SemFlag::HoldMainFolder;
-        self.primary.children.push(full_node.compressed_node);
+        self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(SubTreeMetrics {
             line_count: 0,
@@ -150,10 +159,10 @@ impl MavenModuleAcc {
     pub(crate) fn push_test_source_directory(
         &mut self,
         name: LabelIdentifier,
-        full_node: java_tree_gen::Local,
+        full_node: super::FullNode,
     ) {
         self.status |= SemFlag::HoldTestFolder;
-        self.primary.children.push(full_node.compressed_node);
+        self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(SubTreeMetrics {
             line_count: 0,
@@ -189,31 +198,25 @@ impl MavenPartialAnalysis {
     }
 }
 
-#[derive(Clone)]
-pub struct FullNode {
-    pub id: NodeIdentifier,
-    pub md: MD,
-}
-
 impl FullNode {
     pub fn is_maven_module(&self) -> bool {
-        self.md.status.contains(SemFlag::IsMavenModule)
+        self.status.contains(SemFlag::IsMavenModule)
     }
 
     pub fn hold_maven_submodule(&self) -> bool {
-        self.md.status.contains(SemFlag::HoldMavenSubModule)
+        self.status.contains(SemFlag::HoldMavenSubModule)
     }
 }
 
 impl hyperast::tree_gen::Accumulator for MavenModuleAcc {
     type Node = (LabelIdentifier, FullNode);
     fn push(&mut self, (name, full_node): Self::Node) {
-        let s = full_node.md.status - SemFlag::IsMavenModule;
+        let s = full_node.status - SemFlag::IsMavenModule;
         assert!(!s.contains(SemFlag::IsMavenModule));
         self.status |= s;
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.md.metrics);
+        self.primary.metrics.acc(full_node.metrics);
     }
 }
 

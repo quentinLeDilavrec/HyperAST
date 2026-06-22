@@ -42,6 +42,7 @@ pub struct Impacts();
 #[derive(Clone)]
 pub struct Commit {
     pub parents: Vec<git2::Oid>,
+    // as_nanos
     processing_time: u128,
     memory_used: Bytes,
     pub ast_root: NodeIdentifier,

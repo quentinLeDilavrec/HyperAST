@@ -32,21 +32,6 @@ impl super::InFiles for Pom {
     }
 }
 
-/// The java scheme,
-/// made of packages and modules https://docs.oracle.com/javase/specs/jls/se11/html/jls-7.html
-#[cfg(feature = "maven")]
-pub struct Java;
-
-impl CachesHolding for Java {
-    type Caches = super::caches::Java;
-}
-
-impl super::InFiles for Java {
-    fn matches(name: &ObjectName) -> bool {
-        name.ends_with(".java")
-    }
-}
-
 /// The make scheme,
 /// It contains a Makefile and different directories, often src/ or lib/, tests/ or tests/, and also third-party/ docs/ script/,
 /// but it is mostly community and programming language dependent.
@@ -67,33 +52,6 @@ impl CachesHolding for MakeFile {
 impl super::InFiles for MakeFile {
     fn matches(name: &ObjectName) -> bool {
         name.eq_str("Makefile")
-    }
-}
-
-#[cfg(feature = "cpp")]
-pub struct Cpp;
-
-impl CachesHolding for Cpp {
-    type Caches = super::caches::Cpp;
-}
-
-/// CAUTION about when you change this value,
-/// advice: change it only at the very begining
-#[doc(hidden)]
-pub static mut ONLY_SWITCHES: bool = false;
-
-impl super::InFiles for Cpp {
-    fn matches(name: &ObjectName) -> bool {
-        if unsafe { ONLY_SWITCHES } {
-            name.ends_with("switches.h") || name.ends_with("switches.cc")
-        } else {
-            name.ends_with(".cpp")
-                || name.ends_with(".c")
-                || name.ends_with(".cc")
-                || name.ends_with(".cxx")
-                || name.ends_with(".h")
-                || name.ends_with(".hpp")
-        }
     }
 }
 

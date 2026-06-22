@@ -5,9 +5,12 @@ use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::{CacheHolding, ObjectName};
 
-use super::{MakeModuleAcc, MakeProc, Parameter};
+use super::{MakeModuleAcc, MakeProc};
 
-pub(super) struct MakefileProc(Option<Parameter>, crate::processing::caches::Makefile);
+#[derive(Clone, PartialEq, Eq, Default)]
+pub struct Parameter {}
+
+pub struct MakefileProc(Option<Parameter>, crate::processing::caches::Makefile);
 
 impl From<Parameter> for MakefileProc {
     fn from(value: Parameter) -> Self {

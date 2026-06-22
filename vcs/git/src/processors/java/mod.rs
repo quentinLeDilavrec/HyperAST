@@ -6,6 +6,7 @@ use hyperast::tree_gen;
 use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
+use crate::processing::caches::OidMap;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 pub(crate) use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
@@ -19,7 +20,56 @@ pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 mod parameters;
 pub use parameters::Parameter;
 
-type PrecompQueries = u16;
+pub mod caches {
+    use hyperast::store::nodes::legion::DedupMap;
+
+    use crate::processing::caches::NamedMap;
+    use crate::processing::{ObjectMapper, ObjectName};
+
+    #[derive(Default)]
+    pub struct Java {
+        pub(crate) md_cache: hyperast_gen_ts_java::legion_with_refs::MDCache,
+        /// Passed to subtree builder when deriving different data (assumed to be incompatible).
+        pub(crate) dedup: DedupMap,
+        pub object_map: NamedMap<super::FullNode>,
+    }
+
+    impl ObjectMapper for Java {
+        type K = (git2::Oid, ObjectName);
+
+        type V = super::FullNode;
+
+        fn get(&self, key: &Self::K) -> Option<&Self::V> {
+            self.object_map.get(key)
+        }
+
+        fn insert(&mut self, key: Self::K, value: Self::V) -> Option<Self::V> {
+            self.object_map.insert(key, value)
+        }
+    }
+}
+
+pub mod selection {
+    use crate::processing::{CachesHolding, InFiles, ObjectName};
+
+    /// The java scheme,
+    /// made of packages and modules https://docs.oracle.com/javase/specs/jls/se11/html/jls-7.html
+    #[cfg(feature = "maven")]
+    pub struct Java;
+
+    impl CachesHolding for Java {
+        type Caches = super::caches::Java;
+    }
+
+    impl InFiles for Java {
+        fn matches(name: &ObjectName) -> bool {
+            name.ends_with(".java")
+        }
+    }
+}
+
+use super::FullNode;
+use super::PrecompQueries;
 
 pub struct JavaProc {
     pub(crate) parameter: Parameter,
@@ -27,8 +77,8 @@ pub struct JavaProc {
     query: Option<super::Query>,
     #[cfg(feature = "tsg")]
     tsg: Option<parameters::TsgErzedSettings>,
-    cache: crate::processing::caches::Java,
-    commits: crate::processing::caches::OidMap<crate::Commit>,
+    cache: caches::Java,
+    commits: OidMap<crate::Commit>,
 }
 
 pub struct JavaAcc {
@@ -43,20 +93,19 @@ pub struct JavaAcc {
 }
 
 impl Accumulator for JavaAcc {
-    type Unlabeled = (java_tree_gen::Local,);
+    type Unlabeled = FullNode;
 }
 
 impl hyperast::tree_gen::Accumulator for JavaAcc {
-    type Node = (LabelIdentifier, (java_tree_gen::Local,));
-    fn push(&mut self, (name, (full_node,)): Self::Node) {
+    type Node = (LabelIdentifier, FullNode);
+    fn push(&mut self, (name, full_node): Self::Node) {
         self.push(name, full_node);
     }
 }
 
 impl JavaAcc {
-    pub fn push(&mut self, name: LabelIdentifier, full_node: java_tree_gen::Local) {
-        let id = full_node.compressed_node;
-        self.primary.push(name, id, full_node.metrics);
+    pub fn push(&mut self, name: LabelIdentifier, full_node: FullNode) {
+        self.primary.push(name, full_node.id, full_node.metrics);
 
         #[cfg(feature = "impact")]
         if let Some(ana) = full_node.ana {
@@ -69,7 +118,7 @@ impl JavaAcc {
                 self.skiped_ana = true;
             }
         }
-        self.precomp_queries |= full_node.precomp_queries;
+        self.precomp_queries += full_node.precomp_queries;
     }
 }
 
@@ -85,6 +134,16 @@ impl JavaAcc {
             skiped_ana: false,
             precomp_queries: Default::default(),
             scripting_acc: prepro,
+        }
+    }
+}
+
+impl From<hyperast_gen_ts_java::legion_with_refs::Local> for super::FullNode {
+    fn from(full_node: hyperast_gen_ts_java::legion_with_refs::Local) -> Self {
+        Self {
+            id: full_node.compressed_node,
+            metrics: full_node.metrics,
+            precomp_queries: PrecompQueries(full_node.precomp_queries),
         }
     }
 }

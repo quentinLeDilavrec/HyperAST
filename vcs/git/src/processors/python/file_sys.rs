@@ -13,6 +13,6 @@ impl CachesHolding for Python {
 #[cfg(feature = "python")]
 impl InFiles for Python {
     fn matches(name: &ObjectName) -> bool {
-        name.ends_with(".py")
+        name.ends_with(".py") || name.ends_with(".pyi")
     }
 }

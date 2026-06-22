@@ -1,4 +1,6 @@
+mod caches;
 mod cpp_processor;
+pub mod selection;
 
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::tree_gen;
@@ -6,6 +8,7 @@ use hyperast::tree_gen;
 use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_cpp::TStore;
@@ -14,7 +17,10 @@ use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
 
 pub(crate) use cpp_processor::CppProc;
-pub use cpp_processor::SUB_QUERIES; // To remove, at least in the current form
+pub use cpp_processor::SUB_QUERIES;
+
+use super::FullNode;
+use super::PrecompQueries;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
@@ -22,14 +28,12 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    pub fn new(query: impl Into<hyperast_tsquery::ZeroSepArrayStr>) -> Self {
+    pub fn new(query: impl hyperast_tsquery::ArrayStr) -> Self {
         Self {
-            query: Some(query.into()),
+            query: Some(query.iter().collect()),
         }
     }
 }
-
-type PrecompQueries = u16;
 
 pub struct CppAcc {
     pub(crate) primary: DirPrimary,
@@ -40,21 +44,20 @@ impl CppAcc {
     pub(crate) fn new(name: String) -> Self {
         Self {
             primary: DirPrimary::new(name),
-            precomp_queries: 0,
+            precomp_queries: PrecompQueries::default(),
         }
     }
 }
 
 impl Accumulator for CppAcc {
-    type Unlabeled = (cpp_tree_gen::Local,);
+    type Unlabeled = FullNode;
 }
 
 impl hyperast::tree_gen::Accumulator for CppAcc {
-    type Node = (LabelIdentifier, (cpp_tree_gen::Local,));
-    fn push(&mut self, (name, (full_node,)): Self::Node) {
-        self.primary
-            .push(name, full_node.compressed_node, full_node.metrics);
-        self.precomp_queries |= full_node.precomp_queries;
+    type Node = (LabelIdentifier, FullNode);
+    fn push(&mut self, (name, full_node): Self::Node) {
+        self.primary.push(name, full_node.id, full_node.metrics);
+        self.precomp_queries += full_node.precomp_queries;
     }
 }
 
@@ -65,9 +68,31 @@ impl From<String> for CppAcc {
 }
 
 impl CppAcc {
-    pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: cpp_tree_gen::Local) {
-        self.primary
-            .push(name, full_node.compressed_node, full_node.metrics);
+    pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: impl Into<FullNode>) {
+        let full_node = full_node.into();
+        self.primary.push(name, full_node.id, full_node.metrics);
+        self.precomp_queries += full_node.precomp_queries;
+    }
+}
+
+impl From<hyperast_gen_ts_cpp::legion::Local> for FullNode {
+    fn from(full_node: hyperast_gen_ts_cpp::legion::Local) -> Self {
+        Self {
+            id: full_node.compressed_node,
+            metrics: full_node.metrics,
+            precomp_queries: PrecompQueries(full_node.precomp_queries),
+        }
+    }
+}
+
+impl CppProc {
+    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
+        type CppProcessorHolder = crate::processing::ProcessorHolder<CppProc>;
+        // let q = ["(translation_unit)"].as_slice();
+        // let t = crate::processors::cpp::Parameter::new(q);
+        let t = crate::processors::cpp::Parameter::default();
+        let h = pr.mut_or_default::<CppProcessorHolder>();
+        crate::processing::erased::CommitProcExt::register_param(h, t)
     }
 }
 

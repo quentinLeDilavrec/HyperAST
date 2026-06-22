@@ -213,6 +213,43 @@ impl RepositoryProcessor {
         }
         r
     }
+
+    #[cfg(feature = "file_sys")]
+    pub fn simplified_prepro(
+        &mut self,
+        spec: &crate::git::Repo,
+        before: &str,
+        after: &str,
+        limit: usize,
+    ) -> Result<Vec<git2::Oid>, git2::Error> {
+        let repository = spec.fetch();
+        log::info!(
+            "commits to retrieve: {:?}",
+            all_commits_between(&repository, before, after).map(|x| x.count())
+        );
+
+        let handle = self.default_config();
+
+        let rw = all_commits_between(&repository, before, after)?;
+        let mut rw = rw.map(|x| x.unwrap()).take(limit).peekable();
+
+        let size = limit;
+        let mut r = Vec::with_capacity(rw.size_hint().0);
+        for _ in 0..size {
+            let Some(oid) = rw.next() else { break };
+            let builder = crate::preprocessed::CommitBuilder::start(&repository, oid);
+            let commit_processor = self
+                .processing_systems
+                .by_id_mut(&handle.0)
+                .unwrap()
+                .get_mut(handle.1);
+            let _id = commit_processor
+                .prepare_processing(&repository, builder, handle)
+                .process(self);
+            r.push(oid);
+        }
+        Ok(r)
+    }
 }
 
 #[cfg(feature = "maven_java")]
@@ -418,12 +455,9 @@ impl PreProcessedRepository {
         };
         rw.for_each(|oid| {
             let oid = oid.unwrap();
-            let c = CommitProcessor::<file_sys::Java>::handle_commit::<false>(
-                &mut self.processor,
-                &repository,
-                dir_path,
-                oid,
-            );
+            let c = CommitProcessor::<crate::processors::java::selection::Java>::handle_commit::<
+                false,
+            >(&mut self.processor, &repository, dir_path, oid);
             processing_ordered_commits.push(oid);
             self.commits.insert(oid, c);
         });
@@ -507,7 +541,7 @@ pub(crate) trait CommitProcessor<Sys> {
         repository: &Repository,
         dir_path: &'b mut Peekable<Components<'b>>,
         name: &[u8],
-        oid: git2::Oid,
+        tree_oid: git2::Oid,
     ) -> Self::Module;
 
     /// How to handle a commit eg.
@@ -608,7 +642,7 @@ impl IdHolder for NodeIdentifier {
 
 #[cfg(feature = "maven")]
 impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
-    type Module = (NodeIdentifier, crate::processors::maven::MD);
+    type Module = crate::processors::maven::FullNode;
     fn handle_module<'b, const RMS: bool>(
         &mut self,
         _repository: &Repository,
@@ -632,8 +666,8 @@ impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
     }
 }
 #[cfg(feature = "java")]
-impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
-    type Module = (NodeIdentifier, crate::processors::maven::MD);
+impl CommitProcessor<crate::processors::java::selection::Java> for RepositoryProcessor {
+    type Module = crate::processors::maven::FullNode;
     fn handle_module<'b, const RMS: bool>(
         &mut self,
         _repository: &Repository,
@@ -641,7 +675,7 @@ impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
         _name: &[u8],
         _oid: git2::Oid,
     ) -> Self::Module {
-        todo!("need to refactor the some methods")
+        todo!("need to refactor some methods")
         // let root_full_node = MavenProcessor::<RMS, true, MavenModuleAcc>::new(
         //     repository,
         //     self,
@@ -651,32 +685,6 @@ impl CommitProcessor<file_sys::Java> for RepositoryProcessor {
         //     todo!("para"),
         // )
         // .process();
-        // root_full_node
-    }
-}
-
-#[cfg(feature = "make")]
-impl CommitProcessor<file_sys::Make> for RepositoryProcessor {
-    type Module = (NodeIdentifier, crate::processors::make::MD);
-    fn handle_module<'b, const RMS: bool>(
-        &mut self,
-        _repository: &Repository,
-        _dir_path: &'b mut Peekable<Components<'b>>,
-        _name: &[u8],
-        _oid: git2::Oid,
-    ) -> Self::Module {
-        todo!("need to refactor the some methods")
-        // let root_full_node = MakeProcessor::<RMS, false, MakeModuleAcc>::new(
-        //     repository,
-        //     self,
-        //     dir_path,
-        //     name,
-        //     oid,
-        //     todo!("para"),
-        // )
-        // .process();
-        // // self.object_map_make
-        // //     .insert(commit_oid, root_full_node.clone());
         // root_full_node
     }
 }

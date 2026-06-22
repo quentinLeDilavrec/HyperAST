@@ -8,6 +8,7 @@ use hyperast::tree_gen;
 use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_python::TStore;
@@ -17,7 +18,7 @@ pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 
 pub(crate) use processor::PythonProc;
 
-type FullNode = (python_tree_gen::Local, PrecompQueries);
+use super::FullNode;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
@@ -25,7 +26,7 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    pub(crate) fn with_query(query: impl Into<hyperast_tsquery::ZeroSepArrayStr>) -> Self {
+    pub(crate) fn new(query: impl Into<hyperast_tsquery::ZeroSepArrayStr>) -> Self {
         Self {
             query: Some(query.into()),
             ..Default::default()
@@ -50,14 +51,14 @@ impl PythonAcc {
 }
 
 impl Accumulator for PythonAcc {
-    type Unlabeled = (python_tree_gen::Local, PrecompQueries);
+    type Unlabeled = FullNode;
 }
 
 impl tree_gen::Accumulator for PythonAcc {
-    type Node = (LabelIdentifier, (python_tree_gen::Local, PrecompQueries));
-    fn push(&mut self, (name, (n, precomp_queries)): Self::Node) {
-        self.primary.push(name, n.compressed_node, n.metrics);
-        self.precomp_queries += precomp_queries;
+    type Node = (LabelIdentifier, FullNode);
+    fn push(&mut self, (name, full_node): Self::Node) {
+        self.primary.push(name, full_node.id, full_node.metrics);
+        self.precomp_queries += full_node.precomp_queries;
     }
 }
 
@@ -68,10 +69,22 @@ impl From<String> for PythonAcc {
 }
 
 impl PythonAcc {
-    pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: FullNode) {
-        let id = full_node.0.compressed_node;
-        self.primary.push(name, id, full_node.0.metrics);
-        self.precomp_queries += full_node.1;
+    pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: impl Into<FullNode>) {
+        let full_node = full_node.into();
+        let id = full_node.id;
+        self.primary.push(name, id, full_node.metrics);
+        self.precomp_queries += full_node.precomp_queries;
+    }
+}
+
+impl PythonProc {
+    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
+        type PythonProcessorHolder = crate::processing::ProcessorHolder<PythonProc>;
+        // let q = ["(module)"].as_slice();
+        // let t = crate::processors::python::Parameter::new(q);
+        let t = crate::processors::python::Parameter::default();
+        let h = pr.mut_or_default::<PythonProcessorHolder>();
+        crate::processing::erased::CommitProcExt::register_param(h, t)
     }
 }
 

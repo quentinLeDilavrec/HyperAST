@@ -1,5 +1,5 @@
 use std::iter::Peekable;
-use std::path::{Components, PathBuf};
+use std::path::Components;
 
 use git2::{Oid, Repository};
 
@@ -12,18 +12,14 @@ use hyperast::types::LabelStore;
 use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
-use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
-use crate::processing::erased::CommitProcessorHandle;
+use crate::preprocessed::RepositoryProcessor;
+use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
-use crate::processing::erased::PreparedCommitProc;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
-use crate::processing::{ParametrizedCommitProcessorHandle as PCPHandle, ProcessorHolder};
-use crate::processors::cpp as cpp_processor;
-use crate::processors::java as java_processor;
-use crate::processors::python as python_processor;
 
-use super::{FileSysAcc, FullNode};
+use super::{FileSysAcc, Parameter};
+use super::{FileSysProc, FullNode};
 
 pub struct FileSysProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     prepro: &'b mut RepositoryProcessor,
@@ -67,14 +63,17 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
         let (oid, name) = match current_dir {
             BasicGitObject::Tree(oid, name) => {
                 self.handle_tree_cached(name, oid);
+                dbg!(self.stack.len());
                 return;
             }
             BasicGitObject::Blob(oid, name) => (oid, name),
         };
         if FFWD {
+            dbg!(name.try_str().unwrap());
             return;
         }
         if self.dir_path.peek().is_some() {
+            dbg!(name.try_str().unwrap());
             return;
         }
         self.pre_aux(oid, &name).unwrap();
@@ -123,6 +122,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 let prepared = prepared_exploration(tree);
                 let acc = FileSysAcc::new(name.try_into().unwrap());
                 self.stack.push(StackEle::new(oid, prepared, acc));
+            } else {
+                dbg!(name.try_str().unwrap());
             } // otherwise, ignore
             return;
         }
@@ -131,6 +132,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             .with_parameters_mut(self.handle.1);
         if let Some(already) = proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
+            dbg!(name.try_str().unwrap());
             let full_node = already.clone();
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name = self.prepro.intern_object_name(name);
@@ -138,14 +140,15 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             w.push(name, full_node);
             return;
         }
-        log::debug!("file_sys tree {:?}", name.try_str());
         let tree = self.repository.find_tree(oid).unwrap();
         let prepared = prepared_exploration(tree);
+        log::info!("file_sys tree {:?} {}", name.try_str(), prepared.len());
         let acc = FileSysAcc::new(name.try_into().unwrap());
         self.stack.push(StackEle::new(oid, prepared, acc));
     }
 
     fn pre_aux(&mut self, oid: Oid, name: &ObjectName) -> Result<(), crate::ParseErr> {
+        dbg!(name.try_str().unwrap());
         if crate::processing::file_sys::MakeFile::matches(&name) {
             // TODO reintroduce, but without any build-sys-level analysis
             // self.prepro
@@ -160,24 +163,24 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "cpp")]
-        if crate::processing::file_sys::Cpp::matches(&name) {
+        if crate::processors::cpp::selection::Cpp::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = self.repository;
             let p = PCP2Handle(self.handle.1, std::marker::PhantomData);
-            let (full_node,) = self.prepro.handle_cpp_blob(oid, name, repository, p)?;
+            let full_node = self.prepro.handle_cpp_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
             parent.push(name, full_node);
             return Ok(());
         }
         #[cfg(feature = "java")]
-        if crate::processing::file_sys::Java::matches(&name) {
+        if crate::processors::java::selection::Java::matches(&name) {
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = &self.repository;
             let p = PCP2Handle(self.handle.1, std::marker::PhantomData);
-            let (full_node,) = self.prepro.handle_java_blob(oid, name, repository, p)?;
+            let full_node = self.prepro.handle_java_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!w.primary.children_names.contains(&name));
             w.push(name, full_node);
@@ -189,13 +192,13 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             let name: &ObjectName = &name;
             let repository: &Repository = self.repository;
             let p = PCP2Handle(self.handle.1, std::marker::PhantomData);
-            let (full_node, _precomp) = self.prepro.handle_python_blob(oid, name, repository, p)?;
+            let full_node = self.prepro.handle_python_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
             parent.push(name, full_node);
             return Ok(());
         }
-        log::debug!("not a known source file {:?}", name.try_str());
+        log::info!("not a known source file {:?}", name.try_str());
         Ok(())
     }
 }
@@ -206,6 +209,34 @@ fn prepared_exploration(tree: git2::Tree<'_>) -> Vec<BasicGitObject> {
         .map(TryInto::try_into)
         .filter_map(|x| x.ok())
         .collect()
+}
+
+impl From<Parameter> for FileSysProc {
+    fn from(val: Parameter) -> Self {
+        FileSysProc {
+            parameter: val,
+            cache: Default::default(),
+            commits: Default::default(),
+        }
+    }
+}
+
+impl PartialEq<FileSysProc> for Parameter {
+    fn eq(&self, other: &FileSysProc) -> bool {
+        self == &other.parameter
+    }
+}
+
+impl PartialEq<Parameter> for FileSysProc {
+    fn eq(&self, other: &Parameter) -> bool {
+        self.parameter == *other
+    }
+}
+
+impl PartialEq<()> for FileSysProc {
+    fn eq(&self, _other: &()) -> bool {
+        true
+    }
 }
 
 pub(crate) fn make(acc: FileSysAcc, stores: &mut super::SimpleStores) -> FullNode {
@@ -225,10 +256,19 @@ pub(crate) fn make(acc: FileSysAcc, stores: &mut super::SimpleStores) -> FullNod
 
     let insertion = stores.node_store.prepare_insertion(&hashable, eq);
     if let Some(id) = insertion.occupied_id() {
-        let metrics = primary
-            .metrics
-            .map_hashs(|h| MetaDataHashsBuilder::build(h));
-        return FullNode { id, metrics };
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let n = stores.node_store.resolve(id);
+        use hyperast::store::nodes::compo::Precomp;
+        let precomp_queries = n
+            .get_component::<Precomp<u16>>()
+            .map(|x| x.0)
+            .map(super::PrecompQueries)
+            .unwrap_or(super::PrecompQueries::full());
+        return FullNode {
+            id,
+            metrics,
+            precomp_queries,
+        };
     }
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
@@ -245,131 +285,10 @@ pub(crate) fn make(acc: FileSysAcc, stores: &mut super::SimpleStores) -> FullNod
     let vacant = insertion.vacant();
     let id = vacant.insert_built(dyn_builder.build());
 
-    FullNode { id, metrics }
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct Parameter {
-    pub(crate) cpp_handle: PCP2Handle<cpp_processor::CppProc>,
-    pub(crate) java_handle: PCP2Handle<java_processor::JavaProc>,
-    pub(crate) python_handle: PCP2Handle<python_processor::PythonProc>,
-}
-
-impl From<Parameter> for FileSysProc {
-    fn from(val: Parameter) -> Self {
-        FileSysProc {
-            parameter: val,
-            cache: Default::default(),
-            commits: Default::default(),
-        }
-    }
-}
-
-impl PartialEq<FileSysProc> for Parameter {
-    fn eq(&self, other: &FileSysProc) -> bool {
-        self == &other.parameter
-    }
-}
-
-pub(crate) struct FileSysProc {
-    parameter: Parameter,
-    cache: super::caches::FileSys,
-    commits: std::collections::HashMap<git2::Oid, crate::Commit>,
-}
-
-impl PartialEq<Parameter> for FileSysProc {
-    fn eq(&self, other: &Parameter) -> bool {
-        self.parameter == *other
-    }
-}
-
-struct PreparedMakeCommitProc<'repo> {
-    repository: &'repo git2::Repository,
-    commit_builder: CommitBuilder,
-    pub(crate) handle: PCPHandle,
-}
-impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
-    fn process(
-        self: Box<PreparedMakeCommitProc<'repo>>,
-        prepro: &mut RepositoryProcessor,
-    ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
-        let name = b"";
-        // TODO check parameter in self to know it is a recursive module search
-        let root_full_node = FileSysProcessor::<true, false, FileSysAcc>::prepare(
-            self.repository,
-            prepro,
-            &mut dir_path,
-            name,
-            self.commit_builder.tree_oid(),
-            self.handle,
-        )
-        .process();
-        let h = prepro
-            .processing_systems
-            .mut_or_default::<FileSysProcessorHolder>();
-        let handle = self.handle;
-        let commit_oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle.1)
-            .commits
-            .insert(commit_oid, commit);
-        root_full_node.id
-    }
-}
-
-impl crate::processing::erased::CommitProc for FileSysProc {
-    fn prepare_processing<'repo>(
-        &self,
-        repository: &'repo git2::Repository,
-        commit_builder: CommitBuilder,
-        handle: PCPHandle,
-    ) -> Box<dyn PreparedCommitProc + 'repo> {
-        Box::new(PreparedMakeCommitProc {
-            repository,
-            commit_builder,
-            handle,
-        })
-    }
-
-    fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {
-        self.commits.get(&commit_oid)
-    }
-
-    fn commit_count(&self) -> usize {
-        self.commits.len()
-    }
-
-    fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
-        dbg!(self.parameter.cpp_handle.0.0);
-        if lang.eq_ignore_ascii_case("cpp") {
-            Some(PCPHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<
-                    ProcessorHolder<cpp_processor::CppProc>,
-                >()),
-                self.parameter.cpp_handle.0,
-            ))
-        } else if lang.eq_ignore_ascii_case("java") {
-            if cfg!(debug_assertions) {
-                unimplemented!()
-            }
-            None
-        } else {
-            None
-        }
-    }
-}
-
-// impl CommitProcExt for FileSysProc {
-//     type Holder = FileSysProcessorHolder;
-// }
-
-impl CacheHolding<super::caches::FileSys> for FileSysProc {
-    fn get_caches_mut(&mut self) -> &mut super::caches::FileSys {
-        &mut self.cache
-    }
-    fn get_caches(&self) -> &super::caches::FileSys {
-        &self.cache
+    let precomp_queries = acc.precomp_queries;
+    FullNode {
+        id,
+        metrics,
+        precomp_queries,
     }
 }

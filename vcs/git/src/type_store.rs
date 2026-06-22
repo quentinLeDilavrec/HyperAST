@@ -9,8 +9,8 @@ impl hyperast::store::TyDown<hyperast_gen_ts_cpp::TStore> for TStore {}
 impl hyperast::store::TyDown<hyperast_gen_ts_java::TStore> for TStore {}
 #[cfg(feature = "python")]
 impl hyperast::store::TyDown<hyperast_gen_ts_python::TStore> for TStore {}
-// #[cfg(feature = "file_sys")]
-// impl hyperast::store::TyDown<crate::processors::file_sys::TStore> for TStore {}
+#[cfg(feature = "file_sys")]
+impl hyperast::store::TyDown<crate::processors::file_sys::TStore> for TStore {}
 #[cfg(feature = "maven")]
 impl hyperast::store::TyDown<hyperast_gen_ts_xml::TStore> for TStore {}
 
@@ -86,10 +86,11 @@ impl TypeStore for TStore {
                 use $p as types;
                 if id.is::<types::Lang>() {
                     let tid = std::any::TypeId::of::<types::TType>();
-                    return erazed
+                    let x = erazed
                         .unerase_ref::<types::TType>(tid)
                         .map(|x| *x)
                         .map(|x| x.as_static().into());
+                    return Some(x.unwrap());
                 }
             }};
         }
@@ -97,13 +98,14 @@ impl TypeStore for TStore {
         decomp_t!(hyperast_gen_ts_cpp);
         decomp_t!(hyperast_gen_ts_python);
         decomp_t!(hyperast_gen_ts_xml);
+        decomp_t!(crate::processors::file_sys::types);
         None
     }
     fn decompress_type(
         erazed: &impl hyperast::store::nodes::PolyglotHolder,
-        _tid: std::any::TypeId,
+        tid: std::any::TypeId,
     ) -> Self::Ty {
-        if let Some(t) = Self::try_decompress_type(erazed, _tid) {
+        if let Some(t) = Self::try_decompress_type(erazed, tid) {
             return t;
         }
         #[cfg(not(debug_assertions))]

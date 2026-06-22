@@ -110,4 +110,5 @@ type ErazedTSG = Box<dyn std::any::Any + Send + Sync>;
 
 type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, TS>, Acc>;
 
+#[cfg(feature = "tsg")]
 pub type GraphQuery<'a> = tree_sitter_graph::ast::File<M<'a, TStore, &'a Acc>>;

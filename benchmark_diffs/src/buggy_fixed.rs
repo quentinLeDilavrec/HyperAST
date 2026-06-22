@@ -146,10 +146,10 @@ fn test_dir_increasing_ed() {
 
     let stores = java_gen.main_stores;
 
-    let src_trs = stores.node_store().resolve(src_tr.compressed_node);
+    let src_trs = stores.node_store().resolve(src_tr.id);
     let src_trs = src_trs.children().unwrap();
     let src_trs: Vec<_> = src_trs.iter_children().collect();
-    let dst_trs = stores.node_store().resolve(dst_tr.compressed_node);
+    let dst_trs = stores.node_store().resolve(dst_tr.id);
     let dst_trs = dst_trs.children().unwrap();
     let dst_trs: Vec<_> = dst_trs.iter_children().collect();
     for (src_tr, dst_tr) in src_trs.into_iter().zip(dst_trs.into_iter()) {
@@ -1840,12 +1840,12 @@ pub fn run_dir(src: &Path, dst: &Path) -> Option<String> {
         mapper,
         actions: hast_actions,
         exec_data,
-    } = algorithms::gumtree::diff(&stores, &src_tr.compressed_node, &dst_tr.compressed_node);
+    } = algorithms::gumtree::diff(&stores, &src_tr.id, &dst_tr.id);
 
     let gt_out = other_tools::gumtree::subprocess_checked(
         &stores,
-        src_tr.compressed_node,
-        dst_tr.compressed_node,
+        src_tr.id,
+        dst_tr.id,
         "gumtree",
         "Chawathe",
         60 * 5,

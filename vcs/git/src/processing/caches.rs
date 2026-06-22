@@ -18,53 +18,6 @@ type OidHasher = core::hash::BuildHasherDefault<OidHash>;
 pub(crate) type OidMap<T> = std::collections::HashMap<git2::Oid, T, OidHasher>;
 pub(crate) type NamedMap<T> = hyperast::compat::HashMap<(git2::Oid, ObjectName), T>;
 
-#[cfg(feature = "java")]
-#[derive(Default)]
-pub struct Java {
-    pub(crate) md_cache: hyperast_gen_ts_java::legion_with_refs::MDCache,
-    /// Passed to subtree builder when deriving different data (assumed to be incompatible).
-    pub(crate) dedup: hyperast::store::nodes::legion::DedupMap,
-    pub object_map: NamedMap<(hyperast_gen_ts_java::legion_with_refs::Local,)>,
-}
-
-#[cfg(feature = "java")]
-impl super::ObjectMapper for Java {
-    type K = (git2::Oid, ObjectName);
-
-    type V = (hyperast_gen_ts_java::legion_with_refs::Local,);
-
-    fn get(&self, key: &Self::K) -> Option<&Self::V> {
-        self.object_map.get(key)
-    }
-
-    fn insert(&mut self, key: Self::K, value: Self::V) -> Option<Self::V> {
-        self.object_map.insert(key, value)
-    }
-}
-
-#[cfg(feature = "cpp")]
-#[derive(Default)]
-pub struct Cpp {
-    pub(crate) md_cache: hyperast_gen_ts_cpp::legion::MDCache,
-    pub(crate) dedup: hyperast::store::nodes::legion::DedupMap,
-    pub object_map: NamedMap<(hyperast_gen_ts_cpp::legion::Local,)>,
-}
-
-#[cfg(feature = "cpp")]
-impl super::ObjectMapper for Cpp {
-    type K = (git2::Oid, ObjectName);
-
-    type V = (hyperast_gen_ts_cpp::legion::Local,);
-
-    fn get(&self, key: &Self::K) -> Option<&Self::V> {
-        self.object_map.get(key)
-    }
-
-    fn insert(&mut self, key: Self::K, value: Self::V) -> Option<Self::V> {
-        self.object_map.insert(key, value)
-    }
-}
-
 #[cfg(feature = "maven")]
 #[derive(Default)]
 pub struct Maven {
@@ -95,7 +48,7 @@ impl super::ObjectMapper for Pom {
 #[cfg(feature = "make")]
 #[derive(Default)]
 pub struct Make {
-    pub object_map: OidMap<crate::processors::make::FullNode>,
+    pub object_map: OidMap<crate::processors::FullNode>,
 }
 
 #[cfg(feature = "make")]

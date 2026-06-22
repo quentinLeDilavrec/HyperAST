@@ -128,7 +128,7 @@ impl PreProcessedRepositories {
         &self,
         config: &ParametrizedCommitProcessorHandle,
         commit_oid: &git2::Oid,
-    ) -> std::option::Option<&Commit> {
+    ) -> Option<&Commit> {
         let proc = self
             .processor
             .processing_systems

@@ -8,7 +8,7 @@ use super::{code_tracking, types};
 type ShowRes<T> = (
     egui::Response,
     egui::InnerResponse<()>,
-    std::option::Option<egui::InnerResponse<Option<T>>>,
+    Option<egui::InnerResponse<Option<T>>>,
 );
 
 #[allow(unused)] // TODO move to egui_addon

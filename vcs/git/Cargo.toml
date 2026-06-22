@@ -32,12 +32,15 @@ hyperast_tsquery = { workspace = true, features = ["tsg"] }
 hyperast_gen_ts_java = { workspace = true } #, features = ["subtree-stats"]
 criterion = { workspace = true }
 
+[target.'cfg(not(target_env = "msvc"))'.dev-dependencies]
+jemallocator = { package = "tikv-jemallocator", version = "0.5.0" }
+
 [[bench]]
 name = "construction_runtime"
 harness = false
 
 [features]
-default = ["maven_java", "make_cpp", "npm_ts", "python"]
+default = ["maven_java", "make_cpp", "npm_ts", "python", "file_sys"]
 tsg = ["dep:tree-sitter-graph", "hyperast_tsquery/tsg"]
 file_sys = []
 maven_java = ["maven", "java"]

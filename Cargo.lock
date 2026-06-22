@@ -4587,6 +4587,7 @@ dependencies = [
  "log",
  "num",
  "serde",
+ "tikv-jemallocator",
  "tree-sitter",
  "tree-sitter-graph",
  "vec_extract_if_polyfill",

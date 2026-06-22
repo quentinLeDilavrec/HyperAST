@@ -616,16 +616,16 @@ impl<R> Default for RoleAcc<R> {
 impl<R> RoleAcc<R> {
     pub fn acc(&mut self, role: R, o: usize) {
         use num::ToPrimitive;
-        if let Some(o) = o.to_u8() {
-            self.roles.push(role);
-            self.offsets.push(o);
-        } else {
+        let Some(o) = o.to_u8() else {
             log::warn!("overflowed 255 offseted role...");
             debug_assert!(false);
+            return;
             // TODO could increase to u16,
             // at least on some variants.
             // TODO could also use the repeat nodes to break down nodes with way to many children...
-        }
+        };
+        self.roles.push(role);
+        self.offsets.push(o);
     }
 
     pub fn add_md<EB: GatherAttrErazed>(self, dyn_builder: &mut EB)

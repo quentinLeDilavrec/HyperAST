@@ -111,6 +111,18 @@ role_impl!(
     // Label => "label",
     // Placement => "placement",
 
+    // // Python
+    Superclasses => "superclasses",
+    Attribute => "attribute",
+    Subscript => "subscript",
+    Operators => "operators",
+    Alias => "alias",
+    ModuleName => "module_name",
+    Definition => "definition",
+    Cause => "cause",
+    ReturnType => "return_type",
+    Subject => "subject",
+
     // // TsQuery
     Quantifier => "quantifier",
     Name => "name",

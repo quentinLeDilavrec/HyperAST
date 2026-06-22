@@ -16,6 +16,13 @@ use hyperast::store::nodes::legion::RawHAST;
 #[cfg(feature = "impact")]
 use hyperast::utils::memusage;
 
+#[cfg(not(target_env = "msvc"))]
+use jemallocator::Jemalloc;
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 #[cfg(feature = "impact")]
 #[test]
 fn example_main() {
@@ -455,6 +462,7 @@ fn test_file_sys() {
 
     let commitid = commits[0];
     let commit = preprocessed.get_commit(&config, &commitid).unwrap();
+    dbg!(&commit.memory_used.to_string());
     dbg!(std::time::Duration::from_nanos(
         commit.processing_time as u64
     ));

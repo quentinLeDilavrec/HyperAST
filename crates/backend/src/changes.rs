@@ -33,7 +33,7 @@ pub struct DstChanges {
     pub additions: Vec<u32>, // TODO diff encode
 }
 
-type RepoConfig = hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle;
+type RepoConfig = hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
 pub(crate) const UPD: bool = true;
 
@@ -406,7 +406,7 @@ where
 
 fn compute_and_cache_full_diff(
     state: crate::SharedState,
-    config: &hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle,
+    config: &hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle,
     src_oid: hyperast_vcs_git::git::Oid,
     dst_oid: hyperast_vcs_git::git::Oid,
 ) {

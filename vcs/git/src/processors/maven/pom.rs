@@ -6,10 +6,10 @@ use crate::ParseErr;
 use crate::preprocessed::CommitBuilder;
 use crate::processing::CacheHolding;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::caches::Pom as PomCaches;
 use crate::processing::erased::CommitProc;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 
 use super::MavenProc;

@@ -17,16 +17,17 @@ use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
+use crate::processing::ProcessorHolder;
 use crate::processing::caches::Maven as MavenCaches;
 use crate::processing::erased::CommitProc;
 use crate::processing::erased::CommitProcessorHandle;
 use crate::processing::erased::ConfigParametersHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 use crate::processing::file_sys;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
-use crate::processing::{ParametrizedCommitProcessorHandle as PCPHandle, ProcessorHolder};
 use crate::utils::drain_filter_strip;
 
 use super::JavaProc;

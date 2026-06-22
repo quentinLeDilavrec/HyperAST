@@ -1,8 +1,8 @@
 use git2::{Oid, Repository};
 
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, ObjectName};
 
 use super::{MakeModuleAcc, MakeProc};

@@ -459,7 +459,7 @@ fn pre_query(
     state: &mut SharedState,
     path: &Param,
     content: &Content,
-    repo_config: hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle,
+    repo_config: hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle,
 ) -> Result<hyperast_tsquery::Query, QueryingError> {
     let Param { user, name, commit } = path.clone();
     let mut additional = commit.split("/");

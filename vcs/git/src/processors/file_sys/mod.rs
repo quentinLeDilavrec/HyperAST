@@ -8,6 +8,7 @@ pub mod types;
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub use types::{TStore, Type};
@@ -76,7 +77,7 @@ impl hyperast::tree_gen::Accumulator for FileSysAcc {
 }
 
 impl crate::preprocessed::RepositoryProcessor {
-    pub fn default_config(&mut self) -> crate::processing::ParametrizedCommitProcessorHandle {
+    pub fn default_config(&mut self) -> PCPHandle {
         use crate::processors::cpp::CppProc;
         use crate::processors::java::JavaProc;
         use crate::processors::python::PythonProc;

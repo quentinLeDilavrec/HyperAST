@@ -26,7 +26,6 @@ use super::Extra;
 use super::RoleAcc;
 use super::TreeGen;
 use super::ZippedTreeGen;
-use super::get_spacing;
 use super::handle_file_bounds;
 use super::parser::Node as _;
 use super::parser::TreeCursor as _;
@@ -380,7 +379,164 @@ where
         text: &Self::Text,
         mut acc: Self::Acc,
     ) {
-        let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
+        use super::validate_spacing as validate;
+        let padding = acc.padding_start;
+        let start = acc.start_byte;
+        let end = acc.end_byte;
+        let cursor = global.sum_byte_length();
+        macro_rules! error {
+            (@ $t:expr) => {
+                panic!("{}", std::str::from_utf8($t).unwrap());
+            };
+            ($t:expr) => {
+                parent.push(self.make_error(global, $t));
+            };
+        }
+        macro_rules! space {
+            (@ $t:expr) => {
+                panic!("{}", std::str::from_utf8($t).unwrap());
+            };
+            ($t:expr) => {
+                parent.push(self.make_space(global, $t));
+            };
+        }
+        macro_rules! comp {
+            ($a:ident < $b:ident) => {
+                $a < $b
+            };
+            ($a:ident <= $b:ident) => {
+                $a <= $b
+            };
+            ($a:ident == $b:ident) => {
+                $a == $b
+            };
+            ($a:ident < $b:ident $($t:tt)+) => {
+                $a < $b && comp!( $b $($t)* )
+            };
+            ($a:ident <= $b:ident $($t:tt)+) => {
+                $a <= $b && comp!( $b $($t)* )
+            };
+            ($a:ident == $b:ident $($t:tt)+) => {
+                $a == $b && comp!( $b $($t)* )
+            };
+        }
+        if comp!(      padding == start == end == cursor) {
+            //                        what ??
+            log::info!(
+                "what should we do with {} {} {} {} ?",
+                padding,
+                start,
+                end,
+                cursor
+            );
+            // unreachable!(
+            //     "what should we do with {} {} {} {} ?",
+            //     padding, start, end, cursor
+            // )
+        } else if comp!(padding == start < end == cursor) {
+            //                      | node  |     ...
+            // no space to produce
+        } else if comp!(padding == start < cursor < end) {
+            //                       | node  | error |  ...
+            // no space to produce
+            let error = &text[cursor..end];
+            if validate(error) {
+                space!(error);
+                global.set_sum_byte_length(end);
+            } else {
+                error!(@ error);
+                global.set_sum_byte_length(end);
+            }
+        } else if comp!(padding < start < end == cursor) {
+            //            |  space  | node  |     ...
+            let space = &text[padding..start];
+            if validate(space) {
+                space!(space);
+            } else {
+                error!(space);
+            }
+        } else if comp!(padding < start < cursor < end) {
+            //            |  space  | node  | error |  ...
+            let space = &text[padding..start];
+            if validate(space) {
+                space!(space);
+            } else {
+                error!(space);
+            }
+            let error = &text[cursor..end];
+            if validate(error) {
+                space!(error);
+                global.set_sum_byte_length(end);
+            } else {
+                error!(@ error);
+                global.set_sum_byte_length(end);
+            }
+        } else {
+            unreachable!(
+                "should normally handle all cases {} {} {} {}",
+                padding, start, end, cursor
+            )
+        }
+        // if comp!(      padding == start == end == cursor) {
+        //     //                        what ??
+        //     unreachable!(
+        //         "what should we do with {} {} {} {} ?",
+        //         padding, start, end, cursor
+        //     )
+        // } else if comp!(padding == start < end == cursor) {
+        //     //                      | node  |     ...
+        //     // no space to produce
+        // } else if comp!(padding < start < end == cursor) {
+        //     //            |  space  | node  |     ...
+        //     let space = &text[padding..start];
+        //     if validate(space) {
+        //         space!(space);
+        //     } else {
+        //         error!(space);
+        //     }
+        // } else if comp!(padding < start < cursor < end) {
+        //     //            |  space  | node  |     ...
+        //     let space = &text[padding..start];
+        //     if validate(space) {
+        //         space!(space);
+        //     } else {
+        //         error!(@ space);
+        //     }
+        //     let error = &text[cursor..end];
+        //     if !validate(space) {
+        //         error!(@ space);
+        //         global.set_sum_byte_length(end);
+        //     }
+        // } else {
+        //     unreachable!(
+        //         "should normally handle all cases {} {} {} {}",
+        //         padding, start, end, cursor
+        //     )
+        // }
+        let node = self.post(|n| parent.push(n), global, text, acc);
+        parent.push(node);
+        return;
+        let spacing = super::try_get_spacing2(padding, start, text);
+        if cursor < end {
+            // Only create an error node if tree-sitter is skipping non-whitespaces.
+            // the error node takes the span to realign for next leaf node
+            if super::try_get_spacing(cursor, end, text).is_none() {
+                acc.push(self.make_error(global, &text[cursor..end]));
+                global.set_sum_byte_length(end);
+            }
+        }
+        if let Some(Some(spacing)) = spacing {
+            parent.push(self.make_space(global, &spacing));
+        }
+        let node = self.post(|n| parent.push(n), global, text, acc);
+        parent.push(node);
+        return;
+
+        ////////////////////////
+        ///////////new/////////////
+        ////////////////////////
+
+        let spacing = super::try_get_spacing2(acc.padding_start, acc.start_byte, text);
         if global.sum_byte_length() < acc.end_byte {
             // Only create an error node if tree-sitter is skipping non-whitespaces.
             // the error node takes the span to realign for next leaf node
@@ -388,10 +544,56 @@ where
                 acc.push(self.make_error(global, &text[global.sum_byte_length()..acc.end_byte]));
                 global.set_sum_byte_length(acc.end_byte);
             }
+            let node = self.post(|n| parent.push(n), global, text, acc);
+            parent.push(node);
+            return;
         }
-        if let Some(spacing) = spacing {
+        if let Some(Some(spacing)) = spacing {
             parent.push(self.make_space(global, &spacing));
+            let node = self.post(|n| parent.push(n), global, text, acc);
+            parent.push(node);
+            return;
         }
+        // if acc.padding_start < acc.start_byte && acc.start_byte < acc.end_byte {
+        //     dbg!(
+        //         global.sum_byte_length(),
+        //         acc.padding_start,
+        //         acc.start_byte,
+        //         acc.end_byte
+        //     );
+        //     dbg!(std::str::from_utf8(
+        //         &text[acc.padding_start..acc.start_byte]
+        //     ));
+        //     dbg!(std::str::from_utf8(&text[acc.start_byte..acc.end_byte]));
+        //     acc.push(self.make_error(global, &text[acc.padding_start..acc.start_byte]));
+        //     acc.push(self.make_error(global, &text[acc.start_byte..acc.end_byte]));
+        //     // global.set_sum_byte_length(acc.start_byte);
+        // }
+
+        // else if acc.padding_start < acc.start_byte {
+        //     dbg!(
+        //         global.sum_byte_length(),
+        //         acc.padding_start,
+        //         acc.start_byte,
+        //         acc.end_byte
+        //     );
+        //     dbg!(std::str::from_utf8(
+        //         &text[acc.padding_start..acc.start_byte]
+        //     ));
+        //     acc.push(self.make_error(global, &text[acc.padding_start..acc.start_byte]));
+        //     // global.set_sum_byte_length(acc.start_byte);
+        // } else if acc.start_byte < acc.end_byte {
+        //     dbg!(
+        //         global.sum_byte_length(),
+        //         acc.padding_start,
+        //         acc.start_byte,
+        //         acc.end_byte
+        //     );
+        //     dbg!(std::str::from_utf8(&text[acc.start_byte..acc.end_byte]));
+        //     acc.push(self.make_error(global, &text[acc.start_byte..acc.end_byte]));
+        // } else {
+        //     panic!();
+        // }
         let node = self.post(|n| parent.push(n), global, text, acc);
         parent.push(node);
     }

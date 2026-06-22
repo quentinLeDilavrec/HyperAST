@@ -126,3 +126,30 @@ fn not_simple() {
     dbg!(&f.local.metrics);
     assert_eq!(text, TextSerializer::new(&stores, id).to_string());
 }
+
+#[test]
+pub(crate) fn issue_npy_nditer_test() {
+    let text = CODE_NPY_NDITER_CONSTR;
+    let text = text.as_bytes();
+    let tree = tree_sitter_parse(text);
+    println!("{:#?}", tree.root_node().to_sexp());
+    let mut stores = SimpleStores::default();
+    use crate::legion_ts_simp::CTreeGen;
+    let mut tree_gen = CTreeGen::bare(&mut stores);
+    // let mut md_cache = Default::default();
+    // let mut tree_gen = CTreeGen::new(&mut stores, &mut md_cache);
+    let x = tree_gen.generate_file(b"", text, tree.walk()).node.local;
+    println!(
+        "{}",
+        hyperast::nodes::SyntaxSerializer::new(&stores, x.compressed_node)
+    );
+    // println!("{}", tree.root_node().to_sexp());
+}
+
+// https://github.com/numpy/numpy/blob/main/numpy/_core/src/multiarray/nditer_constr.c
+pub(crate) const CODE_NPY_NDITER_CONSTR: &str = r#"NPY_NO_EXPORT NpyIter *
+NpyIter_AdvancedNew()
+{
+    NIT_ITERINDEX(iter) = 0;
+    memset(NIT_BASEOFFSETS(iter), 0, (nop+1)*NPY_SIZEOF_INTP);
+}"#;

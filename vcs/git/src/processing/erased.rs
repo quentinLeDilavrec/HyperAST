@@ -16,22 +16,6 @@ use crate::Commit;
 #[allow(deprecated)]
 /// A config holding arbitrary parameters for a parametrized commit processor.
 pub struct ConfigParameters(std::rc::Rc<dyn std::any::Any>);
-// pub trait Parametrized: ParametrizedCommitProc2 {
-//     type T: 'static;
-//     // Register a parameter to later be used by the processor,
-//     // each identical (structurally) parameter should identify exactly one processor
-//     fn register_param_erazed(&mut self, t: Self::T) -> PCPHandle {
-//         self.register_param(t).erase()
-//     }
-//     fn register_param(&mut self, t: Self::T) -> PCP2Handle<Self::Proc>;
-// }
-
-//
-//
-//
-//
-//
-//
 
 pub struct ProcessorHolder<Proc>(Vec<Proc>);
 impl<Proc> Default for ProcessorHolder<Proc> {
@@ -63,12 +47,6 @@ impl<Proc: CommitProcExt + 'static> ParametrizedCommitProc2 for ProcessorHolder<
     }
 }
 
-//
-//
-//
-//
-//
-
 /// Handle over a commit processor, resulting from type erasure when registering a commit processor.
 #[derive(Clone, Copy, Debug)]
 pub struct CommitProcessorHandle(pub(crate) std::any::TypeId);
@@ -91,33 +69,29 @@ use ParametrizedCommitProcessorHandle as PCPHandle;
 ///
 /// If you want to store a [`ParametrizedCommitProcessor2Handle`] at runtime, use [`ParametrizedCommitProcessorHandle`] instead.
 #[derive(Debug)]
-pub struct ParametrizedCommitProcessor2Handle<T: CommitProcExt>(
+pub struct ParametrizedCommitProcessor2Handle<T>(
     pub ConfigParametersHandle,
     pub(crate) PhantomData<T>,
 );
 use ParametrizedCommitProcessor2Handle as PCP2Handle;
 
-impl<T: CommitProcExt> PartialEq for PCP2Handle<T> {
+impl<T> PartialEq for PCP2Handle<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.0 == other.0.0 && self.1 == other.1
     }
 }
-
-impl<T: CommitProcExt> Eq for PCP2Handle<T> {}
-
-impl<T: CommitProcExt> Clone for PCP2Handle<T> {
+impl<T> Eq for PCP2Handle<T> {}
+impl<T> Clone for PCP2Handle<T> {
     fn clone(&self) -> Self {
-        *self
+        PCP2Handle(self.0, self.1)
     }
 }
-impl<T: CommitProcExt> Copy for PCP2Handle<T> {}
+impl<T> Copy for PCP2Handle<T> {}
 
 impl<T: CommitProcExt + 'static> PCP2Handle<T> {
     pub(crate) fn erase(&self) -> PCPHandle {
-        PCPHandle(
-            CommitProcessorHandle(std::any::TypeId::of::<ProcessorHolder<T>>()),
-            self.0,
-        )
+        let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
+        PCPHandle(CommitProcessorHandle(tid), self.0)
     }
 }
 
@@ -156,7 +130,6 @@ pub trait PreparedCommitProc {
     fn process(self: Box<Self>, prepro: &mut RepositoryProcessor) -> ProcessorOutput;
 }
 pub trait CommitProcExt: CommitProc {
-    // type Holder: ParametrizedCommitProc + Parametrized;
     fn register_param(
         h: &mut ProcessorHolder<Self>,
         t: impl Into<Self> + PartialEq<Self>,

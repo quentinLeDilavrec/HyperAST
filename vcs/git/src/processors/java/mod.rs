@@ -1,4 +1,10 @@
+//! Handles Java
+
+pub mod caches;
+mod commit_proc;
 mod java_processor;
+mod parameters;
+pub mod selection;
 
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::tree_gen;
@@ -13,60 +19,11 @@ pub(crate) use hyperast_gen_ts_java::legion_with_refs as java_tree_gen;
 use hyperast_gen_ts_java::legion_with_refs::PartialAnalysis;
 use hyperast_gen_ts_java::{TStore, Type};
 
-pub use java_processor::SUB_QUERIES; // To remove, at least in the current form
+pub use parameters::Parameter;
+pub use parameters::SUB_QUERIES; // To remove, at least in the current form
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
-
-mod parameters;
-pub use parameters::Parameter;
-
-pub mod caches {
-    use hyperast::store::nodes::legion::DedupMap;
-
-    use crate::processing::caches::NamedMap;
-    use crate::processing::{ObjectMapper, ObjectName};
-
-    #[derive(Default)]
-    pub struct Java {
-        pub(crate) md_cache: hyperast_gen_ts_java::legion_with_refs::MDCache,
-        /// Passed to subtree builder when deriving different data (assumed to be incompatible).
-        pub(crate) dedup: DedupMap,
-        pub object_map: NamedMap<super::FullNode>,
-    }
-
-    impl ObjectMapper for Java {
-        type K = (git2::Oid, ObjectName);
-
-        type V = super::FullNode;
-
-        fn get(&self, key: &Self::K) -> Option<&Self::V> {
-            self.object_map.get(key)
-        }
-
-        fn insert(&mut self, key: Self::K, value: Self::V) -> Option<Self::V> {
-            self.object_map.insert(key, value)
-        }
-    }
-}
-
-pub mod selection {
-    use crate::processing::{CachesHolding, InFiles, ObjectName};
-
-    /// The java scheme,
-    /// made of packages and modules https://docs.oracle.com/javase/specs/jls/se11/html/jls-7.html
-    #[cfg(feature = "maven")]
-    pub struct Java;
-
-    impl CachesHolding for Java {
-        type Caches = super::caches::Java;
-    }
-
-    impl InFiles for Java {
-        fn matches(name: &ObjectName) -> bool {
-            name.ends_with(".java")
-        }
-    }
-}
+type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
 
 use super::FullNode;
 use super::PrecompQueries;
@@ -77,7 +34,7 @@ pub struct JavaProc {
     query: Option<super::Query>,
     #[cfg(feature = "tsg")]
     tsg: Option<parameters::TsgErzedSettings>,
-    cache: caches::Java,
+    cache: caches::JavaCaches,
     commits: OidMap<crate::Commit>,
 }
 

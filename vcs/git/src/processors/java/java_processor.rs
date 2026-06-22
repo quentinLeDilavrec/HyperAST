@@ -1,7 +1,5 @@
 use std::iter::Peekable;
-use std::marker::PhantomData;
 use std::path::Components;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use git2::{Oid, Repository};
@@ -18,21 +16,16 @@ use hyperast_gen_ts_java::{TStore, Type};
 
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
-use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ParametrizedCommitProcessorHandle;
+use crate::processing::ObjectName;
 use crate::processing::erased::ConfigParametersHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
-use crate::processing::erased::PreparedCommitProc;
-use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::{Processor, StackEle};
 
-use super::JavaAcc;
 use super::JavaProc;
-use super::Parameter;
 use super::SimpleStores;
-use super::caches::Java as JavaCaches;
+use super::{JavaAcc, JavaProcessorHolder};
 
 type Handle = PCP2Handle<JavaProc>;
 
@@ -44,8 +37,6 @@ pub struct JavaProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: &'d Handle,
 }
-
-type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
 
 impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     pub(crate) fn prepare(
@@ -91,7 +82,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
                 self.handle_dir(oid, name);
             }
             BasicGitObject::Blob(oid, name) => {
-                if super::selection::Java::matches(&name) {
+                if super::selection::matches(&name) {
                     self.prepro
                         .help_handle_java_file(
                             oid,
@@ -347,111 +338,6 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
     }
 }
 
-#[doc(hidden)]
-pub static PREPRO: &str = r#"
-local size = 1 -- init
-
-function acc(c)
-    size += c.size
-end
-
-function finish()
-    return {size = size}
-end
-"#;
-
-impl Parameter {
-    pub fn faster() -> Self {
-        let query = None;
-        let tsg = None;
-        let prepro = None;
-        Self { query, tsg, prepro }
-    }
-    pub fn fast() -> Self {
-        let query = Some(SUB_QUERIES.into());
-        let tsg = None;
-        let prepro = None;
-        Self { query, tsg, prepro }
-    }
-    pub fn stable() -> Self {
-        let query = Some(SUB_QUERIES.into());
-        let tsg = None;
-        let prepro = Some(PREPRO.into());
-        Self { query, tsg, prepro }
-    }
-
-    pub fn nightly() -> Self {
-        let query = Some(SUB_QUERIES.into());
-        let tsg = Some(TSG.into());
-        let prepro = Some(PREPRO.into());
-        Self { query, tsg, prepro }
-    }
-}
-
-impl crate::processing::erased::CommitProc for JavaProc {
-    fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {
-        self.commits.get(&commit_oid)
-    }
-
-    fn commit_count(&self) -> usize {
-        self.commits.len()
-    }
-
-    fn get_precomp_query(&self) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
-        self.parameter.query.clone()
-    }
-
-    fn prepare_processing<'repo>(
-        &self,
-        repository: &'repo Repository,
-        commit_builder: CommitBuilder,
-        handle: ParametrizedCommitProcessorHandle,
-    ) -> Box<dyn PreparedCommitProc + 'repo> {
-        Box::new(PreparedJavaCommitProc {
-            repository,
-            commit_builder,
-            handle,
-        })
-    }
-}
-
-struct PreparedJavaCommitProc<'repo> {
-    repository: &'repo Repository,
-    commit_builder: CommitBuilder,
-    pub(crate) handle: ParametrizedCommitProcessorHandle,
-}
-
-impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
-    fn process(
-        self: Box<PreparedJavaCommitProc<'repo>>,
-        prepro: &mut RepositoryProcessor,
-    ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
-        let name = ObjectName::from(b"");
-        // TODO check parameter in self to know it is a recursive module search
-        let root_full_node = JavaProcessor::<JavaAcc>::prepare(
-            self.repository,
-            prepro,
-            &mut dir_path,
-            &name,
-            self.commit_builder.tree_oid(),
-            &PCP2Handle(self.handle.1, PhantomData),
-        )
-        .process();
-        let h = prepro
-            .processing_systems
-            .mut_or_default::<JavaProcessorHolder>();
-        let handle = self.handle;
-        let commit_oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle.1)
-            .commits
-            .insert(commit_oid, commit);
-        root_full_node.id
-    }
-}
-
 impl JavaProc {
     pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
         type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
@@ -460,67 +346,6 @@ impl JavaProc {
         crate::processing::erased::CommitProcExt::register_param(h, t)
     }
 }
-
-impl CacheHolding<JavaCaches> for JavaProc {
-    fn get_caches_mut(&mut self) -> &mut JavaCaches {
-        &mut self.cache
-    }
-    fn get_caches(&self) -> &JavaCaches {
-        &self.cache
-    }
-}
-
-/// WARN be cautious about mutating that
-/// TODO make something safer
-#[doc(hidden)]
-pub static SUB_QUERIES: &[&str] = &[
-    r#"(method_invocation
-    (identifier) (#EQ? "fail")
-)"#,
-    r#"(try_statement
-    (block)
-    (catch_clause)
-)"#,
-    r#"(marker_annotation
-    name: (identifier) (#EQ? "Test")
-)"#,
-    "(constructor_declaration)",
-    "(class_declaration)",
-    "(interface_declaration)",
-    r#"(method_invocation
-        name: (identifier) (#EQ? "sleep")
-    )"#,
-    r#"(marker_annotation
-        name: (identifier) (#EQ? "Ignored")
-    )"#,
-    r#"(block
-        "{"
-        .
-        "}"
-    )"#,
-    r#"(method_invocation
-        (identifier) (#EQ? "assertEquals")
-    )"#,
-    r#"(method_invocation
-        (identifier) (#EQ? "assertSame")
-    )"#,
-    r#"(method_invocation
-        (identifier) (#EQ? "assertThat")
-    )"#,
-    r#"(program)"#,
-];
-
-#[doc(hidden)]
-pub static TSG: &str = r#"
-(program)@prog {
-    node @prog.defs
-    node @prog.lexical_scope
-}
-(class_declaration name:(_)@name)@class {
-    node @class.defs
-    attr (@class.defs) name = (source-text @name)
-}
-"#;
 
 impl RepositoryProcessor {
     pub(crate) fn handle_java_file(
@@ -568,7 +393,7 @@ impl RepositoryProcessor {
         parameters: Handle,
     ) -> Result<super::FullNode, crate::ParseErr> {
         self.processing_systems
-            .caching_blob_handler::<super::selection::Java>()
+            .caching_blob_handler::<JavaProc>()
             .handle2(oid, repository, name, parameters, |c, n, t| {
                 let line_break = _auto_configured_line_break(t);
 
@@ -769,7 +594,7 @@ mod experiments {
                     None
                 }
                 ObjectType::File => {
-                    if super::super::selection::Java::matches(current_object.name()) {
+                    if super::super::selection::matches(current_object.name()) {
                         self.prepro
                             .help_handle_java_file(
                                 *current_object.id(),

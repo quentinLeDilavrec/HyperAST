@@ -1,5 +1,9 @@
+//! Handles C++
+
 mod caches;
+mod commit_proc;
 mod cpp_processor;
+mod impls;
 pub mod selection;
 
 use hyperast::store::defaults::LabelIdentifier;
@@ -16,9 +20,6 @@ use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_cpp::TStore>;
 
-pub(crate) use cpp_processor::CppProc;
-pub use cpp_processor::SUB_QUERIES;
-
 use super::FullNode;
 use super::PrecompQueries;
 
@@ -27,26 +28,18 @@ pub struct Parameter {
     pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
 }
 
-impl Parameter {
-    pub fn new(query: impl hyperast_tsquery::ArrayStr) -> Self {
-        Self {
-            query: Some(query.iter().collect()),
-        }
-    }
+pub(crate) type CppProcessorHolder = crate::processing::ProcessorHolder<CppProc>;
+
+pub struct CppProc {
+    parameter: Parameter,
+    query: Option<crate::processors::Query>,
+    cache: caches::CppCache,
+    commits: crate::processing::caches::OidMap<crate::Commit>,
 }
 
 pub struct CppAcc {
     pub(crate) primary: DirPrimary,
     pub(crate) precomp_queries: PrecompQueries,
-}
-
-impl CppAcc {
-    pub(crate) fn new(name: String) -> Self {
-        Self {
-            primary: DirPrimary::new(name),
-            precomp_queries: PrecompQueries::default(),
-        }
-    }
 }
 
 impl Accumulator for CppAcc {
@@ -61,27 +54,11 @@ impl hyperast::tree_gen::Accumulator for CppAcc {
     }
 }
 
-impl From<String> for CppAcc {
-    fn from(name: String) -> Self {
-        Self::new(name)
-    }
-}
-
 impl CppAcc {
     pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: impl Into<FullNode>) {
         let full_node = full_node.into();
         self.primary.push(name, full_node.id, full_node.metrics);
         self.precomp_queries += full_node.precomp_queries;
-    }
-}
-
-impl From<hyperast_gen_ts_cpp::legion::Local> for FullNode {
-    fn from(full_node: hyperast_gen_ts_cpp::legion::Local) -> Self {
-        Self {
-            id: full_node.compressed_node,
-            metrics: full_node.metrics,
-            precomp_queries: PrecompQueries(full_node.precomp_queries),
-        }
     }
 }
 
@@ -117,6 +94,7 @@ impl CppProc {
 //         node: N,
 //     },
 // }
+/// Processing a single C++ file with `hyperast_gen_ts_cpp::legion::CppTreeGen`
 pub(crate) fn handle_cpp_file1<'a, More>(
     tree_gen: &mut cpp_tree_gen::CppTreeGen<'a, '_, TStore, SimpleStores, More>,
     name: &ObjectName,
@@ -148,6 +126,7 @@ where
     })
 }
 
+/// Processing a single C++ file with new `hyperast_gen_ts_cpp::legion_ts_simp::CppTreeGen`
 pub(crate) fn handle_cpp_file2<'a, E>(
     tree_gen: &mut hyperast_gen_ts_cpp::legion_ts_simp::CppTreeGen<'a, 'a, E>,
     name: &ObjectName,

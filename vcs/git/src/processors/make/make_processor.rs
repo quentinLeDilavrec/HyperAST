@@ -88,7 +88,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     PCP2Handle(self.handle.1, std::marker::PhantomData),
                 )
                 .unwrap();
-        } else if cpp_processor::selection::Cpp::matches(&name) {
+        } else if cpp_processor::selection::matches(&name) {
             self.prepro
                 .help_handle_cpp_file2(
                     oid,

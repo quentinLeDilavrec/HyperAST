@@ -425,45 +425,48 @@ impl PreProcessedRepository {
     }
 }
 
-#[cfg(feature = "java")]
-impl PreProcessedRepository {
-    /// Preprocess commits in `repository` between `before` and `after`.
-    ///
-    /// `dir_path`: the subdirectory to consider for the analysis.
-    ///
-    /// If `before` and `after` are unrelated then only one commit will be processed.
-    ///
-    /// # Panics in debug mode
-    ///
-    /// Panics in debug mode if `before` and 'after' are unrelated.
-    pub fn pre_process_no_maven(
-        &mut self,
-        repository: &mut Repository,
-        before: &str,
-        after: &str,
-        dir_path: &str,
-    ) -> Vec<git2::Oid> {
-        log::info!(
-            "commits to process: {:?}",
-            all_commits_between(&repository, before, after).map(|x| x.count())
-        );
-        let mut processing_ordered_commits = vec![];
-        let rw = all_commits_between(&repository, before, after);
-        let Ok(rw) = rw else {
-            dbg!(rw.err());
-            return vec![];
-        };
-        rw.for_each(|oid| {
-            let oid = oid.unwrap();
-            let c = CommitProcessor::<crate::processors::java::selection::Java>::handle_commit::<
-                false,
-            >(&mut self.processor, &repository, dir_path, oid);
-            processing_ordered_commits.push(oid);
-            self.commits.insert(oid, c);
-        });
-        processing_ordered_commits
-    }
-}
+// #[cfg(feature = "java")]
+// impl PreProcessedRepository {
+//     /// Preprocess commits in `repository` between `before` and `after`.
+//     ///
+//     /// `dir_path`: the subdirectory to consider for the analysis.
+//     ///
+//     /// If `before` and `after` are unrelated then only one commit will be processed.
+//     ///
+//     /// # Panics in debug mode
+//     ///
+//     /// Panics in debug mode if `before` and 'after' are unrelated.
+//     pub fn pre_process_no_maven(
+//         &mut self,
+//         repository: &mut Repository,
+//         before: &str,
+//         after: &str,
+//         dir_path: &str,
+//     ) -> Vec<git2::Oid> {
+//         log::info!(
+//             "commits to process: {:?}",
+//             all_commits_between(&repository, before, after).map(|x| x.count())
+//         );
+//         let mut processing_ordered_commits = vec![];
+//         let rw = all_commits_between(&repository, before, after);
+//         let Ok(rw) = rw else {
+//             dbg!(rw.err());
+//             return vec![];
+//         };
+//         rw.for_each(|oid| {
+//             let oid = oid.unwrap();
+//             let c = CommitProcessor::<crate::processors::java::JavaProc>::handle_commit::<false>(
+//                 &mut self.processor,
+//                 &repository,
+//                 dir_path,
+//                 oid,
+//             );
+//             processing_ordered_commits.push(oid);
+//             self.commits.insert(oid, c);
+//         });
+//         processing_ordered_commits
+//     }
+// }
 
 #[cfg(feature = "make_cpp")]
 impl PreProcessedRepository {
@@ -665,29 +668,29 @@ impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
         // root_full_node
     }
 }
-#[cfg(feature = "java")]
-impl CommitProcessor<crate::processors::java::selection::Java> for RepositoryProcessor {
-    type Module = crate::processors::maven::FullNode;
-    fn handle_module<'b, const RMS: bool>(
-        &mut self,
-        _repository: &Repository,
-        _dir_path: &'b mut Peekable<Components<'b>>,
-        _name: &[u8],
-        _oid: git2::Oid,
-    ) -> Self::Module {
-        todo!("need to refactor some methods")
-        // let root_full_node = MavenProcessor::<RMS, true, MavenModuleAcc>::new(
-        //     repository,
-        //     self,
-        //     dir_path,
-        //     name,
-        //     oid,
-        //     todo!("para"),
-        // )
-        // .process();
-        // root_full_node
-    }
-}
+// #[cfg(feature = "java")]
+// impl CommitProcessor<crate::processors::java::selection::Java> for RepositoryProcessor {
+//     type Module = crate::processors::maven::FullNode;
+//     fn handle_module<'b, const RMS: bool>(
+//         &mut self,
+//         _repository: &Repository,
+//         _dir_path: &'b mut Peekable<Components<'b>>,
+//         _name: &[u8],
+//         _oid: git2::Oid,
+//     ) -> Self::Module {
+//         todo!("need to refactor some methods")
+//         // let root_full_node = MavenProcessor::<RMS, true, MavenModuleAcc>::new(
+//         //     repository,
+//         //     self,
+//         //     dir_path,
+//         //     name,
+//         //     oid,
+//         //     todo!("para"),
+//         // )
+//         // .process();
+//         // root_full_node
+//     }
+// }
 
 /// plan to work on all languges of the family of typesript ie. ts, js, tsx, jsx
 /// - [ ] ts

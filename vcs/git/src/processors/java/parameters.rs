@@ -112,3 +112,96 @@ type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, TS>, Acc>;
 
 #[cfg(feature = "tsg")]
 pub type GraphQuery<'a> = tree_sitter_graph::ast::File<M<'a, TStore, &'a Acc>>;
+
+impl Parameter {
+    pub fn faster() -> Self {
+        let query = None;
+        let tsg = None;
+        let prepro = None;
+        Self { query, tsg, prepro }
+    }
+    pub fn fast() -> Self {
+        let query = Some(SUB_QUERIES.into());
+        let tsg = None;
+        let prepro = None;
+        Self { query, tsg, prepro }
+    }
+    pub fn stable() -> Self {
+        let query = Some(SUB_QUERIES.into());
+        let tsg = None;
+        let prepro = Some(PREPRO.into());
+        Self { query, tsg, prepro }
+    }
+
+    pub fn nightly() -> Self {
+        let query = Some(SUB_QUERIES.into());
+        let tsg = Some(TSG.into());
+        let prepro = Some(PREPRO.into());
+        Self { query, tsg, prepro }
+    }
+}
+
+#[doc(hidden)]
+pub static PREPRO: &str = r#"
+local size = 1 -- init
+
+function acc(c)
+    size += c.size
+end
+
+function finish()
+    return {size = size}
+end
+"#;
+
+/// WARN be cautious about mutating that
+/// TODO make something safer
+#[doc(hidden)]
+pub static SUB_QUERIES: &[&str] = &[
+    r#"(method_invocation
+    (identifier) (#EQ? "fail")
+)"#,
+    r#"(try_statement
+    (block)
+    (catch_clause)
+)"#,
+    r#"(marker_annotation
+    name: (identifier) (#EQ? "Test")
+)"#,
+    "(constructor_declaration)",
+    "(class_declaration)",
+    "(interface_declaration)",
+    r#"(method_invocation
+        name: (identifier) (#EQ? "sleep")
+    )"#,
+    r#"(marker_annotation
+        name: (identifier) (#EQ? "Ignored")
+    )"#,
+    r#"(block
+        "{"
+        .
+        "}"
+    )"#,
+    r#"(method_invocation
+        (identifier) (#EQ? "assertEquals")
+    )"#,
+    r#"(method_invocation
+        (identifier) (#EQ? "assertSame")
+    )"#,
+    r#"(method_invocation
+        (identifier) (#EQ? "assertThat")
+    )"#,
+    r#"(program)"#,
+];
+
+#[doc(hidden)]
+pub static TSG: &str = r#"
+(program)@prog {
+    node @prog.defs
+    node @prog.lexical_scope
+}
+(class_declaration name:(_)@name)@class {
+    node @class.defs
+    attr (@class.defs) name = (source-text @name)
+}
+"#;

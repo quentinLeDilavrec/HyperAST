@@ -163,7 +163,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "cpp")]
-        if crate::processors::cpp::selection::Cpp::matches(&name) {
+        if crate::processors::cpp::selection::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = self.repository;
@@ -175,7 +175,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "java")]
-        if crate::processors::java::selection::Java::matches(&name) {
+        if crate::processors::java::selection::matches(&name) {
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = &self.repository;

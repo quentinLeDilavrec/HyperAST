@@ -1,10 +1,3 @@
-#[cfg(feature = "cpp")]
-pub struct Cpp;
-
-impl crate::processing::CachesHolding for Cpp {
-    type Caches = super::caches::Cpp;
-}
-
 /// CAUTION about when you change this value,
 /// advice: change it only at the very beginning
 #[doc(hidden)]
@@ -20,11 +13,5 @@ pub fn matches(name: &crate::processing::ObjectName) -> bool {
             || name.ends_with(".cxx")
             || name.ends_with(".h")
             || name.ends_with(".hpp")
-    }
-}
-
-impl crate::processing::InFiles for Cpp {
-    fn matches(name: &crate::processing::ObjectName) -> bool {
-        matches(name)
     }
 }

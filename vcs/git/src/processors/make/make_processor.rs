@@ -64,14 +64,14 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
     for MakeProcessor<'a, 'b, 'c, RMS, FFWD, MakeModuleAcc>
 {
-    fn pre(&mut self, current_dir: BasicGitObject) {
-        let (oid, name) = match current_dir {
-            BasicGitObject::Tree(oid, name) => {
-                self.handle_tree_cached(name, oid);
-                return;
-            }
-            BasicGitObject::Blob(oid, name) => (oid, name),
-        };
+    fn pre(&mut self, current_object: BasicGitObject) {
+        log::trace!("pre: {:?}", current_object.name.try_str().unwrap_or(""));
+        let oid = current_object.oid;
+        let name = current_object.name;
+        if current_object.kind == git2::ObjectType::Tree {
+            self.handle_tree_cached(name, oid);
+            return;
+        }
         if FFWD {
             return;
         }
@@ -333,9 +333,9 @@ pub(crate) fn prepare_dir_exploration(
         .filter_map(|x| x.ok())
         .collect();
     if dir_path.peek().is_none() {
-        let p = children_objects.iter().position(|x| match x {
-            BasicGitObject::Blob(_, n) => crate::processing::file_sys::MakeFile::matches(n),
-            _ => false,
+        let p = children_objects.iter().position(|x| {
+            x.kind == git2::ObjectType::Blob
+                && crate::processing::file_sys::MakeFile::matches(&x.name)
         });
         if let Some(p) = p {
             children_objects.swap(0, p); // priority to config file processing

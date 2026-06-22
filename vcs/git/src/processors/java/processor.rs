@@ -77,25 +77,25 @@ pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
 
 impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     fn pre(&mut self, current_object: BasicGitObject) {
-        match current_object {
-            BasicGitObject::Tree(oid, name) => {
-                self.handle_dir(oid, name);
-            }
-            BasicGitObject::Blob(oid, name) => {
-                if super::selection::matches(&name) {
-                    self.prepro
-                        .help_handle_java_file(
-                            oid,
-                            &mut self.stack.last_mut().unwrap().acc,
-                            &name,
-                            self.repository,
-                            *self.handle,
-                        )
-                        .unwrap();
-                } else {
-                    log::debug!("not java source file {:?}", name.try_str());
-                }
-            }
+        log::trace!("pre: {:?}", current_object.name.try_str().unwrap_or(""));
+        let oid = current_object.oid;
+        let name = current_object.name;
+        if current_object.kind == git2::ObjectType::Tree {
+            self.handle_dir(oid, name);
+            return;
+        }
+        if super::selection::matches(&name) {
+            self.prepro
+                .help_handle_java_file(
+                    oid,
+                    &mut self.stack.last_mut().unwrap().acc,
+                    &name,
+                    self.repository,
+                    *self.handle,
+                )
+                .unwrap();
+        } else {
+            log::debug!("not java source file {:?}", name.try_str());
         }
     }
 

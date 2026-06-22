@@ -67,21 +67,23 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 
 
 impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 'c, PythonAcc> {
     fn pre(&mut self, current_object: BasicGitObject) {
-        match current_object {
-            BasicGitObject::Tree(oid, name) => {
-                self.handle_tree_cached(oid, name);
-            }
-            BasicGitObject::Blob(oid, name) if super::file_sys::Python::matches(&name) => {
-                let acc = &mut self.stack.last_mut().unwrap().acc;
-                self.prepro
-                    .help_handle_python_file(oid, acc, &name, self.repository, *self.handle)
-                    .unwrap();
-            }
-            BasicGitObject::Blob(_, name) => {
-                log::debug!("not a python source file {:?}", name.try_str());
-            }
+        log::trace!("pre: {:?}", current_object.name.try_str().unwrap_or(""));
+        let oid = current_object.oid;
+        let name = current_object.name;
+        if current_object.kind == git2::ObjectType::Tree {
+            self.handle_tree_cached(oid, name);
+            return;
+        }
+        if super::file_sys::Python::matches(&name) {
+            let acc = &mut self.stack.last_mut().unwrap().acc;
+            self.prepro
+                .help_handle_python_file(oid, acc, &name, self.repository, *self.handle)
+                .unwrap();
+        } else {
+            log::debug!("not a python source file {:?}", name.try_str());
         }
     }
+
     fn post(&mut self, oid: Oid, acc: PythonAcc) -> Option<super::FullNode> {
         let name = &acc.primary.name;
         let key = (oid, name.as_bytes().into());

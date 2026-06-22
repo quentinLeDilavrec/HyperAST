@@ -446,19 +446,23 @@ fn clone_helper(url: Url, path: &Path, fo: git2::FetchOptions) -> Result<Reposit
 }
 // TODO  rename to something like GitOidTypedNamed
 // TODO use GitObjectType
-pub(crate) enum BasicGitObject {
-    Blob(Oid, ObjectName),
-    Tree(Oid, ObjectName),
+pub(crate) struct BasicGitObject {
+    pub(crate) oid: Oid,
+    pub(crate) name: ObjectName,
+    pub(crate) kind: git2::ObjectType,
 }
 
 impl<'a> TryFrom<TreeEntry<'a>> for BasicGitObject {
     type Error = TreeEntry<'a>;
 
     fn try_from(x: TreeEntry<'a>) -> Result<Self, Self::Error> {
-        if x.kind().unwrap().eq(&git2::ObjectType::Tree) {
-            Ok(Self::Tree(x.id(), x.name_bytes().into()))
-        } else if x.kind().unwrap().eq(&git2::ObjectType::Blob) {
-            Ok(Self::Blob(x.id(), x.name_bytes().into()))
+        let oid = x.id();
+        let name = x.name_bytes().into();
+        let kind = x.kind().unwrap();
+        if kind.eq(&git2::ObjectType::Tree) {
+            Ok(Self { oid, name, kind })
+        } else if kind.eq(&git2::ObjectType::Blob) {
+            Ok(Self { oid, name, kind })
         } else {
             Err(x)
         }
@@ -467,17 +471,16 @@ impl<'a> TryFrom<TreeEntry<'a>> for BasicGitObject {
 
 impl NamedObject for BasicGitObject {
     fn name(&self) -> &ObjectName {
-        match self {
-            BasicGitObject::Blob(_, n) => n,
-            BasicGitObject::Tree(_, n) => n,
-        }
+        &self.name
     }
 }
+
 impl TypedObject for BasicGitObject {
     fn r#type(&self) -> ObjectType {
-        match self {
-            BasicGitObject::Blob(..) => ObjectType::File,
-            BasicGitObject::Tree(..) => ObjectType::Dir,
+        match self.kind {
+            git2::ObjectType::Tree => ObjectType::Dir,
+            git2::ObjectType::Blob => ObjectType::File,
+            _ => unreachable!("does not handle other variants"),
         }
     }
 }
@@ -485,10 +488,7 @@ impl TypedObject for BasicGitObject {
 impl UniqueObject for BasicGitObject {
     type Id = Oid;
     fn id(&self) -> &Oid {
-        match self {
-            BasicGitObject::Tree { 0: id, .. } => id,
-            BasicGitObject::Blob { 0: id, .. } => id,
-        }
+        &self.oid
     }
 }
 

@@ -24,7 +24,7 @@ use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::processors::cpp as cpp_processor;
 use crate::utils::drain_filter_strip;
 
-use super::{FullNode, MD, MakeModuleAcc, Parameter, SimpleStores};
+use super::{FullNode, MakeModuleAcc, Parameter, SimpleStores};
 
 pub struct MakeProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     prepro: &'b mut RepositoryProcessor,
@@ -88,7 +88,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     PCP2Handle(self.handle.1, std::marker::PhantomData),
                 )
                 .unwrap();
-        } else if crate::processing::file_sys::Cpp::matches(&name) {
+        } else if cpp_processor::selection::Cpp::matches(&name) {
             self.prepro
                 .help_handle_cpp_file2(
                     oid,
@@ -142,10 +142,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
 
     fn handle_tree_cached(&mut self, name: ObjectName, oid: Oid) {
         if let Some(s) = self.dir_path.peek() {
-            if name
-                .as_bytes()
-                .eq(std::ffi::OsStr::as_encoded_bytes(s.as_os_str()))
-            {
+            let current = std::ffi::OsStr::as_encoded_bytes(s.as_os_str());
+            if name.as_bytes().eq(current) {
                 self.dir_path.next();
                 self.stack.last_mut().expect("never empty").cs.clear();
                 let tree = self.repository.find_tree(oid).unwrap();
@@ -179,7 +177,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         let parent_acc = &mut self.stack.last_mut().unwrap().acc;
         if true {
             // TODO also try to handle nested Makefiles
-            let (name, (full_node,)) = self.prepro.help_handle_cpp_folder(
+            let (name, full_node) = self.prepro.help_handle_cpp_folder(
                 &self.repository,
                 &mut self.dir_path,
                 oid,
@@ -193,7 +191,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         let helper = MakeModuleHelper::from((parent_acc, &name));
         if helper.source_directories.0 || helper.test_source_directories.0 {
             // handle as source dir
-            let (name, (full_node,)) = self.prepro.help_handle_cpp_folder(
+            let (name, full_node) = self.prepro.help_handle_cpp_folder(
                 &self.repository,
                 self.dir_path,
                 oid,
@@ -253,12 +251,16 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
     assert_eq!(primary.children_names.len(), primary.children.len());
 
     let insertion = stores.node_store.prepare_insertion(&hashable, eq);
-    if let Some(id) = insertion.occupied_id() {
-        let metrics = primary
-            .metrics
-            .map_hashs(|h| MetaDataHashsBuilder::build(h));
-        let md = MD { metrics };
-        return FullNode { id, md };
+    if let Some(_id) = insertion.occupied_id() {
+        unimplemented!("I think it should probably stay unused");
+        // let metrics = primary
+        //     .metrics
+        //     .map_hashs(|h| MetaDataHashsBuilder::build(h));
+        // return FullNode {
+        //     id,
+        //     metrics,
+        //     precomp_queries: super::super::PrecompQueries::full(),
+        // };
     }
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
@@ -274,9 +276,12 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
 
     let vacant = insertion.vacant();
     let id = vacant.insert_built(dyn_builder.build());
-    let md = MD { metrics };
 
-    FullNode { id, md }
+    FullNode {
+        id,
+        metrics,
+        precomp_queries: acc.precomp_queries,
+    }
 }
 
 struct MakeModuleHelper {
@@ -340,9 +345,15 @@ pub(crate) fn prepare_dir_exploration(
     children_objects
 }
 
-impl From<PCP2Handle<cpp_processor::CppProc>> for Parameter {
-    fn from(cpp_handle: PCP2Handle<cpp_processor::CppProc>) -> Self {
-        Self { cpp_handle }
+impl Parameter {
+    pub fn new(
+        makefile_handle: PCP2Handle<super::makefile::MakefileProc>,
+        cpp_handle: PCP2Handle<cpp_processor::CppProc>,
+    ) -> Self {
+        Self {
+            makefile_handle,
+            cpp_handle,
+        }
     }
 }
 
@@ -355,14 +366,15 @@ impl From<PCP2Handle<MakeProc>> for PCP2Handle<cpp_processor::CppProc> {
 pub(crate) struct MakeProc {
     parameter: Parameter,
     cache: MakeCaches,
-    commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+    pub(super) commits: std::collections::HashMap<git2::Oid, crate::Commit>,
 }
 
-struct PreparedMakeCommitProc<'repo> {
+pub(crate) struct PreparedMakeCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: crate::preprocessed::CommitBuilder,
     pub(crate) handle: PCPHandle,
 }
+
 impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommitProc<'repo> {
     fn process(
         self: Box<PreparedMakeCommitProc<'repo>>,
@@ -394,6 +406,21 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
     }
 }
 
+impl MakeProc {
+    pub(crate) fn prepare_processing<'repo>(
+        &self,
+        repository: &'repo git2::Repository,
+        commit_builder: crate::preprocessed::CommitBuilder,
+        handle: PCPHandle,
+    ) -> PreparedMakeCommitProc<'repo> {
+        PreparedMakeCommitProc {
+            repository,
+            commit_builder,
+            handle,
+        }
+    }
+}
+
 impl crate::processing::erased::CommitProc for MakeProc {
     fn prepare_processing<'repo>(
         &self,
@@ -401,11 +428,7 @@ impl crate::processing::erased::CommitProc for MakeProc {
         commit_builder: crate::preprocessed::CommitBuilder,
         handle: PCPHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc + 'repo> {
-        Box::new(PreparedMakeCommitProc {
-            repository,
-            commit_builder,
-            handle,
-        })
+        Box::new(self.prepare_processing(repository, commit_builder, handle))
     }
 
     fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {

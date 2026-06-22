@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::iter::Peekable;
 use std::path::Components;
-use std::sync::Arc;
 
 use git2::{Oid, Repository};
 
@@ -14,11 +13,8 @@ use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::PreparedCommitProc;
-#[cfg(feature = "cpp")]
-use crate::processing::file_sys;
-use crate::processing::{CacheHolding, InFiles, ObjectName};
-#[cfg(feature = "cpp")]
-use crate::processors::make::MakeModuleAcc;
+use crate::processing::{CacheHolding, ObjectName};
+use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
 
 // use super::MakeModuleAcc;
@@ -29,18 +25,11 @@ use hyperast_gen_ts_cpp::legion as cpp_gen;
 
 type Handle = crate::processing::erased::ParametrizedCommitProcessor2Handle<CppProc>;
 
-pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
-    tree.iter()
-        .rev()
-        .map(TryInto::try_into)
-        .filter_map(|x| x.ok())
-        .collect()
-}
-
 pub struct CppProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
+    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: &'d Handle,
 }
@@ -55,7 +44,7 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> CppProcessor<'repo, 'prepro, 'd,
         parameters: &'d Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
-        let prepared = prepare_dir_exploration(tree);
+        let prepared = prepare_dir_exploration(&tree).collect();
         let name = name.try_into().unwrap();
         let stack = vec![StackEle::new(oid, prepared, Acc::from(name))];
         Self {
@@ -102,7 +91,7 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
                 self.handle_tree_cached(oid, name);
             }
             BasicGitObject::Blob(oid, name) => {
-                if file_sys::Cpp::matches(&name) {
+                if super::selection::matches(&name) {
                     self.prepro
                         .help_handle_cpp_file(
                             oid,
@@ -118,7 +107,7 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
             }
         }
     }
-    fn post(&mut self, oid: Oid, acc: CppAcc) -> Option<(cpp_gen::Local,)> {
+    fn post(&mut self, oid: Oid, acc: CppAcc) -> Option<super::FullNode> {
         let name = &acc.primary.name;
         let key = (oid, name.as_bytes().into());
         let name = self.prepro.get_or_insert_label(name);
@@ -128,9 +117,9 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
             .mut_or_default::<CppProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle.0);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
-        proc.cache.object_map.insert(key, (full_node.clone(),));
+        proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
-            return Some((full_node,));
+            return Some(full_node);
         }
         let w = &mut self.stack.last_mut().unwrap().acc;
         assert!(
@@ -157,7 +146,7 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
         let proc = holder.with_parameters_mut(self.handle.0);
         if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
-            let (full_node,) = already.clone();
+            let full_node = already.clone();
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name = prepro.intern_object_name(&name);
             assert!(!w.primary.children_names.contains(&name));
@@ -165,7 +154,7 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
         } else {
             log::debug!("tree {:?}", name.try_str());
             let tree = self.repository.find_tree(oid).unwrap();
-            let prepared = prepare_dir_exploration(tree);
+            let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
             let acc = CppAcc::new(name.try_into().unwrap());
             self.stack.push(StackEle::new(oid, prepared, acc));
         }
@@ -174,10 +163,10 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
 
 pub(crate) type CppProcessorHolder = crate::processing::ProcessorHolder<CppProc>;
 
-pub(crate) struct CppProc {
+pub struct CppProc {
     parameter: Parameter,
-    query: Option<Query>,
-    cache: crate::processing::caches::Cpp,
+    query: Option<crate::processors::Query>,
+    cache: super::caches::Cpp,
     commits: HashMap<git2::Oid, crate::Commit>,
 }
 
@@ -185,7 +174,7 @@ impl Into<CppProc> for Parameter {
     fn into(self) -> CppProc {
         let query = self.query.as_ref().map(|q| {
             use hyperast_tsquery::ArrayStr;
-            Query::new(q.iter())
+            crate::processors::Query::new(q.iter(), hyperast_gen_ts_cpp::language())
         });
         CppProc {
             parameter: self,
@@ -199,26 +188,6 @@ impl Into<CppProc> for Parameter {
 impl PartialEq<CppProc> for Parameter {
     fn eq(&self, other: &CppProc) -> bool {
         self == &other.parameter
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct Query(pub(crate) hyperast_tsquery::Query, Arc<str>);
-
-impl PartialEq for Query {
-    fn eq(&self, other: &Self) -> bool {
-        self.1 == other.1
-    }
-}
-impl Eq for Query {}
-
-impl Query {
-    fn new<'a>(precomputeds: impl Iterator<Item = &'a str>) -> Self {
-        use crate::precomp_patterns::only_parse_query_precomp;
-        let language = hyperast_gen_ts_cpp::language();
-        let precomputeds = precomputeds.collect::<Vec<_>>();
-        let precomp = only_parse_query_precomp(precomputeds.as_slice(), language);
-        Self(precomp.unwrap(), precomputeds.join("\n").into())
     }
 }
 
@@ -246,11 +215,11 @@ impl crate::processing::erased::CommitProc for CppProc {
     }
 }
 
-impl CacheHolding<crate::processing::caches::Cpp> for CppProc {
-    fn get_caches_mut(&mut self) -> &mut crate::processing::caches::Cpp {
+impl CacheHolding<super::caches::Cpp> for CppProc {
+    fn get_caches_mut(&mut self) -> &mut super::caches::Cpp {
         &mut self.cache
     }
-    fn get_caches(&self) -> &crate::processing::caches::Cpp {
+    fn get_caches(&self) -> &super::caches::Cpp {
         &self.cache
     }
 }
@@ -263,10 +232,10 @@ impl RepositoryProcessor {
         name: &ObjectName,
         repository: &Repository,
         parameters: Handle,
-    ) -> Result<(cpp_gen::Local,), crate::ParseErr> {
+    ) -> Result<super::FullNode, crate::ParseErr> {
         let mut handler = self
             .processing_systems
-            .caching_blob_handler::<file_sys::Cpp>();
+            .caching_blob_handler::<super::selection::Cpp>();
         handler.handle2(oid, repository, &name, parameters, |c, n, t| {
             let line_break = crate::_auto_configured_line_break(t);
             let holder = c.mut_or_default::<CppProcessorHolder>();
@@ -284,11 +253,13 @@ impl RepositoryProcessor {
                 )
                 .set_line_break(line_break);
                 super::handle_cpp_file1::<_>(&mut cpp_tree_gen, n, t)
+                    .map(|x| x.map(|x| x.local.into()))
             } else {
                 use hyperast_gen_ts_cpp::legion_ts_simp::CppTreeGen;
                 let mut cpp_tree_gen = CppTreeGen::bare(stores) //
                     .set_line_break(line_break);
-                super::handle_cpp_file2(&mut cpp_tree_gen, n, t).map(empty2full)
+                super::handle_cpp_file2(&mut cpp_tree_gen, n, t).map(|x| x.map(|x| x.into()))
+                // .map(empty2full)
             }
             .map_err(|_| crate::ParseErr::IllFormed)?;
 
@@ -303,7 +274,7 @@ impl RepositoryProcessor {
             );
 
             let r = r.node;
-            Ok((r.local.clone(),))
+            Ok(r)
         })
     }
 
@@ -315,22 +286,23 @@ impl RepositoryProcessor {
         repository: &Repository,
         parameters: Handle,
     ) -> Result<(), crate::ParseErr> {
-        let (full_node,) = self.handle_cpp_blob(oid, name, repository, parameters)?;
+        let full_node = self.handle_cpp_blob(oid, name, repository, parameters)?;
         let name = self.intern_object_name(name);
         assert!(!parent.primary.children_names.contains(&name));
 
         parent.push(name, full_node);
         Ok(())
     }
+    #[cfg(feature = "make")]
     pub(crate) fn help_handle_cpp_file2(
         &mut self,
         oid: Oid,
-        parent: &mut MakeModuleAcc,
+        parent: &mut crate::processors::make::MakeModuleAcc,
         name: &ObjectName,
         repository: &Repository,
         parameters: Handle,
     ) -> Result<(), crate::ParseErr> {
-        let (full_node,) = self.handle_cpp_blob(oid, name, repository, parameters)?;
+        let full_node = self.handle_cpp_blob(oid, name, repository, parameters)?;
         let name = self.intern_object_name(name);
         // assert!(!parent_acc.children_names.contains(&name));
         // parent_acc.push_pom(name, x);
@@ -347,7 +319,7 @@ impl RepositoryProcessor {
         name: &ObjectName,
         oid: git2::Oid,
         handle: Handle,
-    ) -> (cpp_gen::Local,) {
+    ) -> super::FullNode {
         CppProcessor::<CppAcc>::new(repository, self, dir_path, name, oid, &handle).process()
     }
 
@@ -365,34 +337,7 @@ impl RepositoryProcessor {
     }
 }
 
-fn empty2full(
-    x: crate::utils::SuccessProcessing<
-        hyperast::tree_gen::extra::NodeWithExtra<
-            hyperast::full::FullNode<
-                hyperast::tree_gen::BasicGlobalData,
-                hyperast::tree_gen::zipped_ts_extra::Local,
-            >,
-            hyperast::tree_gen::zipped_ts_extra::EmptyExtra,
-        >,
-    >,
-) -> crate::utils::SuccessProcessing<cpp_gen::FNode> {
-    let local: hyperast::tree_gen::zipped_ts_extra::Local = x.node.node.local;
-    let local = cpp_gen::Local {
-        compressed_node: local.compressed_node,
-        metrics: local.metrics,
-        role: local.role,
-        precomp_queries: Default::default(),
-        viz_cs_count: 0,
-    };
-    let global = x.node.node.global;
-    crate::utils::SuccessProcessing {
-        parsing_time: x.parsing_time,
-        processing_time: x.processing_time,
-        node: cpp_gen::FNode { global, local },
-    }
-}
-
-fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_gen::Local {
+fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> super::FullNode {
     use hyperast::hashed::IndexingHashBuilder as _;
     use hyperast::hashed::MetaDataHashsBuilder as _;
     use hyperast::store::nodes::legion::eq_node;
@@ -410,26 +355,27 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
         .map_metrics(|m| m.finalize(&interned_kind, &label_id));
     let hashable = primary.metrics.hashs.most_discriminating();
     let eq = eq_node(&Type::Directory, Some(&label_id), &primary.children);
-    let md_cache = &mut cpp_proc.cache.md_cache;
+    // let md_cache = &mut cpp_proc.cache.md_cache;
     let dedup_cache = &mut cpp_proc.cache.dedup.0;
     let insertion = node_store
         .inner
         .prepare_insertion(dedup_cache, &hashable, eq);
 
-    if let Some(id) = insertion.occupied_id() {
+    if let Some(_id) = insertion.occupied_id() {
         // NOTE this situation should not happen often, due to cache based on oids, so there is no point caching md.
         // If git objects are changed but ignored, then it goes through this branch.
         // TODO bench
         // TODO in the oid cache the values could be NodeIdentifiers, then current cache would be used with an indirection.
 
-        let md = md_cache.get(&id).unwrap();
+        // let md = md_cache.get(&id).unwrap();
 
-        return cpp_gen::Local { ..md.local(id) };
+        // return super::Local { ..md.local(id) };
+        unimplemented!("I think it should probably stay unused")
     }
 
     let mut dyn_builder = subtree_builder::<hyperast_gen_ts_cpp::TStore>(interned_kind);
 
-    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
+    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries.0);
 
     let children_is_empty = primary.children.is_empty();
 
@@ -441,20 +387,18 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> cpp_g
     let vacant = insertion.vacant();
     let node_id = vacant.insert_built(dyn_builder.build());
 
-    md_cache.insert(
-        node_id,
-        cpp_gen::MD {
-            metrics,
-            precomp_queries: acc.precomp_queries,
-        },
-    );
+    // md_cache.insert(
+    //     node_id,
+    //     cpp_gen::MD {
+    //         metrics,
+    //         precomp_queries: acc.precomp_queries,
+    //     },
+    // );
 
-    let full_node = cpp_gen::Local {
-        compressed_node: node_id,
+    let full_node = super::FullNode {
+        id: node_id,
         metrics,
-        role: None,
         precomp_queries: acc.precomp_queries,
-        viz_cs_count: 0,
     };
     full_node
 }

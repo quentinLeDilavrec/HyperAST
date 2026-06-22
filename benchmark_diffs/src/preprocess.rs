@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use hyperast::cyclomatic::Mcc;
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::{SimpleStores, defaults::LabelIdentifier};
+use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 use hyperast::types::LabelStore as _;
 
 use hyperast_gen_ts_java::language;
@@ -10,6 +10,7 @@ use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
 use hyperast_gen_ts_java::legion_with_refs::{FNode, JavaTreeGen, Local, MD, MDCache};
 use hyperast_gen_ts_java::{Lang, TStore, Type};
 use hyperast_vcs_git::auto_configured_line_break;
+use hyperast_vcs_git::processors::FullNode;
 use hyperast_vcs_git::processors::java::JavaAcc;
 
 pub fn iter_dirs(root_buggy: &std::path::Path) -> impl Iterator<Item = std::fs::DirEntry> + use<> {
@@ -72,9 +73,15 @@ impl JavaPreprocessFileSys {
         if tree.root_node().has_error() {
             eprintln!("{}", tree.root_node().to_sexp());
         };
-        let full_node = full_node.local;
-        self.java_md_cache
-            .insert(full_node.compressed_node, MD::from(full_node.clone()));
+        // self.java_md_cache.insert(
+        //     full_node.local.compressed_node,
+        //     PrecompQueries(full_node.local.precomp_queries),
+        // );
+        let full_node = FullNode {
+            id: full_node.local.compressed_node,
+            metrics: full_node.local.metrics,
+            precomp_queries: PrecompQueries::full(),
+        };
         let name = self.main_stores.label_store.get_or_insert(name);
         assert!(!w.primary.children_names.contains(&name));
         w.push(name, full_node);
@@ -85,12 +92,12 @@ impl JavaPreprocessFileSys {
         &mut self,
         path: PathBuf,
         filesys: &mut FileSys,
-    ) -> (Local,) {
+    ) -> FullNode {
         JavaProcessor::<JavaAcc>::new(self, filesys, path).process()
     }
 }
 
-pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local {
+pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> FullNode {
     let a = std::fs::read_dir(path)
         .unwrap_or_else(|_| panic!("{:?} should be a dir", path))
         .filter_map(|x| x.ok());
@@ -113,9 +120,13 @@ pub fn parse_filesys(java_gen: &mut JavaPreprocessFileSys, path: &Path) -> Local
             let full_node =
                 java_tree_gen.generate_file(name.as_bytes(), file.as_bytes(), tree.walk());
 
-            let local = full_node.local;
+            let full_node = FullNode {
+                id: full_node.local.compressed_node,
+                metrics: full_node.local.metrics,
+                precomp_queries: PrecompQueries::full(),
+            };
             let name = java_gen.main_stores.label_store.get_or_insert(name);
-            w.push(name, local);
+            w.push(name, full_node);
         } else if t.is_dir() {
             let local = parse_filesys(java_gen, &x.path());
             let path = x.path();
@@ -135,7 +146,7 @@ trait Accumulator: hyperast::tree_gen::Accumulator<Node = (LabelIdentifier, Self
 }
 
 impl Accumulator for JavaAcc {
-    type Unlabeled = (Local,);
+    type Unlabeled = FullNode;
 }
 
 trait Processor<Acc: Accumulator> {
@@ -241,16 +252,16 @@ impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
             panic!("not file nor dir: {:?}", path);
         }
     }
-    fn post(&mut self, acc: JavaAcc) -> Option<(Local,)> {
+    fn post(&mut self, acc: JavaAcc) -> Option<<JavaAcc as Accumulator>::Unlabeled> {
         let name = acc.primary.name.clone();
         let full_node = make(acc, &mut self.prepro.main_stores);
-        let key = full_node.compressed_node;
-        self.prepro
-            .java_md_cache
-            .insert(key, MD::from(full_node.clone()));
+        let key = full_node.id;
+        // self.prepro
+        //     .java_md_cache
+        //     .insert(key, MD::from(full_node.clone()));
         let name = self.prepro.main_stores.label_store.get_or_insert(name);
         if self.stack.is_empty() {
-            return Some((full_node,));
+            return Some(full_node);
         }
         let w = &mut self.stack.last_mut().unwrap().1;
         assert!(
@@ -268,7 +279,7 @@ impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
     }
 }
 
-fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
+fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> <JavaAcc as Accumulator>::Unlabeled {
     let node_store = &mut stores.node_store;
     let label_store = &mut stores.label_store;
     let kind = Type::Directory;
@@ -284,19 +295,20 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
         hyperast::store::nodes::legion::eq_node(&interned_kind, Some(&label_id), &primary.children);
     let insertion = node_store.prepare_insertion(&hashable, eq);
 
-    if let Some(id) = insertion.occupied_id() {
-        let metrics = primary.metrics.map_hashs(|h| h.build());
-        return Local {
-            compressed_node: id,
-            metrics,
-            #[cfg(feature = "impact")]
-            ana: None,
-            mcc: Mcc::new(&kind),
-            role: None,
-            precomp_queries: Default::default(),
-            stmt_count: 0,
-            member_import_count: 0,
-        };
+    if let Some(_id) = insertion.occupied_id() {
+        unimplemented!("I think it should probably stay unused");
+        // let metrics = primary.metrics.map_hashs(|h| h.build());
+        // return Local {
+        //     compressed_node: id,
+        //     metrics,
+        //     #[cfg(feature = "impact")]
+        //     ana: None,
+        //     mcc: Mcc::new(&kind),
+        //     role: None,
+        //     precomp_queries: Default::default(),
+        //     stmt_count: 0,
+        //     member_import_count: 0,
+        // };
     }
 
     let mut dyn_builder =
@@ -312,25 +324,30 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> Local {
     let vacant = insertion.vacant();
     let node_id = vacant.insert_built(dyn_builder.build());
 
-    Local {
-        compressed_node: node_id,
+    FullNode {
+        id: node_id,
         metrics,
-        #[cfg(feature = "impact")]
-        ana: None,
-        mcc: Mcc::new(&kind),
-        role: None,
-        precomp_queries: Default::default(),
-        stmt_count: 0,
-        member_import_count: 0,
-        // is_named: kind.is_named(),
+        precomp_queries: acc.precomp_queries,
     }
+    // Local {
+    //     compressed_node: node_id,
+    //     metrics,
+    //     #[cfg(feature = "impact")]
+    //     ana: None,
+    //     mcc: Mcc::new(&kind),
+    //     role: None,
+    //     precomp_queries: Default::default(),
+    //     stmt_count: 0,
+    //     member_import_count: 0,
+    //     // is_named: kind.is_named(),
+    // }
 }
 
 pub fn parse_dir_pair(
     java_gen: &mut JavaPreprocessFileSys,
     src: &Path,
     dst: &Path,
-) -> (Local, Local) {
+) -> (FullNode, FullNode) {
     let mut filesys = FileSys {};
 
     if !src.exists() && !dst.exists() {
@@ -352,12 +369,8 @@ pub fn parse_dir_pair(
             dst.to_string_lossy()
         )
     }
-    let src = java_gen
-        .handle_java_directory(src.to_path_buf(), &mut filesys)
-        .0;
-    let dst = java_gen
-        .handle_java_directory(dst.to_path_buf(), &mut filesys)
-        .0;
+    let src = java_gen.handle_java_directory(src.to_path_buf(), &mut filesys);
+    let dst = java_gen.handle_java_directory(dst.to_path_buf(), &mut filesys);
     // let src = parse_filesys(java_gen, src);
     // let dst = parse_filesys(java_gen, dst);
     (src, dst)

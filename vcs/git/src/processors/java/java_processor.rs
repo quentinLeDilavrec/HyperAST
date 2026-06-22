@@ -21,7 +21,6 @@ use crate::git::BasicGitObject;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedCommitProcessorHandle;
-use crate::processing::caches::Java as JavaCaches;
 use crate::processing::erased::ConfigParametersHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
@@ -33,6 +32,7 @@ use super::JavaAcc;
 use super::JavaProc;
 use super::Parameter;
 use super::SimpleStores;
+use super::caches::Java as JavaCaches;
 
 type Handle = PCP2Handle<JavaProc>;
 
@@ -40,6 +40,7 @@ pub struct JavaProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
+    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: &'d Handle,
 }
@@ -90,7 +91,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
                 self.handle_dir(oid, name);
             }
             BasicGitObject::Blob(oid, name) => {
-                if crate::processing::file_sys::Java::matches(&name) {
+                if super::selection::Java::matches(&name) {
                     self.prepro
                         .help_handle_java_file(
                             oid,
@@ -107,7 +108,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
         }
     }
 
-    fn post(&mut self, oid: Oid, acc: JavaAcc) -> Option<(java_tree_gen::Local,)> {
+    fn post(&mut self, oid: Oid, acc: JavaAcc) -> Option<super::FullNode> {
         let ty = Type::Directory;
         let name = &acc.primary.name;
         let key = (oid, name.as_bytes().into());
@@ -118,9 +119,9 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
             .mut_or_default::<JavaProcessorHolder>();
         let java_proc = holder.with_parameters_mut(self.handle.0);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
-        java_proc.cache.object_map.insert(key, (full_node.clone(),));
+        java_proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
-            return Some((full_node,));
+            return Some(full_node);
         }
 
         let w = &mut self.stack.last_mut().unwrap().acc;
@@ -130,7 +131,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
             w.primary.children_names,
             name
         );
-        let id = full_node.compressed_node;
+        let id = full_node.id;
         w.push(name, full_node.clone());
 
         let acc = w.scripting_acc.as_mut()?;
@@ -156,7 +157,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
             // reinit already computed node for post order
             let full_node = already.clone();
             // let skiped_ana = *skiped_ana;
-            let id = full_node.0.compressed_node;
+            let id = full_node.id;
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name = self.prepro.intern_object_name(&name);
             assert!(!w.primary.children_names.contains(&name));
@@ -199,7 +200,7 @@ fn prep_scripting(
     java_proc.parameter.prepro.as_ref()
 }
 
-fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> java_tree_gen::Local {
+fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> super::FullNode {
     use hyperast::cyclomatic::Mcc;
     use hyperast::store::nodes::legion::eq_node;
     use hyperast::types::ETypeStore as _;
@@ -276,16 +277,16 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> ja
     };
 
     // Guard to avoid computing metadata for an already present subtree
-    if let Some(compressed_node) = insertion.occupied_id() {
-        // TODO add (debug) assertions to detect non-local metadata
-        // this branch should be pretty cold
-        let md = md_cache.get(&compressed_node).unwrap();
-        return java_tree_gen::Local {
-            stmt_count: 0,
-            member_import_count: 0,
-            // is_named: kind.is_named(),
-            ..md.local(compressed_node)
-        };
+    if let Some(_compressed_node) = insertion.occupied_id() {
+        unimplemented!("I think it should probably stay unused");
+        // // TODO add (debug) assertions to detect non-local metadata
+        // // this branch should be pretty cold
+        // let md = md_cache.get(&compressed_node).unwrap();
+        // return super::FullNode {
+        //     id: compressed_node,
+        //     metrics: md.metrics,
+        //     precomp_queries: acc.precomp_queries,
+        // };
     }
 
     #[cfg(feature = "impact")]
@@ -304,7 +305,7 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> ja
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
-    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries);
+    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries.0);
 
     if let Some(acc) = acc.scripting_acc {
         let subtr = hyperast::scripting::Subtr(kind, &dyn_builder);
@@ -323,23 +324,27 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> ja
             #[cfg(feature = "impact")]
             ana: None,
             mcc: Mcc::new(&kind),
-            precomp_queries: acc.precomp_queries,
+            precomp_queries: acc.precomp_queries.0,
         },
     );
-    let full_node = java_tree_gen::Local {
-        compressed_node,
+    // let full_node = java_tree_gen::Local {
+    //     compressed_node,
+    //     metrics,
+    //     #[cfg(feature = "impact")]
+    //     ana,
+    //     mcc: Mcc::new(&kind),
+    //     role: None,
+    //     precomp_queries: acc.precomp_queries.0,
+    //     stmt_count: 0,
+    //     // TODO precise the exact semantics
+    //     member_import_count: 0,
+    //     // is_named: kind.is_named(),
+    // };
+    super::FullNode {
+        id: compressed_node,
         metrics,
-        #[cfg(feature = "impact")]
-        ana,
-        mcc: Mcc::new(&kind),
-        role: None,
         precomp_queries: acc.precomp_queries,
-        stmt_count: 0,
-        // TODO precise the exact semantics
-        member_import_count: 0,
-        // is_named: kind.is_named(),
-    };
-    full_node
+    }
 }
 
 #[doc(hidden)]
@@ -439,30 +444,23 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
             .mut_or_default::<JavaProcessorHolder>();
         let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.0.compressed_node);
+        let commit = self.commit_builder.finish(root_full_node.id);
         h.with_parameters_mut(handle.1)
             .commits
             .insert(commit_oid, commit);
-        root_full_node.0.compressed_node
+        root_full_node.id
     }
 }
 
-// impl CommitProcExt for JavaProc {
-//     type Holder = JavaProcessorHolder;
-// }
+impl JavaProc {
+    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
+        type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
+        let t = crate::processors::java::Parameter::faster();
+        let h = pr.mut_or_default::<JavaProcessorHolder>();
+        crate::processing::erased::CommitProcExt::register_param(h, t)
+    }
+}
 
-// impl ParametrizedCommitProc2 for JavaProcessorHolder {
-//     type Proc = JavaProc;
-
-//     fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
-//         &mut self.0[parameters.0]
-//     }
-
-//     fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
-//         &self.0[parameters.0]
-//     }
-// }
-//
 impl CacheHolding<JavaCaches> for JavaProc {
     fn get_caches_mut(&mut self) -> &mut JavaCaches {
         &mut self.cache
@@ -568,9 +566,9 @@ impl RepositoryProcessor {
         name: &ObjectName,
         repository: &Repository,
         parameters: Handle,
-    ) -> Result<(java_tree_gen::Local,), crate::ParseErr> {
+    ) -> Result<super::FullNode, crate::ParseErr> {
         self.processing_systems
-            .caching_blob_handler::<crate::processing::file_sys::Java>()
+            .caching_blob_handler::<super::selection::Java>()
             .handle2(oid, repository, name, parameters, |c, n, t| {
                 let line_break = _auto_configured_line_break(t);
 
@@ -608,6 +606,7 @@ impl RepositoryProcessor {
                             )
                             .set_line_break(line_break);
                         super::handle_java_file1(&mut java_tree_gen, n, t)
+                            .map(|x| x.map(|x| Into::<super::FullNode>::into(x.local)))
                     }
                 } else if let Some(precomp) = &java_proc.parameter.prepro {
                     let more = hyperast::scripting::Prepro::<_, _>::from_arc(precomp.clone());
@@ -618,6 +617,7 @@ impl RepositoryProcessor {
                         )
                         .set_line_break(line_break);
                     super::handle_java_file1(&mut java_tree_gen, n, t)
+                        .map(|x| x.map(|x| x.local.into()))
                 } else if let Some(more) = &java_proc.query {
                     let more = &more.0;
                     // let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
@@ -630,12 +630,14 @@ impl RepositoryProcessor {
                     let mut java_tree_gen =
                         hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen::new(stores, &mut extra)
                             .set_line_break(line_break);
-                    super::handle_java_file2(&mut java_tree_gen, n, t).map(simp2full)
+                    super::handle_java_file2(&mut java_tree_gen, n, t).map(|x| x.map(|x| x.into()))
+                    // .map(simp2full)
                 } else {
                     use hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen;
                     let mut java_tree_gen = JavaTreeGen::bare(stores) //
                         .set_line_break(line_break);
-                    super::handle_java_file2(&mut java_tree_gen, n, t).map(empty2full)
+                    super::handle_java_file2(&mut java_tree_gen, n, t).map(|x| x.map(|x| x.into()))
+                    // .map(empty2full)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;
 
@@ -649,18 +651,19 @@ impl RepositoryProcessor {
                     java_proc.cache.object_map.len()
                 );
 
-                let r = r.node;
+                let r: super::FullNode = r.node;
 
                 #[cfg(debug_assertions)]
                 if let Ok(dd) = stores
                     .node_store
-                    .resolve(r.local.compressed_node)
+                    .resolve(r.id)
                     .get_component::<hyperast::scripting::DerivedData>()
                 {
-                    log::info!("native: {:?} {:?}", r.local.mcc, r.local.metrics);
+                    // log::info!("native: {:?} {:?}", r.local.mcc, r.metrics);
+                    log::info!("native:  {:?}", r.metrics);
                     log::info!("script: {:?}", dd.0);
                 }
-                Ok((r.local.clone(),))
+                Ok(r)
             })
     }
 
@@ -672,10 +675,10 @@ impl RepositoryProcessor {
         repository: &Repository,
         parameters: Handle,
     ) -> Result<(), crate::ParseErr> {
-        let (full_node,) = self.handle_java_blob(oid, name, repository, parameters)?;
+        let full_node = self.handle_java_blob(oid, name, repository, parameters)?;
         let name = self.intern_object_name(name);
         assert!(!w.primary.children_names.contains(&name));
-        let id = full_node.compressed_node;
+        let id = full_node.id;
         w.push(name, full_node);
         if let Some(acc) = &mut w.scripting_acc {
             // SAFETY: this side should be fine, issue when unerasing
@@ -694,71 +697,8 @@ impl RepositoryProcessor {
         name: &ObjectName,
         oid: git2::Oid,
         handle: Handle,
-    ) -> (java_tree_gen::Local,) {
+    ) -> super::FullNode {
         JavaProcessor::<JavaAcc>::prepare(repository, self, dir_path, name, oid, &handle).process()
-    }
-}
-
-fn empty2full(
-    x: crate::utils::SuccessProcessing<
-        hyperast::tree_gen::extra::NodeWithExtra<
-            hyperast::full::FullNode<
-                hyperast::tree_gen::BasicGlobalData,
-                hyperast::tree_gen::zipped_ts_extra::Local,
-            >,
-            hyperast::tree_gen::zipped_ts_extra::EmptyExtra,
-        >,
-    >,
-) -> crate::utils::SuccessProcessing<
-    hyperast::full::FullNode<hyperast::tree_gen::StatsGlobalData, java_tree_gen::Local>,
-> {
-    let local: hyperast::tree_gen::zipped_ts_extra::Local = x.node.node.local;
-    let local = java_tree_gen::Local {
-        compressed_node: local.compressed_node,
-        metrics: local.metrics,
-        mcc: hyperast::cyclomatic::Mcc::new(&Type::Program),
-        role: local.role,
-        precomp_queries: Default::default(),
-        stmt_count: 0,
-        member_import_count: 0,
-    };
-    let global = hyperast::tree_gen::StatsGlobalData::new(x.node.node.global);
-    crate::utils::SuccessProcessing {
-        parsing_time: x.parsing_time,
-        processing_time: x.processing_time,
-        node: java_tree_gen::FNode { global, local },
-    }
-}
-
-fn simp2full(
-    x: crate::utils::SuccessProcessing<
-        hyperast::tree_gen::extra::NodeWithExtra<
-            hyperast::full::FullNode<
-                hyperast::tree_gen::BasicGlobalData,
-                hyperast::tree_gen::zipped_ts_extra::Local,
-            >,
-            hyperast::tree_gen::extra_pattern_precomp::PrecompQueries,
-        >,
-    >,
-) -> crate::utils::SuccessProcessing<
-    hyperast::full::FullNode<hyperast::tree_gen::StatsGlobalData, java_tree_gen::Local>,
-> {
-    let extra = x.node.extra;
-    let local: hyperast::tree_gen::zipped_ts_extra::Local = x.node.node.local;
-    let local = java_tree_gen::Local {
-        compressed_node: local.compressed_node,
-        metrics: local.metrics,
-        mcc: hyperast::cyclomatic::Mcc::new(&Type::Program),
-        role: local.role,
-        precomp_queries: extra.0,
-        stmt_count: 0,
-        member_import_count: 0,
-    };
-    let global = hyperast::tree_gen::StatsGlobalData::new(x.node.node.global);
-    crate::utils::SuccessProcessing {
-        parsing_time: x.parsing_time,
-        processing_time: x.processing_time,
-        node: java_tree_gen::FNode { global, local },
     }
 }
 
@@ -829,7 +769,7 @@ mod experiments {
                     None
                 }
                 ObjectType::File => {
-                    if crate::processing::file_sys::Java::matches(current_object.name()) {
+                    if super::super::selection::Java::matches(current_object.name()) {
                         self.prepro
                             .help_handle_java_file(
                                 *current_object.id(),
@@ -846,7 +786,7 @@ mod experiments {
                 }
             }
         }
-        fn post(&mut self, oid: Oid, acc: JavaAcc) -> Option<(java_tree_gen::Local,)> {
+        fn post(&mut self, oid: Oid, acc: JavaAcc) -> Option<super::super::FullNode> {
             let name = &acc.primary.name;
             // let key = (oid, name.as_bytes().into());
             let name = self.prepro.intern_label(name);
@@ -857,7 +797,6 @@ mod experiments {
                 .mut_or_default::<JavaProcessorHolder>();
             let java_proc = holder.with_parameters_mut(self.handle.0);
             let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
-            let full_node = (full_node,);
             todo!(
               // self.prepro
               // .processing_systems
@@ -876,7 +815,7 @@ mod experiments {
                 w.primary.children_names,
                 name
             );
-            hyperast::tree_gen::Accumulator::push(w, (name, full_node));
+            w.push(name, full_node);
             None
         }
     }

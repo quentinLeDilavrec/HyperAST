@@ -1,16 +1,16 @@
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
-use hyperast_gen_ts_python::TStore;
+// use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
+// use hyperast_gen_ts_python::TStore;
 
 use crate::processing::caches::NamedMap;
 use crate::processing::{ObjectMapper, ObjectName};
 
 use super::PrecompQueries;
 
-type Local = hyperast_gen_ts_python::legion::Local;
-type Acc = hyperast_gen_ts_python::legion::Acc;
-type PrepQuery<'q> = hyperast_tsquery::PreparedQuerying<&'q hyperast_tsquery::Query, TStore, Acc>;
-type Extra<'a> = PatternPrecompExtra<NodeIdentifier, Acc, PrepQuery<'a>>;
+// type Local = hyperast_gen_ts_python::legion::Local;
+// type Acc = hyperast_gen_ts_python::legion::Acc;
+// type PrepQuery<'q> = hyperast_tsquery::PreparedQuerying<&'q hyperast_tsquery::Query, TStore, Acc>;
+// type Extra<'a> = PatternPrecompExtra<NodeIdentifier, Acc, PrepQuery<'a>>;
 
 type MDCache = hyperast::compat::HashMap<NodeIdentifier, PrecompQueries>;
 

@@ -922,8 +922,8 @@ mod tests {
         let gt_out_format = "COMPRESSED"; // JSON
         let gt_out = other_tools::gumtree::subprocess(
             &java_gen.main_stores,
-            src_tr.compressed_node,
-            dst_tr.compressed_node,
+            src_tr.id,
+            dst_tr.id,
             "gumtree",
             "Chawathe",
             60 * 5,
@@ -935,11 +935,7 @@ mod tests {
             mapper: mapping,
             actions,
             exec_data,
-        } = hyper_diff::algorithms::gumtree::diff(
-            &java_gen.main_stores,
-            &src_tr.compressed_node,
-            &dst_tr.compressed_node,
-        );
+        } = hyper_diff::algorithms::gumtree::diff(&java_gen.main_stores, &src_tr.id, &dst_tr.id);
         let actions = actions.unwrap();
 
         let hast_timings = [

@@ -1,11 +1,9 @@
-mod make_processor;
-mod makefile;
+pub mod make_processor;
+pub mod makefile;
 
 use std::{fmt::Debug, path::PathBuf};
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
-use hyperast::tree_gen::SubTreeMetrics;
-use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
 use crate::processing::ObjectName;
@@ -14,11 +12,117 @@ use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub(crate) use make_processor::MakeProc;
 
+use super::FullNode;
+
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
+    pub(crate) makefile_handle: PCP2Handle<makefile::MakefileProc>,
     pub(crate) cpp_handle: PCP2Handle<super::cpp::CppProc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MakeFile {
+    pub compressed_node: NodeIdentifier,
+    pub metrics: DefaultMetrics,
+    submodules: Vec<String>,
+    source_dirs: Vec<String>,
+    test_source_dirs: Vec<String>,
+}
+
+pub struct MakeModuleAcc {
+    pub(crate) primary: BasicDirAcc<NodeIdentifier, LabelIdentifier, DefaultMetrics>,
+    pub(crate) sub_modules: Option<Vec<PathBuf>>,
+    pub(crate) main_dirs: Option<Vec<PathBuf>>,
+    pub(crate) test_dirs: Option<Vec<PathBuf>>,
+    pub(crate) precomp_queries: super::PrecompQueries,
+}
+
+impl hyperast::tree_gen::Accumulator for MakeModuleAcc {
+    type Node = (LabelIdentifier, FullNode);
+    fn push(&mut self, (name, full_node): Self::Node) {
+        self.primary.children.push(full_node.id);
+        self.primary.children_names.push(name);
+        self.primary.metrics.acc(full_node.metrics);
+    }
+}
+
+impl Accumulator for MakeModuleAcc {
+    type Unlabeled = FullNode;
+}
+
+impl From<String> for MakeModuleAcc {
+    fn from(name: String) -> Self {
+        Self::new(name)
+    }
+}
+
+impl MakeModuleAcc {
+    pub(crate) fn new(name: String) -> Self {
+        Self {
+            primary: BasicDirAcc::new(name),
+            sub_modules: None,
+            main_dirs: None,
+            test_dirs: None,
+            precomp_queries: super::PrecompQueries::default(),
+        }
+    }
+    pub(crate) fn with_content(
+        name: String,
+        sub_modules: Vec<PathBuf>,
+        main_dirs: Vec<PathBuf>,
+        test_dirs: Vec<PathBuf>,
+    ) -> Self {
+        Self {
+            primary: BasicDirAcc::new(name),
+            sub_modules: (!sub_modules.is_empty()).then_some(sub_modules),
+            main_dirs: (!main_dirs.is_empty()).then_some(main_dirs),
+            test_dirs: (!test_dirs.is_empty()).then_some(test_dirs),
+            precomp_queries: super::PrecompQueries::default(),
+        }
+    }
+}
+
+impl MakeModuleAcc {
+    pub(crate) fn push_makefile(&mut self, name: LabelIdentifier, full_node: MakeFile) {
+        self.primary.children.push(full_node.compressed_node);
+        self.primary.children_names.push(name);
+        self.main_dirs = Some(full_node.source_dirs.iter().map(|x| x.into()).collect());
+        self.test_dirs = Some(
+            full_node
+                .test_source_dirs
+                .iter()
+                .map(|x| x.into())
+                .collect(),
+        );
+        self.sub_modules = Some(full_node.submodules.iter().map(|x| x.into()).collect());
+        self.primary.metrics.acc(full_node.metrics);
+    }
+    pub fn push_submodule(&mut self, name: LabelIdentifier, full_node: FullNode) {
+        self.primary.children.push(full_node.id);
+        self.primary.children_names.push(name);
+        self.primary.metrics.acc(full_node.metrics);
+    }
+    pub(crate) fn push_source_file(&mut self, name: LabelIdentifier, full_node: FullNode) {
+        self.primary.children.push(full_node.id);
+        self.primary.children_names.push(name);
+        self.primary.metrics.acc(full_node.metrics);
+    }
+    pub(crate) fn push_source_directory(&mut self, name: LabelIdentifier, full_node: FullNode) {
+        self.primary.children.push(full_node.id);
+        self.primary.children_names.push(name);
+        self.primary.metrics.acc(full_node.metrics);
+    }
+    pub(crate) fn push_test_source_directory(
+        &mut self,
+        name: LabelIdentifier,
+        full_node: FullNode,
+    ) {
+        self.primary.children.push(full_node.id);
+        self.primary.children_names.push(name);
+        self.primary.metrics.acc(full_node.metrics);
+    }
 }
 
 pub(crate) fn handle_makefile_file<'a, E>(
@@ -55,144 +159,47 @@ where
     Ok(x)
 }
 
-#[derive(Debug, Clone)]
-pub struct MakeFile {
-    pub compressed_node: NodeIdentifier,
-    pub metrics: DefaultMetrics,
-    submodules: Vec<String>,
-    source_dirs: Vec<String>,
-    test_source_dirs: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MD {
-    pub(crate) metrics: DefaultMetrics,
-}
-
-pub struct MakeModuleAcc {
-    pub(crate) primary: BasicDirAcc<NodeIdentifier, LabelIdentifier, DefaultMetrics>,
-    pub(crate) sub_modules: Option<Vec<PathBuf>>,
-    pub(crate) main_dirs: Option<Vec<PathBuf>>,
-    pub(crate) test_dirs: Option<Vec<PathBuf>>,
-}
-
-impl From<String> for MakeModuleAcc {
-    fn from(name: String) -> Self {
-        Self {
-            primary: BasicDirAcc::new(name),
-            sub_modules: None,
-            main_dirs: None,
-            test_dirs: None,
-        }
-    }
-}
-
-impl MakeModuleAcc {
-    pub(crate) fn new(name: String) -> Self {
-        Self {
-            primary: BasicDirAcc::new(name),
-            sub_modules: None,
-            main_dirs: None,
-            test_dirs: None,
-        }
-    }
-    pub(crate) fn with_content(
-        name: String,
-        sub_modules: Vec<PathBuf>,
-        main_dirs: Vec<PathBuf>,
-        test_dirs: Vec<PathBuf>,
-    ) -> Self {
-        Self {
-            primary: BasicDirAcc::new(name),
-            sub_modules: (!sub_modules.is_empty()).then_some(sub_modules),
-            main_dirs: (!main_dirs.is_empty()).then_some(main_dirs),
-            test_dirs: (!test_dirs.is_empty()).then_some(test_dirs),
-        }
-    }
-}
-
-impl MakeModuleAcc {
-    pub(crate) fn push_makefile(&mut self, name: LabelIdentifier, full_node: MakeFile) {
-        self.primary.children.push(full_node.compressed_node);
-        self.primary.children_names.push(name);
-        self.main_dirs = Some(full_node.source_dirs.iter().map(|x| x.into()).collect());
-        self.test_dirs = Some(
-            full_node
-                .test_source_dirs
-                .iter()
-                .map(|x| x.into())
-                .collect(),
-        );
-        self.sub_modules = Some(full_node.submodules.iter().map(|x| x.into()).collect());
-        self.primary.metrics.acc(full_node.metrics);
-    }
-    pub fn push_submodule(&mut self, name: LabelIdentifier, full_node: FullNode) {
-        self.primary.children.push(full_node.id);
-        self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.md.metrics);
-    }
-    pub(crate) fn push_source_file(
+impl crate::preprocessed::CommitProcessor<crate::processing::file_sys::Make>
+    for crate::preprocessed::RepositoryProcessor
+{
+    type Module = crate::processors::FullNode;
+    fn handle_module<'b, const RMS: bool>(
         &mut self,
-        name: LabelIdentifier,
-        full_node: cpp_tree_gen::Local,
-    ) {
-        self.primary.children.push(full_node.compressed_node);
-        self.primary.children_names.push(name);
-        self.primary.metrics.acc(SubTreeMetrics {
-            hashs: full_node.metrics.hashs,
-            size: full_node.metrics.size,
-            height: full_node.metrics.height,
-            size_no_spaces: full_node.metrics.size_no_spaces,
-            line_count: 0,
-        });
-    }
-    pub(crate) fn push_source_directory(
-        &mut self,
-        name: LabelIdentifier,
-        full_node: cpp_tree_gen::Local,
-    ) {
-        self.primary.children.push(full_node.compressed_node);
-        self.primary.children_names.push(name);
-        self.primary.metrics.acc(SubTreeMetrics {
-            hashs: full_node.metrics.hashs,
-            size: full_node.metrics.size,
-            height: full_node.metrics.height,
-            size_no_spaces: full_node.metrics.size_no_spaces,
-            line_count: 0,
-        });
-    }
-    pub(crate) fn push_test_source_directory(
-        &mut self,
-        name: LabelIdentifier,
-        full_node: cpp_tree_gen::Local,
-    ) {
-        self.primary.children.push(full_node.compressed_node);
-        self.primary.children_names.push(name);
-        self.primary.metrics.acc(SubTreeMetrics {
-            hashs: full_node.metrics.hashs,
-            size: full_node.metrics.size,
-            height: full_node.metrics.height,
-            size_no_spaces: full_node.metrics.size_no_spaces,
-            line_count: 0,
-        });
-    }
-}
+        repository: &git2::Repository,
+        dir_path: &'b mut std::iter::Peekable<std::path::Components<'b>>,
+        name: &[u8],
+        tree_oid: git2::Oid,
+    ) -> Self::Module {
+        dbg!();
+        use crate::processing::ProcessorHolder;
+        type CppProcHolder = ProcessorHolder<crate::processors::cpp::CppProc>;
+        type MakeProcHolder = ProcessorHolder<crate::processors::make::MakeProc>;
+        type MakefileProcHolder = ProcessorHolder<crate::processors::make::makefile::MakefileProc>;
 
-#[derive(Clone)]
-pub struct FullNode {
-    pub id: NodeIdentifier,
-    pub md: MD,
-}
+        let t = crate::processors::cpp::Parameter { query: None };
+        let h_cpp = self.processing_systems.mut_or_default::<CppProcHolder>();
+        let cpp_handle = h_cpp.register_param(t);
+        let h = self
+            .processing_systems
+            .mut_or_default::<MakefileProcHolder>();
+        let t = crate::processors::make::makefile::Parameter::default();
+        let makefile_handle = h.register_param(t);
+        let h = self.processing_systems.mut_or_default::<MakeProcHolder>();
+        let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
+        let handle = h.register_param(t);
 
-impl hyperast::tree_gen::Accumulator for MakeModuleAcc {
-    type Node = (LabelIdentifier, FullNode);
-    fn push(&mut self, (name, full_node): Self::Node) {
-        self.primary.children.push(full_node.id);
-        self.primary.children_names.push(name);
-        self.primary.metrics.acc(full_node.md.metrics);
+        use crate::Processor;
+        use crate::processors::make::MakeModuleAcc;
+        use crate::processors::make::make_processor::MakeProcessor;
+        let root_full_node = MakeProcessor::<true, false, MakeModuleAcc>::prepare(
+            repository,
+            self,
+            dir_path,
+            name,
+            tree_oid,
+            handle.erase(),
+        )
+        .process();
+        root_full_node
     }
-}
-
-impl Accumulator for MakeModuleAcc {
-    type Unlabeled = FullNode;
 }

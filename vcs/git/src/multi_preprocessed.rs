@@ -7,22 +7,38 @@ use crate::processing::erased::{CommitProcExt, ParametrizedCommitProcessorHandle
 use crate::processing::{ConfiguredRepo2, ProcessorHolder};
 use crate::processing::{ConfiguredRepoHandle2, RepoConfig};
 
+#[cfg(feature = "java")]
 use crate::processors::java::JavaProc;
+#[cfg(feature = "java")]
 type JavaProcessorHolder = ProcessorHolder<JavaProc>;
+#[cfg(feature = "cpp")]
 use crate::processors::cpp::CppProc;
+#[cfg(feature = "cpp")]
 type CppProcessorHolder = ProcessorHolder<CppProc>;
 #[cfg(feature = "python")]
-type PythonProcessorHolder = ProcessorHolder<crate::processors::python::PythonProc>;
+use crate::processors::python::PythonProc;
+#[cfg(feature = "python")]
+type PythonProcessorHolder = ProcessorHolder<PythonProc>;
+#[cfg(feature = "make_cpp")]
 use crate::processors::make::MakeProc;
+#[cfg(feature = "make_cpp")]
 type MakeProcessorHolder = ProcessorHolder<MakeProc>;
+#[cfg(feature = "maven_java")]
 use crate::processors::maven::MavenProc;
+#[cfg(feature = "maven_java")]
 type MavenProcessorHolder = ProcessorHolder<MavenProc>;
+#[cfg(feature = "maven_java")]
 use crate::processors::maven::PomProc;
+#[cfg(feature = "maven_java")]
 type PomProcessorHolder = ProcessorHolder<PomProc>;
-// #[cfg(feature = "file_sys")]
-// use crate::processors::file_sys::FileSysProc;
-// #[cfg(feature = "file_sys")]
-// type FileSysProcessorHolder = ProcessorHolder<FileSysProc>;
+#[cfg(feature = "make_cpp")]
+use crate::processors::make::makefile::MakefileProc;
+#[cfg(feature = "make_cpp")]
+type MakefileProcessorHolder = ProcessorHolder<MakefileProc>;
+#[cfg(feature = "file_sys")]
+use crate::processors::file_sys::FileSysProc;
+#[cfg(feature = "file_sys")]
+type FileSysProcessorHolder = ProcessorHolder<FileSysProc>;
 
 /// Preprocess git repositories
 /// share most components with PreProcessedRepository
@@ -150,10 +166,9 @@ impl PreProcessedRepositories {
             let h = pr.mut_or_default::<PomProcessorHolder>();
             CommitProcExt::register_param(h, t)
         };
-        let cpp = |pr: &mut ProcessorMap| {
-            let q = ["(translation_unit)"].as_slice();
-            let t = crate::processors::cpp::Parameter::new(q);
-            let h = pr.mut_or_default::<CppProcessorHolder>();
+        let makefile = |pr: &mut ProcessorMap| {
+            let t = crate::processors::make::makefile::Parameter::default();
+            let h = pr.mut_or_default::<MakefileProcessorHolder>();
             CommitProcExt::register_param(h, t)
         };
         #[cfg(feature = "python")]
@@ -162,9 +177,9 @@ impl PreProcessedRepositories {
             let h = pr.mut_or_default::<PythonProcessorHolder>();
             CommitProcExt::register_param(h, t)
         };
+        let processor_map = &mut self.processor.processing_systems;
         let r = match config {
             RepoConfig::JavaMaven => {
-                let processor_map = &mut self.processor.processing_systems;
                 let java_handle = java(processor_map);
                 let pom_handle = pom(processor_map);
                 let h = processor_map.mut_or_default::<MavenProcessorHolder>();
@@ -176,37 +191,33 @@ impl PreProcessedRepositories {
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::Java => {
-                let processor_map = &mut self.processor.processing_systems;
                 let config = java(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             #[cfg(feature = "python")]
             RepoConfig::Python => {
-                let processor_map = &mut self.processor.processing_systems;
                 let config = python(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::CppMake => {
-                let processor_map = &mut self.processor.processing_systems;
-                let cpp_handle = cpp(processor_map);
+                let cpp_handle = CppProc::default_handle(processor_map);
+                let makefile_handle = makefile(processor_map);
                 let h = processor_map.mut_or_default::<MakeProcessorHolder>();
-                let t = crate::processors::make::Parameter { cpp_handle };
+                let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
                 let config = h.register_param(t).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
-            // #[cfg(feature = "file_sys")]
-            // RepoConfig::Any => {
-            //     let processor_map = &mut self.processor.processing_systems;
-            //     let t = crate::processors::file_sys::Parameter {
-            //         cpp_handle: cpp(processor_map),
-            //         java_handle: java(processor_map),
-            //         python_handle: python(processor_map),
-            //         // query: Some(q.into()),
-            //     };
-            //     let holder = processor_map.mut_or_default::<FileSysProcessorHolder>();
-            //     let config = holder.register_param(t).erase();
-            //     ConfiguredRepoHandle2 { spec, config }
-            // }
+            #[cfg(feature = "file_sys")]
+            RepoConfig::Any => {
+                let t = crate::processors::file_sys::Parameter {
+                    cpp_handle: CppProc::default_handle(processor_map),
+                    java_handle: java(processor_map),
+                    python_handle: python(processor_map),
+                };
+                let holder = processor_map.mut_or_default::<FileSysProcessorHolder>();
+                let config = holder.register_param(t).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
             _ => todo!(),
         };
 
@@ -220,22 +231,41 @@ impl PreProcessedRepositories {
         config: RepoConfig,
         prepro: crate::Str,
     ) -> ConfiguredRepoHandle2 {
+        use crate::processing::erased::ProcessorMap;
+        let processor_map = &mut self.processor.processing_systems;
+        let java = |pr: &mut ProcessorMap, prepro: crate::Str| {
+            let h = pr.mut_or_default::<JavaProcessorHolder>();
+            let t = crate::processors::java::Parameter {
+                prepro: Some(prepro),
+                ..Default::default()
+            };
+            CommitProcExt::register_param(h, t)
+        };
+        let cpp = |_pr: &mut ProcessorMap, _prepro: crate::Str| {
+            todo!("implement scripted preprocessing for cpp");
+            // let h = pr.mut_or_default::<CppProcessorHolder>();
+            // let t = crate::processors::cpp::Parameter {
+            //     // prepro: Some(prepro),
+            //     ..Default::default()
+            // };
+            // CommitProcExt::register_param(h, t)
+        };
+
+        let makefile = |pr: &mut ProcessorMap| {
+            let t = crate::processors::make::makefile::Parameter::default();
+            let h = pr.mut_or_default::<MakefileProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
+        let pom = |pr: &mut ProcessorMap| {
+            let t = crate::processors::maven::PomParameter {};
+            let h = pr.mut_or_default::<PomProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
         let r = match config {
             RepoConfig::JavaMaven => {
-                let processor_map = &mut self.processor.processing_systems;
-                let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
-                let t = crate::processors::java::Parameter {
-                    prepro: Some(prepro),
-                    ..Default::default()
-                };
-                let java_handle = CommitProcExt::register_param(h_java, t);
-                use crate::processors::maven::PomParameter;
-                let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
-                let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
-                let h = self
-                    .processor
-                    .processing_systems
-                    .mut_or_default::<MavenProcessorHolder>();
+                let java_handle = java(processor_map, prepro);
+                let pom_handle = pom(processor_map);
+                let h = processor_map.mut_or_default::<MavenProcessorHolder>();
                 let t = crate::processors::maven::Parameter {
                     java_handle,
                     pom_handle,
@@ -244,17 +274,10 @@ impl PreProcessedRepositories {
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::CppMake => {
-                let t = crate::processors::cpp::Parameter { query: None };
-                let h_cpp = self
-                    .processor
-                    .processing_systems
-                    .mut_or_default::<CppProcessorHolder>();
-                let cpp_handle = CommitProcExt::register_param(h_cpp, t);
-                let h = self
-                    .processor
-                    .processing_systems
-                    .mut_or_default::<MakeProcessorHolder>();
-                let t: crate::processors::make::Parameter = cpp_handle.into();
+                let cpp_handle = cpp(processor_map, prepro);
+                let makefile_handle = makefile(processor_map);
+                let h = processor_map.mut_or_default::<MakeProcessorHolder>();
+                let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
                 let config = h.register_param(t).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
@@ -276,47 +299,53 @@ impl PreProcessedRepositories {
             let h = pr.mut_or_default::<CppProcessorHolder>();
             CommitProcExt::register_param(h, t)
         };
+        let java = |pr: &mut ProcessorMap, q: hyperast_tsquery::ZeroSepArrayStr| {
+            let t = crate::processors::java::Parameter::with_query(q);
+            let h = pr.mut_or_default::<JavaProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
+        let python = |pr: &mut ProcessorMap, q: hyperast_tsquery::ZeroSepArrayStr| {
+            let t = crate::processors::python::Parameter::new(q);
+            let h = pr.mut_or_default::<PythonProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
+        let makefile = |pr: &mut ProcessorMap| {
+            let t = crate::processors::make::makefile::Parameter::default();
+            let h = pr.mut_or_default::<MakefileProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
+        let pom = |pr: &mut ProcessorMap| {
+            let t = crate::processors::maven::PomParameter {};
+            let h = pr.mut_or_default::<PomProcessorHolder>();
+            CommitProcExt::register_param(h, t)
+        };
+        let processor_map = &mut self.processor.processing_systems;
         let r = match config {
             RepoConfig::JavaMaven => {
-                let processor_map = &mut self.processor.processing_systems;
-                let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
-                let t = crate::processors::java::Parameter {
-                    query: Some(query.into()),
-                    ..Default::default()
-                };
-                let java_handle = CommitProcExt::register_param(h_java, t);
-                use crate::processors::maven::PomParameter;
-                let h_pom = processor_map.mut_or_default::<PomProcessorHolder>();
-                let pom_handle = CommitProcExt::register_param(h_pom, PomParameter {});
+                let java_handle = java(processor_map, query.into());
+                let pom_handle = pom(processor_map);
                 let h = processor_map.mut_or_default::<MavenProcessorHolder>();
-                let config = h
-                    .register_param(crate::processors::maven::Parameter {
-                        java_handle,
-                        pom_handle,
-                    })
-                    .erase();
+                let t = crate::processors::maven::Parameter {
+                    java_handle,
+                    pom_handle,
+                };
+                let config = h.register_param(t).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::Java => {
-                let processor_map = &mut self.processor.processing_systems;
-                let h_java = processor_map.mut_or_default::<JavaProcessorHolder>();
-                let t = crate::processors::java::Parameter::with_query(query);
-                let config = h_java.register_param(t).erase();
+                let config = java(processor_map, query.into()).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::CppMake => {
-                let processor_map = &mut self.processor.processing_systems;
                 let cpp_handle = cpp(processor_map, query.into());
-                let t = crate::processors::make::Parameter { cpp_handle };
+                let makefile_handle = makefile(processor_map);
                 let h = processor_map.mut_or_default::<MakeProcessorHolder>();
+                let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
                 let config = h.register_param(t).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::Python => {
-                let processor_map = &mut self.processor.processing_systems;
-                let h_python = processor_map.mut_or_default::<PythonProcessorHolder>();
-                let t = crate::processors::python::Parameter::with_query(query);
-                let config = h_python.register_param(t).erase();
+                let config = python(processor_map, query.into()).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             _ => todo!(),
@@ -364,10 +393,10 @@ impl PreProcessedRepositories {
         r
     }
 
-    pub fn get_config(&self, repo: Repo) -> Option<ConfiguredRepoHandle2> {
+    pub fn get_config(&self, spec: Repo) -> Option<ConfiguredRepoHandle2> {
         self.configs
-            .get(&repo)
-            .map(|&config| ConfiguredRepoHandle2 { config, spec: repo })
+            .get(&spec)
+            .map(|&config| ConfiguredRepoHandle2 { config, spec })
     }
 
     pub fn get_precomp_query(
@@ -375,19 +404,10 @@ impl PreProcessedRepositories {
         handle: ParametrizedCommitProcessorHandle,
         lang: &str,
     ) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
-        let proc = self
-            .processor
-            .processing_systems
-            .by_id(&handle.0)
-            .unwrap()
-            .get(handle.1);
+        let processor_map = &self.processor.processing_systems;
+        let proc = processor_map.by_id(&handle.0).unwrap().get(handle.1);
         let handle = proc.get_lang_handle(lang)?;
-        let proc = self
-            .processor
-            .processing_systems
-            .by_id(&handle.0)
-            .unwrap()
-            .get(handle.1);
+        let proc = processor_map.by_id(&handle.0).unwrap().get(handle.1);
         proc.get_precomp_query()
     }
 
@@ -423,103 +443,4 @@ impl PreProcessedRepositories {
         self.processor
             .ensure_pre_processed_with_limit(repository, before, after, limit)
     }
-
-    // pub fn pre_process_with_config2(
-    //     &mut self,
-    //     repository: &mut ConfiguredRepo2,
-    //     before: &str,
-    //     after: &str,
-    // ) -> Result<Vec<git2::Oid>, git2::Error> {
-    //     assert!(!before.is_empty());
-    //     self.processor.pre_process(repository, before, after)
-    // }
-
-    // fn pre_process_with_config(
-    //     &mut self,
-    //     repository: &mut ConfiguredRepo,
-    //     before: &str,
-    //     after: &str,
-    // ) -> Result<Vec<git2::Oid>, git2::Error> {
-    //     let config = &repository.config;
-    //     let repository = &mut repository.repo;
-    //     log::info!(
-    //         "commits to process: {:?}",
-    //         all_commits_between(&repository, before, after).map(|x| x.count())
-    //     );
-    //     let mut processing_ordered_commits = vec![];
-    //     let rw = all_commits_between(&repository, before, after)?;
-    //     todo!();
-    //     // let config = config.into();
-    //     // match config {
-    //     //     ProcessingConfig::JavaMaven { limit, dir_path } => {
-    //     //         let commits = self.commits.entry(RepoConfig::JavaMaven).or_default();
-    //     //         rw
-    //     //             // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-    //     //             .take(limit) // TODO make a variable
-    //     //             .for_each(|oid| {
-    //     //                 let oid = oid.unwrap();
-    //     //                 let c = CommitProcessor::<file_sys::Maven>::handle_commit::<true>(
-    //     //                     &mut self.processor,
-    //     //                     &repository,
-    //     //                     dir_path,
-    //     //                     oid,
-    //     //                 );
-    //     //                 processing_ordered_commits.push(oid.clone());
-    //     //                 commits.insert(oid.clone(), c);
-    //     //             });
-    //     //     }
-    //     //     ProcessingConfig::CppMake { limit, dir_path } => {
-    //     //         let commits = self.commits.entry(RepoConfig::CppMake).or_default();
-    //     //         rw
-    //     //             // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-    //     //             .take(limit) // TODO make a variable
-    //     //             .for_each(|oid| {
-    //     //                 let oid = oid.unwrap();
-    //     //                 let c = CommitProcessor::<file_sys::Make>::handle_commit::<true>(
-    //     //                     &mut self.processor,
-    //     //                     &repository,
-    //     //                     dir_path,
-    //     //                     oid,
-    //     //                 );
-    //     //                 processing_ordered_commits.push(oid.clone());
-    //     //                 commits.insert(oid.clone(), c);
-    //     //             });
-    //     //     }
-    //     //     ProcessingConfig::TsNpm { limit, dir_path } => {
-    //     //         let commits = self.commits.entry(RepoConfig::TsNpm).or_default();
-    //     //         rw
-    //     //             // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-    //     //             .take(limit) // TODO make a variable
-    //     //             .for_each(|oid| {
-    //     //                 let oid = oid.unwrap();
-    //     //                 let c = CommitProcessor::<file_sys::Npm>::handle_commit::<true>(
-    //     //                     &mut self.processor,
-    //     //                     &repository,
-    //     //                     dir_path,
-    //     //                     oid,
-    //     //                 );
-    //     //                 processing_ordered_commits.push(oid.clone());
-    //     //                 commits.insert(oid.clone(), c);
-    //     //             });
-    //     //     }
-    //     //     ProcessingConfig::Any { limit, dir_path } => {
-    //     //         let commits = self.commits.entry(RepoConfig::Any).or_default();
-    //     //         rw
-    //     //             // .skip(1500)release-1.0.0 refs/tags/release-3.3.2-RC4
-    //     //             .take(limit) // TODO make a variable
-    //     //             .for_each(|oid| {
-    //     //                 let oid = oid.unwrap();
-    //     //                 let c = CommitProcessor::<file_sys::Any>::handle_commit::<true>(
-    //     //                     &mut self.processor,
-    //     //                     &repository,
-    //     //                     dir_path,
-    //     //                     oid,
-    //     //                 );
-    //     //                 processing_ordered_commits.push(oid.clone());
-    //     //                 commits.insert(oid.clone(), c);
-    //     //             });
-    //     //     }
-    //     // }
-    //     Ok(processing_ordered_commits)
-    // }
 }

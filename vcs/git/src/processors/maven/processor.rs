@@ -33,7 +33,7 @@ use super::JavaProc;
 use super::SimpleStores;
 use super::scripting::ScriptingPrepro;
 use super::scripting::prep_scripting;
-use super::{FullNode, MD, MavenModuleAcc};
+use super::{FullNode, MavenModuleAcc};
 
 /// RMS: Resursive Module Search
 /// FFWD: Fast ForWarD to java directories without looking at maven stuff
@@ -123,7 +123,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
     fn post(&mut self, oid: Oid, acc: MavenModuleAcc) -> Option<FullNode> {
         let name = acc.primary.name.clone();
         let full_node = Self::make(acc, self.prepro.main_stores_mut().mut_with_ts());
-        log::info!("tree size: {}", full_node.md.metrics.size);
+        log::info!("tree size: {}", full_node.metrics.size);
         self.prepro
             .processing_systems
             .mut_or_default::<MavenProcessorHolder>()
@@ -223,14 +223,14 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         log::debug!("maven tree {:?}", name.try_str());
         let parent_acc = &mut self.stack.last_mut().unwrap().acc;
         if FFWD {
-            let (name, (full_node,)) = self.prepro.help_handle_java_folder(
+            let (name, full_node) = self.prepro.help_handle_java_folder(
                 &self.repository,
                 &mut self.dir_path,
                 oid,
                 &name,
                 java_handle,
             );
-            let id = full_node.compressed_node;
+            let id = full_node.id;
             assert!(!parent_acc.primary.children_names.contains(&name));
             parent_acc.push_source_directory(name, full_node);
             if let Some(acc) = &mut parent_acc.scripting_acc {
@@ -244,14 +244,14 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         let helper = MavenModuleHelper::new(parent_acc, &name);
         if helper.source_directories.0 || helper.test_source_directories.0 {
             // handle as source dir
-            let (name, (full_node,)) = self.prepro.help_handle_java_folder(
+            let (name, full_node) = self.prepro.help_handle_java_folder(
                 &self.repository,
                 self.dir_path,
                 oid,
                 &name,
                 java_handle,
             );
-            let id = full_node.compressed_node;
+            let id = full_node.id;
             let parent_acc = &mut self.stack.last_mut().unwrap().acc;
             assert!(!parent_acc.primary.children_names.contains(&name));
             if helper.source_directories.0 {
@@ -331,6 +331,20 @@ pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
 
     let eq = eq_node(&interned_kind, Some(&label_id), &primary.children);
 
+    let insertion = node_store.prepare_insertion(&hashable, eq);
+
+    if let Some(_id) = insertion.occupied_id() {
+        unimplemented!("I think it should probably stay unused")
+        // let metrics = primary.metrics.map_hashs(|h| h.build());
+        // let status = acc.status;
+        // return super::FullNode {
+        //     id,
+        //     precomp_queries: super::super::PrecompQueries::full(),
+        //     metrics,
+        //     status,
+        // };
+    }
+
     let ana = {
         let new_sub_modules = drain_filter_strip(&mut acc.sub_modules, b"..");
         let new_main_dirs = drain_filter_strip(&mut acc.main_dirs, b"..");
@@ -349,18 +363,6 @@ pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
         }
         ana.resolve()
     };
-    let insertion = node_store.prepare_insertion(&hashable, eq);
-
-    if let Some(id) = insertion.occupied_id() {
-        let metrics = primary.metrics.map_hashs(|h| h.build());
-        let status = acc.status;
-        let md = MD {
-            metrics,
-            ana,
-            status,
-        };
-        return FullNode { id, md };
-    }
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
     assert_eq!(primary.children_names.len(), primary.children.len());
@@ -386,12 +388,13 @@ pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
 
     let status = acc.status;
 
-    let md = MD {
+    FullNode {
+        id: node_id,
         metrics,
-        ana,
+        precomp_queries: acc.precomp_queries,
         status,
-    };
-    FullNode { id: node_id, md }
+        ana,
+    }
 }
 
 struct MavenModuleHelper {

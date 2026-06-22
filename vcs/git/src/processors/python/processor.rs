@@ -35,6 +35,7 @@ pub struct PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
+    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: &'d Handle,
 }
@@ -214,9 +215,9 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
             .mut_or_default::<PythonProcessorHolder>();
         let handle = self.handle;
         let oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.0.compressed_node);
+        let commit = self.commit_builder.finish(root_full_node.id);
         h.with_parameters_mut(handle.1).commits.insert(oid, commit);
-        root_full_node.0.compressed_node
+        root_full_node.id
     }
 }
 
@@ -305,13 +306,12 @@ fn handle_python_blob_aux(
         let mut extra = PatternPrecompExtra::<_, Acc, _>::with_cache(more, md_cache);
         let mut tree_gen = PythonTreeGen::new(stores, &mut extra).set_line_break(lb);
         let r = super::handle_python_file(tree_gen.with_dedup(dedup), n, t)
-            .map(|x| x.map(|x| (x.node.local, x.extra)));
+            .map(|x| x.map(|x| x.into()));
         proc.cache.md_cache = extra.md_cache;
         r
     } else {
         let mut tree_gen = PythonTreeGen::bare(stores).set_line_break(lb);
-        super::handle_python_file(tree_gen.with_dedup(dedup), n, t)
-            .map(|x| x.map(|x| (x.node.local, Default::default())))
+        super::handle_python_file(tree_gen.with_dedup(dedup), n, t).map(|x| x.map(|x| x.into()))
     }
 }
 
@@ -339,28 +339,20 @@ fn make(acc: PythonAcc, stores: &mut SimpleStores, proc: &mut PythonProc) -> sup
         .inner
         .prepare_insertion(dedup_cache, &hashable, eq);
 
-    if let Some(id) = insertion.occupied_id() {
+    if let Some(_id) = insertion.occupied_id() {
         // NOTE this situation should not happen often, due to cache based on oids, so there is no point caching md.
         // If git objects are changed but ignored, then it goes through this branch.
         // TODO bench
         // TODO in the oid cache the values could be NodeIdentifiers, then current cache would be used with an indirection.
 
-        let md = md_cache.get(&id).unwrap();
-        let metrics = primary.metrics;
-        let metrics = metrics.map_hashs(|h| h.build());
-        return (
-            python_gen::Local {
-                compressed_node: id,
-                metrics,
-                role: None,
-            },
-            md.clone(),
-        );
+        unimplemented!("I think it should probably stay unused")
+        // let md = md_cache.get(&id).unwrap();
+        // let metrics = primary.metrics;
+        // let metrics = metrics.map_hashs(|h| h.build());
+        // return todo!();
     }
 
     let mut dyn_builder = subtree_builder::<TStore>(interned_kind);
-
-    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries.0);
 
     let children_is_empty = primary.children.is_empty();
 
@@ -369,15 +361,16 @@ fn make(acc: PythonAcc, stores: &mut SimpleStores, proc: &mut PythonProc) -> sup
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
+    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries.0);
+
     let vacant = insertion.vacant();
     let node_id = vacant.insert_built(dyn_builder.build());
 
     md_cache.insert(node_id, acc.precomp_queries.clone());
 
-    let local = python_gen::Local {
-        compressed_node: node_id,
+    super::FullNode {
+        id: node_id,
         metrics,
-        role: None,
-    };
-    (local, acc.precomp_queries)
+        precomp_queries: acc.precomp_queries,
+    }
 }

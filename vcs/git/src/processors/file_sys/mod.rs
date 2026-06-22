@@ -1,33 +1,48 @@
-//! Handle any directory structure
+//! Handles raw directory structure, ignoring build systems
 
 mod caches;
+mod commit_proc;
 mod processor;
-mod types;
-
-use std::fmt::Debug;
+pub mod types;
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 
+use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
-
-pub(crate) use processor::FileSysProc;
 
 pub use types::{TStore, Type};
 
-pub use processor::Parameter;
+use super::FullNode;
 
 type SimpleStores = hyperast::store::SimpleStores<TStore>;
+use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 
-type PrecompQueries = hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
+#[derive(Clone, PartialEq, Eq)]
+pub struct Parameter {
+    #[cfg(feature = "cpp")]
+    pub(crate) cpp_handle: PCP2Handle<super::cpp::CppProc>,
+    #[cfg(feature = "java")]
+    pub(crate) java_handle: PCP2Handle<super::java::JavaProc>,
+    #[cfg(feature = "python")]
+    pub(crate) python_handle: PCP2Handle<super::python::PythonProc>,
+}
+
+pub(crate) struct FileSysProc {
+    parameter: Parameter,
+    cache: caches::FileSys,
+    commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+}
 
 pub struct FileSysAcc {
     pub(crate) primary: BasicDirAcc<NodeIdentifier, LabelIdentifier, DefaultMetrics>,
+    pub(crate) precomp_queries: PrecompQueries,
 }
 
 impl From<String> for FileSysAcc {
     fn from(name: String) -> Self {
         Self {
             primary: BasicDirAcc::new(name),
+            precomp_queries: PrecompQueries::default(),
         }
     }
 }
@@ -36,6 +51,7 @@ impl FileSysAcc {
     pub(crate) fn new(name: String) -> Self {
         Self {
             primary: BasicDirAcc::new(name),
+            precomp_queries: PrecompQueries::default(),
         }
     }
 
@@ -44,6 +60,7 @@ impl FileSysAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries += full_node.precomp_queries;
     }
 }
 
@@ -58,35 +75,22 @@ impl hyperast::tree_gen::Accumulator for FileSysAcc {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct FullNode {
-    pub id: NodeIdentifier,
-    pub metrics: DefaultMetrics,
-}
-
-impl From<hyperast_gen_ts_cpp::legion::Local> for FullNode {
-    fn from(full_node: hyperast_gen_ts_cpp::legion::Local) -> Self {
-        Self {
-            id: full_node.compressed_node,
-            metrics: full_node.metrics,
-        }
-    }
-}
-
-impl From<hyperast_gen_ts_java::legion_with_refs::Local> for FullNode {
-    fn from(full_node: hyperast_gen_ts_java::legion_with_refs::Local) -> Self {
-        Self {
-            id: full_node.compressed_node,
-            metrics: full_node.metrics,
-        }
-    }
-}
-
-impl From<hyperast::tree_gen::zipped_ts_extra::Local> for FullNode {
-    fn from(full_node: hyperast::tree_gen::zipped_ts_extra::Local) -> Self {
-        Self {
-            id: full_node.compressed_node,
-            metrics: full_node.metrics,
-        }
+impl crate::preprocessed::RepositoryProcessor {
+    pub fn default_config(&mut self) -> crate::processing::ParametrizedCommitProcessorHandle {
+        use crate::processors::cpp::CppProc;
+        use crate::processors::java::JavaProc;
+        use crate::processors::python::PythonProc;
+        let processor_map = &mut self.processing_systems;
+        let t = crate::processors::file_sys::Parameter {
+            #[cfg(feature = "cpp")]
+            cpp_handle: CppProc::default_handle(processor_map),
+            #[cfg(feature = "java")]
+            java_handle: JavaProc::default_handle(processor_map),
+            #[cfg(feature = "python")]
+            python_handle: PythonProc::default_handle(processor_map),
+        };
+        type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
+        let holder = processor_map.mut_or_default::<FileSysProcessorHolder>();
+        holder.register_param(t).erase()
     }
 }

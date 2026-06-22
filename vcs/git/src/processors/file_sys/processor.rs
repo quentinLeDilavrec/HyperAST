@@ -14,8 +14,8 @@ use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::erased::ParametrizedCommitProc2;
-use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
+use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 
 use super::{FileSysAcc, Parameter};

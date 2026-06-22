@@ -5,8 +5,8 @@ use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
 use crate::processing::erased::ParametrizedCommitProc2;
-use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
+use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::erased::PreparedCommitProc;
 
 use super::CppProc;

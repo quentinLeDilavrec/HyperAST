@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::processing::ProcessorHolder;
 
 use super::erased::{CommitProcExt, ParametrizedCommitProc2};
-use super::erased::{ParametrizedCommitProcessor2Handle, ProcessorMap};
+use super::erased::{ParametrizedProcessor2Handle, ProcessorMap};
 use super::{CacheHolding, CachesHolding, ObjectMapper};
 
 impl ProcessorMap {
@@ -27,7 +27,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         oid: Oid,
         repository: &Repository,
         name: &N,
-        parameters: ParametrizedCommitProcessor2Handle<T>,
+        parameters: ParametrizedProcessor2Handle<T>,
         wrapped: F,
     ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where
@@ -77,7 +77,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         oid: Oid,
         repository: &Repository,
         name: &N,
-        parameters: ParametrizedCommitProcessor2Handle<T>,
+        parameters: ParametrizedProcessor2Handle<T>,
         wrapped: F,
     ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where

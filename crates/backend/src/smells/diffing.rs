@@ -85,7 +85,7 @@ impl hyperast::types::Labeled for T {
 pub(crate) fn diff(
     state: std::sync::Arc<crate::AppState>,
     repo_handle: &impl hyperast_vcs_git::processing::ConfiguredRepoTrait<
-        Config = hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle,
+        Config = hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle,
     >,
     src_oid: hyperast_vcs_git::git::Oid,
     dst_oid: hyperast_vcs_git::git::Oid,

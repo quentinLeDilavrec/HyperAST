@@ -7,9 +7,9 @@ use crate::Processor;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessor2Handle as PCP2Handle;
+use crate::processing::erased::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::PreparedCommitProc;
 
 use super::JavaAcc;

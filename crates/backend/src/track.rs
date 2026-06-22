@@ -7,11 +7,12 @@ use hyperast::position::position_accessors;
 use hyperast::position::{compute_position_with_no_spaces, compute_range, resolve_range};
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
+use hyperast_vcs_git::TStore;
 use hyperast_vcs_git::git::{Oid, Repo};
+use hyperast_vcs_git::multi_preprocessed;
 use hyperast_vcs_git::preprocessed::child_at_path_tracked;
 use hyperast_vcs_git::processing::ConfiguredRepo2 as ConfiguredRepo;
-use hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle;
-use hyperast_vcs_git::{TStore, multi_preprocessed};
+use hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
 use crate::changes::{DstChanges, SrcChanges, added_deleted};
 use crate::utils::PieceOfCode;
@@ -547,7 +548,7 @@ impl<IdN, Idx, T> From<Result<MappingResult<IdN, Idx, T>, String>> for MappingRe
     }
 }
 
-type RepoConfig = hyperast_vcs_git::processing::ParametrizedCommitProcessorHandle;
+type RepoConfig = hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
 fn track_aux(
     tracking: &mut TrackingImpl,

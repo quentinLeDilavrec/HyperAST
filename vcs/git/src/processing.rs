@@ -5,7 +5,6 @@ use crate::git::Repo;
 mod blob_caching;
 
 pub mod erased;
-pub use erased::ParametrizedCommitProcessorHandle;
 pub use erased::ProcessorHolder;
 
 pub mod configurations;
@@ -46,7 +45,7 @@ impl ConfiguredRepoHandle {
 #[derive(Debug, Clone)]
 pub struct ConfiguredRepoHandle2 {
     pub spec: Repo,
-    pub config: ParametrizedCommitProcessorHandle,
+    pub config: erased::ParametrizedCommitProcessorHandle,
 }
 
 // NOTE could have impl deref but it is a bad idea (see rust book, related to ownership)
@@ -54,7 +53,7 @@ impl ConfiguredRepoTrait for ConfiguredRepoHandle2 {
     fn spec(&self) -> &Repo {
         &self.spec
     }
-    type Config = ParametrizedCommitProcessorHandle;
+    type Config = erased::ParametrizedCommitProcessorHandle;
 
     fn config(&self) -> &Self::Config {
         &self.config
@@ -96,14 +95,14 @@ impl ConfiguredRepoTrait for ConfiguredRepo {
 pub struct ConfiguredRepo2 {
     pub spec: Repo,
     pub repo: Repository,
-    pub config: ParametrizedCommitProcessorHandle,
+    pub config: erased::ParametrizedCommitProcessorHandle,
 }
 
 impl ConfiguredRepoTrait for ConfiguredRepo2 {
     fn spec(&self) -> &Repo {
         &self.spec
     }
-    type Config = ParametrizedCommitProcessorHandle;
+    type Config = erased::ParametrizedCommitProcessorHandle;
     fn config(&self) -> &Self::Config {
         &self.config
     }

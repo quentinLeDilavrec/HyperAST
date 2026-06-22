@@ -308,7 +308,10 @@ where
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
         if (!HIDDEN_NODES && kind.is_hidden()) || kind.is_repeat() {
-            return PreResult::Ignore;
+            if stack.parent().unwrap().simple.children.len() < 120
+            {
+                return PreResult::Ignore;
+            }
         }
         if node.0.is_missing() {
             log::trace!(

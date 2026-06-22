@@ -10,8 +10,8 @@ use hyperast::tree_gen::add_md_precomp_queries;
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
+use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
-use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::erased::{ParametrizedCommitProc2, PreparedCommitProc};
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::processors::Query;
@@ -22,7 +22,7 @@ use super::{Parameter, PythonAcc};
 use hyperast_gen_ts_python::legion as python_gen;
 use hyperast_gen_ts_python::{TStore, Type};
 
-type Handle = crate::processing::erased::ParametrizedProcessor2Handle<PythonProc>;
+type Handle = crate::processing::ParametrizedProcessor2Handle<PythonProc>;
 
 pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
     (tree.iter().rev())

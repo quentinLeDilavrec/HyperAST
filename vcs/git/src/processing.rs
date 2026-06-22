@@ -1,14 +1,21 @@
-use git2::Repository;
+//! traits and structures modeling the processing model of this crate
+
+mod blob_caching;
+pub(crate) mod caches;
+pub mod configurations;
+pub mod erased;
+pub mod object_mapper;
+
+pub use configurations::RepoConfig;
+pub use erased::ProcessorHolder;
+pub use object_mapper::{ObjectMapper, ObjectName};
 
 use crate::git::Repo;
 
-mod blob_caching;
-
-pub mod erased;
-pub use erased::ProcessorHolder;
-
-pub mod configurations;
-pub use crate::processing::configurations::RepoConfig;
+/// A git Commit contains a Tree (ie. a directory in a file system) that contain other Trees and end with Blobs (ie. files).
+/// It can follow a specific scheme,
+/// and is often related to a specific build system or language.
+pub mod file_sys;
 
 pub trait ConfiguredRepoTrait {
     fn spec(&self) -> &Repo;
@@ -78,7 +85,7 @@ impl ConfiguredRepoHandle2 {
 
 pub struct ConfiguredRepo {
     pub spec: Repo,
-    pub repo: Repository,
+    pub repo: git2::Repository,
     pub config: RepoConfig,
 }
 
@@ -94,7 +101,7 @@ impl ConfiguredRepoTrait for ConfiguredRepo {
 
 pub struct ConfiguredRepo2 {
     pub spec: Repo,
-    pub repo: Repository,
+    pub repo: git2::Repository,
     pub config: erased::ParametrizedCommitProcessorHandle,
 }
 
@@ -105,6 +112,43 @@ impl ConfiguredRepoTrait for ConfiguredRepo2 {
     type Config = erased::ParametrizedCommitProcessorHandle;
     fn config(&self) -> &Self::Config {
         &self.config
+    }
+}
+
+/// Handle over a set of configuration parameters for a parametrized commit processor.
+#[derive(Clone, Copy, Debug)]
+pub struct ConfigParametersHandle(
+    /// A unique identifier for the set of configuration parameters.
+    pub usize,
+);
+
+/// Parametrized handle over a processor T, composing [`ConfigParametersHandle`].
+///
+/// If you want to store a [`ParametrizedProcessor2Handle`] at runtime, use [`erased::ParametrizedCommitProcessorHandle`] instead.
+#[derive(Debug)]
+pub struct ParametrizedProcessor2Handle<T>(
+    pub ConfigParametersHandle,
+    pub(crate) std::marker::PhantomData<T>,
+);
+use ParametrizedProcessor2Handle as PCP2Handle;
+
+impl<T> PartialEq for PCP2Handle<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.0 == other.0.0 && self.1 == other.1
+    }
+}
+impl<T> Eq for PCP2Handle<T> {}
+impl<T> Clone for PCP2Handle<T> {
+    fn clone(&self) -> Self {
+        PCP2Handle(self.0, self.1)
+    }
+}
+impl<T> Copy for PCP2Handle<T> {}
+impl<T> std::ops::Deref for PCP2Handle<T> {
+    type Target = ConfigParametersHandle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -146,16 +190,6 @@ pub trait UniqueObject {
     type Id: Clone;
     fn id(&self) -> &Self::Id;
 }
-
-pub mod object_mapper;
-pub use object_mapper::{ObjectMapper, ObjectName};
-
-pub(crate) mod caches;
-
-/// A git Commit contains a Tree (ie. a directory in a file system) that contain other Trees and end with Blobs (ie. files).
-/// It can follow a specific scheme,
-/// and is often related to a specific build system or language.
-pub mod file_sys;
 
 mod experiments {
 

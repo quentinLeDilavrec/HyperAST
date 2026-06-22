@@ -7,8 +7,8 @@ pub mod types;
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 
+use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
-use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub use types::{TStore, Type};

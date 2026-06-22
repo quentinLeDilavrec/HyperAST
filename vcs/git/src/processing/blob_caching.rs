@@ -3,8 +3,10 @@ use std::marker::PhantomData;
 
 use crate::processing::ProcessorHolder;
 
-use super::erased::{CommitProcExt, ParametrizedCommitProc2};
-use super::erased::{ParametrizedProcessor2Handle, ProcessorMap};
+use super::ParametrizedProcessor2Handle;
+use super::erased::CommitProcExt;
+use super::erased::ParametrizedCommitProc2;
+use super::erased::ProcessorMap;
 use super::{CacheHolding, CachesHolding, ObjectMapper};
 
 impl ProcessorMap {

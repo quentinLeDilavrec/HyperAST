@@ -10,8 +10,8 @@ use hyperast_gen_ts_cpp::TStore;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
+use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::erased::ParametrizedCommitProc2;
-use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
 

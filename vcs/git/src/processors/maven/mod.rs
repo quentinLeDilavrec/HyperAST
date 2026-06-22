@@ -22,7 +22,7 @@ use hyperast_gen_ts_xml::TStore;
 use crate::Accumulator;
 use crate::BasicDirAcc;
 use crate::DefaultMetrics;
-use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processors::java::JavaProc;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;

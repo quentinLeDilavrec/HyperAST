@@ -1,15 +1,18 @@
 use std::any::Any;
 use std::marker::PhantomData;
-use std::ops::Deref;
 
 use crate::preprocessed::CommitBuilder;
 
-// TODO erase output type from PreparedCommitProc without loosing type information and transparently to implementers
-use hyperast::store::defaults::NodeIdentifier as ProcessorOutput;
 // same but for erasing the store as it is associated with the output type
 use crate::preprocessed::RepositoryProcessor;
+
+// TODO erase output type from PreparedCommitProc without loosing type information and transparently to implementers
+use hyperast::store::defaults::NodeIdentifier as ProcessorOutput;
 // also erase the commit returned by the commit processor
 use crate::Commit;
+
+use super::ConfigParametersHandle;
+use super::ParametrizedProcessor2Handle as PCP2Handle;
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -51,39 +54,12 @@ impl<Proc: CommitProcExt + 'static> ParametrizedCommitProc2 for ProcessorHolder<
 #[derive(Clone, Copy, Debug)]
 pub struct CommitProcessorHandle(pub(crate) std::any::TypeId);
 
-/// Handle over a set of configuration parameters for a parametrized commit processor.
-#[derive(Clone, Copy, Debug)]
-pub struct ConfigParametersHandle(
-    /// A unique identifier for the set of configuration parameters.
-    pub usize,
-);
-
-/// Parametrized handle over a processor T, composing [`ConfigParametersHandle`].
+/// Parametrized handle over a processor like [`ParametrizedProcessor2Handle`], using the erased [`CommitProcessorHandle`].
 ///
-/// If you want to store a [`ParametrizedProcessor2Handle`] at runtime, use [`ParametrizedCommitProcessorHandle`] instead.
-#[derive(Debug)]
-pub struct ParametrizedProcessor2Handle<T>(pub ConfigParametersHandle, pub(crate) PhantomData<T>);
-use ParametrizedProcessor2Handle as PCP2Handle;
-
-impl<T> PartialEq for PCP2Handle<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.0 == other.0.0 && self.1 == other.1
-    }
-}
-impl<T> Eq for PCP2Handle<T> {}
-impl<T> Clone for PCP2Handle<T> {
-    fn clone(&self) -> Self {
-        PCP2Handle(self.0, self.1)
-    }
-}
-impl<T> Copy for PCP2Handle<T> {}
-impl<T: CommitProcExt> Deref for PCP2Handle<T> {
-    type Target = ConfigParametersHandle;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+/// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessor2Handle`] instead.
+#[derive(Clone, Copy, Debug)]
+pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
+use ParametrizedCommitProcessorHandle as PCPHandle;
 
 impl<T: CommitProcExt + 'static> PCP2Handle<T> {
     pub(crate) fn erase(&self) -> PCPHandle {
@@ -91,13 +67,6 @@ impl<T: CommitProcExt + 'static> PCP2Handle<T> {
         PCPHandle(CommitProcessorHandle(tid), self.0)
     }
 }
-
-/// Parametrized handle over a processor like [`ParametrizedProcessor2Handle`], using the erased [`CommitProcessorHandle`].
-///
-/// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessor2Handle`] instead.
-#[derive(Clone, Copy, Debug)]
-pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
-use ParametrizedCommitProcessorHandle as PCPHandle;
 
 pub trait CommitProc {
     // TODO remove, just for debugging dynamic dispatch

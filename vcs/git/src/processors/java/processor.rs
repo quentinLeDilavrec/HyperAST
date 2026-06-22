@@ -17,10 +17,10 @@ use hyperast_gen_ts_java::{TStore, Type};
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
+use crate::processing::ConfigParametersHandle;
 use crate::processing::ObjectName;
-use crate::processing::erased::ConfigParametersHandle;
+use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::processing::erased::ParametrizedCommitProc2;
-use crate::processing::erased::ParametrizedProcessor2Handle as PCP2Handle;
 use crate::{Processor, StackEle};
 
 use super::JavaProc;

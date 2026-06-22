@@ -81,8 +81,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
         if crate::processing::file_sys::MakeFile::matches(&name) {
             self.prepro
                 .help_handle_makefile(
-                    oid,
                     &mut self.stack.last_mut().unwrap().acc,
+                    oid,
                     name,
                     &self.repository,
                     PCP2Handle(self.handle.1, std::marker::PhantomData),

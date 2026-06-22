@@ -42,8 +42,8 @@ use hyperast_gen_ts_xml::legion::XmlTreeGen;
 impl RepositoryProcessor {
     pub(super) fn help_handle_makefile(
         &mut self,
-        oid: Oid,
         parent_acc: &mut MakeModuleAcc,
+        oid: Oid,
         name: ObjectName,
         repository: &Repository,
         parameters: PCP2Handle<MakefileProc>,

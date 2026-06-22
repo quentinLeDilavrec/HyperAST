@@ -77,7 +77,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
         if super::file_sys::Python::matches(&name) {
             let acc = &mut self.stack.last_mut().unwrap().acc;
             self.prepro
-                .help_handle_python_file(oid, acc, &name, self.repository, *self.handle)
+                .help_handle_python_file(acc, oid, &name, self.repository, *self.handle)
                 .unwrap();
         } else {
             log::debug!("not a python source file {:?}", name.try_str());
@@ -263,8 +263,8 @@ impl RepositoryProcessor {
 
     pub(crate) fn help_handle_python_file(
         &mut self,
-        oid: Oid,
         parent: &mut PythonAcc,
+        oid: Oid,
         name: &ObjectName,
         repository: &Repository,
         parameters: Handle,

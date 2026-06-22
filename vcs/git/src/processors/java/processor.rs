@@ -87,8 +87,8 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
         if super::selection::matches(&name) {
             self.prepro
                 .help_handle_java_file(
-                    oid,
                     &mut self.stack.last_mut().unwrap().acc,
+                    oid,
                     &name,
                     self.repository,
                     *self.handle,
@@ -495,8 +495,8 @@ impl RepositoryProcessor {
 
     pub(crate) fn help_handle_java_file(
         &mut self,
-        oid: Oid,
         w: &mut JavaAcc,
+        oid: Oid,
         name: &ObjectName,
         repository: &Repository,
         parameters: Handle,
@@ -598,8 +598,8 @@ mod experiments {
                     if super::super::selection::matches(current_object.name()) {
                         self.prepro
                             .help_handle_java_file(
-                                *current_object.id(),
                                 &mut self.stack.last_mut().unwrap().acc,
+                                *current_object.id(),
                                 current_object.name(),
                                 self.repository,
                                 *self.handle,

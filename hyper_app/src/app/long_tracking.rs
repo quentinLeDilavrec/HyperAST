@@ -1301,8 +1301,8 @@ pub(crate) fn show_tree_view(
             };
             let mut hightlights = vec![];
             let mut focus = None;
-            let mut blue_pos = HashMap::<usize, std::option::Option<egui::Rect>>::default();
-            let mut green_pos = HashMap::<usize, std::option::Option<egui::Rect>>::default();
+            let mut blue_pos = HashMap::<usize, Option<egui::Rect>>::default();
+            let mut green_pos = HashMap::<usize, Option<egui::Rect>>::default();
             for (_, i) in curr_view.effective_targets.iter() {
                 blue_pos.insert(*i, None);
             }

@@ -63,7 +63,7 @@ pub struct MavenModuleAcc {
     pub(crate) main_dirs: Option<Vec<PathBuf>>,
     pub(crate) test_dirs: Option<Vec<PathBuf>>,
     pub(crate) status: EnumSet<SemFlag>,
-    pub(crate) scripting_acc: std::option::Option<hyperast::scripting::Acc>,
+    pub(crate) scripting_acc: Option<hyperast::scripting::Acc>,
 }
 
 #[derive(enumset::EnumSetType, Debug)]

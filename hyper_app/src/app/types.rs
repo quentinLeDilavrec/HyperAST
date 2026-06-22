@@ -602,7 +602,7 @@ impl Config {
         &mut self,
         ui: &mut egui::Ui,
         label: impl Into<egui::WidgetText>,
-    ) -> egui::InnerResponse<std::option::Option<()>> {
+    ) -> egui::InnerResponse<Option<()>> {
         egui::ComboBox::from_label(label)
             .selected_text(format!("{:?}", self))
             .show_ui(ui, |ui| {

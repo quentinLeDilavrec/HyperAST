@@ -122,7 +122,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
             let parameters = PCP2Handle(ConfigParametersHandle(0), PhantomData);
             if let Err(err) =
                 self.prepro
-                    .handle_pom(oid, parent_acc, name, &self.repository, parameters)
+                    .handle_pom(parent_acc, oid, name, &self.repository, parameters)
             {
                 log::debug!("{:?}", err);
             }

@@ -66,8 +66,8 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
         if super::selection::matches(&name) {
             self.prepro
                 .help_handle_cpp_file(
-                    oid,
                     &mut self.stack.last_mut().unwrap().acc,
+                    oid,
                     &name,
                     self.repository,
                     *self.handle,
@@ -183,8 +183,8 @@ impl RepositoryProcessor {
 
     pub(crate) fn help_handle_cpp_file(
         &mut self,
-        oid: Oid,
         parent: &mut CppAcc,
+        oid: Oid,
         name: &ObjectName,
         repository: &Repository,
         parameters: PCP2Handle<CppProc>,

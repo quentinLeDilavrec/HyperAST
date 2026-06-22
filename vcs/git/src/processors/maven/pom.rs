@@ -70,8 +70,8 @@ where
 impl crate::preprocessed::RepositoryProcessor {
     pub(crate) fn handle_pom(
         &mut self,
-        oid: git2::Oid,
         parent_acc: &mut super::MavenModuleAcc,
+        oid: git2::Oid,
         name: ObjectName,
         repository: &git2::Repository,
         parameters: PCP2Handle<PomProc>,

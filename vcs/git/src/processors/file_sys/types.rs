@@ -28,74 +28,81 @@ impl std::fmt::Display for Type {
 }
 
 impl HyperType for Type {
-    fn as_shared(&self) -> hyperast::types::Shared {
-        todo!()
-    }
-
-    fn as_abstract(&self) -> hyperast::types::Abstracts {
-        todo!()
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
-        todo!()
+        self
     }
 
     fn as_static(&self) -> &'static dyn HyperType {
-        todo!()
+        let t = <Lang as hyperast::types::Lang<Type>>::to_u16(*self);
+        let t = <Lang as hyperast::types::Lang<Type>>::make(t);
+        t
     }
 
     fn as_static_str(&self) -> &'static str {
-        todo!()
+        self.to_str()
     }
 
     fn generic_eq(&self, other: &dyn HyperType) -> bool
     where
         Self: 'static + Sized,
     {
-        todo!()
+        // Do a type-safe casting. If the types are different,
+        // return false, otherwise test the values for equality.
+        other
+            .as_any()
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self == a)
     }
 
     fn is_file(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_directory(&self) -> bool {
-        todo!()
+        self == &Type::Directory
     }
 
     fn is_spaces(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_syntax(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_hidden(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_named(&self) -> bool {
-        todo!()
+        true
     }
 
     fn is_supertype(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_error(&self) -> bool {
-        todo!()
+        false
+    }
+
+    fn as_shared(&self) -> hyperast::types::Shared {
+        hyperast::types::Shared::Other
+    }
+
+    fn as_abstract(&self) -> hyperast::types::Abstracts {
+        Default::default()
     }
 
     fn get_lang(&self) -> hyperast::types::LangWrapper<Self>
     where
         Self: Sized,
     {
-        todo!()
+        hyperast::types::LangWrapper::from(&Lang as &(dyn LangRef<Self> + 'static))
     }
 
     fn lang_ref(&self) -> hyperast::types::LangWrapper<hyperast::types::AnyType> {
-        todo!()
+        hyperast::types::LangWrapper::from(&Lang as &(dyn LangRef<AnyType> + 'static))
     }
 }
 
@@ -245,7 +252,7 @@ impl LangRef<AnyType> for Lang {
         Self::name()
     }
 
-    fn ts_symbol(&self, t: AnyType) -> u16 {
+    fn ts_symbol(&self, _t: AnyType) -> u16 {
         // TODO check lang
         // id_for_node_kind(t.as_static_str(), t.is_named())
         unimplemented!()
@@ -275,14 +282,14 @@ impl LangRef<Type> for Lang {
         Self::name()
     }
 
-    fn ts_symbol(&self, t: Type) -> u16 {
+    fn ts_symbol(&self, _t: Type) -> u16 {
         unimplemented!()
         // id_for_node_kind(t.as_static_str(), t.is_named())
     }
 }
 
 impl LangRef<TType> for Lang {
-    fn make(&self, t: u16) -> &'static TType {
+    fn make(&self, _t: u16) -> &'static TType {
         todo!()
         // TODO could make one safe, but not priority
         // unsafe { std::mem::transmute(&S_T_L[t as usize]) }
@@ -296,7 +303,7 @@ impl LangRef<TType> for Lang {
         Self::name()
     }
 
-    fn ts_symbol(&self, t: TType) -> u16 {
+    fn ts_symbol(&self, _t: TType) -> u16 {
         unimplemented!()
         // id_for_node_kind(t.as_static_str(), t.is_named())
     }

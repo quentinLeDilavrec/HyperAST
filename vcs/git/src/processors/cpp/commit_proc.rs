@@ -64,7 +64,7 @@ impl<'repo> PreparedCommitProc for PreparedCppCommitProc<'repo> {
         );
         let h = prepro
             .processing_systems
-            .mut_or_default::<CppProcessorHolder>();
+            .commit_proc_mut::<CppProcessorHolder>();
         let handle = self.handle;
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);

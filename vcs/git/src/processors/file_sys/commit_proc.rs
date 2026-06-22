@@ -34,7 +34,7 @@ impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
         .process();
         let h = prepro
             .processing_systems
-            .mut_or_default::<FileSysProcessorHolder>();
+            .commit_proc_mut::<FileSysProcessorHolder>();
         let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);

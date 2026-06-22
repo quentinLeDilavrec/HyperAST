@@ -85,8 +85,8 @@ impl PythonProc {
         // let q = ["(module)"].as_slice();
         // let t = crate::processors::python::Parameter::new(q);
         let t = crate::processors::python::Parameter::default();
-        let h = pr.mut_or_default::<PythonProcessorHolder>();
-        crate::processing::erased::CommitProcExt::register_param(h, t)
+        let h = pr.commit_proc_mut::<PythonProcessorHolder>();
+        h.register_param(t)
     }
 }
 

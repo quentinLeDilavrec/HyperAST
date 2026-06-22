@@ -68,8 +68,8 @@ impl CppProc {
         // let q = ["(translation_unit)"].as_slice();
         // let t = crate::processors::cpp::Parameter::new(q);
         let t = crate::processors::cpp::Parameter::default();
-        let h = pr.mut_or_default::<CppProcessorHolder>();
-        crate::processing::erased::CommitProcExt::register_param(h, t)
+        let h = pr.commit_proc_mut::<CppProcessorHolder>();
+        h.register_param(t)
     }
 }
 

@@ -179,14 +179,12 @@ impl crate::preprocessed::CommitProcessor<crate::processing::file_sys::Make>
         type MakefileProcHolder = ProcessorHolder<crate::processors::make::makefile::MakefileProc>;
 
         let t = crate::processors::cpp::Parameter { query: None };
-        let h_cpp = self.processing_systems.mut_or_default::<CppProcHolder>();
+        let h_cpp = self.processing_systems.commit_proc_mut::<CppProcHolder>();
         let cpp_handle = h_cpp.register_param(t);
-        let h = self
-            .processing_systems
-            .mut_or_default::<MakefileProcHolder>();
+        let h = self.processing_systems.proc_mut::<MakefileProcHolder>();
         let t = crate::processors::make::makefile::Parameter::default();
         let makefile_handle = h.register_param(t);
-        let h = self.processing_systems.mut_or_default::<MakeProcHolder>();
+        let h = self.processing_systems.commit_proc_mut::<MakeProcHolder>();
         let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
         let handle = h.register_param(t);
 

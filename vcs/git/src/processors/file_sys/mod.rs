@@ -91,7 +91,7 @@ impl crate::preprocessed::RepositoryProcessor {
             python_handle: PythonProc::default_handle(processor_map),
         };
         type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
-        let holder = processor_map.mut_or_default::<FileSysProcessorHolder>();
+        let holder = processor_map.commit_proc_mut::<FileSysProcessorHolder>();
         holder.register_param(t).erase()
     }
 }

@@ -2,7 +2,6 @@ use git2::{Oid, Repository};
 
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
-use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, ObjectName};
 
 use super::{MakeModuleAcc, MakeProc};
@@ -36,26 +35,6 @@ impl CacheHolding<crate::processing::caches::Makefile> for MakefileProc {
     }
     fn get_caches(&self) -> &crate::processing::caches::Makefile {
         &self.1
-    }
-}
-
-// TODO should not have to impl this trait
-impl crate::processing::erased::CommitProc for MakefileProc {
-    fn prepare_processing(
-        &self,
-        _repository: &git2::Repository,
-        _commit_builder: crate::preprocessed::CommitBuilder,
-        _param_handle: PCPHandle,
-    ) -> Box<dyn crate::processing::erased::PreparedCommitProc> {
-        unimplemented!("required for processing at the root of a project")
-    }
-
-    fn get_commit(&self, _commit_oid: git2::Oid) -> Option<&crate::Commit> {
-        unimplemented!("required for processing at the root of a project")
-    }
-
-    fn commit_count(&self) -> usize {
-        unimplemented!()
     }
 }
 

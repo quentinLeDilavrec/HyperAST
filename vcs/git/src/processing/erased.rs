@@ -1,8 +1,6 @@
 use std::any::Any;
-use std::marker::PhantomData;
 
 use crate::preprocessed::CommitBuilder;
-
 // same but for erasing the store as it is associated with the output type
 use crate::preprocessed::RepositoryProcessor;
 
@@ -13,42 +11,13 @@ use crate::Commit;
 
 use super::ConfigParametersHandle;
 use super::ParametrizedProcessor2Handle as PCP2Handle;
+use super::ProcessorHolder;
 
 #[derive(Clone)]
 #[allow(unused)]
 #[allow(deprecated)]
 /// A config holding arbitrary parameters for a parametrized commit processor.
 pub struct ConfigParameters(std::rc::Rc<dyn std::any::Any>);
-
-pub struct ProcessorHolder<Proc>(Vec<Proc>);
-impl<Proc> Default for ProcessorHolder<Proc> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<Proc: CommitProcExt> ProcessorHolder<Proc> {
-    pub fn register_param<T: Into<Proc> + PartialEq<Proc>>(&mut self, t: T) -> PCP2Handle<Proc> {
-        let l = self.0.iter().position(|x| t.eq(x)).unwrap_or_else(|| {
-            let l = self.0.len();
-            self.0.push(t.into());
-            l
-        });
-        PCP2Handle(ConfigParametersHandle(l), PhantomData)
-    }
-}
-
-impl<Proc: CommitProcExt + 'static> ParametrizedCommitProc2 for ProcessorHolder<Proc> {
-    type Proc = Proc;
-
-    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
-        &mut self.0[parameters.0]
-    }
-
-    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
-        &self.0[parameters.0]
-    }
-}
 
 /// Handle over a commit processor, resulting from type erasure when registering a commit processor.
 #[derive(Clone, Copy, Debug)]
@@ -69,10 +38,6 @@ impl<T: CommitProcExt + 'static> PCP2Handle<T> {
 }
 
 pub trait CommitProc {
-    // TODO remove, just for debugging dynamic dispatch
-    fn p(&self) {
-        dbg!()
-    }
     fn prepare_processing<'repo>(
         &self,
         repository: &'repo git2::Repository,
@@ -258,7 +223,7 @@ mod spreaded {
             }
 
             fn commit_count(&self) -> usize {
-                unimplemented!()
+                0
             }
         }
 
@@ -271,6 +236,7 @@ mod spreaded {
             .erase();
         // You can easily store hh in any collection.
         // You can easily add a method to CommitProc.
-        h.by_id_mut(&hh.0).unwrap().get_mut(hh.1).p();
+        let count = h.by_id_mut(&hh.0).unwrap().get_mut(hh.1).commit_count();
+        assert_eq!(count, 0);
     }
 }

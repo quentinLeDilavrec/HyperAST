@@ -7,15 +7,16 @@ pub mod erased;
 pub mod object_mapper;
 
 pub use configurations::RepoConfig;
-pub use erased::ProcessorHolder;
 pub use object_mapper::{ObjectMapper, ObjectName};
-
-use crate::git::Repo;
 
 /// A git Commit contains a Tree (ie. a directory in a file system) that contain other Trees and end with Blobs (ie. files).
 /// It can follow a specific scheme,
 /// and is often related to a specific build system or language.
 pub mod file_sys;
+
+use crate::git::Repo;
+
+////////////// repository //////////////
 
 pub trait ConfiguredRepoTrait {
     fn spec(&self) -> &Repo;
@@ -115,6 +116,8 @@ impl ConfiguredRepoTrait for ConfiguredRepo2 {
     }
 }
 
+////////////// configuration system //////////////
+
 /// Handle over a set of configuration parameters for a parametrized commit processor.
 #[derive(Clone, Copy, Debug)]
 pub struct ConfigParametersHandle(
@@ -151,6 +154,40 @@ impl<T> std::ops::Deref for PCP2Handle<T> {
         &self.0
     }
 }
+
+pub struct ProcessorHolder<Proc>(Vec<Proc>);
+impl<Proc> Default for ProcessorHolder<Proc> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<Proc> ProcessorHolder<Proc> {
+    pub fn register_param<T: Into<Proc> + PartialEq<Proc>>(&mut self, t: T) -> PCP2Handle<Proc> {
+        let l = self.0.iter().position(|x| t.eq(x)).unwrap_or_else(|| {
+            let l = self.0.len();
+            self.0.push(t.into());
+            l
+        });
+        PCP2Handle(ConfigParametersHandle(l), std::marker::PhantomData)
+    }
+}
+
+impl<Proc: erased::CommitProcExt + 'static> erased::ParametrizedCommitProc2
+    for ProcessorHolder<Proc>
+{
+    type Proc = Proc;
+
+    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
+        &mut self.0[parameters.0]
+    }
+
+    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc {
+        &self.0[parameters.0]
+    }
+}
+
+////////////// mostly caching //////////////
 
 // TODO make a macro to generate the implementation and the wrapping type
 pub trait CachesHolding {

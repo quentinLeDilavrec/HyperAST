@@ -1,3 +1,5 @@
+//! Handles the Make build system
+
 pub mod make_processor;
 pub mod makefile;
 

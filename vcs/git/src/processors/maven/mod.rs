@@ -1,13 +1,14 @@
-mod processor;
+//! Handles the Maven build system
 
 pub mod iter_maven_module;
+mod pom;
+mod processor;
+mod scripting;
+
 pub use iter_maven_module::IterMavenModules2;
 
-mod pom;
 use pom::handle_pom_file;
 pub use pom::{PomParameter, PomProc};
-
-mod scripting;
 
 use std::fmt::Debug;
 use std::path::PathBuf;

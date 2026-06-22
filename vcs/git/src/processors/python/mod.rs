@@ -1,3 +1,5 @@
+//! Handles Java
+//!
 mod caches;
 pub mod file_sys;
 mod processor;

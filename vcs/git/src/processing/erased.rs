@@ -65,13 +65,19 @@ pub struct CommitProcessorHandle(std::any::TypeId);
 ///
 /// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessorHandle`] instead.
 #[derive(Clone, Copy, Debug)]
-pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
+pub struct ParametrizedCommitProcessorHandle(CommitProcessorHandle, pub ConfigParametersHandle);
 use ParametrizedCommitProcessorHandle as PCPHandle;
 
 impl<T: CommitProc + 'static> PPHandle<T> {
     pub(crate) fn erase(&self) -> PCPHandle {
         let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
         PCPHandle(CommitProcessorHandle(tid), self.0)
+    }
+}
+
+impl Into<CommitProcessorHandle> for ParametrizedCommitProcessorHandle {
+    fn into(self) -> CommitProcessorHandle {
+        self.0
     }
 }
 
@@ -130,9 +136,16 @@ impl<T: ParametrizedCommitProc2> ParametrizedCommitProc for T {
 
 /// stores both commit and non-commit processors
 pub type ProcessorMap = spreaded::ProcessorMap<spreaded::ErasedProcessorBunch>;
+#[doc(hidden)]
 pub type ProcessorMapOnlyNonCommit = spreaded::ProcessorMap<Box<dyn spreaded::ErasableProcessor>>;
+#[doc(hidden)]
 pub type ProcessorMapOnlyCommit =
     spreaded::ProcessorMap<Box<dyn spreaded::ErasableCommitProcessor>>;
+#[doc(hidden)]
+pub type ProcessorMap2 = spreaded::ProcessorMap2<
+    Box<dyn spreaded::ErasableProcessor>,
+    Box<dyn spreaded::ErasableCommitProcessor>,
+>;
 
 #[doc(hidden)]
 mod spreaded {
@@ -280,10 +293,10 @@ mod spreaded {
         /// give write access to process commits
         pub fn by_id_mut(
             &mut self,
-            id: &CommitProcessorHandle,
+            id: impl Into<CommitProcessorHandle>,
         ) -> Result<&mut (dyn ErasableCommitProcessor + 'static), ProcAccessError> {
             use ErasedProcessorBunch::*;
-            match self.0.get_mut(&id.0) {
+            match self.0.get_mut(&id.into().0) {
                 Some(Commit(p)) => Ok(p.as_mut()),
                 Some(_) => Err(ProcAccessError::NotCommitEnabled),
                 _ => {
@@ -296,10 +309,10 @@ mod spreaded {
         /// give access to already processed commits
         pub fn by_id(
             &self,
-            id: &CommitProcessorHandle,
+            id: impl Into<CommitProcessorHandle>,
         ) -> Result<&(dyn ErasableCommitProcessor + 'static), ProcAccessError> {
             use ErasedProcessorBunch::*;
-            match self.0.get(&id.0) {
+            match self.0.get(&id.into().0) {
                 Some(Commit(p)) => Ok(p.as_ref()),
                 Some(_) => Err(ProcAccessError::NotCommitEnabled),
                 _ => {

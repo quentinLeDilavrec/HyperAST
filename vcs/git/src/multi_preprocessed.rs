@@ -134,7 +134,7 @@ impl PreProcessedRepositories {
         let proc = self
             .processor
             .processing_systems
-            .by_id(&config.0)
+            .by_id(*config)
             .unwrap()
             .get(config.1);
         proc.commit_count()
@@ -148,7 +148,7 @@ impl PreProcessedRepositories {
         let proc = self
             .processor
             .processing_systems
-            .by_id(&config.0)
+            .by_id(*config)
             .unwrap()
             .get(config.1);
         proc.get_commit(*commit_oid)
@@ -405,9 +405,9 @@ impl PreProcessedRepositories {
         lang: &str,
     ) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
         let processor_map = &self.processor.processing_systems;
-        let proc = processor_map.by_id(&handle.0).unwrap().get(handle.1);
+        let proc = processor_map.by_id(handle).unwrap().get(handle.1);
         let handle = proc.get_lang_handle(lang)?;
-        let proc = processor_map.by_id(&handle.0).unwrap().get(handle.1);
+        let proc = processor_map.by_id(handle).unwrap().get(handle.1);
         proc.get_precomp_query()
     }
 

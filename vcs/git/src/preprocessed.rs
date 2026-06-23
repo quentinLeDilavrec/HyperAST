@@ -160,7 +160,7 @@ impl RepositoryProcessor {
             let Some(&oid) = rw.peek() else { break };
             let commit_processor = self
                 .processing_systems
-                .by_id(&repository.config.0)
+                .by_id(repository.config)
                 .unwrap()
                 .get(repository.config.1);
             if let Some(_) = commit_processor.get_commit(oid) {
@@ -203,7 +203,7 @@ impl RepositoryProcessor {
             let builder = crate::preprocessed::CommitBuilder::start(&repository.repo, oid);
             let commit_processor = self
                 .processing_systems
-                .by_id_mut(&repository.config.0)
+                .by_id_mut(repository.config)
                 .unwrap()
                 .get_mut(repository.config.1);
             let _id = commit_processor
@@ -240,7 +240,7 @@ impl RepositoryProcessor {
             let builder = crate::preprocessed::CommitBuilder::start(&repository, oid);
             let commit_processor = self
                 .processing_systems
-                .by_id_mut(&handle.0)
+                .by_id_mut(handle)
                 .unwrap()
                 .get_mut(handle.1);
             let _id = commit_processor

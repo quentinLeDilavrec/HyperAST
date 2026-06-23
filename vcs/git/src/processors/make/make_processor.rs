@@ -17,7 +17,7 @@ use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Make as MakeCaches;
-use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::erased::ParametrizedCommitProc2 as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::processors::cpp as cpp_processor;

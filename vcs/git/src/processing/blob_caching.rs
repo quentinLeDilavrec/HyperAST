@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use super::ParametrizedProcessorHandle;
 use super::ProcessorHolder;
 use super::erased::CommitProc;
-use super::erased::ParametrizedCommitProc2;
+use super::erased::ParametrizedCommitProc2 as _;
 use super::erased::ParametrizedProc2 as _;
 use super::erased::ProcessorMap;
 use super::{CacheHolding, CachesHolding, ObjectMapper};

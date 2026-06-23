@@ -20,7 +20,7 @@ use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Maven as MavenCaches;
 use crate::processing::erased::CommitProc;
-use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::erased::ParametrizedCommitProc2 as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 use crate::processing::file_sys;

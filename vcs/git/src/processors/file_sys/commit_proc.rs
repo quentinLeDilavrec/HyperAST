@@ -1,5 +1,6 @@
 use crate::Processor as _;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
@@ -12,7 +13,8 @@ struct PreparedMakeCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: CommitBuilder,
     dir_path: std::path::PathBuf,
-    pub(crate) handle: PCPHandle,
+    pub(crate) file_sys_handle: PPHandle<FileSysProc>,
+    pub(crate) handles: super::Parameter,
 }
 
 impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
@@ -29,13 +31,14 @@ impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
             &mut dir_path,
             name,
             self.commit_builder.tree_oid(),
-            self.handle,
+            self.file_sys_handle,
+            self.handles,
         )
         .process();
         let h = prepro
             .processing_systems
             .commit_proc_mut::<FileSysProcessorHolder>();
-        let handle = self.handle.try_into().unwrap();
+        let handle = self.file_sys_handle;
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
         h.with_parameters_mut(handle).commits.insert(oid, commit);
@@ -51,11 +54,17 @@ impl crate::processing::erased::CommitProc for FileSysProc {
         path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
+        let file_sys_handle = handle.try_into().unwrap_or_else(|err| {
+            eprintln!("{}", err);
+            unreachable!("caller of prepare_processing should properly dispatch")
+        });
+        let handles = self.parameter.clone();
         Box::new(PreparedMakeCommitProc {
             repository,
             commit_builder,
             dir_path: path,
-            handle,
+            file_sys_handle,
+            handles,
         })
     }
 

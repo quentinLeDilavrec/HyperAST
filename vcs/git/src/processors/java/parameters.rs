@@ -1,10 +1,9 @@
 use hyperast::store::nodes::legion::RawHAST;
 
-use hyperast_gen_ts_java::legion_with_refs::Acc;
+use crate::processors::Query;
+use crate::utils::Str;
 
-use crate::{processors::Query, utils::Str};
-
-use super::{JavaProc, TStore};
+use super::JavaProc;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
@@ -66,6 +65,8 @@ fn make_proc(t: Parameter) -> JavaProc {
 
 #[cfg(feature = "tsg")]
 fn register_param_tsg(t: &Parameter, q: &Str) -> Option<TsgErzedSettings> {
+    use super::TStore;
+    use hyperast_gen_ts_java::legion_with_refs::Acc;
     use std::ops::Deref;
     let tsg = q.deref();
     type ExtQ<'a, HAST, Acc> =
@@ -111,7 +112,9 @@ type ErazedTSG = Box<dyn std::any::Any + Send + Sync>;
 type M<'a, TS, Acc> = hyperast_tsquery::QueryMatcher<RawHAST<'a, TS>, Acc>;
 
 #[cfg(feature = "tsg")]
-pub type GraphQuery<'a> = tree_sitter_graph::ast::File<M<'a, TStore, &'a Acc>>;
+pub type GraphQuery<'a> = tree_sitter_graph::ast::File<
+    M<'a, super::TStore, &'a hyperast_gen_ts_java::legion_with_refs::Acc>,
+>;
 
 impl Parameter {
     pub fn faster() -> Self {

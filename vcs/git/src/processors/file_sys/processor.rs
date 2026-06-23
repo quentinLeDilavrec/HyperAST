@@ -14,8 +14,8 @@ use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
-use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 
 use super::{FileSysAcc, Parameter};
@@ -26,7 +26,8 @@ pub struct FileSysProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> 
     repository: &'a Repository,
     stack: Vec<StackEle<Acc>>,
     dir_path: &'c mut Peekable<Components<'c>>,
-    handle: PCPHandle,
+    file_sys_handle: PPHandle<FileSysProc>,
+    handles: super::Parameter,
 }
 
 type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
@@ -40,7 +41,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
         dir_path: &'c mut Peekable<Components<'c>>,
         name: &[u8],
         oid: git2::Oid,
-        handle: PCPHandle,
+        file_sys_handle: PPHandle<FileSysProc>,
+        handles: super::Parameter,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepared_exploration(tree);
@@ -51,7 +53,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
             repository,
             prepro,
             dir_path,
-            handle,
+            file_sys_handle,
+            handles,
         }
     }
 }
@@ -81,7 +84,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
         let full_node = make(acc, self.prepro.main_stores_mut().mut_with_ts());
         let cache = (self.prepro.processing_systems)
             .commit_proc_mut::<FileSysProcessorHolder>()
-            .with_parameters_mut(self.handle.try_into().unwrap())
+            .with_parameters_mut(self.file_sys_handle)
             .get_caches_mut();
         cache.object_map.insert(oid, full_node.clone());
 
@@ -128,10 +131,9 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         }
         let proc = (self.prepro.processing_systems)
             .commit_proc_mut::<FileSysProcessorHolder>()
-            .with_parameters_mut(self.handle.try_into().unwrap());
+            .with_parameters_mut(self.file_sys_handle);
         if let Some(already) = proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
-            dbg!(name.try_str().unwrap());
             let full_node = already.clone();
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name = self.prepro.intern_object_name(name);
@@ -163,9 +165,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         #[cfg(feature = "cpp")]
         if crate::processors::cpp::selection::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
-            let name: &ObjectName = &name;
-            let repository: &Repository = self.repository;
-            let p = self.handle.try_into().unwrap();
+            let repository = self.repository;
+            let p = self.handles.cpp_handle;
             let full_node = self.prepro.handle_cpp_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
@@ -175,9 +176,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         #[cfg(feature = "java")]
         if crate::processors::java::selection::matches(&name) {
             let w = &mut self.stack.last_mut().unwrap().acc;
-            let name: &ObjectName = &name;
             let repository: &Repository = &self.repository;
-            let p = self.handle.try_into().unwrap();
+            let p = self.handles.java_handle;
             let full_node = self.prepro.handle_java_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!w.primary.children_names.contains(&name));
@@ -187,9 +187,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         #[cfg(feature = "python")]
         if crate::processors::python::file_sys::Python::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
-            let name: &ObjectName = &name;
-            let repository: &Repository = self.repository;
-            let p = self.handle.try_into().unwrap();
+            let repository = self.repository;
+            let p = self.handles.python_handle;
             let full_node = self.prepro.handle_python_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));

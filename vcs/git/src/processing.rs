@@ -153,6 +153,8 @@ impl<T> Clone for PPHandle<T> {
 }
 impl<T> Copy for PPHandle<T> {}
 
+/// holds a vector of processors,
+/// allowing to register multiple instances of the same processor configured with different parameters
 pub struct ProcessorHolder<Proc>(Vec<Proc>);
 impl<Proc> Default for ProcessorHolder<Proc> {
     fn default() -> Self {
@@ -161,6 +163,10 @@ impl<Proc> Default for ProcessorHolder<Proc> {
 }
 
 impl<Proc> ProcessorHolder<Proc> {
+    /// Register a processor `Proc` with the given parameters `T`,
+    /// if a processor with the same parameters is already registered, returns the existing handle.
+    ///
+    /// The returned handle can then be used to retrieve `Proc`.
     pub fn register_param<T: Into<Proc> + PartialEq<Proc>>(&mut self, t: T) -> PPHandle<Proc> {
         let l = self.0.iter().position(|x| t.eq(x)).unwrap_or_else(|| {
             let l = self.0.len();

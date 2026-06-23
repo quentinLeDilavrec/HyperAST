@@ -11,7 +11,7 @@ use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
-use crate::processing::erased::ParametrizedCommitProc2 as _;
+use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 use crate::processing::{CacheHolding, InFiles, ObjectName};

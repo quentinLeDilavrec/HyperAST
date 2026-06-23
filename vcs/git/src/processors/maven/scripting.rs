@@ -1,7 +1,7 @@
 use hyperast::store::nodes::legion::RawHAST;
 
 use crate::processing::ParametrizedProcessorHandle;
-use crate::processing::erased::ParametrizedCommitProc2 as _;
+use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processors::java::JavaProc;
 use crate::processors::maven::MavenModuleAcc;
 use crate::{preprocessed::RepositoryProcessor, processing::ProcessorHolder};

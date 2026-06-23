@@ -1,6 +1,8 @@
 use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 
 // # languages
+#[cfg(feature = "c")]
+pub mod c;
 #[cfg(feature = "cpp")]
 pub mod cpp;
 #[cfg(feature = "java")]

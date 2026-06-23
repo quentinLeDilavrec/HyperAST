@@ -15,6 +15,8 @@ type JavaProcessorHolder = ProcessorHolder<JavaProc>;
 use crate::processors::cpp::CppProc;
 #[cfg(feature = "cpp")]
 type CppProcessorHolder = ProcessorHolder<CppProc>;
+#[cfg(feature = "c")]
+use crate::processors::c::CProc;
 #[cfg(feature = "python")]
 use crate::processors::python::PythonProc;
 #[cfg(feature = "python")]
@@ -213,6 +215,11 @@ impl PreProcessedRepositories {
             #[cfg(feature = "cpp")]
             RepoConfig::Cpp => {
                 let config = CppProc::default_handle(processor_map).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            #[cfg(feature = "c")]
+            RepoConfig::C => {
+                let config = CProc::default_handle(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             #[cfg(feature = "file_sys")]

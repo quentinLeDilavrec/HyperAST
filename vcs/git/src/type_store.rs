@@ -5,6 +5,8 @@ pub struct TStore;
 
 #[cfg(feature = "cpp")]
 impl hyperast::store::TyDown<hyperast_gen_ts_cpp::TStore> for TStore {}
+#[cfg(feature = "c")]
+impl hyperast::store::TyDown<hyperast_gen_ts_c::TStore> for TStore {}
 #[cfg(feature = "java")]
 impl hyperast::store::TyDown<hyperast_gen_ts_java::TStore> for TStore {}
 #[cfg(feature = "python")]
@@ -65,6 +67,8 @@ impl RoleStore for TStore {
         intern_role!(hyperast_gen_ts_java);
         #[cfg(feature = "cpp")]
         intern_role!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "c")]
+        intern_role!(hyperast_gen_ts_c);
         #[cfg(feature = "python")]
         intern_role!(hyperast_gen_ts_python);
         #[cfg(feature = "maven")]

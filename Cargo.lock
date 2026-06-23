@@ -4579,6 +4579,7 @@ dependencies = [
  "env_logger 0.11.5",
  "git2",
  "hyperast",
+ "hyperast_gen_ts_c",
  "hyperast_gen_ts_cpp",
  "hyperast_gen_ts_java",
  "hyperast_gen_ts_python",

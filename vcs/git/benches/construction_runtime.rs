@@ -1,5 +1,8 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+
+use hyperast_vcs_git::git::Forge;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
+use hyperast_vcs_git::processing::RepoConfig;
 
 fn construction_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("HyperAST Construction");
@@ -7,7 +10,7 @@ fn construction_group(c: &mut Criterion) {
     struct Input {
         repo: hyperast_vcs_git::git::Repo,
         commit: &'static str,
-        config: hyperast_vcs_git::processing::RepoConfig,
+        config: RepoConfig,
         fetch: bool,
     }
 
@@ -19,37 +22,96 @@ fn construction_group(c: &mut Criterion) {
         //     fetch: false,
         // },
         Input {
-            repo: hyperast_vcs_git::git::Forge::Github.repo("INRIA", "spoon"),
+            repo: Forge::Github.repo("INRIA", "spoon"),
             commit: "56e12a0c0e0e69ea70863011b4f4ca3305e0542b",
-            config: hyperast_vcs_git::processing::RepoConfig::JavaMaven,
+            config: RepoConfig::JavaMaven,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("INRIA", "spoon"),
+            commit: "56e12a0c0e0e69ea70863011b4f4ca3305e0542b",
+            config: RepoConfig::Java,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("INRIA", "spoon"),
+            commit: "56e12a0c0e0e69ea70863011b4f4ca3305e0542b",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pallets", "click"),
+            commit: "8a1b1a33d739be05b7e91251e3c0dde77c5e152f",
+            config: RepoConfig::Python,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pallets", "click"),
+            commit: "8a1b1a33d739be05b7e91251e3c0dde77c5e152f",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pallets", "flask"),
+            commit: "36e4a824f340fdee7ed50937ba8e7f6bc7d17f81",
+            config: RepoConfig::Python,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pallets", "flask"),
+            commit: "36e4a824f340fdee7ed50937ba8e7f6bc7d17f81",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("malivinayak", "Multi-Programming"),
+            commit: "5debb0d755d71f9714d2fcd3e11fdac66d055b4a",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("numpy", "numpy"),
+            commit: "706b1035187baf72959059cd35ac1f5266e1932c",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("numpy", "numpy"),
+            commit: "706b1035187baf72959059cd35ac1f5266e1932c",
+            config: RepoConfig::Python,
             fetch: true,
         },
     ];
 
     for p in inputs.iter() {
-        group.bench_with_input(BenchmarkId::new("HyperAST", p.repo.name()), &p, |b, p| {
-            b.iter_batched(
-                || {
-                    let mut repositories = PreProcessedRepositories::default();
-                    repositories.register_config(p.repo.clone(), p.config);
-                    let repo = repositories
-                        .get_config(p.repo.clone())
-                        .ok_or_else(|| "missing config for repository".to_string())
-                        .unwrap();
-                    let repository = if p.fetch {
-                        repo.fetch()
-                    } else {
-                        repo.nofetch()
-                    };
-                    (repositories, repository)
-                },
-                |(mut repositories, repository)| {
-                    let mut rw = single_commit(p.commit, &repository.repo).unwrap();
-                    repositories.pre_process_chunk(&mut rw, &repository, usize::MAX)
-                },
-                BatchSize::PerIteration,
-            )
-        });
+        group.throughput(criterion::Throughput::Elements(1));
+        group.bench_with_input(
+            BenchmarkId::new("HyperAST", format!("{}_{:?}", p.repo.name(), p.config)),
+            &p,
+            |b, p| {
+                b.iter_batched(
+                    || {
+                        let mut repositories = PreProcessedRepositories::default();
+                        repositories.register_config(p.repo.clone(), p.config);
+                        let repo = repositories
+                            .get_config(p.repo.clone())
+                            .ok_or_else(|| "missing config for repository".to_string())
+                            .unwrap();
+                        let repository = if p.fetch {
+                            repo.fetch()
+                        } else {
+                            repo.nofetch()
+                        };
+                        (repositories, repository)
+                    },
+                    |(mut repositories, repository)| {
+                        let mut rw = single_commit(p.commit, &repository.repo).unwrap();
+                        repositories.pre_process_chunk(&mut rw, &repository, usize::MAX)
+                    },
+                    BatchSize::PerIteration,
+                )
+            },
+        );
     }
     group.finish()
 }

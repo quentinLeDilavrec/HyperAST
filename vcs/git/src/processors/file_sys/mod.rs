@@ -28,6 +28,8 @@ pub struct Parameter {
     pub(crate) python_handle: PPHandle<super::python::PythonProc>,
     #[cfg(feature = "typescript")]
     pub(crate) typescript_handle: PPHandle<super::typescript::TypescriptProc>,
+    #[cfg(feature = "rust")]
+    pub(crate) rust_handle: PPHandle<super::rust::RustProc>,
 }
 
 pub(crate) struct FileSysProc {
@@ -83,6 +85,7 @@ impl crate::preprocessed::RepositoryProcessor {
         use crate::processors::cpp::CppProc;
         use crate::processors::java::JavaProc;
         use crate::processors::python::PythonProc;
+        use crate::processors::rust::RustProc;
         use crate::processors::typescript::TypescriptProc;
         let processor_map = &mut self.processing_systems;
         let t = crate::processors::file_sys::Parameter {
@@ -94,6 +97,8 @@ impl crate::preprocessed::RepositoryProcessor {
             python_handle: PythonProc::default_handle(processor_map),
             #[cfg(feature = "typescript")]
             typescript_handle: TypescriptProc::default_handle(processor_map),
+            #[cfg(feature = "rust")]
+            rust_handle: RustProc::default_handle(processor_map),
         };
         type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
         let holder = processor_map.commit_proc_mut::<FileSysProcessorHolder>();

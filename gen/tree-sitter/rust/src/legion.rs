@@ -18,7 +18,11 @@ fn medium_extra_pattern_precomp() {
 
     use crate::Type;
 
-    const EX: &str = r#"fn f() -> usize {42}"#;
+    const EX: &str = r#"// Copyright 2018-2026. License.
+use indexmap::IndexMap;
+
+fn f() -> usize {42}
+"#;
 
     let lang = crate::language();
     let name = b"";

@@ -9,6 +9,8 @@ pub mod cpp;
 pub mod java;
 #[cfg(feature = "python")]
 pub mod python;
+#[cfg(feature = "typescript")]
+pub mod typescript;
 
 // # build systems
 #[cfg(feature = "make")]

@@ -23,6 +23,8 @@ use crate::processors::python::PythonProc;
 type PythonProcessorHolder = ProcessorHolder<PythonProc>;
 #[cfg(feature = "make_cpp")]
 use crate::processors::make::MakeProc;
+#[cfg(feature = "typescript")]
+use crate::processors::typescript::TypescriptProc;
 #[cfg(feature = "make_cpp")]
 type MakeProcessorHolder = ProcessorHolder<MakeProc>;
 #[cfg(feature = "maven_java")]
@@ -158,11 +160,6 @@ impl PreProcessedRepositories {
 
     pub fn register_config(&mut self, spec: Repo, config: RepoConfig) -> ConfiguredRepoHandle2 {
         use crate::processing::erased::ProcessorMap;
-        let java = |pr: &mut ProcessorMap| {
-            let t = crate::processors::java::Parameter::faster();
-            let h = pr.commit_proc_mut::<JavaProcessorHolder>();
-            h.register_param(t)
-        };
         let pom = |pr: &mut ProcessorMap| {
             let t = crate::processors::maven::PomParameter::default();
             let h = pr.proc_mut::<PomProcessorHolder>();
@@ -173,17 +170,11 @@ impl PreProcessedRepositories {
             let h = pr.proc_mut::<MakefileProcessorHolder>();
             h.register_param(t)
         };
-        #[cfg(feature = "python")]
-        let python = |pr: &mut ProcessorMap| {
-            let t = crate::processors::python::Parameter::default();
-            let h = pr.commit_proc_mut::<PythonProcessorHolder>();
-            h.register_param(t)
-        };
         let processor_map = &mut self.processor.processing_systems;
         let r = match config {
             #[cfg(feature = "maven_java")]
             RepoConfig::JavaMaven => {
-                let java_handle = java(processor_map);
+                let java_handle = JavaProc::default_handle(processor_map);
                 let pom_handle = pom(processor_map);
                 let h = processor_map.commit_proc_mut::<MavenProcessorHolder>();
                 let t = crate::processors::maven::Parameter {
@@ -195,12 +186,12 @@ impl PreProcessedRepositories {
             }
             #[cfg(feature = "java")]
             RepoConfig::Java => {
-                let config = java(processor_map).erase();
+                let config = JavaProc::default_handle(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             #[cfg(feature = "python")]
             RepoConfig::Python => {
-                let config = python(processor_map).erase();
+                let config = PythonProc::default_handle(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             #[cfg(feature = "make_cpp")]
@@ -222,12 +213,18 @@ impl PreProcessedRepositories {
                 let config = CProc::default_handle(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
+            #[cfg(feature = "typescript")]
+            RepoConfig::Typescript => {
+                let config = TypescriptProc::default_handle(processor_map).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
             #[cfg(feature = "file_sys")]
             RepoConfig::Any => {
                 let t = crate::processors::file_sys::Parameter {
                     cpp_handle: CppProc::default_handle(processor_map),
-                    java_handle: java(processor_map),
-                    python_handle: python(processor_map),
+                    java_handle: JavaProc::default_handle(processor_map),
+                    python_handle: PythonProc::default_handle(processor_map),
+                    typescript_handle: TypescriptProc::default_handle(processor_map),
                 };
                 let holder = processor_map.commit_proc_mut::<FileSysProcessorHolder>();
                 let config = holder.register_param(t).erase();

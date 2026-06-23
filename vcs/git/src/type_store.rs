@@ -11,6 +11,8 @@ impl hyperast::store::TyDown<hyperast_gen_ts_c::TStore> for TStore {}
 impl hyperast::store::TyDown<hyperast_gen_ts_java::TStore> for TStore {}
 #[cfg(feature = "python")]
 impl hyperast::store::TyDown<hyperast_gen_ts_python::TStore> for TStore {}
+#[cfg(feature = "typescript")]
+impl hyperast::store::TyDown<hyperast_gen_ts_typescript::TStore> for TStore {}
 #[cfg(feature = "file_sys")]
 impl hyperast::store::TyDown<crate::processors::file_sys::TStore> for TStore {}
 #[cfg(feature = "maven")]
@@ -46,6 +48,8 @@ impl RoleStore for TStore {
         resolve_field!(hyperast_gen_ts_c);
         #[cfg(feature = "python")]
         resolve_field!(hyperast_gen_ts_python);
+        #[cfg(feature = "typescript")]
+        resolve_field!(hyperast_gen_ts_typescript);
         #[cfg(feature = "maven")]
         resolve_field!(hyperast_gen_ts_xml);
         panic!("unsupported lang: {}", name);
@@ -71,6 +75,8 @@ impl RoleStore for TStore {
         intern_role!(hyperast_gen_ts_c);
         #[cfg(feature = "python")]
         intern_role!(hyperast_gen_ts_python);
+        #[cfg(feature = "typescript")]
+        intern_role!(hyperast_gen_ts_typescript);
         #[cfg(feature = "maven")]
         intern_role!(hyperast_gen_ts_xml);
         panic!("unsupported lang: {}", name);
@@ -98,13 +104,21 @@ impl TypeStore for TStore {
                 }
             }};
         }
+        #[cfg(feature = "java")]
         decomp_t!(hyperast_gen_ts_java);
+        #[cfg(feature = "cpp")]
         decomp_t!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "python")]
         decomp_t!(hyperast_gen_ts_python);
+        #[cfg(feature = "typescript")]
+        decomp_t!(hyperast_gen_ts_typescript);
+        #[cfg(feature = "maven")]
         decomp_t!(hyperast_gen_ts_xml);
+        #[cfg(feature = "file_sys")]
         decomp_t!(crate::processors::file_sys::types);
         None
     }
+
     fn decompress_type(
         erazed: &impl hyperast::store::nodes::PolyglotHolder,
         tid: std::any::TypeId,

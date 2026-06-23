@@ -13,6 +13,7 @@ pub enum ProcessingConfig<P> {
     C { limit: usize, dir_path: P },
     TsNpm { limit: usize, dir_path: P },
     Python { limit: usize, dir_path: P },
+    Typescript { limit: usize, dir_path: P },
     Any { limit: usize, dir_path: P },
 }
 
@@ -27,6 +28,7 @@ pub enum RepoConfig {
     JavaMaven,
     TsNpm,
     Python,
+    Typescript,
     Any,
 }
 
@@ -41,8 +43,8 @@ impl std::str::FromStr for RepoConfig {
             "JavaMaven" => Self::JavaMaven,
             "Java" => Self::JavaMaven,
             "java" => Self::JavaMaven,
-            "typescript" => Self::TsNpm,
-            "javascript" => Self::TsNpm,
+            "typescript" => Self::Typescript,
+            "javascript" => Self::Typescript,
             "python" => Self::Python,
             "Ts" => Self::TsNpm,
             "ts" => Self::TsNpm,
@@ -77,6 +79,10 @@ impl From<&RepoConfig> for ProcessingConfig<&'static str> {
             },
             RepoConfig::TsNpm => todo!(),
             RepoConfig::Python => Self::Python {
+                limit: 3,
+                dir_path: "",
+            },
+            RepoConfig::Typescript => Self::Typescript {
                 limit: 3,
                 dir_path: "",
             },

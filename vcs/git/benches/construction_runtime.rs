@@ -93,14 +93,77 @@ fn construction_group(c: &mut Criterion) {
             config: RepoConfig::C,
             fetch: true,
         },
+        Input {
+            repo: Forge::Github.repo("microsoft", "vscode"),
+            commit: "12717879c47434790e4e956f8e211dc6b1948efa",
+            config: RepoConfig::Typescript,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("godotengine", "godot"),
+            commit: "8222d0983aa49f0bd4d74dde05d1a801269231db",
+            config: RepoConfig::Cpp,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("microsoft", "TypeScript"),
+            commit: "8ef3e2f3d43c8c92bda9510c47f7d4d2b3aeca33",
+            config: RepoConfig::Typescript,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pola-rs", "polars"),
+            commit: "5e9cf5c09d3c0c316cba1ced8282cb835f76df5f",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pandas-dev", "pandas"),
+            commit: "d57b53693bb01efeba9e51281e6e676c226ba1ae",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("fastapi", "fastapi"),
+            commit: "a497a025e7114ca442478ed28da7e0a1cdc6177a",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("scikit-learn", "scikit-learn"),
+            commit: "aeadb51af96556dd0f884c0037c9dc9993449538",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("denoland", "deno"),
+            commit: "dbcd1a9194f4a69b2ac96d925c90dcf9bf5a50cc",
+            config: RepoConfig::Any,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("denoland", "deno"),
+            commit: "dbcd1a9194f4a69b2ac96d925c90dcf9bf5a50cc",
+            config: RepoConfig::Typescript,
+            fetch: true,
+        },
     ];
 
     for p in inputs.iter() {
         group.throughput(criterion::Throughput::Elements(1));
-        group.bench_with_input(
+        group.bench_with_input_prepared(
             BenchmarkId::new("HyperAST", format!("{}_{:?}", p.repo.name(), p.config)),
-            &p,
-            |b, p| {
+            &mut &p,
+            |_, p| {
+                if p.fetch {
+                    p.repo
+                        .fetch_with_cb(|s| {
+                            println!("{}", s);
+                        })
+                        .unwrap();
+                };
+            },
+            |b, (p, _)| {
                 b.iter_batched(
                     || {
                         let mut repositories = PreProcessedRepositories::default();
@@ -109,12 +172,7 @@ fn construction_group(c: &mut Criterion) {
                             .get_config(p.repo.clone())
                             .ok_or_else(|| "missing config for repository".to_string())
                             .unwrap();
-                        let repository = if p.fetch {
-                            repo.fetch()
-                        } else {
-                            repo.nofetch()
-                        };
-                        (repositories, repository)
+                        (repositories, repo.nofetch())
                     },
                     |(mut repositories, repository)| {
                         let mut rw = single_commit(p.commit, &repository.repo).unwrap();

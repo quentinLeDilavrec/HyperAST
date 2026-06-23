@@ -11,7 +11,7 @@ pub(crate) mod types;
 #[cfg(feature = "types")]
 pub use types::Type;
 #[cfg(feature = "types")]
-pub use types::{Lang, Role, TIdN, TStore};
+pub use types::{Lang, Role, TIdN, TStore, TType};
 
 #[cfg(feature = "legion")]
 pub use hyperast::tree_gen::utils_ts::TNode;

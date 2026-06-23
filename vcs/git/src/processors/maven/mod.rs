@@ -22,7 +22,7 @@ use hyperast_gen_ts_xml::TStore;
 use crate::Accumulator;
 use crate::BasicDirAcc;
 use crate::DefaultMetrics;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processors::java::JavaProc;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
@@ -51,8 +51,8 @@ impl crate::preprocessed::IdHolder for FullNode {
 pub struct Parameter {
     // pub(crate) query: Option<std::sync::Arc<[String]>>,
     // pub(crate) prepo: Option<hyperast_scripting::Prepro>,
-    pub java_handle: PCP2Handle<JavaProc>,
-    pub pom_handle: PCP2Handle<PomProc>,
+    pub java_handle: PPHandle<JavaProc>,
+    pub pom_handle: PPHandle<PomProc>,
 }
 
 #[derive(Debug, Clone)]

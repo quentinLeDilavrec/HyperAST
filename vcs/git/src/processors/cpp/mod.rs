@@ -12,7 +12,7 @@ use hyperast::tree_gen;
 use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_cpp::TStore;
@@ -63,7 +63,7 @@ impl CppAcc {
 }
 
 impl CppProc {
-    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
+    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PPHandle<Self> {
         type CppProcessorHolder = crate::processing::ProcessorHolder<CppProc>;
         // let q = ["(translation_unit)"].as_slice();
         // let t = crate::processors::cpp::Parameter::new(q);

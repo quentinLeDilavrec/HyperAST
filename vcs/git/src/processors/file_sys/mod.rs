@@ -7,7 +7,7 @@ pub mod types;
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
@@ -21,11 +21,11 @@ use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
     #[cfg(feature = "cpp")]
-    pub(crate) cpp_handle: PCP2Handle<super::cpp::CppProc>,
+    pub(crate) cpp_handle: PPHandle<super::cpp::CppProc>,
     #[cfg(feature = "java")]
-    pub(crate) java_handle: PCP2Handle<super::java::JavaProc>,
+    pub(crate) java_handle: PPHandle<super::java::JavaProc>,
     #[cfg(feature = "python")]
-    pub(crate) python_handle: PCP2Handle<super::python::PythonProc>,
+    pub(crate) python_handle: PPHandle<super::python::PythonProc>,
 }
 
 pub(crate) struct FileSysProc {

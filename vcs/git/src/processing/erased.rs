@@ -3,7 +3,7 @@
 use std::any::Any;
 
 use super::ConfigParametersHandle;
-use super::ParametrizedProcessor2Handle as PCP2Handle;
+use super::ParametrizedProcessorHandle as PPHandle;
 use super::ProcessorHolder;
 
 //
@@ -61,14 +61,14 @@ use crate::preprocessed::CommitBuilder;
 #[derive(Clone, Copy, Debug)]
 pub struct CommitProcessorHandle(std::any::TypeId);
 
-/// Parametrized handle over a processor like [`ParametrizedProcessor2Handle`], using the erased [`CommitProcessorHandle`].
+/// Parametrized handle over a processor like [`ParametrizedProcessorHandle`], using the erased [`CommitProcessorHandle`].
 ///
-/// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessor2Handle`] instead.
+/// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessorHandle`] instead.
 #[derive(Clone, Copy, Debug)]
 pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
 use ParametrizedCommitProcessorHandle as PCPHandle;
 
-impl<T: CommitProc + 'static> PCP2Handle<T> {
+impl<T: CommitProc + 'static> PPHandle<T> {
     pub(crate) fn erase(&self) -> PCPHandle {
         let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
         PCPHandle(CommitProcessorHandle(tid), self.0)

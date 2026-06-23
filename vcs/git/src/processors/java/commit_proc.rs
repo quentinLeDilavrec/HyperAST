@@ -7,7 +7,7 @@ use crate::Processor;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::PreparedCommitProc;
@@ -65,7 +65,7 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
             &mut dir_path,
             &name,
             self.commit_builder.tree_oid(),
-            &PCP2Handle(self.handle.1, PhantomData),
+            &PPHandle(self.handle.1, PhantomData),
         )
         .process();
         let h = prepro

@@ -9,7 +9,7 @@ use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub(crate) use make_processor::MakeProc;
@@ -20,8 +20,8 @@ pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStor
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
-    pub(crate) makefile_handle: PCP2Handle<makefile::MakefileProc>,
-    pub(crate) cpp_handle: PCP2Handle<super::cpp::CppProc>,
+    pub(crate) makefile_handle: PPHandle<makefile::MakefileProc>,
+    pub(crate) cpp_handle: PPHandle<super::cpp::CppProc>,
 }
 
 #[derive(Debug, Clone)]

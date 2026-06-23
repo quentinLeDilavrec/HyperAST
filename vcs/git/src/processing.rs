@@ -127,27 +127,24 @@ pub struct ConfigParametersHandle(
 
 /// Parametrized handle over a processor T, composing [`ConfigParametersHandle`].
 ///
-/// If you want to store a [`ParametrizedProcessor2Handle`] at runtime, use [`erased::ParametrizedCommitProcessorHandle`] instead.
+/// If you want to store a [`ParametrizedProcessorHandle`] at runtime, use [`erased::ParametrizedCommitProcessorHandle`] instead.
 #[derive(Debug)]
-pub struct ParametrizedProcessor2Handle<T>(
-    pub ConfigParametersHandle,
-    pub(crate) std::marker::PhantomData<T>,
-);
-use ParametrizedProcessor2Handle as PCP2Handle;
+pub struct ParametrizedProcessorHandle<T>(pub ConfigParametersHandle, std::marker::PhantomData<T>);
+use ParametrizedProcessorHandle as PPHandle;
 
-impl<T> PartialEq for PCP2Handle<T> {
+impl<T> PartialEq for PPHandle<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.0 == other.0.0 && self.1 == other.1
     }
 }
-impl<T> Eq for PCP2Handle<T> {}
-impl<T> Clone for PCP2Handle<T> {
+impl<T> Eq for PPHandle<T> {}
+impl<T> Clone for PPHandle<T> {
     fn clone(&self) -> Self {
-        PCP2Handle(self.0, self.1)
+        PPHandle(self.0, self.1)
     }
 }
-impl<T> Copy for PCP2Handle<T> {}
-impl<T> std::ops::Deref for PCP2Handle<T> {
+impl<T> Copy for PPHandle<T> {}
+impl<T> std::ops::Deref for PPHandle<T> {
     type Target = ConfigParametersHandle;
 
     fn deref(&self) -> &Self::Target {
@@ -163,13 +160,13 @@ impl<Proc> Default for ProcessorHolder<Proc> {
 }
 
 impl<Proc> ProcessorHolder<Proc> {
-    pub fn register_param<T: Into<Proc> + PartialEq<Proc>>(&mut self, t: T) -> PCP2Handle<Proc> {
+    pub fn register_param<T: Into<Proc> + PartialEq<Proc>>(&mut self, t: T) -> PPHandle<Proc> {
         let l = self.0.iter().position(|x| t.eq(x)).unwrap_or_else(|| {
             let l = self.0.len();
             self.0.push(t.into());
             l
         });
-        PCP2Handle(ConfigParametersHandle(l), std::marker::PhantomData)
+        PPHandle(ConfigParametersHandle(l), std::marker::PhantomData)
     }
 }
 

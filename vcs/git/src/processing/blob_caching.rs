@@ -1,7 +1,7 @@
 use git2::{Oid, Repository};
 use std::marker::PhantomData;
 
-use super::ParametrizedProcessor2Handle;
+use super::ParametrizedProcessorHandle;
 use super::ProcessorHolder;
 use super::erased::CommitProc;
 use super::erased::ParametrizedCommitProc2;
@@ -29,7 +29,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         oid: Oid,
         repository: &Repository,
         name: &N,
-        parameters: ParametrizedProcessor2Handle<T>,
+        parameters: ParametrizedProcessorHandle<T>,
         wrapped: F,
     ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where
@@ -78,7 +78,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         oid: Oid,
         repository: &Repository,
         name: &N,
-        parameters: ParametrizedProcessor2Handle<T>,
+        parameters: ParametrizedProcessorHandle<T>,
         wrapped: F,
     ) -> Result<<Sys::Caches as ObjectMapper>::V, E>
     where

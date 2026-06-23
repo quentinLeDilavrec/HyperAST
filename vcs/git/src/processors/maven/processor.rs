@@ -18,7 +18,7 @@ use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
 use crate::processing::ConfigParametersHandle;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Maven as MavenCaches;
 use crate::processing::erased::CommitProc;
 use crate::processing::erased::ParametrizedCommitProc2;
@@ -28,7 +28,6 @@ use crate::processing::file_sys;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
 use crate::utils::drain_filter_strip;
 
-use super::JavaProc;
 use super::SimpleStores;
 use super::scripting::ScriptingPrepro;
 use super::scripting::prep_scripting;
@@ -117,7 +116,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
         if file_sys::Pom::matches(&name) {
             let parent_acc = &mut self.stack.last_mut().unwrap().acc;
             // TODO find a better conversion, ie. first safe conv to MavenProc handle then into()
-            let parameters = PCP2Handle(ConfigParametersHandle(0), PhantomData);
+            let parameters = PPHandle(ConfigParametersHandle(0), PhantomData);
             if let Err(err) =
                 self.prepro
                     .handle_pom(parent_acc, oid, name, &self.repository, parameters)

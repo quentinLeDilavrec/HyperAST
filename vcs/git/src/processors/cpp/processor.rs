@@ -10,7 +10,7 @@ use hyperast_gen_ts_cpp::TStore;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
@@ -29,7 +29,7 @@ pub struct CppProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     stack: Vec<StackEle<Acc>>,
     // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
-    handle: &'d PCP2Handle<CppProc>,
+    handle: &'d PPHandle<CppProc>,
 }
 
 impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> CppProcessor<'repo, 'prepro, 'd, 'c, Acc> {
@@ -39,7 +39,7 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> CppProcessor<'repo, 'prepro, 'd,
         dir_path: &'d mut Peekable<Components<'c>>,
         name: &ObjectName,
         oid: git2::Oid,
-        parameters: &'d PCP2Handle<CppProc>,
+        parameters: &'d PPHandle<CppProc>,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(&tree).collect();
@@ -140,7 +140,7 @@ impl RepositoryProcessor {
         oid: Oid,
         name: &ObjectName,
         repository: &Repository,
-        parameters: PCP2Handle<CppProc>,
+        parameters: PPHandle<CppProc>,
     ) -> Result<super::FullNode, crate::ParseErr> {
         let mut handler = self.processing_systems.caching_blob_handler::<CppProc>();
         handler.handle2(oid, repository, &name, parameters, |c, n, t| {
@@ -187,7 +187,7 @@ impl RepositoryProcessor {
         oid: Oid,
         name: &ObjectName,
         repository: &Repository,
-        parameters: PCP2Handle<CppProc>,
+        parameters: PPHandle<CppProc>,
     ) -> Result<(), crate::ParseErr> {
         let full_node = self.handle_cpp_blob(oid, name, repository, parameters)?;
         let name = self.intern_object_name(name);
@@ -203,7 +203,7 @@ impl RepositoryProcessor {
         parent: &mut crate::processors::make::MakeModuleAcc,
         name: &ObjectName,
         repository: &Repository,
-        parameters: PCP2Handle<CppProc>,
+        parameters: PPHandle<CppProc>,
     ) -> Result<(), crate::ParseErr> {
         let full_node = self.handle_cpp_blob(oid, name, repository, parameters)?;
         let name = self.intern_object_name(name);
@@ -221,7 +221,7 @@ impl RepositoryProcessor {
         dir_path: &'b mut Peekable<Components<'d>>,
         name: &ObjectName,
         oid: git2::Oid,
-        handle: PCP2Handle<CppProc>,
+        handle: PPHandle<CppProc>,
     ) -> super::FullNode {
         CppProcessor::<CppAcc>::new(repository, self, dir_path, name, oid, &handle).process()
     }
@@ -232,7 +232,7 @@ impl RepositoryProcessor {
         dir_path: &'c mut Peekable<Components<'d>>,
         oid: Oid,
         name: &ObjectName,
-        handle: PCP2Handle<CppProc>,
+        handle: PPHandle<CppProc>,
     ) -> <CppAcc as hyperast::tree_gen::Accumulator>::Node {
         let full_node = self.handle_cpp_directory(repository, dir_path, name, oid, handle);
         let name = self.intern_object_name(name);

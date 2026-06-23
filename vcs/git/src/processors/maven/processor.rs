@@ -507,11 +507,10 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
         let h = prepro
             .processing_systems
             .commit_proc_mut::<MavenProcessorHolder>();
-        let commit_oid = self.commit_builder.commit_oid();
+        let handle = self.maven_handle;
+        let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters42_mut(self.maven_handle)
-            .commits
-            .insert(commit_oid, commit);
+        h.with_parameters42_mut(handle).commits.insert(oid, commit);
         root_full_node.id
     }
 }

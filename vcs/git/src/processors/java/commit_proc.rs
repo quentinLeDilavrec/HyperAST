@@ -74,11 +74,10 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
         let h = prepro
             .processing_systems
             .commit_proc_mut::<JavaProcessorHolder>();
-        let commit_oid = self.commit_builder.commit_oid();
+        let handle = self.java_handle;
+        let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters42_mut(self.java_handle)
-            .commits
-            .insert(commit_oid, commit);
+        h.with_parameters42_mut(handle).commits.insert(oid, commit);
         root_full_node.id
     }
 }

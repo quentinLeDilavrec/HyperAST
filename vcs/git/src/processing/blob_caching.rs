@@ -45,7 +45,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         T: CacheHolding<Sys::Caches>,
     {
         let caches = self.processors.proc_mut::<ProcessorHolder<T>>();
-        let caches = caches.with_parameters_mut0(parameters.0);
+        let caches = caches.with_parameters42_mut0(parameters);
         let caches = caches.get_caches_mut();
         use crate::processing::ObjectMapper;
         if let Some(already) = caches.get(&oid) {
@@ -66,7 +66,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
             self.processors
                 // .mut_or_default::<Sys::Holder>().get_caches_mut()
                 .proc_mut::<ProcessorHolder<T>>()
-                .with_parameters_mut0(parameters.0)
+                .with_parameters42_mut0(parameters)
                 .get_caches_mut()
                 .insert(oid, x.clone());
         }
@@ -96,7 +96,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         T: CacheHolding<Sys::Caches>,
     {
         let caches = self.processors.commit_proc_mut::<ProcessorHolder<T>>();
-        let caches = caches.with_parameters_mut(parameters.0);
+        let caches = caches.with_parameters42_mut(parameters);
         let caches = caches.get_caches_mut();
         use crate::processing::ObjectMapper;
         if let Some(already) = caches.get(&(oid, name.clone())) {
@@ -130,7 +130,7 @@ impl<'cache, Sys> CachingBlobWrapper2<'cache, Sys> {
         if let Ok(x) = &full_node {
             self.processors
                 .commit_proc_mut::<ProcessorHolder<T>>()
-                .with_parameters_mut(parameters.0)
+                .with_parameters42_mut(parameters)
                 .get_caches_mut()
                 .insert((oid, name.clone()), x.clone());
         }

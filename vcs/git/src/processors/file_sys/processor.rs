@@ -80,7 +80,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
         let full_node = make(acc, self.prepro.main_stores_mut().mut_with_ts());
         let cache = (self.prepro.processing_systems)
             .commit_proc_mut::<FileSysProcessorHolder>()
-            .with_parameters_mut(self.handle.1)
+            .with_parameters42_mut(self.handle.try_into().unwrap())
             .get_caches_mut();
         cache.object_map.insert(oid, full_node.clone());
 
@@ -126,7 +126,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         }
         let proc = (self.prepro.processing_systems)
             .commit_proc_mut::<FileSysProcessorHolder>()
-            .with_parameters_mut(self.handle.1);
+            .with_parameters42_mut(self.handle.try_into().unwrap());
         if let Some(already) = proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
             dbg!(name.try_str().unwrap());

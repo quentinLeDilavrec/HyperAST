@@ -215,10 +215,10 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
         let h = prepro
             .processing_systems
             .commit_proc_mut::<PythonProcessorHolder>();
-        let handle = self.handle;
+        let handle = self.handle.try_into().unwrap();
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle.1).commits.insert(oid, commit);
+        h.with_parameters42_mut(handle).commits.insert(oid, commit);
         root_full_node.id
     }
 }

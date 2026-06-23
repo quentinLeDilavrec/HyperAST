@@ -152,14 +152,6 @@ impl<T> Clone for PPHandle<T> {
     }
 }
 impl<T> Copy for PPHandle<T> {}
-// TODO remove Deref impl
-// impl<T> std::ops::Deref for PPHandle<T> {
-//     type Target = ConfigParametersHandle;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.0
-//     }
-// }
 
 pub struct ProcessorHolder<Proc>(Vec<Proc>);
 impl<Proc> Default for ProcessorHolder<Proc> {
@@ -179,7 +171,7 @@ impl<Proc> ProcessorHolder<Proc> {
     }
 }
 
-impl<Proc: erased::CommitProc> erased::ParametrizedCommitProc2 for ProcessorHolder<Proc> {
+impl<Proc: erased::CommitProc + 'static> erased::ParametrizedCommitProc2 for ProcessorHolder<Proc> {
     type Proc = Proc;
 
     fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
@@ -191,7 +183,7 @@ impl<Proc: erased::CommitProc> erased::ParametrizedCommitProc2 for ProcessorHold
     }
 }
 
-impl<Proc> erased::ParametrizedProc2 for ProcessorHolder<Proc> {
+impl<Proc: 'static> erased::ParametrizedProc2 for ProcessorHolder<Proc> {
     type Proc = Proc;
 
     fn with_parameters_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {

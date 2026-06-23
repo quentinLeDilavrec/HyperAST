@@ -12,7 +12,7 @@ use super::ProcessorHolder;
 
 /// Handle over a processor, resulting from type erasure when registering a  processor.
 #[derive(Clone, Copy, Debug)]
-pub struct ProcessorHandle(pub(crate) std::any::TypeId);
+pub struct ProcessorHandle(#[allow(dead_code)] std::any::TypeId);
 
 pub trait Proc {}
 impl<T> Proc for T {}
@@ -25,23 +25,31 @@ pub trait ParametrizedProc {
         ProcessorHandle(std::any::TypeId::of::<Self>())
     }
 
-    fn get_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut dyn Proc;
-    fn get0(&self, parameters: ConfigParametersHandle) -> &dyn Proc;
+    fn get_mut0(&mut self, parameters: PCPHandle) -> &mut dyn Proc;
+    fn get0(&self, parameters: PCPHandle) -> &dyn Proc;
 }
 
 pub trait ParametrizedProc2: ParametrizedProc {
-    type Proc: Proc;
+    type Proc: Proc + 'static;
+    fn with_parameters420(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
+        self.with_parameters0(parameters.0)
+    }
+    fn with_parameters42_mut0(&mut self, parameters: PPHandle<Self::Proc>) -> &mut Self::Proc {
+        self.with_parameters_mut0(parameters.0)
+    }
     fn with_parameters0(&self, parameters: ConfigParametersHandle) -> &Self::Proc;
     fn with_parameters_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc;
 }
 
 impl<T: ParametrizedProc2> ParametrizedProc for T {
-    fn get_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut dyn Proc {
-        ParametrizedProc2::with_parameters_mut0(self, parameters)
+    fn get_mut0(&mut self, parameters: PCPHandle) -> &mut dyn Proc {
+        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        ParametrizedProc2::with_parameters_mut0(self, parameters.1)
     }
 
-    fn get0(&self, parameters: ConfigParametersHandle) -> &dyn Proc {
-        ParametrizedProc2::with_parameters0(self, parameters)
+    fn get0(&self, parameters: PCPHandle) -> &dyn Proc {
+        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        ParametrizedProc2::with_parameters0(self, parameters.1)
     }
 }
 
@@ -65,7 +73,7 @@ pub struct CommitProcessorHandle(std::any::TypeId);
 ///
 /// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessorHandle`] instead.
 #[derive(Clone, Copy, Debug)]
-pub struct ParametrizedCommitProcessorHandle(CommitProcessorHandle, pub ConfigParametersHandle);
+pub struct ParametrizedCommitProcessorHandle(CommitProcessorHandle, ConfigParametersHandle);
 use ParametrizedCommitProcessorHandle as PCPHandle;
 
 impl<T: CommitProc + 'static> PPHandle<T> {
@@ -129,12 +137,12 @@ pub trait ParametrizedCommitProc {
         CommitProcessorHandle(std::any::TypeId::of::<Self>())
     }
 
-    fn get_mut(&mut self, parameters: ConfigParametersHandle) -> &mut dyn CommitProc;
-    fn get(&self, parameters: ConfigParametersHandle) -> &dyn CommitProc;
+    fn get_mut(&mut self, parameters: PCPHandle) -> &mut dyn CommitProc;
+    fn get(&self, parameters: PCPHandle) -> &dyn CommitProc;
 }
 
 pub trait ParametrizedCommitProc2: ParametrizedCommitProc {
-    type Proc: CommitProc;
+    type Proc: CommitProc + 'static;
     fn with_parameters42(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
         self.with_parameters(parameters.0)
     }
@@ -146,12 +154,14 @@ pub trait ParametrizedCommitProc2: ParametrizedCommitProc {
 }
 
 impl<T: ParametrizedCommitProc2> ParametrizedCommitProc for T {
-    fn get_mut(&mut self, parameters: ConfigParametersHandle) -> &mut dyn CommitProc {
-        ParametrizedCommitProc2::with_parameters_mut(self, parameters)
+    fn get_mut(&mut self, parameters: PCPHandle) -> &mut dyn CommitProc {
+        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        ParametrizedCommitProc2::with_parameters_mut(self, parameters.1)
     }
 
-    fn get(&self, parameters: ConfigParametersHandle) -> &dyn CommitProc {
-        ParametrizedCommitProc2::with_parameters(self, parameters)
+    fn get(&self, parameters: PCPHandle) -> &dyn CommitProc {
+        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        ParametrizedCommitProc2::with_parameters(self, parameters.1)
     }
 }
 

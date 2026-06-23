@@ -162,7 +162,7 @@ impl RepositoryProcessor {
                 .processing_systems
                 .by_id(repository.config)
                 .unwrap()
-                .get(repository.config.1);
+                .get(repository.config);
             if let Some(_) = commit_processor.get_commit(oid) {
                 rw.next();
                 r.push(oid);
@@ -205,7 +205,7 @@ impl RepositoryProcessor {
                 .processing_systems
                 .by_id_mut(repository.config)
                 .unwrap()
-                .get_mut(repository.config.1);
+                .get_mut(repository.config);
             let _id = commit_processor
                 .prepare_processing(&repository.repo, builder, repository.config)
                 .process(self);
@@ -242,7 +242,7 @@ impl RepositoryProcessor {
                 .processing_systems
                 .by_id_mut(handle)
                 .unwrap()
-                .get_mut(handle.1);
+                .get_mut(handle);
             let _id = commit_processor
                 .prepare_processing(&repository, builder, handle)
                 .process(self);

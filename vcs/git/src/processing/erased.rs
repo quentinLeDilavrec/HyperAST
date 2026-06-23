@@ -31,25 +31,25 @@ pub trait ParametrizedProc {
 
 pub trait ParametrizedProc2: ParametrizedProc {
     type Proc: Proc + 'static;
-    fn with_parameters420(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
-        self.with_parameters0(parameters.0)
+    fn with_parameters0(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
+        self._with_parameters0(parameters.0)
     }
-    fn with_parameters42_mut0(&mut self, parameters: PPHandle<Self::Proc>) -> &mut Self::Proc {
-        self.with_parameters_mut0(parameters.0)
+    fn with_parameters_mut0(&mut self, parameters: PPHandle<Self::Proc>) -> &mut Self::Proc {
+        self._with_parameters_mut0(parameters.0)
     }
-    fn with_parameters0(&self, parameters: ConfigParametersHandle) -> &Self::Proc;
-    fn with_parameters_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc;
+    fn _with_parameters0(&self, parameters: ConfigParametersHandle) -> &Self::Proc;
+    fn _with_parameters_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc;
 }
 
 impl<T: ParametrizedProc2> ParametrizedProc for T {
     fn get_mut0(&mut self, parameters: PCPHandle) -> &mut dyn Proc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
-        ParametrizedProc2::with_parameters_mut0(self, parameters.1)
+        ParametrizedProc2::_with_parameters_mut0(self, parameters.1)
     }
 
     fn get0(&self, parameters: PCPHandle) -> &dyn Proc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
-        ParametrizedProc2::with_parameters0(self, parameters.1)
+        ParametrizedProc2::_with_parameters0(self, parameters.1)
     }
 }
 
@@ -143,25 +143,25 @@ pub trait ParametrizedCommitProc {
 
 pub trait ParametrizedCommitProc2: ParametrizedCommitProc {
     type Proc: CommitProc + 'static;
-    fn with_parameters42(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
-        self.with_parameters(parameters.0)
+    fn with_parameters(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
+        self._with_parameters(parameters.0)
     }
-    fn with_parameters42_mut(&mut self, parameters: PPHandle<Self::Proc>) -> &mut Self::Proc {
-        self.with_parameters_mut(parameters.0)
+    fn with_parameters_mut(&mut self, parameters: PPHandle<Self::Proc>) -> &mut Self::Proc {
+        self._with_parameters_mut(parameters.0)
     }
-    fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc;
-    fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc;
+    fn _with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc;
+    fn _with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc;
 }
 
 impl<T: ParametrizedCommitProc2> ParametrizedCommitProc for T {
     fn get_mut(&mut self, parameters: PCPHandle) -> &mut dyn CommitProc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
-        ParametrizedCommitProc2::with_parameters_mut(self, parameters.1)
+        ParametrizedCommitProc2::_with_parameters_mut(self, parameters.1)
     }
 
     fn get(&self, parameters: PCPHandle) -> &dyn CommitProc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
-        ParametrizedCommitProc2::with_parameters(self, parameters.1)
+        ParametrizedCommitProc2::_with_parameters(self, parameters.1)
     }
 }
 

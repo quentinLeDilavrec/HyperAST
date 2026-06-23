@@ -140,7 +140,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
         self.prepro
             .processing_systems
             .commit_proc_mut::<MavenProcessorHolder>()
-            .with_parameters42_mut(self.maven_handle)
+            .with_parameters_mut(self.maven_handle)
             .get_caches_mut()
             .object_map
             .insert(oid, full_node.clone());
@@ -210,7 +210,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             .prepro
             .processing_systems
             .commit_proc_mut::<MavenProcessorHolder>()
-            .with_parameters42_mut(self.maven_handle);
+            .with_parameters_mut(self.maven_handle);
         let java_handle = maven_proc.parameter.java_handle;
         if let Some(already) = maven_proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
@@ -510,7 +510,7 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
         let handle = self.maven_handle;
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters42_mut(handle).commits.insert(oid, commit);
+        h.with_parameters_mut(handle).commits.insert(oid, commit);
         root_full_node.id
     }
 }

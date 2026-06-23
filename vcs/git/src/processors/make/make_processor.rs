@@ -107,7 +107,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
         self.prepro
             .processing_systems
             .commit_proc_mut::<MakeProcessorHolder>()
-            .with_parameters42_mut(self.handle.try_into().unwrap())
+            .with_parameters_mut(self.handle.try_into().unwrap())
             .get_caches_mut()
             .object_map
             .insert(oid, full_node.clone());
@@ -161,7 +161,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             .prepro
             .processing_systems
             .commit_proc_mut::<MakeProcessorHolder>()
-            .with_parameters42_mut(self.handle.try_into().unwrap());
+            .with_parameters_mut(self.handle.try_into().unwrap());
         let cpp_handle = make_proc.parameter.cpp_handle;
         if let Some(already) = make_proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
@@ -397,7 +397,7 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
         let handle = self.handle.try_into().unwrap();
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters42_mut(handle).commits.insert(oid, commit);
+        h.with_parameters_mut(handle).commits.insert(oid, commit);
         root_full_node.id
     }
 }

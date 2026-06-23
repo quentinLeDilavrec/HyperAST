@@ -479,6 +479,7 @@ pub(crate) fn prepare_dir_exploration(
 struct PreparedMavenCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: CommitBuilder,
+    dir_path: std::path::PathBuf,
     pub(crate) maven_handle: PPHandle<MavenProc>,
     pub(crate) pom_handle: PPHandle<PomProc>,
     pub(crate) java_handle: PPHandle<JavaProc>,
@@ -489,8 +490,7 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
         self: Box<PreparedMavenCommitProc<'repo>>,
         prepro: &mut RepositoryProcessor,
     ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
+        let mut dir_path = self.dir_path.components().peekable();
         let name = b"";
         // TODO check parameter in self to know it is a recursive module search
         let root_full_node = MavenProcessor::<true, false, MavenModuleAcc>::prepare(
@@ -516,10 +516,11 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
 }
 
 impl CommitProc for MavenProc {
-    fn prepare_processing<'repo>(
+    fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo git2::Repository,
         commit_builder: CommitBuilder,
+        path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
         let maven_handle = handle.try_into().unwrap_or_else(|err| {
@@ -531,6 +532,7 @@ impl CommitProc for MavenProc {
         Box::new(PreparedMavenCommitProc {
             repository,
             commit_builder,
+            dir_path: path,
             maven_handle,
             pom_handle,
             java_handle,

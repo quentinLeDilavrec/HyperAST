@@ -63,15 +63,14 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
             self.handle_tree_cached(oid, name);
             return;
         }
+        if self.dir_path.peek().is_some() {
+            log::trace!("ignoring2 {}", name.try_str().unwrap());
+            return;
+        }
         if super::selection::matches(&name) {
+            let w = &mut self.stack.last_mut().unwrap().acc;
             self.prepro
-                .help_handle_cpp_file(
-                    &mut self.stack.last_mut().unwrap().acc,
-                    oid,
-                    &name,
-                    self.repository,
-                    self.handle,
-                )
+                .help_handle_cpp_file(w, oid, &name, self.repository, self.handle)
                 .unwrap();
         } else {
             log::debug!("not cpp source file {:?}", name.try_str());
@@ -110,6 +109,23 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
 
 impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
+        if let Some(s) = self.dir_path.peek() {
+            // there is a specific dir we want to analyze
+            let other = std::ffi::OsStr::as_encoded_bytes(s.as_os_str());
+            if name.as_bytes().eq(other) {
+                log::trace!("found next dir {}", name.try_str().unwrap());
+                // match, consume the path component and make the next StackEle
+                self.dir_path.next();
+                self.stack.last_mut().expect("never empty").cs.clear();
+                let tree = self.repository.find_tree(oid).unwrap();
+                let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
+                let acc = CppAcc::new(name.try_into().unwrap());
+                self.stack.push(StackEle::new(oid, prepared, acc));
+            } else {
+                log::trace!("ignoring {}", name.try_str().unwrap());
+            }
+            return;
+        }
         let prepro = &mut self.prepro;
         let holder = prepro
             .processing_systems

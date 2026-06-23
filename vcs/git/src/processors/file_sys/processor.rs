@@ -71,6 +71,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<FileSysAcc>
             return;
         }
         if self.dir_path.peek().is_some() {
+            log::trace!("ignoring2 {}", name.try_str().unwrap());
             return;
         }
         self.pre_aux(oid, &name).unwrap();
@@ -112,6 +113,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             // there is a specific dir we want to analyze
             let other = std::ffi::OsStr::as_encoded_bytes(s.as_os_str());
             if name.as_bytes().eq(other) {
+                log::trace!("found next dir {}", name.try_str().unwrap());
                 // match, consume the path component and make the next StackEle
                 self.dir_path.next();
                 self.stack.last_mut().expect("never empty").cs.clear();
@@ -120,8 +122,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 let acc = FileSysAcc::new(name.try_into().unwrap());
                 self.stack.push(StackEle::new(oid, prepared, acc));
             } else {
-                dbg!(name.try_str().unwrap());
-            } // otherwise, ignore
+                log::trace!("ignoring {}", name.try_str().unwrap());
+            }
             return;
         }
         let proc = (self.prepro.processing_systems)

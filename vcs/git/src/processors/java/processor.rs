@@ -20,6 +20,7 @@ use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
+use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
 
 use super::JavaProc;
@@ -47,7 +48,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
         handle: Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
-        let prepared = prepare_dir_exploration(tree);
+        let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
         let name = name.try_into().unwrap();
         let prep_scripting = prep_scripting(prepro, handle);
         use hyperast::scripting::Prepro;
@@ -67,13 +68,6 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     }
 }
 
-pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
-    (tree.iter().rev())
-        .map(TryInto::try_into)
-        .filter_map(|x| x.ok())
-        .collect()
-}
-
 impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     fn pre(&mut self, current_object: BasicGitObject) {
         log::trace!("pre: {:?}", current_object.name.try_str().unwrap_or(""));
@@ -81,6 +75,10 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
         let name = current_object.name;
         if current_object.kind == git2::ObjectType::Tree {
             self.handle_dir(oid, name);
+            return;
+        }
+        if self.dir_path.peek().is_some() {
+            log::trace!("ignoring2 {}", name.try_str().unwrap());
             return;
         }
         if super::selection::matches(&name) {
@@ -139,6 +137,29 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
 
 impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     fn handle_dir(&mut self, oid: Oid, name: ObjectName) {
+        if let Some(s) = self.dir_path.peek() {
+            // there is a specific dir we want to analyze
+            let other = std::ffi::OsStr::as_encoded_bytes(s.as_os_str());
+            if name.as_bytes().eq(other) {
+                log::trace!("found next dir {}", name.try_str().unwrap());
+                // match, consume the path component and make the next StackEle
+                self.dir_path.next();
+                self.stack.last_mut().expect("never empty").cs.clear();
+                let tree = self.repository.find_tree(oid).unwrap();
+                let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
+                use hyperast::scripting::Prepro;
+                use hyperast::tree_gen::Prepro as _;
+                let prepro_acc = prep_scripting(&self.prepro, self.handle)
+                    .cloned()
+                    .map(Prepro::<RawHAST<TStore>, &Acc>::from)
+                    .map(|more| more.preprocessing(Type::Directory).unwrap());
+                let acc = JavaAcc::new(name.try_into().unwrap(), prepro_acc);
+                self.stack.push(StackEle::new(oid, prepared, acc));
+            } else {
+                log::trace!("ignoring {}", name.try_str().unwrap());
+            }
+            return;
+        }
         let java_proc = (self.prepro.processing_systems)
             .commit_proc_mut::<JavaProcessorHolder>()
             .with_parameters(self.handle);
@@ -163,7 +184,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
         }
         log::info!("tree {:?}", name.try_str());
         let tree = self.repository.find_tree(oid).unwrap();
-        let prepared: Vec<BasicGitObject> = prepare_dir_exploration(tree);
+        let prepared: Vec<BasicGitObject> = prepare_dir_exploration(&tree).collect::<Vec<_>>();
 
         use hyperast::scripting::Prepro;
         use hyperast::tree_gen::Prepro as _;

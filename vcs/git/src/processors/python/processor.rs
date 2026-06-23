@@ -15,7 +15,7 @@ use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
-use crate::processors::Query;
+use crate::processors::{Query, prepare_dir_exploration};
 use crate::{Processor, StackEle};
 
 use super::SimpleStores;
@@ -24,13 +24,6 @@ use hyperast_gen_ts_python::legion as python_gen;
 use hyperast_gen_ts_python::{TStore, Type};
 
 type Handle = PPHandle<PythonProc>;
-
-pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
-    (tree.iter().rev())
-        .map(TryInto::try_into)
-        .filter_map(|x| x.ok())
-        .collect()
-}
 
 pub struct PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
@@ -53,7 +46,7 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 
         handle: Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
-        let prepared = prepare_dir_exploration(tree);
+        let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
         let name = name.try_into().unwrap();
         let stack = vec![StackEle::new(oid, prepared, Acc::from(name))];
         Self {
@@ -115,6 +108,23 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
 
 impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> {
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
+        if let Some(s) = self.dir_path.peek() {
+            // there is a specific dir we want to analyze
+            let other = std::ffi::OsStr::as_encoded_bytes(s.as_os_str());
+            if name.as_bytes().eq(other) {
+                log::trace!("found next dir {}", name.try_str().unwrap());
+                // match, consume the path component and make the next StackEle
+                self.dir_path.next();
+                self.stack.last_mut().expect("never empty").cs.clear();
+                let tree = self.repository.find_tree(oid).unwrap();
+                let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
+                let acc = PythonAcc::new(name.try_into().unwrap());
+                self.stack.push(StackEle::new(oid, prepared, acc));
+            } else {
+                log::trace!("ignoring {}", name.try_str().unwrap());
+            }
+            return;
+        }
         let processor_map = &mut self.prepro.processing_systems;
         let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle);
@@ -128,7 +138,7 @@ impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> 
         } else {
             log::debug!("tree {:?}", name.try_str());
             let tree = self.repository.find_tree(oid).unwrap();
-            let prepared: Vec<BasicGitObject> = prepare_dir_exploration(tree);
+            let prepared = prepare_dir_exploration(&tree).collect::<Vec<_>>();
             let acc = PythonAcc::new(name.try_into().unwrap());
             self.stack.push(StackEle::new(oid, prepared, acc));
         }
@@ -164,15 +174,17 @@ impl PartialEq<PythonProc> for Parameter {
 }
 
 impl crate::processing::erased::CommitProc for PythonProc {
-    fn prepare_processing<'repo>(
+    fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo Repository,
         commit_builder: CommitBuilder,
+        path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
         Box::new(PreparedPythonCommitProc {
             repository,
             commit_builder,
+            dir_path: path,
             handle,
         })
     }
@@ -194,6 +206,7 @@ impl crate::processing::erased::CommitProc for PythonProc {
 struct PreparedPythonCommitProc<'repo> {
     repository: &'repo Repository,
     commit_builder: CommitBuilder,
+    dir_path: std::path::PathBuf,
     pub(crate) handle: PCPHandle,
 }
 
@@ -202,8 +215,7 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
         self: Box<PreparedPythonCommitProc<'repo>>,
         prepro: &mut RepositoryProcessor,
     ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = std::path::PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
+        let mut dir_path = self.dir_path.components().peekable();
         let name = ObjectName::from(b"");
         // TODO check parameter in self to know it is a recursive module search
         let root_full_node = prepro.handle_python_directory(

@@ -90,7 +90,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
         let name = self.prepro.get_or_insert_label(name);
         let processor_map = &mut self.prepro.processing_systems;
         let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
-        let proc = holder.with_parameters42_mut(self.handle);
+        let proc = holder.with_parameters_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
         proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
@@ -116,7 +116,7 @@ impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> 
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
         let processor_map = &mut self.prepro.processing_systems;
         let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
-        let proc = holder.with_parameters42_mut(self.handle);
+        let proc = holder.with_parameters_mut(self.handle);
         if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
             let full_node = already.clone();
@@ -218,7 +218,7 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
         let handle = self.handle.try_into().unwrap();
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters42_mut(handle).commits.insert(oid, commit);
+        h.with_parameters_mut(handle).commits.insert(oid, commit);
         root_full_node.id
     }
 }
@@ -244,7 +244,7 @@ impl RepositoryProcessor {
             .caching_blob_handler::<super::file_sys::Python>()
             .handle2(oid, repository, &name, parameters, |c, n, t| {
                 let holder = c.commit_proc_mut::<PythonProcessorHolder>();
-                let proc = holder.with_parameters42_mut(parameters);
+                let proc = holder.with_parameters_mut(parameters);
                 let stores = self.main_stores.mut_with_ts::<TStore>();
                 let r = handle_python_blob_aux(n, t, proc, stores)
                     .map_err(|_| crate::ParseErr::IllFormed)?;

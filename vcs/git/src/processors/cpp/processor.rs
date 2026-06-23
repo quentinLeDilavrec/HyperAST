@@ -86,7 +86,7 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
             .prepro
             .processing_systems
             .commit_proc_mut::<CppProcessorHolder>();
-        let proc = holder.with_parameters42_mut(self.handle);
+        let proc = holder.with_parameters_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
         proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
@@ -114,7 +114,7 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
         let holder = prepro
             .processing_systems
             .commit_proc_mut::<CppProcessorHolder>();
-        let proc = holder.with_parameters42_mut(self.handle);
+        let proc = holder.with_parameters_mut(self.handle);
 
         if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
@@ -146,7 +146,7 @@ impl RepositoryProcessor {
         handler.handle2(oid, repository, &name, parameters, |c, n, t| {
             let line_break = crate::_auto_configured_line_break(t);
             let holder = c.commit_proc_mut::<CppProcessorHolder>();
-            let cpp_proc = holder.with_parameters42_mut(parameters);
+            let cpp_proc = holder.with_parameters_mut(parameters);
             let md_cache = &mut cpp_proc.cache.md_cache;
             let dedup = &mut cpp_proc.cache.dedup;
             let stores = self.main_stores.mut_with_ts::<TStore>();

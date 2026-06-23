@@ -107,7 +107,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
             .prepro
             .processing_systems
             .commit_proc_mut::<JavaProcessorHolder>();
-        let java_proc = holder.with_parameters42_mut(self.handle);
+        let java_proc = holder.with_parameters_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
         java_proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
@@ -141,7 +141,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     fn handle_dir(&mut self, oid: Oid, name: ObjectName) {
         let java_proc = (self.prepro.processing_systems)
             .commit_proc_mut::<JavaProcessorHolder>()
-            .with_parameters42(self.handle);
+            .with_parameters(self.handle);
         let k = (oid, name.clone());
         if let Some(already) = java_proc.cache.object_map.get(&k) {
             // reinit already computed node for post order
@@ -184,7 +184,7 @@ fn prep_scripting(prepro: &RepositoryProcessor, handle: PPHandle<JavaProc>) -> O
         .processing_systems
         .get::<JavaProcessorHolder>()
         .as_ref()?
-        .with_parameters42(handle);
+        .with_parameters(handle);
     java_proc.parameter.prepro.as_ref()
 }
 
@@ -396,7 +396,7 @@ impl RepositoryProcessor {
                 let line_break = _auto_configured_line_break(t);
 
                 let holder = c.commit_proc_mut::<JavaProcessorHolder>();
-                let java_proc = holder.with_parameters42_mut(parameters);
+                let java_proc = holder.with_parameters_mut(parameters);
                 let md_cache = &mut java_proc.cache.md_cache;
                 let dedup = &mut java_proc.cache.dedup;
                 let stores = self.main_stores.mut_with_ts::<TStore>();
@@ -618,7 +618,7 @@ mod experiments {
                 .prepro
                 .processing_systems
                 .commit_proc_mut::<JavaProcessorHolder>();
-            let java_proc = holder.with_parameters42_mut(self.handle);
+            let java_proc = holder.with_parameters_mut(self.handle);
             let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
             todo!(
               // self.prepro

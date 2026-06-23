@@ -41,7 +41,7 @@ pub(super) fn prep_scripting(
         // it is fine but could do better and kind of use MavenHolder
         .get::<ProcessorHolder<JavaProc>>()
         .as_ref()?
-        .with_parameters42(handle)
+        .with_parameters(handle)
         .parameter
         .prepro
         .as_ref()

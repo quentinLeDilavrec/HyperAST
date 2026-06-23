@@ -1,5 +1,6 @@
 //! Handles the Make build system
 
+mod commit_proc;
 pub mod make_processor;
 pub mod makefile;
 
@@ -10,9 +11,15 @@ use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
-pub(crate) use make_processor::MakeProc;
+pub struct MakeProc {
+    parameter: Parameter,
+    cache: crate::processing::caches::Make,
+    pub(super) commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+}
+type MakeProcessorHolder = crate::processing::ProcessorHolder<MakeProc>;
 
 use super::FullNode;
+use super::PrecompQueries;
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_xml::TStore>;
 
@@ -40,7 +47,7 @@ pub struct MakeModuleAcc {
     pub(crate) sub_modules: Option<Vec<PathBuf>>,
     pub(crate) main_dirs: Option<Vec<PathBuf>>,
     pub(crate) test_dirs: Option<Vec<PathBuf>>,
-    pub(crate) precomp_queries: super::PrecompQueries,
+    pub(crate) precomp_queries: PrecompQueries,
 }
 
 impl hyperast::tree_gen::Accumulator for MakeModuleAcc {
@@ -69,7 +76,7 @@ impl MakeModuleAcc {
             sub_modules: None,
             main_dirs: None,
             test_dirs: None,
-            precomp_queries: super::PrecompQueries::default(),
+            precomp_queries: PrecompQueries::default(),
         }
     }
     pub(crate) fn with_content(
@@ -83,7 +90,7 @@ impl MakeModuleAcc {
             sub_modules: (!sub_modules.is_empty()).then_some(sub_modules),
             main_dirs: (!main_dirs.is_empty()).then_some(main_dirs),
             test_dirs: (!test_dirs.is_empty()).then_some(test_dirs),
-            precomp_queries: super::PrecompQueries::default(),
+            precomp_queries: PrecompQueries::default(),
         }
     }
 }

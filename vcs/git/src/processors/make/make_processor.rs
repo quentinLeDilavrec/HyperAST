@@ -14,7 +14,7 @@ use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Make as MakeCaches;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
@@ -83,7 +83,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     oid,
                     name,
                     &self.repository,
-                    PCP2Handle(self.handle.1, std::marker::PhantomData),
+                    PPHandle(self.handle.1, std::marker::PhantomData),
                 )
                 .unwrap();
         } else if cpp_processor::selection::matches(&name) {
@@ -93,7 +93,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     &mut self.stack.last_mut().unwrap().acc,
                     &name,
                     self.repository,
-                    PCP2Handle(self.handle.1, std::marker::PhantomData),
+                    PPHandle(self.handle.1, std::marker::PhantomData),
                 )
                 .unwrap();
         } else {
@@ -345,8 +345,8 @@ pub(crate) fn prepare_dir_exploration(
 
 impl Parameter {
     pub fn new(
-        makefile_handle: PCP2Handle<super::makefile::MakefileProc>,
-        cpp_handle: PCP2Handle<cpp_processor::CppProc>,
+        makefile_handle: PPHandle<super::makefile::MakefileProc>,
+        cpp_handle: PPHandle<cpp_processor::CppProc>,
     ) -> Self {
         Self {
             makefile_handle,
@@ -355,9 +355,9 @@ impl Parameter {
     }
 }
 
-impl From<PCP2Handle<MakeProc>> for PCP2Handle<cpp_processor::CppProc> {
-    fn from(value: PCP2Handle<MakeProc>) -> Self {
-        PCP2Handle(value.0, std::marker::PhantomData)
+impl From<PPHandle<MakeProc>> for PPHandle<cpp_processor::CppProc> {
+    fn from(value: PPHandle<MakeProc>) -> Self {
+        PPHandle(value.0, std::marker::PhantomData)
     }
 }
 

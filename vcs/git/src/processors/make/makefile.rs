@@ -1,7 +1,7 @@
 use git2::{Oid, Repository};
 
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::{CacheHolding, ObjectName};
 
 use super::{MakeModuleAcc, MakeProc};
@@ -23,9 +23,9 @@ impl PartialEq<MakefileProc> for Parameter {
     }
 }
 
-impl From<PCP2Handle<MakeProc>> for PCP2Handle<MakefileProc> {
-    fn from(value: PCP2Handle<MakeProc>) -> Self {
-        PCP2Handle(value.0, std::marker::PhantomData)
+impl From<PPHandle<MakeProc>> for PPHandle<MakefileProc> {
+    fn from(value: PPHandle<MakeProc>) -> Self {
+        PPHandle(value.0, std::marker::PhantomData)
     }
 }
 
@@ -46,7 +46,7 @@ impl RepositoryProcessor {
         oid: Oid,
         name: ObjectName,
         repository: &Repository,
-        parameters: PCP2Handle<MakefileProc>,
+        parameters: PPHandle<MakefileProc>,
     ) -> Result<(), crate::ParseErr> {
         let x = self
             .processing_systems

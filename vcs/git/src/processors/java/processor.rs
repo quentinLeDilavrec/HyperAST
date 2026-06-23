@@ -19,7 +19,7 @@ use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ConfigParametersHandle;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::{Processor, StackEle};
 
@@ -27,7 +27,7 @@ use super::JavaProc;
 use super::SimpleStores;
 use super::{JavaAcc, JavaProcessorHolder};
 
-type Handle = PCP2Handle<JavaProc>;
+type Handle = PPHandle<JavaProc>;
 
 pub struct JavaProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
@@ -340,7 +340,7 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
 }
 
 impl JavaProc {
-    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
+    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PPHandle<Self> {
         type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
         let t = crate::processors::java::Parameter::default();
         let h = pr.commit_proc_mut::<JavaProcessorHolder>();

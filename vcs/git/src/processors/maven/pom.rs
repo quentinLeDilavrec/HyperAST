@@ -5,7 +5,7 @@ use hyperast_gen_ts_xml::legion::XmlTreeGen;
 use crate::ParseErr;
 use crate::processing::CacheHolding;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Pom as PomCaches;
 
 use super::MavenProc;
@@ -74,7 +74,7 @@ impl crate::preprocessed::RepositoryProcessor {
         oid: git2::Oid,
         name: ObjectName,
         repository: &git2::Repository,
-        parameters: PCP2Handle<PomProc>,
+        parameters: PPHandle<PomProc>,
     ) -> Result<(), crate::ParseErr> {
         use hyperast_gen_ts_xml::legion::XmlTreeGen;
         let x = self
@@ -125,8 +125,8 @@ impl CacheHolding<PomCaches> for PomProc {
     }
 }
 
-impl From<PCP2Handle<MavenProc>> for PCP2Handle<PomProc> {
-    fn from(value: PCP2Handle<MavenProc>) -> Self {
-        PCP2Handle(value.0, PhantomData)
+impl From<PPHandle<MavenProc>> for PPHandle<PomProc> {
+    fn from(value: PPHandle<MavenProc>) -> Self {
+        PPHandle(value.0, PhantomData)
     }
 }

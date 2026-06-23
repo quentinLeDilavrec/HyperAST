@@ -10,7 +10,7 @@ use hyperast::tree_gen;
 use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
+use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_python::TStore;
@@ -80,7 +80,7 @@ impl PythonAcc {
 }
 
 impl PythonProc {
-    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PCP2Handle<Self> {
+    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PPHandle<Self> {
         type PythonProcessorHolder = crate::processing::ProcessorHolder<PythonProc>;
         // let q = ["(module)"].as_slice();
         // let t = crate::processors::python::Parameter::new(q);

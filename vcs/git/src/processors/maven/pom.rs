@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
 use crate::ParseErr;
@@ -8,7 +6,6 @@ use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Pom as PomCaches;
 
-use super::MavenProc;
 use super::POM;
 use super::SimpleStores;
 
@@ -125,8 +122,8 @@ impl CacheHolding<PomCaches> for PomProc {
     }
 }
 
-impl From<PPHandle<MavenProc>> for PPHandle<PomProc> {
-    fn from(value: PPHandle<MavenProc>) -> Self {
-        PPHandle(value.0, PhantomData)
-    }
-}
+// impl From<PPHandle<MavenProc>> for PPHandle<PomProc> {
+//     fn from(value: PPHandle<MavenProc>) -> Self {
+//         PPHandle(value.0, PhantomData)
+//     }
+// }

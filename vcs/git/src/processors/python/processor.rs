@@ -22,7 +22,7 @@ use super::{Parameter, PythonAcc};
 use hyperast_gen_ts_python::legion as python_gen;
 use hyperast_gen_ts_python::{TStore, Type};
 
-type Handle = crate::processing::ParametrizedProcessorHandle<PythonProc>;
+type Handle = PPHandle<PythonProc>;
 
 pub(crate) fn prepare_dir_exploration(tree: git2::Tree) -> Vec<BasicGitObject> {
     (tree.iter().rev())
@@ -37,7 +37,7 @@ pub struct PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     stack: Vec<StackEle<Acc>>,
     // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
-    handle: &'d Handle,
+    handle: Handle,
 }
 
 type PythonProcessorHolder = crate::processing::ProcessorHolder<PythonProc>;
@@ -49,7 +49,7 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 
         dir_path: &'d mut Peekable<Components<'c>>,
         name: &ObjectName,
         oid: git2::Oid,
-        handle: &'d Handle,
+        handle: Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree);
@@ -77,7 +77,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
         if super::file_sys::Python::matches(&name) {
             let acc = &mut self.stack.last_mut().unwrap().acc;
             self.prepro
-                .help_handle_python_file(acc, oid, &name, self.repository, *self.handle)
+                .help_handle_python_file(acc, oid, &name, self.repository, self.handle)
                 .unwrap();
         } else {
             log::debug!("not a python source file {:?}", name.try_str());
@@ -90,7 +90,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
         let name = self.prepro.get_or_insert_label(name);
         let processor_map = &mut self.prepro.processing_systems;
         let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
-        let proc = holder.with_parameters_mut(self.handle.0);
+        let proc = holder.with_parameters42_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
         proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
@@ -116,7 +116,7 @@ impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> 
     fn handle_tree_cached(&mut self, oid: Oid, name: ObjectName) {
         let processor_map = &mut self.prepro.processing_systems;
         let holder = processor_map.commit_proc_mut::<PythonProcessorHolder>();
-        let proc = holder.with_parameters_mut(self.handle.0);
+        let proc = holder.with_parameters42_mut(self.handle);
         if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
             let full_node = already.clone();
@@ -210,7 +210,7 @@ impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
             &mut dir_path,
             &name,
             self.commit_builder.tree_oid(),
-            PPHandle(self.handle.1, std::marker::PhantomData),
+            self.handle.try_into().unwrap(),
         );
         let h = prepro
             .processing_systems
@@ -244,7 +244,7 @@ impl RepositoryProcessor {
             .caching_blob_handler::<super::file_sys::Python>()
             .handle2(oid, repository, &name, parameters, |c, n, t| {
                 let holder = c.commit_proc_mut::<PythonProcessorHolder>();
-                let proc = holder.with_parameters_mut(parameters.0);
+                let proc = holder.with_parameters42_mut(parameters);
                 let stores = self.main_stores.mut_with_ts::<TStore>();
                 let r = handle_python_blob_aux(n, t, proc, stores)
                     .map_err(|_| crate::ParseErr::IllFormed)?;
@@ -285,7 +285,7 @@ impl RepositoryProcessor {
         oid: git2::Oid,
         handle: Handle,
     ) -> super::FullNode {
-        PythonProcessor::<PythonAcc>::prepare(repository, self, dir_path, name, oid, &handle)
+        PythonProcessor::<PythonAcc>::prepare(repository, self, dir_path, name, oid, handle)
             .process()
     }
 }

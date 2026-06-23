@@ -29,7 +29,7 @@ pub struct CppProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     stack: Vec<StackEle<Acc>>,
     // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
-    handle: &'d PPHandle<CppProc>,
+    handle: PPHandle<CppProc>,
 }
 
 impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> CppProcessor<'repo, 'prepro, 'd, 'c, Acc> {
@@ -39,7 +39,7 @@ impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> CppProcessor<'repo, 'prepro, 'd,
         dir_path: &'d mut Peekable<Components<'c>>,
         name: &ObjectName,
         oid: git2::Oid,
-        parameters: &'d PPHandle<CppProc>,
+        parameters: PPHandle<CppProc>,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(&tree).collect();
@@ -70,7 +70,7 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
                     oid,
                     &name,
                     self.repository,
-                    *self.handle,
+                    self.handle,
                 )
                 .unwrap();
         } else {
@@ -86,7 +86,7 @@ impl<'repo, 'b, 'd, 'c> Processor<CppAcc> for CppProcessor<'repo, 'b, 'd, 'c, Cp
             .prepro
             .processing_systems
             .commit_proc_mut::<CppProcessorHolder>();
-        let proc = holder.with_parameters_mut(self.handle.0);
+        let proc = holder.with_parameters42_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
         proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
@@ -114,7 +114,7 @@ impl<'repo, 'prepro, 'd, 'c> CppProcessor<'repo, 'prepro, 'd, 'c, CppAcc> {
         let holder = prepro
             .processing_systems
             .commit_proc_mut::<CppProcessorHolder>();
-        let proc = holder.with_parameters_mut(self.handle.0);
+        let proc = holder.with_parameters42_mut(self.handle);
 
         if let Some(already) = proc.cache.object_map.get(&(oid, name.clone())) {
             // reinit already computed node for post order
@@ -146,7 +146,7 @@ impl RepositoryProcessor {
         handler.handle2(oid, repository, &name, parameters, |c, n, t| {
             let line_break = crate::_auto_configured_line_break(t);
             let holder = c.commit_proc_mut::<CppProcessorHolder>();
-            let cpp_proc = holder.with_parameters_mut(parameters.0);
+            let cpp_proc = holder.with_parameters42_mut(parameters);
             let md_cache = &mut cpp_proc.cache.md_cache;
             let dedup = &mut cpp_proc.cache.dedup;
             let stores = self.main_stores.mut_with_ts::<TStore>();
@@ -223,7 +223,7 @@ impl RepositoryProcessor {
         oid: git2::Oid,
         handle: PPHandle<CppProc>,
     ) -> super::FullNode {
-        CppProcessor::<CppAcc>::new(repository, self, dir_path, name, oid, &handle).process()
+        CppProcessor::<CppAcc>::new(repository, self, dir_path, name, oid, handle).process()
     }
 
     pub(crate) fn help_handle_cpp_folder<'a, 'b, 'c, 'd: 'c>(
@@ -264,16 +264,17 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> super
         .inner
         .prepare_insertion(dedup_cache, &hashable, eq);
 
-    if let Some(_id) = insertion.occupied_id() {
-        // NOTE this situation should not happen often, due to cache based on oids, so there is no point caching md.
-        // If git objects are changed but ignored, then it goes through this branch.
-        // TODO bench
-        // TODO in the oid cache the values could be NodeIdentifiers, then current cache would be used with an indirection.
-
-        // let md = md_cache.get(&id).unwrap();
-
-        // return super::Local { ..md.local(id) };
-        unimplemented!("I think it should probably stay unused")
+    // Guard to avoid computing metadata for an already present subtree
+    if let Some(id) = insertion.occupied_id() {
+        // different git object but same name and content (that we processed)
+        // NOTE we do not necessarily process every git object, avoid dead weight.
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let precomp_queries = acc.precomp_queries;
+        return super::FullNode {
+            id,
+            metrics,
+            precomp_queries,
+        };
     }
 
     let mut dyn_builder = subtree_builder::<TStore>(interned_kind);

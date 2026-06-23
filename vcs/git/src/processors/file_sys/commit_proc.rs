@@ -68,7 +68,7 @@ impl crate::processing::erased::CommitProc for FileSysProc {
     }
 
     fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
-        dbg!(self.parameter.cpp_handle.0.0);
+        dbg!(self.parameter.cpp_handle);
         if lang.eq_ignore_ascii_case("cpp") {
             Some(self.parameter.cpp_handle.erase())
         } else if lang.eq_ignore_ascii_case("java") {

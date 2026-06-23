@@ -17,7 +17,6 @@ use hyperast_gen_ts_java::{TStore, Type};
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ConfigParametersHandle;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
@@ -35,7 +34,7 @@ pub struct JavaProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     stack: Vec<StackEle<Acc>>,
     // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
-    handle: &'d Handle,
+    handle: Handle,
 }
 
 impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
@@ -45,12 +44,12 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
         dir_path: &'d mut Peekable<Components<'c>>,
         name: &ObjectName,
         oid: git2::Oid,
-        handle: &'d Handle,
+        handle: Handle,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree);
         let name = name.try_into().unwrap();
-        let prep_scripting = prep_scripting(prepro, handle.0);
+        let prep_scripting = prep_scripting(prepro, handle);
         use hyperast::scripting::Prepro;
         use hyperast::tree_gen::Prepro as _;
         let scripting_acc = (prep_scripting.cloned())
@@ -91,7 +90,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
                     oid,
                     &name,
                     self.repository,
-                    *self.handle,
+                    self.handle,
                 )
                 .unwrap();
         } else {
@@ -108,7 +107,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
             .prepro
             .processing_systems
             .commit_proc_mut::<JavaProcessorHolder>();
-        let java_proc = holder.with_parameters_mut(self.handle.0);
+        let java_proc = holder.with_parameters42_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
         java_proc.cache.object_map.insert(key, full_node.clone());
         if self.stack.is_empty() {
@@ -142,7 +141,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
     fn handle_dir(&mut self, oid: Oid, name: ObjectName) {
         let java_proc = (self.prepro.processing_systems)
             .commit_proc_mut::<JavaProcessorHolder>()
-            .with_parameters(self.handle.0);
+            .with_parameters42(self.handle);
         let k = (oid, name.clone());
         if let Some(already) = java_proc.cache.object_map.get(&k) {
             // reinit already computed node for post order
@@ -168,7 +167,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
 
         use hyperast::scripting::Prepro;
         use hyperast::tree_gen::Prepro as _;
-        let prepro_acc = prep_scripting(&self.prepro, self.handle.0)
+        let prepro_acc = prep_scripting(&self.prepro, self.handle)
             .cloned()
             .map(Prepro::<RawHAST<TStore>, &Acc>::from)
             .map(|more| more.preprocessing(Type::Directory).unwrap());
@@ -180,15 +179,12 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
 // TODO generalize and factor similar preps
 // and use the type in Parametrized
 //Processor2Handle to get the Holder
-fn prep_scripting(
-    prepro: &RepositoryProcessor,
-    handle: ConfigParametersHandle,
-) -> Option<&Arc<str>> {
+fn prep_scripting(prepro: &RepositoryProcessor, handle: PPHandle<JavaProc>) -> Option<&Arc<str>> {
     let java_proc = prepro
         .processing_systems
         .get::<JavaProcessorHolder>()
         .as_ref()?
-        .with_parameters(handle);
+        .with_parameters42(handle);
     java_proc.parameter.prepro.as_ref()
 }
 
@@ -399,7 +395,7 @@ impl RepositoryProcessor {
                 let line_break = _auto_configured_line_break(t);
 
                 let holder = c.commit_proc_mut::<JavaProcessorHolder>();
-                let java_proc = holder.with_parameters_mut(parameters.0);
+                let java_proc = holder.with_parameters42_mut(parameters);
                 let md_cache = &mut java_proc.cache.md_cache;
                 let dedup = &mut java_proc.cache.dedup;
                 let stores = self.main_stores.mut_with_ts::<TStore>();
@@ -524,7 +520,7 @@ impl RepositoryProcessor {
         oid: git2::Oid,
         handle: Handle,
     ) -> super::FullNode {
-        JavaProcessor::<JavaAcc>::prepare(repository, self, dir_path, name, oid, &handle).process()
+        JavaProcessor::<JavaAcc>::prepare(repository, self, dir_path, name, oid, handle).process()
     }
 }
 
@@ -602,7 +598,7 @@ mod experiments {
                                 *current_object.id(),
                                 current_object.name(),
                                 self.repository,
-                                *self.handle,
+                                self.handle,
                             )
                             .unwrap();
                     } else {
@@ -621,7 +617,7 @@ mod experiments {
                 .prepro
                 .processing_systems
                 .commit_proc_mut::<JavaProcessorHolder>();
-            let java_proc = holder.with_parameters_mut(self.handle.0);
+            let java_proc = holder.with_parameters42_mut(self.handle);
             let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
             todo!(
               // self.prepro

@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use git2::{Oid, Repository};
@@ -7,7 +6,7 @@ use crate::Processor;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::ParametrizedProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::PreparedCommitProc;
@@ -36,10 +35,14 @@ impl crate::processing::erased::CommitProc for JavaProc {
         commit_builder: CommitBuilder,
         handle: ParametrizedCommitProcessorHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
+        let java_handle = handle.try_into().unwrap_or_else(|err| {
+            eprintln!("{}", err);
+            unreachable!("caller of prepare_processing should properly dispatch")
+        });
         Box::new(PreparedJavaCommitProc {
             repository,
             commit_builder,
-            handle,
+            java_handle,
         })
     }
 }
@@ -47,7 +50,7 @@ impl crate::processing::erased::CommitProc for JavaProc {
 struct PreparedJavaCommitProc<'repo> {
     repository: &'repo Repository,
     commit_builder: CommitBuilder,
-    pub(crate) handle: ParametrizedCommitProcessorHandle,
+    pub(crate) java_handle: ParametrizedProcessorHandle<JavaProc>,
 }
 
 impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
@@ -65,16 +68,15 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
             &mut dir_path,
             &name,
             self.commit_builder.tree_oid(),
-            &PPHandle(self.handle.1, PhantomData),
+            self.java_handle,
         )
         .process();
         let h = prepro
             .processing_systems
             .commit_proc_mut::<JavaProcessorHolder>();
-        let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle.1)
+        h.with_parameters42_mut(self.java_handle)
             .commits
             .insert(commit_oid, commit);
         root_full_node.id

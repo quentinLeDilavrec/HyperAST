@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::iter::Peekable;
-use std::marker::PhantomData;
 use std::path::{Components, PathBuf};
 
 use git2::{Oid, Repository};
@@ -8,16 +7,15 @@ use git2::{Oid, Repository};
 use hyperast::hashed::MetaDataHashsBuilder;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::dyn_builder::EntityBuilder;
-use hyperast::tree_gen::Accumulator;
-use hyperast::types::ETypeStore as _;
+use hyperast::tree_gen::{Accumulator, add_md_precomp_queries};
 use hyperast::types::LabelStore;
+use hyperast::types::{ETypeStore as _, Labeled};
 use hyperast_gen_ts_xml::Type;
 
 use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
-use crate::processing::ConfigParametersHandle;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Maven as MavenCaches;
 use crate::processing::erased::CommitProc;
@@ -26,6 +24,8 @@ use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 use crate::processing::file_sys;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::processors::java::JavaProc;
+use crate::processors::maven::PomProc;
 use crate::utils::drain_filter_strip;
 
 use super::SimpleStores;
@@ -40,7 +40,9 @@ pub struct MavenProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     repository: &'a Repository,
     stack: Vec<StackEle<Acc>>,
     dir_path: &'c mut Peekable<Components<'c>>,
-    handle: PCPHandle,
+    maven_handle: PPHandle<MavenProc>,
+    pom_handle: PPHandle<PomProc>,
+    java_handle: PPHandle<JavaProc>,
 }
 
 type MavenProcessorHolder = crate::processing::ProcessorHolder<MavenProc>;
@@ -76,13 +78,15 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         mut dir_path: &'c mut Peekable<Components<'c>>,
         name: &[u8],
         oid: git2::Oid,
-        handle: PCPHandle,
+        maven_handle: PPHandle<MavenProc>,
+        pom_handle: PPHandle<PomProc>,
+        java_handle: PPHandle<JavaProc>,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree, &mut dir_path);
         let name = std::str::from_utf8(&name).unwrap().to_string();
         let acc = MavenModuleAcc::new(name);
-        let prep_scripting = prep_scripting(prepro, handle.1);
+        let prep_scripting = prep_scripting(prepro, java_handle);
         let prep_scripting = prep_scripting.cloned().map(ScriptingPrepro::from);
         let acc = acc.init_scripting(prep_scripting.as_ref());
         let stack = vec![StackEle::new(oid, prepared, acc)];
@@ -91,7 +95,9 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             repository,
             prepro,
             dir_path,
-            handle,
+            maven_handle,
+            pom_handle,
+            java_handle,
         }
     }
 }
@@ -116,7 +122,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
         if file_sys::Pom::matches(&name) {
             let parent_acc = &mut self.stack.last_mut().unwrap().acc;
             // TODO find a better conversion, ie. first safe conv to MavenProc handle then into()
-            let parameters = PPHandle(ConfigParametersHandle(0), PhantomData);
+            // let parameters = PPHandle(ConfigParametersHandle(0), PhantomData);
+            let parameters = self.pom_handle;
             if let Err(err) =
                 self.prepro
                     .handle_pom(parent_acc, oid, name, &self.repository, parameters)
@@ -132,7 +139,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
         self.prepro
             .processing_systems
             .commit_proc_mut::<MavenProcessorHolder>()
-            .with_parameters_mut(self.handle.1)
+            .with_parameters42_mut(self.maven_handle)
             .get_caches_mut()
             .object_map
             .insert(oid, full_node.clone());
@@ -186,7 +193,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 let tree = self.repository.find_tree(oid).unwrap();
                 let prepared = prepare_dir_exploration(tree, &mut self.dir_path);
                 let acc = MavenModuleAcc::new(name.try_into().unwrap());
-                let prep_scripting = prep_scripting(&self.prepro, self.handle.1);
+                let prep_scripting = prep_scripting(&self.prepro, self.java_handle);
                 let acc = acc.init_scripting(
                     prep_scripting
                         .map(|x| ScriptingPrepro::from(x.clone()))
@@ -202,7 +209,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             .prepro
             .processing_systems
             .commit_proc_mut::<MavenProcessorHolder>()
-            .with_parameters_mut(self.handle.1);
+            .with_parameters42_mut(self.maven_handle);
         let java_handle = maven_proc.parameter.java_handle;
         if let Some(already) = maven_proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
@@ -285,7 +292,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         {
             let tree = self.repository.find_tree(oid).unwrap();
             let prepared = prepare_dir_exploration(tree, &mut self.dir_path);
-            let prep_scripting = prep_scripting(&self.prepro, self.handle.1);
+            let prep_scripting = prep_scripting(&self.prepro, self.java_handle);
             if helper.submodules.0 {
                 // handle as maven module
                 let acc = helper.into_acc().init_scripting(
@@ -308,7 +315,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             // anyway try to find maven modules, but maybe can do better
             let prepared = prepare_dir_exploration(tree, &mut self.dir_path);
 
-            let prep_scripting = prep_scripting(&self.prepro, self.handle.1);
+            let prep_scripting = prep_scripting(&self.prepro, self.java_handle);
             let acc = helper.into_acc().init_scripting(
                 prep_scripting
                     .map(|x| ScriptingPrepro::from(x.clone()))
@@ -464,7 +471,9 @@ pub(crate) fn prepare_dir_exploration(
 struct PreparedMavenCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: CommitBuilder,
-    pub(crate) handle: PCPHandle,
+    pub(crate) maven_handle: PPHandle<MavenProc>,
+    pub(crate) pom_handle: PPHandle<PomProc>,
+    pub(crate) java_handle: PPHandle<JavaProc>,
 }
 
 impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
@@ -482,16 +491,17 @@ impl<'repo> PreparedCommitProc for PreparedMavenCommitProc<'repo> {
             &mut dir_path,
             name,
             self.commit_builder.tree_oid(),
-            self.handle,
+            self.maven_handle,
+            self.pom_handle,
+            self.java_handle,
         )
         .process();
         let h = prepro
             .processing_systems
             .commit_proc_mut::<MavenProcessorHolder>();
-        let handle = self.handle;
         let commit_oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle.1)
+        h.with_parameters42_mut(self.maven_handle)
             .commits
             .insert(commit_oid, commit);
         root_full_node.id
@@ -505,10 +515,18 @@ impl CommitProc for MavenProc {
         commit_builder: CommitBuilder,
         handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
+        let maven_handle = handle.try_into().unwrap_or_else(|err| {
+            eprintln!("{}", err);
+            unreachable!("caller of prepare_processing should properly dispatch")
+        });
+        let pom_handle = self.parameter.pom_handle;
+        let java_handle = self.parameter.java_handle;
         Box::new(PreparedMavenCommitProc {
             repository,
             commit_builder,
-            handle,
+            maven_handle,
+            pom_handle,
+            java_handle,
         })
     }
 

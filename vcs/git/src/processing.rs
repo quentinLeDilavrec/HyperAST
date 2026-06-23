@@ -128,10 +128,18 @@ pub struct ConfigParametersHandle(
 /// Parametrized handle over a processor T, composing [`ConfigParametersHandle`].
 ///
 /// If you want to store a [`ParametrizedProcessorHandle`] at runtime, use [`erased::ParametrizedCommitProcessorHandle`] instead.
-#[derive(Debug)]
-pub struct ParametrizedProcessorHandle<T>(pub ConfigParametersHandle, std::marker::PhantomData<T>);
+pub struct ParametrizedProcessorHandle<T>(ConfigParametersHandle, std::marker::PhantomData<T>);
+
 use ParametrizedProcessorHandle as PPHandle;
 
+impl<T> std::fmt::Debug for ParametrizedProcessorHandle<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("PPHandle")
+            .field(&self.0)
+            .field(&self.1)
+            .finish()
+    }
+}
 impl<T> PartialEq for PPHandle<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.0 == other.0.0 && self.1 == other.1
@@ -144,13 +152,14 @@ impl<T> Clone for PPHandle<T> {
     }
 }
 impl<T> Copy for PPHandle<T> {}
-impl<T> std::ops::Deref for PPHandle<T> {
-    type Target = ConfigParametersHandle;
+// TODO remove Deref impl
+// impl<T> std::ops::Deref for PPHandle<T> {
+//     type Target = ConfigParametersHandle;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
 
 pub struct ProcessorHolder<Proc>(Vec<Proc>);
 impl<Proc> Default for ProcessorHolder<Proc> {

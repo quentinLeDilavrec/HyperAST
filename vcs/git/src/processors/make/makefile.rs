@@ -4,7 +4,7 @@ use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::{CacheHolding, ObjectName};
 
-use super::{MakeModuleAcc, MakeProc};
+use super::MakeModuleAcc;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {}
@@ -20,12 +20,6 @@ impl From<Parameter> for MakefileProc {
 impl PartialEq<MakefileProc> for Parameter {
     fn eq(&self, other: &MakefileProc) -> bool {
         Some(self) == other.0.as_ref()
-    }
-}
-
-impl From<PPHandle<MakeProc>> for PPHandle<MakefileProc> {
-    fn from(value: PPHandle<MakeProc>) -> Self {
-        PPHandle(value.0, std::marker::PhantomData)
     }
 }
 

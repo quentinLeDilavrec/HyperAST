@@ -71,6 +71,7 @@ use ParametrizedCommitProcessorHandle as PCPHandle;
 impl<T: CommitProc + 'static> PPHandle<T> {
     pub(crate) fn erase(&self) -> PCPHandle {
         let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
+        dbg!(tid);
         PCPHandle(CommitProcessorHandle(tid), self.0)
     }
 }
@@ -78,6 +79,20 @@ impl<T: CommitProc + 'static> PPHandle<T> {
 impl Into<CommitProcessorHandle> for ParametrizedCommitProcessorHandle {
     fn into(self) -> CommitProcessorHandle {
         self.0
+    }
+}
+
+impl<T: 'static> TryFrom<ParametrizedCommitProcessorHandle> for PPHandle<T> {
+    type Error = String;
+
+    fn try_from(value: ParametrizedCommitProcessorHandle) -> Result<Self, Self::Error> {
+        if std::any::TypeId::of::<ProcessorHolder<T>>() != value.0.0 {
+            return Err(format!(
+                "this is not a handle to {}",
+                std::any::type_name::<T>()
+            ));
+        }
+        Ok(PPHandle(value.1, std::marker::PhantomData))
     }
 }
 
@@ -120,6 +135,12 @@ pub trait ParametrizedCommitProc {
 
 pub trait ParametrizedCommitProc2: ParametrizedCommitProc {
     type Proc: CommitProc;
+    fn with_parameters42(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
+        self.with_parameters(parameters.0)
+    }
+    fn with_parameters42_mut(&mut self, parameters: PPHandle<Self::Proc>) -> &mut Self::Proc {
+        self.with_parameters_mut(parameters.0)
+    }
     fn with_parameters(&self, parameters: ConfigParametersHandle) -> &Self::Proc;
     fn with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc;
 }

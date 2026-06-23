@@ -1,5 +1,6 @@
 //! Handles the Maven build system
 
+mod commit_proc;
 pub mod iter_maven_module;
 mod pom;
 mod processor;
@@ -23,12 +24,20 @@ use crate::Accumulator;
 use crate::BasicDirAcc;
 use crate::DefaultMetrics;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::caches::OidMap;
 use crate::processors::java::JavaProc;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
+type MavenProcessorHolder = crate::processing::ProcessorHolder<MavenProc>;
 
-pub use processor::MavenProc;
+#[doc(hidden)] // only used internally to kind of compose snapshots
 pub use processor::make;
+
+pub struct MavenProc {
+    parameter: Parameter,
+    cache: crate::processing::caches::Maven,
+    commits: OidMap<crate::Commit>,
+}
 
 #[derive(Clone, Debug)]
 pub struct FullNode {

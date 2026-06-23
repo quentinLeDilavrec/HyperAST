@@ -11,6 +11,7 @@ type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
 struct PreparedMakeCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: CommitBuilder,
+    dir_path: std::path::PathBuf,
     pub(crate) handle: PCPHandle,
 }
 
@@ -19,8 +20,7 @@ impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
         self: Box<PreparedMakeCommitProc<'repo>>,
         prepro: &mut RepositoryProcessor,
     ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = std::path::PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
+        let mut dir_path = self.dir_path.components().peekable();
         let name = b"";
         // TODO check parameter in self to know it is a recursive module search
         let root_full_node = FileSysProcessor::<true, false, FileSysAcc>::prepare(
@@ -44,15 +44,17 @@ impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
 }
 
 impl crate::processing::erased::CommitProc for FileSysProc {
-    fn prepare_processing<'repo>(
+    fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo git2::Repository,
         commit_builder: CommitBuilder,
+        path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
         Box::new(PreparedMakeCommitProc {
             repository,
             commit_builder,
+            dir_path: path,
             handle,
         })
     }

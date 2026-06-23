@@ -11,6 +11,7 @@ use crate::preprocessed::PreProcessedRepository;
 
 #[cfg(feature = "impact")]
 use std::env;
+use std::str::FromStr;
 
 use hyperast::store::nodes::legion::RawHAST;
 #[cfg(feature = "impact")]
@@ -336,6 +337,58 @@ fn test_java() {
     let _commits = preprocessed
         .pre_process_with_limit(handle, "", "56e12a0c0e0e69ea70863011b4f4ca3305e0542b", 2)
         .unwrap();
+}
+
+#[test]
+fn test_java_at_path() {
+    use std::io::Write;
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("hyperast_vcs_git=trace"),
+    )
+    .format(|buf, record| {
+        if record.level().to_level_filter() > log::LevelFilter::Debug {
+            writeln!(buf, "{}", record.args())
+        } else {
+            writeln!(
+                buf,
+                "[{} {}] {}",
+                buf.timestamp_millis(),
+                record.level(),
+                record.args()
+            )
+        }
+    })
+    .init();
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+    let repo = crate::git::Forge::Github.repo("INRIA", "spoon");
+    let before = "";
+    let after = "56e12a0c0e0e69ea70863011b4f4ca3305e0542b";
+    let Ok(path) = std::path::PathBuf::from_str("src");
+    let config = crate::processing::RepoConfig::Java;
+    dbg!(&preprocessed.processor.processing_systems);
+    let handle = preprocessed.register_config(repo, config);
+    dbg!(&preprocessed.processor.processing_systems);
+    let handle = &handle.fetch();
+    use crate::git::all_commits_between;
+    let rw = all_commits_between(&handle.repo, before, after).unwrap();
+    let mut rw = rw.take(2).map(|x| x.unwrap());
+    let mut r = Vec::with_capacity(rw.size_hint().0);
+    for _ in 0.. {
+        let Some(oid) = rw.next() else { break };
+        let builder = crate::preprocessed::CommitBuilder::start(&handle.repo, oid);
+        let processor_map = &mut preprocessed.processor.processing_systems;
+        dbg!(&processor_map);
+        let commit_processor = processor_map
+            .by_id_mut(handle.config)
+            .unwrap()
+            .get_mut(handle.config);
+        let path = path.clone();
+        let _id = commit_processor
+            .prepare_processing_at_path(&handle.repo, builder, path, handle.config)
+            .process(&mut preprocessed.processor);
+        r.push(oid);
+    }
+    dbg!(r.len());
 }
 
 #[test]

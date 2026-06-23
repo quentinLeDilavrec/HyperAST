@@ -370,6 +370,7 @@ pub(crate) struct MakeProc {
 pub(crate) struct PreparedMakeCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: crate::preprocessed::CommitBuilder,
+    dir_path: std::path::PathBuf,
     pub(crate) handle: PCPHandle,
 }
 
@@ -378,8 +379,7 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
         self: Box<PreparedMakeCommitProc<'repo>>,
         prepro: &mut RepositoryProcessor,
     ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
+        let mut dir_path = self.dir_path.components().peekable();
         let name = b"";
         // TODO check parameter in self to know it is a recursive module search
         let root_full_node = MakeProcessor::<true, false, MakeModuleAcc>::prepare(
@@ -407,24 +407,27 @@ impl MakeProc {
         &self,
         repository: &'repo git2::Repository,
         commit_builder: crate::preprocessed::CommitBuilder,
+        path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> PreparedMakeCommitProc<'repo> {
         PreparedMakeCommitProc {
             repository,
             commit_builder,
+            dir_path: path,
             handle,
         }
     }
 }
 
 impl crate::processing::erased::CommitProc for MakeProc {
-    fn prepare_processing<'repo>(
+    fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo git2::Repository,
         commit_builder: crate::preprocessed::CommitBuilder,
+        path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc + 'repo> {
-        Box::new(self.prepare_processing(repository, commit_builder, handle))
+        Box::new(self.prepare_processing(repository, commit_builder, path, handle))
     }
 
     fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {

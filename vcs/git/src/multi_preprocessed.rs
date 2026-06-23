@@ -158,7 +158,7 @@ impl PreProcessedRepositories {
         use crate::processing::erased::ProcessorMap;
         let java = |pr: &mut ProcessorMap| {
             let t = crate::processors::java::Parameter::faster();
-            let h = pr.proc_mut::<JavaProcessorHolder>();
+            let h = pr.commit_proc_mut::<JavaProcessorHolder>();
             h.register_param(t)
         };
         let pom = |pr: &mut ProcessorMap| {

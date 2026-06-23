@@ -1,6 +1,7 @@
 //! type erasure utilities for processors
 
 use std::any::Any;
+use std::any::TypeId;
 
 use super::ConfigParametersHandle;
 use super::ParametrizedProcessorHandle as PPHandle;
@@ -47,13 +48,13 @@ pub trait ParametrizedProcTyped: ParametrizedProc_ {
 
 // both hide and share common implementation details while providing a typed interface
 impl<T: ParametrizedProc_> ParametrizedProcTyped for T {}
-impl<T: ParametrizedProcTyped> ParametrizedProc for T {
+impl<T: ParametrizedProcTyped + 'static> ParametrizedProc for T {
     fn get_mut0(&mut self, parameters: PCPHandle) -> &mut dyn Proc {
-        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        debug_assert_eq!(TypeId::of::<T>(), parameters.0.0);
         ParametrizedProc_::_with_parameters_mut0(self, parameters.1)
     }
     fn get0(&self, parameters: PCPHandle) -> &dyn Proc {
-        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        debug_assert_eq!(TypeId::of::<T>(), parameters.0.0);
         ParametrizedProc_::_with_parameters0(self, parameters.1)
     }
 }
@@ -84,7 +85,6 @@ use ParametrizedCommitProcessorHandle as PCPHandle;
 impl<T: CommitProc + 'static> PPHandle<T> {
     pub(crate) fn erase(&self) -> PCPHandle {
         let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
-        dbg!(tid);
         PCPHandle(CommitProcessorHandle(tid), self.0)
     }
 }
@@ -114,6 +114,21 @@ pub trait CommitProc: Proc {
         &self,
         repository: &'repo git2::Repository,
         commit_builder: CommitBuilder,
+        param_handle: PCPHandle,
+    ) -> Box<dyn PreparedCommitProc + 'repo> {
+        self.prepare_processing_at_path(
+            repository,
+            commit_builder,
+            std::path::PathBuf::new(),
+            param_handle,
+        )
+    }
+
+    fn prepare_processing_at_path<'repo>(
+        &self,
+        repository: &'repo git2::Repository,
+        commit_builder: CommitBuilder,
+        path: std::path::PathBuf,
         param_handle: PCPHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo>;
 
@@ -164,13 +179,13 @@ pub trait ParametrizedCommitProcTyped: ParametrizedCommitProc_ {
 
 // both hide and share common implementation details while providing a typed interface
 impl<T: ParametrizedCommitProc_> ParametrizedCommitProcTyped for T {}
-impl<T: ParametrizedCommitProc_> ParametrizedCommitProc for T {
+impl<T: ParametrizedCommitProc_ + 'static> ParametrizedCommitProc for T {
     fn get_mut(&mut self, parameters: PCPHandle) -> &mut dyn CommitProc {
-        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        debug_assert_eq!(TypeId::of::<T>(), parameters.0.0);
         ParametrizedCommitProc_::_with_parameters_mut(self, parameters.1)
     }
     fn get(&self, parameters: PCPHandle) -> &dyn CommitProc {
-        assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
+        debug_assert_eq!(TypeId::of::<T>(), parameters.0.0);
         ParametrizedCommitProc_::_with_parameters(self, parameters.1)
     }
 }
@@ -190,9 +205,11 @@ pub type ProcessorMap2 = spreaded::ProcessorMap2<
 
 #[doc(hidden)]
 mod spreaded {
+
     use super::*;
 
-    pub struct ProcessorMap<V>(std::collections::HashMap<std::any::TypeId, V>);
+    pub struct ProcessorMap<V>(std::collections::HashMap<TypeId, V>);
+
     impl<V> Default for ProcessorMap<V> {
         fn default() -> Self {
             Self(Default::default())
@@ -201,6 +218,20 @@ mod spreaded {
     impl<V> ProcessorMap<V> {
         pub(crate) fn clear(&mut self) {
             self.0.clear()
+        }
+    }
+    impl std::fmt::Debug for ProcessorMap<ErasedProcessorBunch> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "ProcessorMap[")?;
+            for (tid, v) in &self.0 {
+                if let ErasedProcessorBunch::Commit(_) = v {
+                    write!(f, " {:?}:(commit),", tid)?;
+                } else {
+                    write!(f, " {:?}:(non-commit),", tid)?;
+                }
+            }
+            write!(f, "]")?;
+            Ok(())
         }
     }
 
@@ -243,14 +274,14 @@ mod spreaded {
         }
 
         pub fn proc_mut<T: 'static + ToErasedProc + Default + Send + Sync>(&mut self) -> &mut T {
-            let r = self.0.entry(std::any::TypeId::of::<T>());
+            let r = self.0.entry(TypeId::of::<T>());
             let r = r.or_insert_with(|| Box::new(T::default()).to_erasable_processor());
             let r = r.as_mut();
             let r = <dyn Any>::downcast_mut(r.as_mut_any());
             r.unwrap()
         }
         pub fn get<T: 'static + ToErasedProc + Default + Send + Sync>(&self) -> Option<&T> {
-            let r = self.0.get(&std::any::TypeId::of::<T>())?;
+            let r = self.0.get(&TypeId::of::<T>())?;
             <dyn Any>::downcast_ref(r.as_any())
         }
     }
@@ -296,14 +327,14 @@ mod spreaded {
         pub fn commit_proc_mut<T: 'static + ToErasedCommitProc + Default + Send + Sync>(
             &mut self,
         ) -> &mut T {
-            let r = self.0.entry(std::any::TypeId::of::<T>());
+            let r = self.0.entry(TypeId::of::<T>());
             let r = r.or_insert_with(|| Box::new(T::default()).to_erasable_commit_processor());
             let r = r.as_mut();
             let r = <dyn Any>::downcast_mut(r.as_mut_any());
             r.unwrap()
         }
         pub fn get<T: 'static + ToErasedCommitProc + Default + Send + Sync>(&self) -> Option<&T> {
-            let r = self.0.get(&std::any::TypeId::of::<T>())?;
+            let r = self.0.get(&TypeId::of::<T>())?;
             <dyn Any>::downcast_ref(r.as_any())
         }
         // pub fn mut_or_default_with_param<T: 'static + CommitProcExt>(
@@ -365,10 +396,10 @@ mod spreaded {
 
         /// write enabled processor T
         ///
-        /// call `commit_proc_mut` if you want to let a processor handle commits
+        /// WARN call `commit_proc_mut` if you want to let a processor handle commits
         pub fn proc_mut<T: 'static + ToErasedProc + Default + Send + Sync>(&mut self) -> &mut T {
             use ErasedProcessorBunch::*;
-            let r = self.0.entry(std::any::TypeId::of::<T>());
+            let r = self.0.entry(TypeId::of::<T>());
             let lse = || Box::new(T::default()).to_erasable_processor();
             let r = r.or_insert_with(|| NonCommit(lse()));
             match r {
@@ -385,7 +416,7 @@ mod spreaded {
             &mut self,
         ) -> &mut T {
             use ErasedProcessorBunch::*;
-            let r = self.0.entry(std::any::TypeId::of::<T>());
+            let r = self.0.entry(TypeId::of::<T>());
             let lse = || Box::new(T::default()).to_erasable_commit_processor();
             let r = r.or_insert_with(|| Commit(lse()));
             if let NonCommit(_) = r {
@@ -408,7 +439,7 @@ mod spreaded {
         /// read-only **commit** processor T
         pub fn get<T: 'static + ToErasedCommitProc + Default + Send + Sync>(&self) -> Option<&T> {
             use ErasedProcessorBunch::*;
-            if let Commit(r) = self.0.get(&std::any::TypeId::of::<T>())? {
+            if let Commit(r) = self.0.get(&TypeId::of::<T>())? {
                 return <dyn Any>::downcast_ref(r.as_any());
             };
             log::trace!("not a commit enabled processor");
@@ -425,8 +456,8 @@ mod spreaded {
     /////// attempt at tiered
 
     pub struct ProcessorMap2<U, V>(
-        pub(super) std::collections::HashMap<std::any::TypeId, U>,
-        pub(super) std::collections::HashMap<std::any::TypeId, V>,
+        pub(super) std::collections::HashMap<TypeId, U>,
+        pub(super) std::collections::HashMap<TypeId, V>,
     );
 
     impl<U, V> Default for ProcessorMap2<U, V> {
@@ -461,7 +492,7 @@ mod spreaded {
         pub fn mut_or_default0<T: 'static + ToErasedProc + Default + Send + Sync>(
             &mut self,
         ) -> &mut T {
-            let r = self.0.entry(std::any::TypeId::of::<T>());
+            let r = self.0.entry(TypeId::of::<T>());
             let r = r.or_insert_with(|| Box::new(T::default()).to_erasable_processor());
             let r = r.as_mut();
             let r = <dyn Any>::downcast_mut(r.as_mut_any());
@@ -471,7 +502,7 @@ mod spreaded {
         pub fn mut_or_default<T: 'static + ToErasedCommitProc + Default + Send + Sync>(
             &mut self,
         ) -> &mut T {
-            let r = self.1.entry(std::any::TypeId::of::<T>());
+            let r = self.1.entry(TypeId::of::<T>());
             let r = r.or_insert_with(|| Box::new(T::default()).to_erasable_commit_processor());
             let r = r.as_mut();
             let r = <dyn Any>::downcast_mut(r.as_mut_any());
@@ -479,7 +510,7 @@ mod spreaded {
         }
 
         pub fn get<T: 'static + ToErasedProc + Default + Send + Sync>(&self) -> Option<&T> {
-            let r = self.0.get(&std::any::TypeId::of::<T>())?;
+            let r = self.0.get(&TypeId::of::<T>())?;
             <dyn Any>::downcast_ref(r.as_any())
         }
     }

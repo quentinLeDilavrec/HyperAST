@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use git2::{Oid, Repository};
 
 use crate::Processor;
@@ -29,10 +27,11 @@ impl crate::processing::erased::CommitProc for JavaProc {
         self.parameter.query.clone()
     }
 
-    fn prepare_processing<'repo>(
+    fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo Repository,
         commit_builder: CommitBuilder,
+        path: std::path::PathBuf,
         handle: ParametrizedCommitProcessorHandle,
     ) -> Box<dyn PreparedCommitProc + 'repo> {
         let java_handle = handle.try_into().unwrap_or_else(|err| {
@@ -42,6 +41,7 @@ impl crate::processing::erased::CommitProc for JavaProc {
         Box::new(PreparedJavaCommitProc {
             repository,
             commit_builder,
+            dir_path: path,
             java_handle,
         })
     }
@@ -50,6 +50,7 @@ impl crate::processing::erased::CommitProc for JavaProc {
 struct PreparedJavaCommitProc<'repo> {
     repository: &'repo Repository,
     commit_builder: CommitBuilder,
+    dir_path: std::path::PathBuf,
     pub(crate) java_handle: ParametrizedProcessorHandle<JavaProc>,
 }
 
@@ -58,8 +59,7 @@ impl<'repo> PreparedCommitProc for PreparedJavaCommitProc<'repo> {
         self: Box<PreparedJavaCommitProc<'repo>>,
         prepro: &mut RepositoryProcessor,
     ) -> hyperast::store::defaults::NodeIdentifier {
-        let dir_path = PathBuf::from("");
-        let mut dir_path = dir_path.components().peekable();
+        let mut dir_path = self.dir_path.components().peekable();
         let name = ObjectName::from(b"");
         // TODO check parameter in self to know it is a recursive module search
         let root_full_node = JavaProcessor::<JavaAcc>::prepare(

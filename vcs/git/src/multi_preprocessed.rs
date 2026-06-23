@@ -25,8 +25,12 @@ type PythonProcessorHolder = ProcessorHolder<PythonProc>;
 use crate::processors::make::MakeProc;
 #[cfg(feature = "rust")]
 use crate::processors::rust::RustProc;
+#[cfg(feature = "rust")]
+type RustProcessorHolder = ProcessorHolder<RustProc>;
 #[cfg(feature = "typescript")]
 use crate::processors::typescript::TypescriptProc;
+#[cfg(feature = "typescript")]
+type TypescriptProcessorHolder = ProcessorHolder<TypescriptProc>;
 #[cfg(feature = "make_cpp")]
 type MakeProcessorHolder = ProcessorHolder<MakeProc>;
 #[cfg(feature = "maven_java")]
@@ -329,6 +333,16 @@ impl PreProcessedRepositories {
             let h = pr.commit_proc_mut::<PythonProcessorHolder>();
             h.register_param(t)
         };
+        let typescript = |pr: &mut ProcessorMap, q: hyperast_tsquery::ZeroSepArrayStr| {
+            let t = crate::processors::typescript::Parameter::new(q);
+            let h = pr.commit_proc_mut::<TypescriptProcessorHolder>();
+            h.register_param(t)
+        };
+        let rust = |pr: &mut ProcessorMap, q: hyperast_tsquery::ZeroSepArrayStr| {
+            let t = crate::processors::rust::Parameter::new(q);
+            let h = pr.commit_proc_mut::<RustProcessorHolder>();
+            h.register_param(t)
+        };
         let makefile = |pr: &mut ProcessorMap| {
             let t = crate::processors::make::makefile::Parameter::default();
             let h = pr.proc_mut::<MakefileProcessorHolder>();
@@ -370,6 +384,14 @@ impl PreProcessedRepositories {
             }
             RepoConfig::Python => {
                 let config = python(processor_map, query.into()).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            RepoConfig::Typescript => {
+                let config = typescript(processor_map, query.into()).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            RepoConfig::Rust => {
+                let config = rust(processor_map, query.into()).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             _ => todo!(),

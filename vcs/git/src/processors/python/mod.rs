@@ -1,6 +1,7 @@
 //! Handles Java
 //!
 mod caches;
+mod commit_proc;
 pub mod file_sys;
 mod processor;
 
@@ -11,20 +12,28 @@ use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::caches::OidMap;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_python::TStore;
 use hyperast_gen_ts_python::legion as python_tree_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
-
-pub(crate) use processor::PythonProc;
+type PythonProcessorHolder = crate::processing::ProcessorHolder<PythonProc>;
 
 use super::FullNode;
+use super::PrecompQueries;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
     pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
+}
+
+pub(crate) struct PythonProc {
+    parameter: Parameter,
+    query: Option<super::Query>,
+    cache: caches::Python,
+    commits: OidMap<crate::Commit>,
 }
 
 impl Parameter {
@@ -35,8 +44,6 @@ impl Parameter {
         }
     }
 }
-
-type PrecompQueries = tree_gen::extra_pattern_precomp::PrecompQueries;
 
 pub struct PythonAcc {
     pub(crate) primary: DirPrimary,

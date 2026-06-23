@@ -1,7 +1,7 @@
 use hyperast::store::defaults::NodeIdentifier;
 
 use crate::processing::caches::NamedMap;
-use crate::processing::{CachesHolding, ObjectMapper, ObjectName};
+use crate::processing::{CacheHolding, CachesHolding, ObjectMapper, ObjectName};
 
 use super::PrecompQueries;
 
@@ -31,4 +31,13 @@ impl ObjectMapper for Typescript {
 
 impl CachesHolding for super::TypescriptProc {
     type Caches = Typescript;
+}
+
+impl CacheHolding<Typescript> for super::TypescriptProc {
+    fn get_caches_mut(&mut self) -> &mut Typescript {
+        &mut self.cache
+    }
+    fn get_caches(&self) -> &Typescript {
+        &self.cache
+    }
 }

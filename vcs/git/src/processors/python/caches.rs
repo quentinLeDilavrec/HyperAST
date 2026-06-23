@@ -1,7 +1,7 @@
 use hyperast::store::defaults::NodeIdentifier;
 
 use crate::processing::caches::NamedMap;
-use crate::processing::{CachesHolding, ObjectMapper, ObjectName};
+use crate::processing::{CacheHolding, CachesHolding, ObjectMapper, ObjectName};
 
 use super::PrecompQueries;
 
@@ -31,4 +31,13 @@ impl ObjectMapper for Python {
 
 impl CachesHolding for super::PythonProc {
     type Caches = Python;
+}
+
+impl CacheHolding<Python> for super::PythonProc {
+    fn get_caches_mut(&mut self) -> &mut Python {
+        &mut self.cache
+    }
+    fn get_caches(&self) -> &Python {
+        &self.cache
+    }
 }

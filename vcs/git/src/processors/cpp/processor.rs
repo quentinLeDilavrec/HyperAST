@@ -259,10 +259,8 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> super
     let hashable = primary.metrics.hashs.most_discriminating();
     let eq = eq_node(&kind, Some(&label_id), &primary.children);
     // let md_cache = &mut cpp_proc.cache.md_cache;
-    let dedup_cache = &mut cpp_proc.cache.dedup.0;
-    let insertion = node_store
-        .inner
-        .prepare_insertion(dedup_cache, &hashable, eq);
+    let dedup = &mut cpp_proc.cache.dedup.0;
+    let insertion = node_store.inner.prepare_insertion(dedup, &hashable, eq);
 
     // Guard to avoid computing metadata for an already present subtree
     if let Some(id) = insertion.occupied_id() {
@@ -279,15 +277,15 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> super
 
     let mut dyn_builder = subtree_builder::<TStore>(interned_kind);
 
-    let precomp_queries = acc.precomp_queries;
-    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
-
     let children_is_empty = primary.children.is_empty();
 
     let metrics = primary.persist(&mut dyn_builder, interned_kind, label_id);
     let metrics = metrics.map_hashs(|h| h.build());
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
+
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
 
     let vacant = insertion.vacant();
     let id = vacant.insert_built(dyn_builder.build());

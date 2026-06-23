@@ -265,16 +265,16 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
     };
 
     // Guard to avoid computing metadata for an already present subtree
-    if let Some(_compressed_node) = insertion.occupied_id() {
-        unimplemented!("I think it should probably stay unused");
-        // // TODO add (debug) assertions to detect non-local metadata
-        // // this branch should be pretty cold
-        // let md = md_cache.get(&compressed_node).unwrap();
-        // return super::FullNode {
-        //     id: compressed_node,
-        //     metrics: md.metrics,
-        //     precomp_queries: acc.precomp_queries,
-        // };
+    if let Some(id) = insertion.occupied_id() {
+        // different git object but same name and content (that we processed)
+        // NOTE we do not necessarily process every git object, avoid dead weight.
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let precomp_queries = acc.precomp_queries;
+        return super::FullNode {
+            id,
+            metrics,
+            precomp_queries,
+        };
     }
 
     #[cfg(feature = "impact")]
@@ -293,7 +293,8 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
-    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries.0);
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
 
     if let Some(acc) = acc.scripting_acc {
         let subtr = hyperast::scripting::Subtr(kind, &dyn_builder);
@@ -312,7 +313,7 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
             #[cfg(feature = "impact")]
             ana: None,
             mcc: Mcc::new(&kind),
-            precomp_queries: acc.precomp_queries.0,
+            precomp_queries: precomp_queries.0,
         },
     );
     // let full_node = java_tree_gen::Local {
@@ -331,7 +332,7 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
     super::FullNode {
         id: compressed_node,
         metrics,
-        precomp_queries: acc.precomp_queries,
+        precomp_queries,
     }
 }
 

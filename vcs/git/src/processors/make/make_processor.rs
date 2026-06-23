@@ -250,16 +250,18 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
     assert_eq!(primary.children_names.len(), primary.children.len());
 
     let insertion = stores.node_store.prepare_insertion(&hashable, eq);
-    if let Some(_id) = insertion.occupied_id() {
-        unimplemented!("I think it should probably stay unused");
-        // let metrics = primary
-        //     .metrics
-        //     .map_hashs(|h| MetaDataHashsBuilder::build(h));
-        // return FullNode {
-        //     id,
-        //     metrics,
-        //     precomp_queries: super::super::PrecompQueries::full(),
-        // };
+
+    // Guard to avoid computing metadata for an already present subtree
+    if let Some(id) = insertion.occupied_id() {
+        // different git object but same name and content (that we processed)
+        // NOTE we do not necessarily process every git object, avoid dead weight.
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let precomp_queries = acc.precomp_queries;
+        return super::FullNode {
+            id,
+            metrics,
+            precomp_queries,
+        };
     }
 
     log::info!("make mm {} {}", &primary.name, primary.children.len());
@@ -273,13 +275,16 @@ pub(crate) fn make(acc: MakeModuleAcc, stores: &mut SimpleStores) -> FullNode {
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
+
     let vacant = insertion.vacant();
     let id = vacant.insert_built(dyn_builder.build());
 
     FullNode {
         id,
         metrics,
-        precomp_queries: acc.precomp_queries,
+        precomp_queries,
     }
 }
 

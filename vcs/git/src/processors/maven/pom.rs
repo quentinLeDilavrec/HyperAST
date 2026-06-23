@@ -121,9 +121,3 @@ impl CacheHolding<PomCaches> for PomProc {
         &self.cache
     }
 }
-
-// impl From<PPHandle<MavenProc>> for PPHandle<PomProc> {
-//     fn from(value: PPHandle<MavenProc>) -> Self {
-//         PPHandle(value.0, PhantomData)
-//     }
-// }

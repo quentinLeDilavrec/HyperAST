@@ -313,6 +313,32 @@ fn python_aux(
 }
 
 #[test]
+fn test_java_maven() {
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+
+    let repo = crate::git::Forge::Github.repo("INRIA", "spoon");
+    let config = crate::processing::RepoConfig::JavaMaven;
+    let handle = preprocessed.register_config(repo, config);
+    let handle = &handle.fetch();
+    let _commits = preprocessed
+        .pre_process_with_limit(handle, "", "56e12a0c0e0e69ea70863011b4f4ca3305e0542b", 2)
+        .unwrap();
+}
+
+#[test]
+fn test_java() {
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+
+    let repo = crate::git::Forge::Github.repo("INRIA", "spoon");
+    let config = crate::processing::RepoConfig::Java;
+    let handle = preprocessed.register_config(repo, config);
+    let handle = &handle.fetch();
+    let _commits = preprocessed
+        .pre_process_with_limit(handle, "", "56e12a0c0e0e69ea70863011b4f4ca3305e0542b", 2)
+        .unwrap();
+}
+
+#[test]
 fn test_tsg_incr_inner_classes() -> std::result::Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
         .format(|buf, record| {

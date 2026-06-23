@@ -14,6 +14,7 @@ pub enum ProcessingConfig<P> {
     TsNpm { limit: usize, dir_path: P },
     Python { limit: usize, dir_path: P },
     Typescript { limit: usize, dir_path: P },
+    Rust { limit: usize, dir_path: P },
     Any { limit: usize, dir_path: P },
 }
 
@@ -29,6 +30,7 @@ pub enum RepoConfig {
     TsNpm,
     Python,
     Typescript,
+    Rust,
     Any,
 }
 
@@ -48,6 +50,7 @@ impl std::str::FromStr for RepoConfig {
             "python" => Self::Python,
             "Ts" => Self::TsNpm,
             "ts" => Self::TsNpm,
+            "rust" => Self::Rust,
             "any" => Self::Any,
             x => return Err(format!("'{}' is not available config", x)),
         })
@@ -83,6 +86,10 @@ impl From<&RepoConfig> for ProcessingConfig<&'static str> {
                 dir_path: "",
             },
             RepoConfig::Typescript => Self::Typescript {
+                limit: 3,
+                dir_path: "",
+            },
+            RepoConfig::Rust => Self::Rust {
                 limit: 3,
                 dir_path: "",
             },

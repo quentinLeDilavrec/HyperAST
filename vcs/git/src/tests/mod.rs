@@ -340,6 +340,7 @@ fn test_java() {
 }
 
 #[test]
+#[ignore] // not a normal test
 fn test_java_at_path() {
     use std::io::Write;
     env_logger::Builder::from_env(
@@ -392,6 +393,7 @@ fn test_java_at_path() {
 }
 
 #[test]
+#[ignore] // not a normal test
 fn test_tsg_incr_inner_classes() -> std::result::Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
         .format(|buf, record| {
@@ -509,6 +511,44 @@ public class ClientClass extends ChildClass {
 "#;
 
 #[test]
+#[ignore] // not a normal test
+fn test_rust() {
+    dbg!();
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or(
+            "warn,hyperast::tree_gen::zipped_ts_extra=trace,hyperast_vcs_git=info",
+        ),
+    )
+    .format(|buf, record| {
+        use std::io::Write;
+        if record.level().to_level_filter() > log::LevelFilter::Debug {
+            writeln!(buf, "{}", record.args())
+        } else {
+            writeln!(
+                buf,
+                "[{} {}] {}",
+                buf.timestamp_millis(),
+                record.level(),
+                record.args()
+            )
+        }
+    })
+    .is_test(false)
+    .init();
+    log::error!("test_rust");
+    dbg!();
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+    let repo = crate::git::Forge::Github.repo("pola-rs", "polars");
+    let config = crate::processing::RepoConfig::Rust;
+    let handle = preprocessed.register_config(repo, config);
+    let handle = &handle.fetch();
+    let _commits = preprocessed
+        .pre_process_with_limit(handle, "", "5e9cf5c09d3c0c316cba1ced8282cb835f76df5f", 2)
+        .unwrap();
+}
+
+#[test]
+#[ignore] // not a normal test
 fn test_file_sys() {
     // env_logger::builder()
     //     .parse_env(

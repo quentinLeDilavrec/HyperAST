@@ -118,6 +118,18 @@ fn construction_group(c: &mut Criterion) {
             fetch: true,
         },
         Input {
+            repo: Forge::Github.repo("pola-rs", "polars"),
+            commit: "5e9cf5c09d3c0c316cba1ced8282cb835f76df5f",
+            config: RepoConfig::Python,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("pola-rs", "polars"),
+            commit: "5e9cf5c09d3c0c316cba1ced8282cb835f76df5f",
+            config: RepoConfig::Rust,
+            fetch: true,
+        },
+        Input {
             repo: Forge::Github.repo("pandas-dev", "pandas"),
             commit: "d57b53693bb01efeba9e51281e6e676c226ba1ae",
             config: RepoConfig::Any,
@@ -145,6 +157,12 @@ fn construction_group(c: &mut Criterion) {
             repo: Forge::Github.repo("denoland", "deno"),
             commit: "dbcd1a9194f4a69b2ac96d925c90dcf9bf5a50cc",
             config: RepoConfig::Typescript,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("denoland", "deno"),
+            commit: "dbcd1a9194f4a69b2ac96d925c90dcf9bf5a50cc",
+            config: RepoConfig::Rust,
             fetch: true,
         },
     ];

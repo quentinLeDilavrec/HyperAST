@@ -206,6 +206,17 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             parent.push(name, full_node);
             return Ok(());
         }
+        #[cfg(feature = "rust")]
+        if crate::processors::rust::file_sys::matches(&name) {
+            let parent = &mut self.stack.last_mut().unwrap().acc;
+            let repo = self.repository;
+            let p = self.handles.rust_handle;
+            let full_node = self.prepro.handle_rust_blob(oid, name, repo, p)?;
+            let name = self.prepro.intern_object_name(name);
+            assert!(!parent.primary.children_names.contains(&name));
+            parent.push(name, full_node);
+            return Ok(());
+        }
         log::info!("not a known source file {:?}", name.try_str());
         Ok(())
     }

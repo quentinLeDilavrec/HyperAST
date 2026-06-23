@@ -307,8 +307,7 @@ where
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
         if (!HIDDEN_NODES && kind.is_hidden()) || kind.is_repeat() {
-            if stack.parent().unwrap().simple.children.len() < 120
-            {
+            if stack.parent().unwrap().simple.children.len() < 120 {
                 return PreResult::Ignore;
             }
         }
@@ -444,8 +443,8 @@ where
                 space!(error);
                 global.set_sum_byte_length(end);
             } else {
-                error!(@ error);
-                global.set_sum_byte_length(end);
+                // error!(error);
+                // global.set_sum_byte_length(end);
             }
         } else if comp!(padding < start < end == cursor) {
             //            |  space  | node  |     ...
@@ -468,8 +467,16 @@ where
                 space!(error);
                 global.set_sum_byte_length(end);
             } else {
-                error!(@ error);
+                error!(error);
                 global.set_sum_byte_length(end);
+            }
+        } else if comp!(padding < start == cursor == end) {
+            //            |  space  |
+            let space = &text[padding..start];
+            if validate(space) {
+                space!(space);
+            } else {
+                error!(space);
             }
         } else {
             unreachable!(

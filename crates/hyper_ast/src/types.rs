@@ -111,6 +111,15 @@ role_impl!(
     // Label => "label",
     // Placement => "placement",
 
+    // // Rust
+    List => "list",
+    Bounds => "bounds",
+    Trait => "trait",
+    Macro => "macro",
+    Doc => "doc",
+    Outer => "outer",
+    Inner => "inner",
+
     // // Python
     Superclasses => "superclasses",
     Attribute => "attribute",

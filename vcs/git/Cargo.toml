@@ -44,7 +44,7 @@ name = "construction_runtime"
 harness = false
 
 [features]
-default = ["maven_java", "make_cpp", "npm_ts", "python", "file_sys", "c", "typescript"]
+default = ["maven_java", "make_cpp", "npm_ts", "python", "file_sys", "c", "typescript", "rust"]
 tsg = ["dep:tree-sitter-graph", "hyperast_tsquery/tsg"]
 file_sys = []
 maven_java = ["maven", "java"]

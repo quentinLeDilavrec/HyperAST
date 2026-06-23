@@ -23,6 +23,8 @@ use crate::processors::python::PythonProc;
 type PythonProcessorHolder = ProcessorHolder<PythonProc>;
 #[cfg(feature = "make_cpp")]
 use crate::processors::make::MakeProc;
+#[cfg(feature = "rust")]
+use crate::processors::rust::RustProc;
 #[cfg(feature = "typescript")]
 use crate::processors::typescript::TypescriptProc;
 #[cfg(feature = "make_cpp")]
@@ -218,10 +220,16 @@ impl PreProcessedRepositories {
                 let config = TypescriptProc::default_handle(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
+            #[cfg(feature = "rust")]
+            RepoConfig::Rust => {
+                let config = RustProc::default_handle(processor_map).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
             #[cfg(feature = "file_sys")]
             RepoConfig::Any => {
                 let t = crate::processors::file_sys::Parameter {
                     cpp_handle: CppProc::default_handle(processor_map),
+                    rust_handle: RustProc::default_handle(processor_map),
                     java_handle: JavaProc::default_handle(processor_map),
                     python_handle: PythonProc::default_handle(processor_map),
                     typescript_handle: TypescriptProc::default_handle(processor_map),

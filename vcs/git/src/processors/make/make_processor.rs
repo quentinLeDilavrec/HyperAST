@@ -14,13 +14,13 @@ use hyperast_gen_ts_xml::Type;
 use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
-use crate::preprocessed::RepositoryProcessor;
+use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Make as MakeCaches;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
-use crate::processors::cpp as cpp_processor;
+use crate::processors::cpp::{self as cpp_processor};
 use crate::utils::drain_filter_strip;
 
 use super::{FullNode, MakeModuleAcc, Parameter, SimpleStores};
@@ -30,7 +30,8 @@ pub struct MakeProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> {
     repository: &'a Repository,
     stack: Vec<StackEle<Acc>>,
     dir_path: &'c mut Peekable<Components<'c>>,
-    handle: PCPHandle,
+    handle: PPHandle<MakeProc>,
+    handles: Parameter,
 }
 
 type MakeProcessorHolder = crate::processing::ProcessorHolder<MakeProc>;
@@ -44,7 +45,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
         mut dir_path: &'c mut Peekable<Components<'c>>,
         name: &[u8],
         oid: git2::Oid,
-        handle: PCPHandle,
+        handle: PPHandle<MakeProc>,
+        handles: Parameter,
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree, &mut dir_path);
@@ -56,6 +58,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
             prepro,
             dir_path,
             handle,
+            handles,
         }
     }
 }
@@ -84,7 +87,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     oid,
                     name,
                     &self.repository,
-                    self.handle.try_into().unwrap(),
+                    self.handles.makefile_handle,
                 )
                 .unwrap();
         } else if cpp_processor::selection::matches(&name) {
@@ -94,7 +97,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     &mut self.stack.last_mut().unwrap().acc,
                     &name,
                     self.repository,
-                    self.handle.try_into().unwrap(),
+                    self.handles.cpp_handle,
                 )
                 .unwrap();
         } else {
@@ -107,7 +110,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
         self.prepro
             .processing_systems
             .commit_proc_mut::<MakeProcessorHolder>()
-            .with_parameters_mut(self.handle.try_into().unwrap())
+            .with_parameters_mut(self.handle)
             .get_caches_mut()
             .object_map
             .insert(oid, full_node.clone());
@@ -161,7 +164,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             .prepro
             .processing_systems
             .commit_proc_mut::<MakeProcessorHolder>()
-            .with_parameters_mut(self.handle.try_into().unwrap());
+            .with_parameters_mut(self.handle);
         let cpp_handle = make_proc.parameter.cpp_handle;
         if let Some(already) = make_proc.get_caches_mut().object_map.get(&oid) {
             // reinit already computed node for post order
@@ -361,7 +364,7 @@ impl Parameter {
     }
 }
 
-pub(crate) struct MakeProc {
+pub struct MakeProc {
     parameter: Parameter,
     cache: MakeCaches,
     pub(super) commits: std::collections::HashMap<git2::Oid, crate::Commit>,
@@ -369,9 +372,10 @@ pub(crate) struct MakeProc {
 
 pub(crate) struct PreparedMakeCommitProc<'repo> {
     repository: &'repo git2::Repository,
-    commit_builder: crate::preprocessed::CommitBuilder,
+    commit_builder: CommitBuilder,
     dir_path: std::path::PathBuf,
-    pub(crate) handle: PCPHandle,
+    pub(crate) handle: PPHandle<MakeProc>,
+    pub(crate) handles: Parameter,
 }
 
 impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommitProc<'repo> {
@@ -389,6 +393,7 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
             name,
             self.commit_builder.tree_oid(),
             self.handle,
+            self.handles,
         )
         .process();
         let h = prepro
@@ -406,15 +411,20 @@ impl MakeProc {
     pub(crate) fn prepare_processing<'repo>(
         &self,
         repository: &'repo git2::Repository,
-        commit_builder: crate::preprocessed::CommitBuilder,
+        commit_builder: CommitBuilder,
         path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> PreparedMakeCommitProc<'repo> {
+        let handle = handle.try_into().unwrap_or_else(|err| {
+            eprintln!("{}", err);
+            unreachable!("caller of prepare_processing should properly dispatch")
+        });
         PreparedMakeCommitProc {
             repository,
             commit_builder,
             dir_path: path,
             handle,
+            handles: self.parameter.clone(),
         }
     }
 }
@@ -423,7 +433,7 @@ impl crate::processing::erased::CommitProc for MakeProc {
     fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo git2::Repository,
-        commit_builder: crate::preprocessed::CommitBuilder,
+        commit_builder: CommitBuilder,
         path: std::path::PathBuf,
         handle: PCPHandle,
     ) -> Box<dyn crate::processing::erased::PreparedCommitProc + 'repo> {

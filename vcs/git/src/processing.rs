@@ -171,7 +171,7 @@ impl<Proc> ProcessorHolder<Proc> {
     }
 }
 
-impl<Proc: erased::CommitProc + 'static> erased::ParametrizedCommitProc2 for ProcessorHolder<Proc> {
+impl<Proc: erased::CommitProc + 'static> erased::ParametrizedCommitProc_ for ProcessorHolder<Proc> {
     type Proc = Proc;
 
     fn _with_parameters_mut(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {
@@ -183,7 +183,7 @@ impl<Proc: erased::CommitProc + 'static> erased::ParametrizedCommitProc2 for Pro
     }
 }
 
-impl<Proc: 'static> erased::ParametrizedProc2 for ProcessorHolder<Proc> {
+impl<Proc: 'static> erased::ParametrizedProc_ for ProcessorHolder<Proc> {
     type Proc = Proc;
 
     fn _with_parameters_mut0(&mut self, parameters: ConfigParametersHandle) -> &mut Self::Proc {

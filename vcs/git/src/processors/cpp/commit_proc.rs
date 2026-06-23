@@ -4,7 +4,7 @@ use git2::Repository;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
-use crate::processing::erased::ParametrizedCommitProc2;
+use crate::processing::erased::ParametrizedCommitProc2 as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 

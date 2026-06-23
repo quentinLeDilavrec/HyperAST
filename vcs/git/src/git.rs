@@ -182,20 +182,9 @@ where
     let url: Url = url.try_into().unwrap();
     let mut path: PathBuf = path.into();
     path.push(url.path.clone());
-    // let url = &format!("{}{}", "https://github.com/", repo_name);
-    // let path = &format!("{}{}", "/tmp/hyperastgitresources/repo/", repo_name);
-    let mut callbacks = RemoteCallbacks::new();
-
-    callbacks.transfer_progress(|x| {
-        log::info!("transfer {}/{}", x.received_objects(), x.total_objects());
-        true
+    let repository = fetch_with_cb(&url, &path, |s| {
+        log::info!("{}", s);
     });
-
-    let mut fo = git2::FetchOptions::new();
-
-    fo.remote_callbacks(callbacks);
-
-    let repository = up_to_date_repo(&path, Some(fo), url.clone());
     if let Ok(repository) = repository {
         return repository;
     }
@@ -206,10 +195,37 @@ where
         .current_dir(&*path.to_string_lossy())
         .spawn()
     {
-        log::error!("tryed to use the git executable, but failed. {}", err);
+        log::error!("tried to use the git executable, but failed. {}", err);
     }
 
     nofetch_repository(url, path)
+}
+
+pub fn fetch_with_cb<F>(url: &Url, path: &PathBuf, cb: F) -> Result<Repository, Error>
+where
+    F: Fn(String),
+{
+    let mut callbacks = RemoteCallbacks::new();
+
+    let mut now = std::time::Instant::now();
+    callbacks.transfer_progress(|x| {
+        if now.elapsed().as_secs() > 5 {
+            let total = x.total_objects();
+            let received = x.received_objects();
+            cb(format!("transfer {}/{}", received, total));
+            now = std::time::Instant::now();
+        }
+        true
+    });
+
+    callbacks.pack_progress(|stage, current, total| {
+        cb(format!("pack {:?} {} {}", stage, current, total));
+    });
+
+    let mut fo = git2::FetchOptions::new();
+    fo.remote_callbacks(callbacks);
+
+    up_to_date_repo(path, Some(fo), url.clone())
 }
 
 pub fn nofetch_repository<T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
@@ -290,6 +306,17 @@ pub struct Repo {
 impl Repo {
     pub fn url(&self) -> String {
         format!("{}{}/{}", self.forge.url(), self.user, self.name)
+    }
+    pub fn fetch_with_cb<F>(&self, cb: F) -> Result<Repository, Error>
+    where
+        F: Fn(String),
+    {
+        let url = self.url();
+        let url: Url = url.try_into().unwrap();
+        let path = "/tmp/hyperastgitresources/repo/".to_string();
+        let mut path: PathBuf = path.into();
+        path.push(url.path.clone());
+        fetch_with_cb(&url, &path, cb)
     }
     pub fn fetch(&self) -> Repository {
         let url = self.url();

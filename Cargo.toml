@@ -52,7 +52,9 @@ hyperast_gen_ts_java = { path = "./gen/tree-sitter/java" }
 hyperast_gen_ts_xml = { path = "./gen/tree-sitter/xml" }
 hyperast_gen_ts_tsquery = { path = "./gen/tree-sitter/query", default-features = false }
 hyperast_gen_ts_typescript = { path = "./gen/tree-sitter/typescript" }
+hyperast_gen_ts_javascript = { path = "./gen/tree-sitter/javascript" }
 hyperast_gen_ts_python = { path = "./gen/tree-sitter/python" }
+hyperast_gen_ts_rust = { path = "./gen/tree-sitter/rust" }
 
 legion = { version = "^0.4.0" }
 criterion = { version = "0.6.1", features = [

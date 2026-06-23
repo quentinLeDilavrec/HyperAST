@@ -165,9 +165,9 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         #[cfg(feature = "cpp")]
         if crate::processors::cpp::selection::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
-            let repository = self.repository;
+            let repo = self.repository;
             let p = self.handles.cpp_handle;
-            let full_node = self.prepro.handle_cpp_blob(oid, name, repository, p)?;
+            let full_node = self.prepro.handle_cpp_blob(oid, name, repo, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
             parent.push(name, full_node);
@@ -176,9 +176,9 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         #[cfg(feature = "java")]
         if crate::processors::java::selection::matches(&name) {
             let w = &mut self.stack.last_mut().unwrap().acc;
-            let repository: &Repository = &self.repository;
+            let repo = self.repository;
             let p = self.handles.java_handle;
-            let full_node = self.prepro.handle_java_blob(oid, name, repository, p)?;
+            let full_node = self.prepro.handle_java_blob(oid, name, repo, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!w.primary.children_names.contains(&name));
             w.push(name, full_node);
@@ -187,9 +187,20 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
         #[cfg(feature = "python")]
         if crate::processors::python::file_sys::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
-            let repository = self.repository;
+            let repo = self.repository;
             let p = self.handles.python_handle;
-            let full_node = self.prepro.handle_python_blob(oid, name, repository, p)?;
+            let full_node = self.prepro.handle_python_blob(oid, name, repo, p)?;
+            let name = self.prepro.intern_object_name(name);
+            assert!(!parent.primary.children_names.contains(&name));
+            parent.push(name, full_node);
+            return Ok(());
+        }
+        #[cfg(feature = "typescript")]
+        if crate::processors::typescript::file_sys::matches(&name) {
+            let parent = &mut self.stack.last_mut().unwrap().acc;
+            let repo = self.repository;
+            let p = self.handles.typescript_handle;
+            let full_node = self.prepro.handle_typescript_blob(oid, name, repo, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
             parent.push(name, full_node);

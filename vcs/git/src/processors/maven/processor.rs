@@ -19,10 +19,8 @@ use crate::git::BasicGitObject;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
 use crate::processing::ConfigParametersHandle;
 use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
-use crate::processing::ProcessorHolder;
 use crate::processing::caches::Maven as MavenCaches;
 use crate::processing::erased::CommitProc;
-use crate::processing::erased::CommitProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
@@ -525,11 +523,7 @@ impl CommitProc for MavenProc {
 
     fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
         if lang.eq_ignore_ascii_case("java") {
-            // TODO Factorize that
-            Some(PCPHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<ProcessorHolder<JavaProc>>()),
-                self.parameter.java_handle.0,
-            ))
+            Some(self.parameter.java_handle.erase())
         } else if lang.eq_ignore_ascii_case("cpp") {
             if cfg!(debug_assertions) {
                 unimplemented!()

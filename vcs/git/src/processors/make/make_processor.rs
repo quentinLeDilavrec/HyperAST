@@ -15,9 +15,7 @@ use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedProcessor2Handle as PCP2Handle;
-use crate::processing::ProcessorHolder;
 use crate::processing::caches::Make as MakeCaches;
-use crate::processing::erased::CommitProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
@@ -442,12 +440,7 @@ impl crate::processing::erased::CommitProc for MakeProc {
     fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
         dbg!(self.parameter.cpp_handle.0.0);
         if lang.eq_ignore_ascii_case("cpp") {
-            Some(PCPHandle(
-                CommitProcessorHandle(std::any::TypeId::of::<
-                    ProcessorHolder<cpp_processor::CppProc>,
-                >()),
-                self.parameter.cpp_handle.0,
-            ))
+            Some(self.parameter.cpp_handle.erase())
         } else if lang.eq_ignore_ascii_case("java") {
             if cfg!(debug_assertions) {
                 unimplemented!()

@@ -87,6 +87,12 @@ fn construction_group(c: &mut Criterion) {
             config: RepoConfig::Cpp,
             fetch: true,
         },
+        Input {
+            repo: Forge::Github.repo("numpy", "numpy"),
+            commit: "706b1035187baf72959059cd35ac1f5266e1932c",
+            config: RepoConfig::C,
+            fetch: true,
+        },
     ];
 
     for p in inputs.iter() {

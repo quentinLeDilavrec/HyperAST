@@ -10,6 +10,7 @@ pub enum ProcessingConfig<P> {
     JavaMaven { limit: usize, dir_path: P },
     CppMake { limit: usize, dir_path: P },
     Cpp { limit: usize, dir_path: P },
+    C { limit: usize, dir_path: P },
     TsNpm { limit: usize, dir_path: P },
     Python { limit: usize, dir_path: P },
     Any { limit: usize, dir_path: P },
@@ -22,6 +23,7 @@ pub enum RepoConfig {
     Java,
     CppMake,
     Cpp,
+    C,
     JavaMaven,
     TsNpm,
     Python,
@@ -58,6 +60,10 @@ impl From<&RepoConfig> for ProcessingConfig<&'static str> {
                 dir_path: "",
             },
             RepoConfig::Cpp => Self::Cpp {
+                limit: 3,
+                dir_path: "",
+            },
+            RepoConfig::C => Self::C {
                 limit: 3,
                 dir_path: "",
             },

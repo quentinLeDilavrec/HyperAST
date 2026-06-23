@@ -151,10 +151,8 @@ impl<IdN: Clone + Eq + UniformNodeId> TypedNodeId for TIdN<IdN> {
 
 impl C {
     pub const INST: C = Lang;
-    pub const fn name() -> &'static str {
-        // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
-        "hyperast_gen_ts_c::types::Lang"
-    }
+    pub const NAME: &'static str = "hyperast_gen_ts_c::types::Lang";
+    // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
 }
 
 impl LangRef<AnyType> for C {
@@ -169,8 +167,8 @@ impl LangRef<AnyType> for C {
     }
 
     fn name(&self) -> &'static str {
-        debug_assert_eq!(std::any::type_name::<C>(), Self::name());
-        Self::name()
+        debug_assert_eq!(std::any::type_name::<C>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
@@ -198,8 +196,8 @@ impl LangRef<Type> for C {
     }
 
     fn name(&self) -> &'static str {
-        debug_assert_eq!(std::any::type_name::<C>(), Self::name());
-        Self::name()
+        debug_assert_eq!(std::any::type_name::<C>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
@@ -217,8 +215,8 @@ impl LangRef<TType> for Lang {
     }
 
     fn name(&self) -> &'static str {
-        debug_assert_eq!(std::any::type_name::<Lang>(), Self::name());
-        Self::name()
+        debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
+        Self::NAME
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {

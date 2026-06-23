@@ -7,7 +7,7 @@ use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle;
-use crate::processing::erased::ParametrizedCommitProc2 as _;
+use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle;
 use crate::processing::erased::PreparedCommitProc;
 

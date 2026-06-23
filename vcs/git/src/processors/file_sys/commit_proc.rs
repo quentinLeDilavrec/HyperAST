@@ -1,6 +1,6 @@
 use crate::Processor as _;
 use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
-use crate::processing::erased::ParametrizedCommitProc2 as _;
+use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 use crate::processors::file_sys::processor::FileSysProcessor;

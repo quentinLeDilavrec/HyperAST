@@ -36,7 +36,7 @@ pub trait ParametrizedProc_: ParametrizedProc {
 }
 
 // TODO find a better naming scheme for methods
-pub trait ParametrizedProc2: ParametrizedProc_ {
+pub trait ParametrizedProcTyped: ParametrizedProc_ {
     fn with_parameters0(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
         self._with_parameters0(parameters.0)
     }
@@ -45,14 +45,13 @@ pub trait ParametrizedProc2: ParametrizedProc_ {
     }
 }
 
-impl<T: ParametrizedProc_> ParametrizedProc2 for T {}
-
-impl<T: ParametrizedProc2> ParametrizedProc for T {
+// both hide and share common implementation details while providing a typed interface
+impl<T: ParametrizedProc_> ParametrizedProcTyped for T {}
+impl<T: ParametrizedProcTyped> ParametrizedProc for T {
     fn get_mut0(&mut self, parameters: PCPHandle) -> &mut dyn Proc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
         ParametrizedProc_::_with_parameters_mut0(self, parameters.1)
     }
-
     fn get0(&self, parameters: PCPHandle) -> &dyn Proc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
         ParametrizedProc_::_with_parameters0(self, parameters.1)
@@ -154,7 +153,7 @@ pub trait ParametrizedCommitProc_: ParametrizedCommitProc {
 }
 
 // TODO find a better naming scheme for methods
-pub trait ParametrizedCommitProc2: ParametrizedCommitProc_ {
+pub trait ParametrizedCommitProcTyped: ParametrizedCommitProc_ {
     fn with_parameters(&self, parameters: PPHandle<Self::Proc>) -> &Self::Proc {
         self._with_parameters(parameters.0)
     }
@@ -163,14 +162,13 @@ pub trait ParametrizedCommitProc2: ParametrizedCommitProc_ {
     }
 }
 
-impl<T: ParametrizedCommitProc_> ParametrizedCommitProc2 for T {}
-
+// both hide and share common implementation details while providing a typed interface
+impl<T: ParametrizedCommitProc_> ParametrizedCommitProcTyped for T {}
 impl<T: ParametrizedCommitProc_> ParametrizedCommitProc for T {
     fn get_mut(&mut self, parameters: PCPHandle) -> &mut dyn CommitProc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
         ParametrizedCommitProc_::_with_parameters_mut(self, parameters.1)
     }
-
     fn get(&self, parameters: PCPHandle) -> &dyn CommitProc {
         assert_eq!(std::any::TypeId::of::<T::Proc>(), parameters.0.0);
         ParametrizedCommitProc_::_with_parameters(self, parameters.1)

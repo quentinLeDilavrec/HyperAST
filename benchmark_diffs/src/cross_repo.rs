@@ -10,7 +10,7 @@ use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use hyperast_vcs_git::processing::CacheHolding as _;
 use hyperast_vcs_git::processing::ConfiguredRepoHandle2;
 use hyperast_vcs_git::processing::ConfiguredRepoTrait as _;
-use hyperast_vcs_git::processing::erased::ParametrizedCommitProc2 as _;
+use hyperast_vcs_git::processing::erased::ParametrizedCommitProcTyped as _;
 use hyperast_vcs_git::processors::maven::MavenModuleAcc;
 use hyperast_vcs_git::processors::maven::MavenProc;
 type MavenProcessorHolder = hyperast_vcs_git::processing::ProcessorHolder<MavenProc>;
@@ -128,19 +128,14 @@ pub fn windowed_commits_compare(
                 src_mem += commit_src.memory_used();
                 let oid = commit_src.tree_oid;
                 let label_store = &mut preprocessed.processor.main_stores.label_store;
+                let maven_proc = (preprocessed.processor.processing_systems)
+                    .get::<MavenProcessorHolder>()
+                    .unwrap()
+                    .with_parameters(repo.config.try_into().unwrap());
+                let full_node = maven_proc.get_caches().object_map.get(&oid);
                 src_acc.push_submodule(
                     label_store.get_or_insert(&*repo_names[i]),
-                    preprocessed
-                        .processor
-                        .processing_systems
-                        .get::<MavenProcessorHolder>()
-                        .unwrap()
-                        .with_parameters(repo.config.1)
-                        .get_caches()
-                        .object_map
-                        .get(&oid)
-                        .unwrap()
-                        .clone(),
+                    full_node.unwrap().clone(),
                 )
             }
 
@@ -157,20 +152,14 @@ pub fn windowed_commits_compare(
                 dst_mem += commit_dst.memory_used();
                 let oid = commit_dst.tree_oid;
                 let label_store = &mut preprocessed.processor.main_stores.label_store;
+                let maven_proc = (preprocessed.processor.processing_systems)
+                    .get::<MavenProcessorHolder>()
+                    .unwrap()
+                    .with_parameters(repo.config.try_into().unwrap());
+                let full_node = maven_proc.get_caches().object_map.get(&oid);
                 dst_acc.push_submodule(
                     label_store.get_or_insert(&*repo_names[i]),
-                    preprocessed
-                        .processor
-                        .processing_systems
-                        .get::<MavenProcessorHolder>()
-                        .unwrap()
-                        .with_parameters(repo.config.1)
-                        .get_caches()
-                        .object_map
-                        // .get::<Caches>().unwrap().object_map//object_map_maven
-                        .get(&oid)
-                        .unwrap()
-                        .clone(),
+                    full_node.unwrap().clone(),
                 )
             }
 

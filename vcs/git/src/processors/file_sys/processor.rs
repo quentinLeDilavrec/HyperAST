@@ -13,7 +13,6 @@ use crate::Processor;
 use crate::StackEle;
 use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::{CacheHolding, InFiles, ObjectName};
@@ -163,7 +162,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = self.repository;
-            let p = PPHandle(self.handle.1, std::marker::PhantomData);
+            let p = self.handle.try_into().unwrap();
             let full_node = self.prepro.handle_cpp_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
@@ -175,7 +174,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             let w = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = &self.repository;
-            let p = PPHandle(self.handle.1, std::marker::PhantomData);
+            let p = self.handle.try_into().unwrap();
             let full_node = self.prepro.handle_java_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!w.primary.children_names.contains(&name));
@@ -187,7 +186,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let name: &ObjectName = &name;
             let repository: &Repository = self.repository;
-            let p = PPHandle(self.handle.1, std::marker::PhantomData);
+            let p = self.handle.try_into().unwrap();
             let full_node = self.prepro.handle_python_blob(oid, name, repository, p)?;
             let name = self.prepro.intern_object_name(name);
             assert!(!parent.primary.children_names.contains(&name));
@@ -281,7 +280,6 @@ pub(crate) fn make(acc: FileSysAcc, stores: &mut super::SimpleStores) -> FullNod
     let vacant = insertion.vacant();
     let id = vacant.insert_built(dyn_builder.build());
 
-    let precomp_queries = acc.precomp_queries;
     FullNode {
         id,
         metrics,

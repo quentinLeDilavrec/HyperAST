@@ -1,6 +1,6 @@
 use hyperast::store::nodes::legion::RawHAST;
 
-use crate::processing::ConfigParametersHandle;
+use crate::processing::ParametrizedProcessorHandle;
 use crate::processing::erased::ParametrizedCommitProc2 as _;
 use crate::processors::java::JavaProc;
 use crate::processors::maven::MavenModuleAcc;
@@ -34,14 +34,14 @@ impl MavenModuleAcc {
 //Processor2Handle to get the Holder
 pub(super) fn prep_scripting(
     prepro: &RepositoryProcessor,
-    handle: ConfigParametersHandle,
+    handle: ParametrizedProcessorHandle<JavaProc>,
 ) -> Option<&crate::Str> {
     prepro
         .processing_systems
         // it is fine but could do better and kind of use MavenHolder
         .get::<ProcessorHolder<JavaProc>>()
         .as_ref()?
-        .with_parameters(handle)
+        .with_parameters42(handle)
         .parameter
         .prepro
         .as_ref()

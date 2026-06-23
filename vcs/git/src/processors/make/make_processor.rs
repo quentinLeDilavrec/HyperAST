@@ -6,6 +6,7 @@ use git2::{Oid, Repository};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::nodes::legion::dyn_builder::EntityBuilder;
 use hyperast::store::nodes::legion::eq_node;
+use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
 use hyperast_gen_ts_xml::Type;
@@ -83,7 +84,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     oid,
                     name,
                     &self.repository,
-                    PPHandle(self.handle.1, std::marker::PhantomData),
+                    self.handle.try_into().unwrap(),
                 )
                 .unwrap();
         } else if cpp_processor::selection::matches(&name) {
@@ -93,7 +94,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
                     &mut self.stack.last_mut().unwrap().acc,
                     &name,
                     self.repository,
-                    PPHandle(self.handle.1, std::marker::PhantomData),
+                    self.handle.try_into().unwrap(),
                 )
                 .unwrap();
         } else {
@@ -355,12 +356,6 @@ impl Parameter {
     }
 }
 
-impl From<PPHandle<MakeProc>> for PPHandle<cpp_processor::CppProc> {
-    fn from(value: PPHandle<MakeProc>) -> Self {
-        PPHandle(value.0, std::marker::PhantomData)
-    }
-}
-
 pub(crate) struct MakeProc {
     parameter: Parameter,
     cache: MakeCaches,
@@ -438,7 +433,7 @@ impl crate::processing::erased::CommitProc for MakeProc {
     }
 
     fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
-        dbg!(self.parameter.cpp_handle.0.0);
+        dbg!(self.parameter.cpp_handle);
         if lang.eq_ignore_ascii_case("cpp") {
             Some(self.parameter.cpp_handle.erase())
         } else if lang.eq_ignore_ascii_case("java") {

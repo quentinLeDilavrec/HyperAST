@@ -4,7 +4,6 @@ use git2::Repository;
 use crate::preprocessed::CommitBuilder;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ObjectName;
-use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProc2;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
@@ -60,7 +59,7 @@ impl<'repo> PreparedCommitProc for PreparedCppCommitProc<'repo> {
             &mut dir_path,
             &name,
             self.commit_builder.tree_oid(),
-            PPHandle(self.handle.1, std::marker::PhantomData),
+            self.handle.try_into().unwrap(),
         );
         let h = prepro
             .processing_systems

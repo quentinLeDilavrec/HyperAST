@@ -552,7 +552,7 @@ impl RepositoryProcessor {
 mod experiments {
     use super::*;
     use crate::Accumulator;
-    use crate::processing::{InFiles, NamedObject};
+    use crate::processing::NamedObject;
     use crate::processing::{ObjectType, TypedObject, UniqueObject};
 
     pub(crate) struct GitProcessorMiddleWare<'repo, 'prepro, 'd, 'c> {

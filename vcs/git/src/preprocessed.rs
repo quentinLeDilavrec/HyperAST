@@ -274,7 +274,7 @@ impl PreProcessedRepository {
         };
         rw.for_each(|oid| {
             let oid = oid.unwrap();
-            let c = CommitProcessor::<file_sys::Maven>::handle_commit::<true>(
+            let c = CommitProcessor::<crate::processors::maven::MavenProc>::handle_commit::<true>(
                 &mut self.processor,
                 &repository,
                 dir_path,
@@ -365,7 +365,7 @@ impl PreProcessedRepository {
         };
         rw.take(limit).for_each(|oid| {
             let oid = oid.unwrap();
-            let c = CommitProcessor::<file_sys::Maven>::handle_commit::<true>(
+            let c = CommitProcessor::<crate::processors::maven::MavenProc>::handle_commit::<true>(
                 &mut self.processor,
                 &repository,
                 dir_path,
@@ -395,7 +395,7 @@ impl PreProcessedRepository {
         };
         rw.take(limit).for_each(|oid| {
             let oid = oid.unwrap();
-            let c = CommitProcessor::<file_sys::Maven>::handle_commit::<true>(
+            let c = CommitProcessor::<crate::processors::maven::MavenProc>::handle_commit::<true>(
                 &mut self.processor,
                 &repository,
                 dir_path,
@@ -414,7 +414,7 @@ impl PreProcessedRepository {
         dir_path: &str,
     ) -> git2::Oid {
         let oid = retrieve_commit(repository, ref_or_commit).unwrap().id();
-        let c = CommitProcessor::<file_sys::Maven>::handle_commit::<false>(
+        let c = CommitProcessor::<crate::processors::maven::MavenProc>::handle_commit::<false>(
             &mut self.processor,
             &repository,
             dir_path,
@@ -498,8 +498,10 @@ impl PreProcessedRepository {
             return vec![];
         };
         rw.take(limit).for_each(|oid| {
+            use crate::processors::make::MakeProc;
+
             let oid = oid.unwrap();
-            let c = CommitProcessor::<file_sys::Make>::handle_commit::<false>(
+            let c = CommitProcessor::<MakeProc>::handle_commit::<false>(
                 &mut self.processor,
                 &repository,
                 dir_path,
@@ -520,7 +522,7 @@ impl PreProcessedRepository {
         dir_path: &str,
     ) -> git2::Oid {
         let oid = retrieve_commit(repository, ref_or_commit).unwrap().id();
-        let c = CommitProcessor::<file_sys::Make>::handle_commit::<false>(
+        let c = CommitProcessor::<crate::processors::make::MakeProc>::handle_commit::<false>(
             &mut self.processor,
             &repository,
             dir_path,
@@ -644,7 +646,7 @@ impl IdHolder for NodeIdentifier {
 }
 
 #[cfg(feature = "maven")]
-impl CommitProcessor<file_sys::Maven> for RepositoryProcessor {
+impl CommitProcessor<crate::processors::maven::MavenProc> for RepositoryProcessor {
     type Module = crate::processors::maven::FullNode;
     fn handle_module<'b, const RMS: bool>(
         &mut self,

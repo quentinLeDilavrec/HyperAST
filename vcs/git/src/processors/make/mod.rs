@@ -33,6 +33,10 @@ pub struct MakeFile {
     test_source_dirs: Vec<String>,
 }
 
+/// The make scheme,
+/// It contains a Makefile and different directories, often src/ or lib/, tests/ or tests/, and also third-party/ docs/ script/,
+/// but it is mostly community and programming language dependent.
+/// TODO properly implement it
 pub struct MakeModuleAcc {
     pub(crate) primary: BasicDirAcc<NodeIdentifier, LabelIdentifier, DefaultMetrics>,
     pub(crate) sub_modules: Option<Vec<PathBuf>>,
@@ -161,9 +165,11 @@ where
     Ok(x)
 }
 
-impl crate::preprocessed::CommitProcessor<crate::processing::file_sys::Make>
-    for crate::preprocessed::RepositoryProcessor
-{
+impl crate::processing::CachesHolding for MakeProc {
+    type Caches = crate::processing::caches::Make;
+}
+
+impl crate::preprocessed::CommitProcessor<MakeProc> for crate::preprocessed::RepositoryProcessor {
     type Module = crate::processors::FullNode;
     fn handle_module<'b, const RMS: bool>(
         &mut self,

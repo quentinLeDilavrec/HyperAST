@@ -32,6 +32,14 @@ impl CacheHolding<crate::processing::caches::Makefile> for MakefileProc {
     }
 }
 
+pub fn matches(name: &ObjectName) -> bool {
+    name.eq_str("Makefile")
+}
+
+impl crate::processing::CachesHolding for MakefileProc {
+    type Caches = crate::processing::caches::Makefile;
+}
+
 use hyperast_gen_ts_xml::legion::XmlTreeGen;
 impl RepositoryProcessor {
     pub(super) fn help_handle_makefile(
@@ -44,7 +52,7 @@ impl RepositoryProcessor {
     ) -> Result<(), crate::ParseErr> {
         let x = self
             .processing_systems
-            .caching_blob_handler::<crate::processing::file_sys::MakeFile>()
+            .caching_blob_handler::<MakefileProc>()
             .handle(oid, repository, &name, parameters, |_c, n, t| {
                 super::handle_makefile_file(
                     &mut XmlTreeGen::bare(self.main_stores.mut_with_ts()),

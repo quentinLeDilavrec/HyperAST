@@ -23,8 +23,7 @@ use crate::processing::erased::CommitProc;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
-use crate::processing::file_sys;
-use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::processing::{CacheHolding, ObjectName};
 use crate::processors::java::JavaProc;
 use crate::processors::maven::PomProc;
 use crate::utils::drain_filter_strip;
@@ -120,7 +119,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
         if self.dir_path.peek().is_some() {
             return;
         }
-        if file_sys::Pom::matches(&name) {
+        if super::pom::matches(&name) {
             let parent_acc = &mut self.stack.last_mut().unwrap().acc;
             // TODO find a better conversion, ie. first safe conv to MavenProc handle then into()
             // let parameters = PPHandle(ConfigParametersHandle(0), PhantomData);
@@ -466,7 +465,7 @@ pub(crate) fn prepare_dir_exploration(
         .collect::<Vec<_>>();
     if dir_path.peek().is_none() {
         let p = children_objects.iter().position(|x: &BasicGitObject| {
-            git2::ObjectType::Blob == x.kind && file_sys::Pom::matches(&x.name)
+            git2::ObjectType::Blob == x.kind && super::pom::matches(&x.name)
         });
         if let Some(p) = p {
             children_objects.swap(0, p); // priority to pom.xml processing

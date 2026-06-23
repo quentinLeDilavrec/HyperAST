@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::Commit;
 use crate::git::Repo;
 use crate::preprocessed::RepositoryProcessor;
-use crate::processing::erased::{ParametrizedCommitProcessorHandle, ProcExt};
+use crate::processing::erased::ParametrizedCommitProcessorHandle;
 use crate::processing::{ConfiguredRepo2, ProcessorHolder};
 use crate::processing::{ConfiguredRepoHandle2, RepoConfig};
 
@@ -164,12 +164,12 @@ impl PreProcessedRepositories {
         let pom = |pr: &mut ProcessorMap| {
             let t = crate::processors::maven::PomParameter::default();
             let h = pr.proc_mut::<PomProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         let makefile = |pr: &mut ProcessorMap| {
             let t = crate::processors::make::makefile::Parameter::default();
             let h = pr.proc_mut::<MakefileProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         #[cfg(feature = "python")]
         let python = |pr: &mut ProcessorMap| {
@@ -248,18 +248,18 @@ impl PreProcessedRepositories {
             //     // prepro: Some(prepro),
             //     ..Default::default()
             // };
-            // CommitProcExt::register_param(h, t)
+            // h.register_param(t)
         };
 
         let makefile = |pr: &mut ProcessorMap| {
             let t = crate::processors::make::makefile::Parameter::default();
             let h = pr.proc_mut::<MakefileProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         let pom = |pr: &mut ProcessorMap| {
             let t = crate::processors::maven::PomParameter {};
             let h = pr.proc_mut::<PomProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         let r = match config {
             RepoConfig::JavaMaven => {
@@ -312,12 +312,12 @@ impl PreProcessedRepositories {
         let makefile = |pr: &mut ProcessorMap| {
             let t = crate::processors::make::makefile::Parameter::default();
             let h = pr.proc_mut::<MakefileProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         let pom = |pr: &mut ProcessorMap| {
             let t = crate::processors::maven::PomParameter {};
             let h = pr.proc_mut::<PomProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         let processor_map = &mut self.processor.processing_systems;
         let r = match config {
@@ -369,7 +369,7 @@ impl PreProcessedRepositories {
         let pom = |pr: &mut ProcessorMap| {
             let t = crate::processors::maven::PomParameter::default();
             let h = pr.proc_mut::<PomProcessorHolder>();
-            ProcExt::register_param(h, t)
+            h.register_param(t)
         };
         let r = match config {
             RepoConfig::JavaMaven => {

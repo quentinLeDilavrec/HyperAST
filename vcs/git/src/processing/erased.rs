@@ -1,79 +1,21 @@
+//! type erasure utilities for processors
+
 use std::any::Any;
-
-use crate::preprocessed::CommitBuilder;
-// same but for erasing the store as it is associated with the output type
-use crate::preprocessed::RepositoryProcessor;
-
-// TODO erase output type from PreparedCommitProc without loosing type information and transparently to implementers
-use hyperast::store::defaults::NodeIdentifier as ProcessorOutput;
-// also erase the commit returned by the commit processor
-use crate::Commit;
 
 use super::ConfigParametersHandle;
 use super::ParametrizedProcessor2Handle as PCP2Handle;
 use super::ProcessorHolder;
 
-#[derive(Clone)]
-#[allow(unused)]
-#[allow(deprecated)]
-/// A config holding arbitrary parameters for a parametrized commit processor.
-pub struct ConfigParameters(std::rc::Rc<dyn std::any::Any>);
-
-/// Handle over a commit processor, resulting from type erasure when registering a commit processor.
-#[derive(Clone, Copy, Debug)]
-pub struct CommitProcessorHandle(pub(crate) std::any::TypeId);
+//
+// processor erasure
+//
 
 /// Handle over a processor, resulting from type erasure when registering a  processor.
 #[derive(Clone, Copy, Debug)]
 pub struct ProcessorHandle(pub(crate) std::any::TypeId);
 
-/// Parametrized handle over a processor like [`ParametrizedProcessor2Handle`], using the erased [`CommitProcessorHandle`].
-///
-/// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessor2Handle`] instead.
-#[derive(Clone, Copy, Debug)]
-pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
-use ParametrizedCommitProcessorHandle as PCPHandle;
-
-impl<T: CommitProc + 'static> PCP2Handle<T> {
-    pub(crate) fn erase(&self) -> PCPHandle {
-        let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
-        PCPHandle(CommitProcessorHandle(tid), self.0)
-    }
-}
-
-//
-//
-// processor erasure
-//
-//
-
-pub trait ProcKind {}
-pub struct NonCommitProcKind;
-pub struct CommitProcKind;
-impl ProcKind for NonCommitProcKind {}
-impl ProcKind for CommitProcKind {}
-
-////////
-
-pub trait Proc {
-    // type Kind: ProcKind;
-}
-
+pub trait Proc {}
 impl<T> Proc for T {}
-
-pub trait ProcExt: Proc {
-    fn register_param(
-        h: &mut ProcessorHolder<Self>,
-        t: impl Into<Self> + PartialEq<Self>,
-    ) -> PCP2Handle<Self>
-    where
-        Self: Sized,
-    {
-        h.register_param(t)
-    }
-}
-
-impl<T: Proc> ProcExt for T {}
 
 pub trait ParametrizedProc {
     fn erased_handle(&self) -> ProcessorHandle
@@ -104,10 +46,34 @@ impl<T: ParametrizedProc2> ParametrizedProc for T {
 }
 
 //
+// **commit** processor erasure
 //
-// commit processor erasure
-//
-//
+
+// TODO erase output type from PreparedCommitProc without loosing type information and transparently to implementers
+use hyperast::store::defaults::NodeIdentifier as ProcessorOutput;
+// same but for erasing the store as it is associated with the output type
+use crate::preprocessed::RepositoryProcessor;
+// also erase the commit returned by the commit processor
+use crate::Commit;
+use crate::preprocessed::CommitBuilder;
+
+/// Handle over a commit processor, resulting from type erasure when registering a commit processor.
+#[derive(Clone, Copy, Debug)]
+pub struct CommitProcessorHandle(std::any::TypeId);
+
+/// Parametrized handle over a processor like [`ParametrizedProcessor2Handle`], using the erased [`CommitProcessorHandle`].
+///
+/// If you want to easily refer to the specific commit processor type, use [`ParametrizedProcessor2Handle`] instead.
+#[derive(Clone, Copy, Debug)]
+pub struct ParametrizedCommitProcessorHandle(pub CommitProcessorHandle, pub ConfigParametersHandle);
+use ParametrizedCommitProcessorHandle as PCPHandle;
+
+impl<T: CommitProc + 'static> PCP2Handle<T> {
+    pub(crate) fn erase(&self) -> PCPHandle {
+        let tid = std::any::TypeId::of::<ProcessorHolder<T>>();
+        PCPHandle(CommitProcessorHandle(tid), self.0)
+    }
+}
 
 pub trait CommitProc: Proc {
     fn prepare_processing<'repo>(
@@ -129,7 +95,7 @@ pub trait CommitProc: Proc {
     }
 }
 
-// erased commit processor
+/// erased commit processor
 pub trait PreparedCommitProc {
     fn process(self: Box<Self>, prepro: &mut RepositoryProcessor) -> ProcessorOutput;
 }
@@ -162,10 +128,14 @@ impl<T: ParametrizedCommitProc2> ParametrizedCommitProc for T {
     }
 }
 
+/// stores both commit and non-commit processors
 pub type ProcessorMap = spreaded::ProcessorMap<spreaded::ErasedProcessorBunch>;
+pub type ProcessorMapOnlyNonCommit = spreaded::ProcessorMap<Box<dyn spreaded::ErasableProcessor>>;
+pub type ProcessorMapOnlyCommit =
+    spreaded::ProcessorMap<Box<dyn spreaded::ErasableCommitProcessor>>;
 
 #[doc(hidden)]
-pub mod spreaded {
+mod spreaded {
     use super::*;
 
     pub struct ProcessorMap<V>(std::collections::HashMap<std::any::TypeId, V>);
@@ -179,9 +149,6 @@ pub mod spreaded {
             self.0.clear()
         }
     }
-
-    // unsafe impl<V: Send> Send for ProcessorMap<V> {}
-    // unsafe impl<V: Sync> Sync for ProcessorMap<V> {}
 
     ////// spreaded proc
 
@@ -206,6 +173,7 @@ pub mod spreaded {
     pub trait ErasableProcessor: Any + ToErasedProc + ParametrizedProc + Send + Sync {}
     impl<T> ErasableProcessor for T where T: Any + ParametrizedProc + Send + Sync {}
 
+    // basic collection of erased processors
     impl ProcessorMap<Box<dyn ErasableProcessor>> {
         pub fn by_id_mut(
             &mut self,
@@ -220,9 +188,7 @@ pub mod spreaded {
             self.0.get(&id.0).map(|x| x.as_ref())
         }
 
-        pub fn mut_or_default<T: 'static + ToErasedProc + Default + Send + Sync>(
-            &mut self,
-        ) -> &mut T {
+        pub fn proc_mut<T: 'static + ToErasedProc + Default + Send + Sync>(&mut self) -> &mut T {
             let r = self.0.entry(std::any::TypeId::of::<T>());
             let r = r.or_insert_with(|| Box::new(T::default()).to_erasable_processor());
             let r = r.as_mut();
@@ -259,6 +225,7 @@ pub mod spreaded {
     }
 
     // NOTE crazy good stuff
+    // collection of erased commit processors
     impl ProcessorMap<Box<dyn ErasableCommitProcessor>> {
         pub fn by_id_mut(
             &mut self,
@@ -272,7 +239,7 @@ pub mod spreaded {
         ) -> Option<&(dyn ErasableCommitProcessor + 'static)> {
             self.0.get(&id.0).map(|x| x.as_ref())
         }
-        pub fn mut_or_default<T: 'static + ToErasedCommitProc + Default + Send + Sync>(
+        pub fn commit_proc_mut<T: 'static + ToErasedCommitProc + Default + Send + Sync>(
             &mut self,
         ) -> &mut T {
             let r = self.0.entry(std::any::TypeId::of::<T>());
@@ -299,12 +266,16 @@ pub mod spreaded {
         //     r.unwrap()
         // }
     }
+
+    ////// spreaded both commit and non-commit proc
+
     pub enum ErasedProcessorBunch {
         NonCommit(Box<dyn ErasableProcessor>),
         Commit(Box<dyn ErasableCommitProcessor>),
     }
 
     // NOTE even crazier
+    // collection of erased both commit and non-commit processors
     impl ProcessorMap<ErasedProcessorBunch> {
         /// give write access to process commits
         pub fn by_id_mut(
@@ -397,7 +368,7 @@ pub mod spreaded {
         NotCommitEnabled,
     }
 
-    /////// tiered
+    /////// attempt at tiered
 
     pub struct ProcessorMap2<U, V>(
         pub(super) std::collections::HashMap<std::any::TypeId, U>,

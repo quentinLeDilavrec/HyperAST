@@ -36,6 +36,12 @@ pub(crate) struct FailedParsing<D = std::time::Duration> {
     pub error: &'static str,
 }
 
+impl From<FailedParsing> for ParseErr {
+    fn from(_: FailedParsing) -> Self {
+        ParseErr::IllFormed
+    }
+}
+
 pub(crate) struct SuccessProcessing<N, D = std::time::Duration> {
     pub parsing_time: D,
     pub processing_time: D,
@@ -52,6 +58,28 @@ impl<N, D> SuccessProcessing<N, D> {
     }
 }
 
+// waiting for residual stabilization https://github.com/rust-lang/rust/issues/84277
+// see after the temporary solution
+// It is also limiting the usability with more variants
+// enum FileProcessingResult<N, D = Duration> {
+//     FailedParsing {
+//         parsing_time: D,
+//         tree: tree_sitter::Tree,
+//         error: &'static str,
+//     },
+//     // ParsingTimedout(D),
+//     // FailedProcessing {
+//     //     parsing_time: D,
+//     //     processing_time: D,
+//     //     node: N,
+//     // },
+//     Success {
+//         parsing_time: D,
+//         processing_time: D,
+//         node: N,
+//     },
+// }
+/// Fancy return type for file processing
 pub(crate) type FileProcessingResult<N, D = std::time::Duration> =
     Result<SuccessProcessing<N, D>, FailedParsing<D>>;
 

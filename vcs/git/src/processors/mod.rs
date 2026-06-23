@@ -90,3 +90,20 @@ impl Query {
         Self(precomp.unwrap(), precomputeds.join("\n").into())
     }
 }
+
+static VAR_NAME: &'static str = "CST contains parsing errors";
+macro_rules! report_or_fail_on_errored_tree {
+    ($name:expr, $tree:expr, $parsing_time:expr) => {
+        if $tree.root_node().has_error() {
+            log::warn!("bad CST: {:?}", $name.try_str());
+            if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
+                return Err(crate::utils::FailedParsing {
+                    parsing_time: $parsing_time,
+                    tree: $tree,
+                    error: crate::processors::VAR_NAME,
+                })?;
+            }
+        };
+    };
+}
+use report_or_fail_on_errored_tree;

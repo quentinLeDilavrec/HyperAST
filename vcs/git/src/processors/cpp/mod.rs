@@ -13,7 +13,7 @@ use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
-use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
+use crate::{FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_cpp::TStore;
 use hyperast_gen_ts_cpp::legion as cpp_tree_gen;
@@ -73,27 +73,6 @@ impl CppProc {
     }
 }
 
-// waiting for residual stabilization https://github.com/rust-lang/rust/issues/84277
-// see after the temporary solution
-// It is also limiting the usability with more variants
-// enum FileProcessingResult<N, D = Duration> {
-//     FailedParsing {
-//         parsing_time: D,
-//         tree: tree_sitter::Tree,
-//         error: &'static str,
-//     },
-//     // ParsingTimedout(D),
-//     // FailedProcessing {
-//     //     parsing_time: D,
-//     //     processing_time: D,
-//     //     node: N,
-//     // },
-//     Success {
-//         parsing_time: D,
-//         processing_time: D,
-//         node: N,
-//     },
-// }
 /// Processing a single C++ file with `hyperast_gen_ts_cpp::legion::CppTreeGen`
 pub(crate) fn handle_cpp_file1<'a, More>(
     tree_gen: &mut cpp_tree_gen::CppTreeGen<'a, '_, TStore, SimpleStores, More>,
@@ -107,16 +86,7 @@ where
     let time = std::time::Instant::now();
     let tree = tree_gen::utils_ts::tree_sitter_parse(text, &hyperast_gen_ts_cpp::language());
     let parsing_time = time.elapsed();
-    if tree.root_node().has_error() {
-        log::warn!("bad CST: {:?}", name.try_str());
-        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
-            return Err(FailedParsing {
-                parsing_time,
-                tree,
-                error: "CST contains parsing errors",
-            });
-        }
-    };
+    super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
     let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
     let processing_time = time.elapsed() - parsing_time;
     Ok(SuccessProcessing {
@@ -138,16 +108,7 @@ where
     let time = std::time::Instant::now();
     let tree = tree_gen::utils_ts::tree_sitter_parse(text, &hyperast_gen_ts_cpp::language());
     let parsing_time = time.elapsed();
-    if tree.root_node().has_error() {
-        log::warn!("bad CST: {:?}", name.try_str());
-        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
-            return Err(FailedParsing {
-                parsing_time,
-                tree,
-                error: "CST contains parsing errors",
-            });
-        }
-    };
+    super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
     let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
     let processing_time = time.elapsed() - parsing_time;
     Ok(SuccessProcessing {

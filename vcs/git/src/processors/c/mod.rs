@@ -13,7 +13,7 @@ use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
-use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
+use crate::{FileProcessingResult, SuccessProcessing};
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_c::TStore>;
 
@@ -80,16 +80,7 @@ where
     let time = std::time::Instant::now();
     let tree = tree_gen::utils_ts::tree_sitter_parse(text, &hyperast_gen_ts_c::language());
     let parsing_time = time.elapsed();
-    if tree.root_node().has_error() {
-        log::warn!("bad CST: {:?}", name.try_str());
-        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
-            return Err(FailedParsing {
-                parsing_time,
-                tree,
-                error: "CST contains parsing errors",
-            });
-        }
-    };
+    super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
     let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
     let processing_time = time.elapsed() - parsing_time;
     Ok(SuccessProcessing {

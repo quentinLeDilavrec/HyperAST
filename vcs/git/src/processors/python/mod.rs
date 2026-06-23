@@ -13,7 +13,7 @@ use crate::DirPrimary;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::OidMap;
-use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
+use crate::{FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_python::TStore;
 use hyperast_gen_ts_python::legion as python_tree_gen;
@@ -109,16 +109,7 @@ where
     let language = hyperast_gen_ts_python::language();
     let tree = tree_gen::utils_ts::tree_sitter_parse(text, &language);
     let parsing_time = time.elapsed();
-    if tree.root_node().has_error() {
-        log::warn!("bad CST: {:?}", name.try_str());
-        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
-            return Err(FailedParsing {
-                parsing_time,
-                tree,
-                error: "CST contains parsing errors",
-            });
-        }
-    };
+    super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
     let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
     let processing_time = time.elapsed() - parsing_time;
     Ok(SuccessProcessing {

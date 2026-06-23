@@ -32,6 +32,14 @@ impl PartialEq<PomProc> for PomParameter {
     }
 }
 
+impl crate::processing::CachesHolding for PomProc {
+    type Caches = crate::processing::caches::Pom;
+}
+
+pub fn matches(name: &ObjectName) -> bool {
+    name.eq_str("pom.xml")
+}
+
 pub(crate) fn handle_pom_file<'a, E>(
     tree_gen: &mut XmlTreeGen<'a, 'a, E>,
     name: &ObjectName,
@@ -76,7 +84,7 @@ impl crate::preprocessed::RepositoryProcessor {
         use hyperast_gen_ts_xml::legion::XmlTreeGen;
         let x = self
             .processing_systems
-            .caching_blob_handler::<crate::processing::file_sys::Pom>()
+            .caching_blob_handler::<PomProc>()
             .handle(oid, repository, &name, parameters, |_c, n, t| {
                 let line_break = crate::_auto_configured_line_break(t);
                 // let holder = c.mut_or_default::<PomProcessorHolder>();

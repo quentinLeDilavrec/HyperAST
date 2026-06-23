@@ -83,6 +83,10 @@ pub enum SemFlag {
     HoldMavenSubModule,
 }
 
+impl crate::processing::CachesHolding for MavenProc {
+    type Caches = crate::processing::caches::Maven;
+}
+
 impl MavenModuleAcc {
     pub(crate) fn new(name: String) -> Self {
         Self {
@@ -174,6 +178,14 @@ impl MavenModuleAcc {
     }
 }
 
+/// The maven scheme https://maven.apache.org/guides/introduction/introduction-to-the-standard-directory-layout.html ,
+/// made of nested maven modules.
+/// Each maven module has a config file (often a pom.xml),
+/// a src/main/java/ directory that contains production code for java,
+/// a src/test/java/ directory that contains tests for java,
+/// a src/test/resources/ directory that contains resources that should not be compiled (most of the time),
+/// ... (see ref.)
+// TODO finish implementation
 #[derive(Debug, Clone)]
 pub(crate) struct MavenPartialAnalysis {
     submodules: Vec<()>,

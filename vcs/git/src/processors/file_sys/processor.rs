@@ -16,7 +16,7 @@ use crate::git::BasicGitObject;
 use crate::preprocessed::RepositoryProcessor;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
-use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::processing::{CacheHolding, ObjectName};
 
 use super::{FileSysAcc, Parameter};
 use super::{FileSysProc, FullNode};
@@ -149,7 +149,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     }
 
     fn pre_aux(&mut self, oid: Oid, name: &ObjectName) -> Result<(), crate::ParseErr> {
-        if crate::processing::file_sys::MakeFile::matches(&name) {
+        if crate::processors::make::makefile::matches(&name) {
             // TODO reintroduce, but without any build-sys-level analysis
             // self.prepro
             //     .help_handle_makefile(
@@ -185,7 +185,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "python")]
-        if crate::processors::python::file_sys::Python::matches(&name) {
+        if crate::processors::python::file_sys::matches(&name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let repository = self.repository;
             let p = self.handles.python_handle;

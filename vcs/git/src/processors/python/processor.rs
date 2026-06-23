@@ -14,8 +14,9 @@ use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
-use crate::processing::{CacheHolding, InFiles, ObjectName};
-use crate::processors::{Query, prepare_dir_exploration};
+use crate::processing::{CacheHolding, ObjectName};
+use crate::processors::Query;
+use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
 
 use super::SimpleStores;
@@ -68,7 +69,7 @@ impl<'repo, 'b, 'd, 'c> Processor<PythonAcc> for PythonProcessor<'repo, 'b, 'd, 
             self.handle_tree_cached(oid, name);
             return;
         }
-        if super::file_sys::Python::matches(&name) {
+        if super::file_sys::matches(&name) {
             let acc = &mut self.stack.last_mut().unwrap().acc;
             self.prepro
                 .help_handle_python_file(acc, oid, &name, self.repository, self.handle)
@@ -254,7 +255,7 @@ impl RepositoryProcessor {
         parameters: Handle,
     ) -> Result<super::FullNode, crate::ParseErr> {
         self.processing_systems
-            .caching_blob_handler::<super::file_sys::Python>()
+            .caching_blob_handler::<PythonProc>()
             .handle2(oid, repository, &name, parameters, |c, n, t| {
                 let holder = c.commit_proc_mut::<PythonProcessorHolder>();
                 let proc = holder.with_parameters_mut(parameters);

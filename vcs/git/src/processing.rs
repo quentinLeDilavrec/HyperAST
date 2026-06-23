@@ -221,10 +221,6 @@ pub trait HoldedCache: Sized {
     type Holder: CacheHolding<Self>;
 }
 
-pub trait InFiles {
-    fn matches(name: &ObjectName) -> bool;
-}
-
 pub trait NamedObject {
     fn name(&self) -> &ObjectName;
 }

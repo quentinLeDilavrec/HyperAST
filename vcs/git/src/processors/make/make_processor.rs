@@ -19,7 +19,7 @@ use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::Make as MakeCaches;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
-use crate::processing::{CacheHolding, InFiles, ObjectName};
+use crate::processing::{CacheHolding, ObjectName};
 use crate::processors::cpp::{self as cpp_processor};
 use crate::utils::drain_filter_strip;
 
@@ -80,7 +80,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
         if self.dir_path.peek().is_some() {
             return;
         }
-        if crate::processing::file_sys::MakeFile::matches(&name) {
+        if super::makefile::matches(&name) {
             self.prepro
                 .help_handle_makefile(
                     &mut self.stack.last_mut().unwrap().acc,
@@ -340,10 +340,9 @@ pub(crate) fn prepare_dir_exploration(
         .filter_map(|x| x.ok())
         .collect();
     if dir_path.peek().is_none() {
-        let p = children_objects.iter().position(|x| {
-            x.kind == git2::ObjectType::Blob
-                && crate::processing::file_sys::MakeFile::matches(&x.name)
-        });
+        let p = children_objects
+            .iter()
+            .position(|x| x.kind == git2::ObjectType::Blob && super::makefile::matches(&x.name));
         if let Some(p) = p {
             children_objects.swap(0, p); // priority to config file processing
             children_objects.reverse(); // we use it like a stack

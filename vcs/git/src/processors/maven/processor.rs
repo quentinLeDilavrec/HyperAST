@@ -7,9 +7,10 @@ use git2::{Oid, Repository};
 use hyperast::hashed::MetaDataHashsBuilder;
 use hyperast::store::nodes::compo;
 use hyperast::store::nodes::legion::dyn_builder::EntityBuilder;
-use hyperast::tree_gen::{Accumulator, add_md_precomp_queries};
+use hyperast::tree_gen::Accumulator;
+use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
-use hyperast::types::{ETypeStore as _, Labeled};
 use hyperast_gen_ts_xml::Type;
 
 use crate::Processor;
@@ -345,16 +346,20 @@ pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
 
     let insertion = node_store.prepare_insertion(&hashable, eq);
 
-    if let Some(_id) = insertion.occupied_id() {
-        unimplemented!("I think it should probably stay unused")
-        // let metrics = primary.metrics.map_hashs(|h| h.build());
-        // let status = acc.status;
-        // return super::FullNode {
-        //     id,
-        //     precomp_queries: super::super::PrecompQueries::full(),
-        //     metrics,
-        //     status,
-        // };
+    // Guard to avoid computing metadata for an already present subtree
+    if let Some(id) = insertion.occupied_id() {
+        // different git object but same name and content (that we processed)
+        // NOTE we do not necessarily process every git object, avoid dead weight.
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let status = acc.status;
+        let ana = acc.ana;
+        return FullNode {
+            id: id,
+            metrics,
+            precomp_queries: acc.precomp_queries,
+            status,
+            ana,
+        };
     }
 
     let ana = {
@@ -388,6 +393,9 @@ pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
+
     if let Some(acc) = acc.scripting_acc {
         let subtr = hyperast::scripting::Subtr(kind, &dyn_builder);
         let ss = acc.finish(&subtr).unwrap();
@@ -396,14 +404,14 @@ pub fn make(mut acc: MavenModuleAcc, stores: &mut SimpleStores) -> FullNode {
     };
 
     let vacant = insertion.vacant();
-    let node_id = vacant.insert_built(dyn_builder.build());
+    let id = vacant.insert_built(dyn_builder.build());
 
     let status = acc.status;
 
     FullNode {
-        id: node_id,
+        id,
         metrics,
-        precomp_queries: acc.precomp_queries,
+        precomp_queries,
         status,
         ana,
     }

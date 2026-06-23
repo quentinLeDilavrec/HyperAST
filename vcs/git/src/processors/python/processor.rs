@@ -341,17 +341,17 @@ fn make(acc: PythonAcc, stores: &mut SimpleStores, proc: &mut PythonProc) -> sup
         .inner
         .prepare_insertion(dedup_cache, &hashable, eq);
 
-    if let Some(_id) = insertion.occupied_id() {
-        // NOTE this situation should not happen often, due to cache based on oids, so there is no point caching md.
-        // If git objects are changed but ignored, then it goes through this branch.
-        // TODO bench
-        // TODO in the oid cache the values could be NodeIdentifiers, then current cache would be used with an indirection.
-
-        unimplemented!("I think it should probably stay unused")
-        // let md = md_cache.get(&id).unwrap();
-        // let metrics = primary.metrics;
-        // let metrics = metrics.map_hashs(|h| h.build());
-        // return todo!();
+    // Guard to avoid computing metadata for an already present subtree
+    if let Some(id) = insertion.occupied_id() {
+        // different git object but same name and content (that we processed)
+        // NOTE we do not necessarily process every git object, avoid dead weight.
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let precomp_queries = acc.precomp_queries;
+        return super::FullNode {
+            id,
+            metrics,
+            precomp_queries,
+        };
     }
 
     let mut dyn_builder = subtree_builder::<TStore>(interned_kind);
@@ -363,16 +363,17 @@ fn make(acc: PythonAcc, stores: &mut SimpleStores, proc: &mut PythonProc) -> sup
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
-    add_md_precomp_queries(&mut dyn_builder, acc.precomp_queries.0);
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
 
     let vacant = insertion.vacant();
     let node_id = vacant.insert_built(dyn_builder.build());
 
-    md_cache.insert(node_id, acc.precomp_queries.clone());
+    md_cache.insert(node_id, precomp_queries.clone());
 
     super::FullNode {
         id: node_id,
         metrics,
-        precomp_queries: acc.precomp_queries,
+        precomp_queries,
     }
 }

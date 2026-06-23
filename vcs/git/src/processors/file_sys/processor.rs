@@ -6,6 +6,7 @@ use git2::{Oid, Repository};
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::nodes::legion::dyn_builder::EntityBuilder;
 use hyperast::store::nodes::legion::eq_node;
+use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast::types::ETypeStore as _;
 use hyperast::types::LabelStore;
 
@@ -250,7 +251,10 @@ pub(crate) fn make(acc: FileSysAcc, stores: &mut super::SimpleStores) -> FullNod
     assert_eq!(primary.children_names.len(), primary.children.len());
 
     let insertion = stores.node_store.prepare_insertion(&hashable, eq);
+    // Guard to avoid computing metadata for an already present subtree
     if let Some(id) = insertion.occupied_id() {
+        // different git object but same name and content (that we processed)
+        // NOTE we do not necessarily process every git object, avoid dead weight.
         let metrics = primary.metrics.map_hashs(|h| h.build());
         let n = stores.node_store.resolve(id);
         use hyperast::store::nodes::compo::Precomp;
@@ -276,6 +280,9 @@ pub(crate) fn make(acc: FileSysAcc, stores: &mut super::SimpleStores) -> FullNod
     let metrics = metrics.map_hashs(|h| h.build());
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
+
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
 
     let vacant = insertion.vacant();
     let id = vacant.insert_built(dyn_builder.build());

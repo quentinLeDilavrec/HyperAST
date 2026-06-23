@@ -186,18 +186,13 @@ impl crate::preprocessed::CommitProcessor<crate::processing::file_sys::Make>
         let makefile_handle = h.register_param(t);
         let h = self.processing_systems.commit_proc_mut::<MakeProcHolder>();
         let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
-        let handle = h.register_param(t);
+        let handle = h.register_param(t.clone());
 
         use crate::Processor;
         use crate::processors::make::MakeModuleAcc;
         use crate::processors::make::make_processor::MakeProcessor;
         let root_full_node = MakeProcessor::<true, false, MakeModuleAcc>::prepare(
-            repository,
-            self,
-            dir_path,
-            name,
-            tree_oid,
-            handle.erase(),
+            repository, self, dir_path, name, tree_oid, handle, t,
         )
         .process();
         root_full_node

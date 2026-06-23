@@ -179,6 +179,7 @@ impl PreProcessedRepositories {
         };
         let processor_map = &mut self.processor.processing_systems;
         let r = match config {
+            #[cfg(feature = "maven_java")]
             RepoConfig::JavaMaven => {
                 let java_handle = java(processor_map);
                 let pom_handle = pom(processor_map);
@@ -190,6 +191,7 @@ impl PreProcessedRepositories {
                 let config = h.register_param(t).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
+            #[cfg(feature = "java")]
             RepoConfig::Java => {
                 let config = java(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
@@ -199,12 +201,18 @@ impl PreProcessedRepositories {
                 let config = python(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
+            #[cfg(feature = "make_cpp")]
             RepoConfig::CppMake => {
                 let cpp_handle = CppProc::default_handle(processor_map);
                 let makefile_handle = makefile(processor_map);
                 let h = processor_map.commit_proc_mut::<MakeProcessorHolder>();
                 let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
                 let config = h.register_param(t).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            #[cfg(feature = "cpp")]
+            RepoConfig::Cpp => {
+                let config = CppProc::default_handle(processor_map).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             #[cfg(feature = "file_sys")]
@@ -342,6 +350,10 @@ impl PreProcessedRepositories {
                 let h = processor_map.commit_proc_mut::<MakeProcessorHolder>();
                 let t = crate::processors::make::Parameter::new(makefile_handle, cpp_handle);
                 let config = h.register_param(t).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            RepoConfig::Cpp => {
+                let config = cpp(processor_map, query.into()).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             RepoConfig::Python => {

@@ -9,6 +9,7 @@ pub enum ProcessingConfig<P> {
     Java { limit: usize, dir_path: P },
     JavaMaven { limit: usize, dir_path: P },
     CppMake { limit: usize, dir_path: P },
+    Cpp { limit: usize, dir_path: P },
     TsNpm { limit: usize, dir_path: P },
     Python { limit: usize, dir_path: P },
     Any { limit: usize, dir_path: P },
@@ -20,6 +21,7 @@ pub enum ProcessingConfig<P> {
 pub enum RepoConfig {
     Java,
     CppMake,
+    Cpp,
     JavaMaven,
     TsNpm,
     Python,
@@ -52,6 +54,10 @@ impl From<&RepoConfig> for ProcessingConfig<&'static str> {
     fn from(value: &RepoConfig) -> Self {
         match value {
             RepoConfig::CppMake => Self::CppMake {
+                limit: 3,
+                dir_path: "",
+            },
+            RepoConfig::Cpp => Self::Cpp {
                 limit: 3,
                 dir_path: "",
             },

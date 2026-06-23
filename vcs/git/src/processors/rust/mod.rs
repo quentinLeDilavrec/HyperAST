@@ -1,6 +1,7 @@
 //! Handles Java
 //!
 mod caches;
+mod commit_proc;
 pub mod file_sys;
 mod processor;
 
@@ -11,16 +12,24 @@ use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::caches::OidMap;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_rust::TStore;
 use hyperast_gen_ts_rust::legion as rust_tree_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
+type RustProcessorHolder = crate::processing::ProcessorHolder<RustProc>;
 
-pub(crate) use processor::RustProc;
+pub(crate) struct RustProc {
+    parameter: Parameter,
+    query: Option<super::Query>,
+    cache: caches::Rust,
+    commits: OidMap<crate::Commit>,
+}
 
 use super::FullNode;
+use super::PrecompQueries;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
@@ -35,8 +44,6 @@ impl Parameter {
         }
     }
 }
-
-type PrecompQueries = tree_gen::extra_pattern_precomp::PrecompQueries;
 
 pub struct RustAcc {
     pub(crate) primary: DirPrimary,

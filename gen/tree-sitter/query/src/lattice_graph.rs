@@ -4,7 +4,7 @@ use num::ToPrimitive;
 use petgraph::csr::Csr;
 use petgraph::{Directed, Graph};
 
-use hashbrown::{HashMap, HashSet};
+use hyperast::compat::{HashMap, HashSet};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::{EdgeRef, IntoNodeReferences};
 

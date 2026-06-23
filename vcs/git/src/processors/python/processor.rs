@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::iter::Peekable;
 use std::path::Components;
 
@@ -9,16 +8,16 @@ use hyperast::tree_gen::add_md_precomp_queries;
 
 use crate::_auto_configured_line_break;
 use crate::git::BasicGitObject;
-use crate::preprocessed::{CommitBuilder, RepositoryProcessor};
+use crate::preprocessed::RepositoryProcessor;
+use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
-use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
-use crate::processing::erased::PreparedCommitProc;
-use crate::processing::{CacheHolding, ObjectName};
 use crate::processors::Query;
 use crate::processors::prepare_dir_exploration;
+use crate::processors::python::PythonProc;
 use crate::{Processor, StackEle};
 
+use super::PythonProcessorHolder;
 use super::SimpleStores;
 use super::{Parameter, PythonAcc};
 use hyperast_gen_ts_python::legion as python_gen;
@@ -34,8 +33,6 @@ pub struct PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: Handle,
 }
-
-type PythonProcessorHolder = crate::processing::ProcessorHolder<PythonProc>;
 
 impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     pub(crate) fn prepare(
@@ -146,13 +143,6 @@ impl<'repo, 'prepro, 'd, 'c> PythonProcessor<'repo, 'prepro, 'd, 'c, PythonAcc> 
     }
 }
 
-pub(crate) struct PythonProc {
-    parameter: Parameter,
-    query: Option<Query>,
-    cache: super::caches::Python,
-    commits: HashMap<git2::Oid, crate::Commit>,
-}
-
 impl From<Parameter> for PythonProc {
     fn from(t: Parameter) -> Self {
         let query = t.query.as_ref().map(|q| {
@@ -171,78 +161,6 @@ impl From<Parameter> for PythonProc {
 impl PartialEq<PythonProc> for Parameter {
     fn eq(&self, other: &PythonProc) -> bool {
         self == &other.parameter
-    }
-}
-
-impl crate::processing::erased::CommitProc for PythonProc {
-    fn prepare_processing_at_path<'repo>(
-        &self,
-        repository: &'repo Repository,
-        commit_builder: CommitBuilder,
-        path: std::path::PathBuf,
-        handle: PCPHandle,
-    ) -> Box<dyn PreparedCommitProc + 'repo> {
-        Box::new(PreparedPythonCommitProc {
-            repository,
-            commit_builder,
-            dir_path: path,
-            handle,
-        })
-    }
-
-    fn get_commit(&self, commit_oid: git2::Oid) -> Option<&crate::Commit> {
-        self.commits.get(&commit_oid)
-    }
-
-    fn commit_count(&self) -> usize {
-        self.commits.len()
-    }
-
-    fn get_precomp_query(&self) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
-        dbg!(&self.parameter.query);
-        self.parameter.query.clone()
-    }
-}
-
-struct PreparedPythonCommitProc<'repo> {
-    repository: &'repo Repository,
-    commit_builder: CommitBuilder,
-    dir_path: std::path::PathBuf,
-    pub(crate) handle: PCPHandle,
-}
-
-impl<'repo> PreparedCommitProc for PreparedPythonCommitProc<'repo> {
-    fn process(
-        self: Box<PreparedPythonCommitProc<'repo>>,
-        prepro: &mut RepositoryProcessor,
-    ) -> hyperast::store::defaults::NodeIdentifier {
-        let mut dir_path = self.dir_path.components().peekable();
-        let name = ObjectName::from(b"");
-        // TODO check parameter in self to know it is a recursive module search
-        let root_full_node = prepro.handle_python_directory(
-            self.repository,
-            &mut dir_path,
-            &name,
-            self.commit_builder.tree_oid(),
-            self.handle.try_into().unwrap(),
-        );
-        let h = prepro
-            .processing_systems
-            .commit_proc_mut::<PythonProcessorHolder>();
-        let handle = self.handle.try_into().unwrap();
-        let oid = self.commit_builder.commit_oid();
-        let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle).commits.insert(oid, commit);
-        root_full_node.id
-    }
-}
-
-impl CacheHolding<super::caches::Python> for PythonProc {
-    fn get_caches_mut(&mut self) -> &mut super::caches::Python {
-        &mut self.cache
-    }
-    fn get_caches(&self) -> &super::caches::Python {
-        &self.cache
     }
 }
 

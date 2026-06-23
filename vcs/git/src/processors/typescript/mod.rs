@@ -1,6 +1,7 @@
 //! Handles Java
 //!
 mod caches;
+mod commit_proc;
 pub mod file_sys;
 mod processor;
 
@@ -11,20 +12,28 @@ use crate::Accumulator;
 use crate::DirPrimary;
 use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::caches::OidMap;
 use crate::{FailedParsing, FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_typescript::TStore;
 use hyperast_gen_ts_typescript::legion as typescript_tree_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
-
-pub(crate) use processor::TypescriptProc;
+type TypescriptProcessorHolder = crate::processing::ProcessorHolder<TypescriptProc>;
 
 use super::FullNode;
+use super::PrecompQueries;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct Parameter {
     pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
+}
+
+pub(crate) struct TypescriptProc {
+    parameter: Parameter,
+    query: Option<super::Query>,
+    cache: caches::Typescript,
+    commits: OidMap<crate::Commit>,
 }
 
 impl Parameter {
@@ -35,8 +44,6 @@ impl Parameter {
         }
     }
 }
-
-type PrecompQueries = tree_gen::extra_pattern_precomp::PrecompQueries;
 
 pub struct TypescriptAcc {
     pub(crate) primary: DirPrimary,

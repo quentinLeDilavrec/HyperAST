@@ -6,9 +6,7 @@ pub mod makefile;
 use std::{fmt::Debug, path::PathBuf};
 
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
-use hyperast_gen_ts_xml::legion::XmlTreeGen;
 
-use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
@@ -129,40 +127,6 @@ impl MakeModuleAcc {
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
     }
-}
-
-pub(crate) fn handle_makefile_file<'a, E>(
-    tree_gen: &mut XmlTreeGen<'a, 'a, E>,
-    name: &ObjectName,
-    text: &'a [u8],
-) -> Result<MakeFile, ()>
-where
-    E: hyperast::tree_gen::TsExtra<SimpleStores>,
-{
-    log::trace!("not parsing {} bytes long Makefile", text.len()); // TODO parse the makefile
-    let text = b"<proj></proj>";
-    let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
-    if tree.root_node().has_error() {
-        log::warn!("bad CST");
-        log::debug!("{:?}", name.try_str());
-        log::debug!("{}", tree.root_node().to_sexp());
-        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
-            return Err(());
-        }
-    }
-    let (n, _) = tree_gen
-        .generate_file(name.as_bytes(), text, tree.walk())
-        .into();
-    let x = n.local;
-    // TODO extract submodules, dependencies and directories. maybe even more ie. artefact id, ...
-    let x = MakeFile {
-        compressed_node: x.compressed_node,
-        metrics: x.metrics,
-        submodules: vec![],
-        source_dirs: vec![".".to_owned()],
-        test_source_dirs: vec!["../tests".to_owned()],
-    };
-    Ok(x)
 }
 
 impl crate::processing::CachesHolding for MakeProc {

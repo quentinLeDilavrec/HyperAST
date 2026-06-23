@@ -48,15 +48,10 @@ pub(crate) fn handle_pom_file<'a, E>(
 where
     E: hyperast::tree_gen::TsExtra<SimpleStores>,
 {
+    let time = std::time::Instant::now();
     let tree = hyperast_gen_ts_xml::tree_sitter_parse(text);
-    if tree.root_node().has_error() {
-        log::warn!("bad CST: {:?}", name.try_str());
-        log::debug!("{}", tree.root_node().to_sexp());
-        if crate::PROPAGATE_ERROR_ON_BAD_CST_NODE {
-            return Err(ParseErr::IllFormed);
-        }
-    }
-
+    let parsing_time = time.elapsed();
+    super::super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
     let (n, _) = tree_gen
         .generate_file(name.as_bytes(), text, tree.walk())
         .into();

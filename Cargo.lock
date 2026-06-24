@@ -4307,6 +4307,8 @@ dependencies = [
  "hyper_diff",
  "hyperast",
  "hyperast_gen_ts_java",
+ "hyperast_gen_ts_python",
+ "hyperast_gen_ts_rust",
  "hyperast_gen_ts_tsquery",
  "hyperast_gen_ts_xml",
  "hyperast_tsquery",

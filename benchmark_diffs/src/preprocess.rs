@@ -7,7 +7,7 @@ use hyperast::types::LabelStore as _;
 
 use hyperast_gen_ts_java::language;
 use hyperast_gen_ts_java::legion_with_refs::tree_sitter_parse;
-use hyperast_gen_ts_java::legion_with_refs::{FNode, JavaTreeGen, Local, MD, MDCache};
+use hyperast_gen_ts_java::legion_with_refs::{FNode, JavaTreeGen, MDCache};
 use hyperast_gen_ts_java::{Lang, TStore, Type};
 use hyperast_vcs_git::auto_configured_line_break;
 use hyperast_vcs_git::processors::FullNode;

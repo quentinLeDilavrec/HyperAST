@@ -322,7 +322,6 @@ pub fn per_blob_cached<TS>(
     dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
-    use hyperast_gen_ts_java::TStore;
     multi_run::<_, hyperast_tsquery::Query, _, _>(
         &mut cumulative,
         &mut repositories,
@@ -335,7 +334,7 @@ pub fn per_blob_cached<TS>(
             let commits = repositories.pre_process_chunk(&mut rw, &repository, first_chunk);
             cumulative.commit_prepared(commits.len())?;
             dbg!(memusage().to_string());
-            execute_on_commits_per_blob_cached::<_, TStore, _>(
+            execute_on_commits_per_blob_cached::<_, TS, _>(
                 config,
                 &mut repositories,
                 &repository,
@@ -354,18 +353,11 @@ pub fn polyglot(
     repo: hyperast_vcs_git::git::Repo,
     sub: &[&str],
     commit: &str,
-    depth: usize,
+    config: crate::Config,
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) {
-    let config = crate::Config {
-        config: RepoConfig::Java,
-        first_chunk: 1,
-        chunk_interval: 1,
-        depth,
-    };
-
     let mut cumulative = Cumulative::<RichResult<usize>>::with_timeout(timeout);
     dbg!(memusage().to_string());
 
@@ -376,7 +368,7 @@ pub fn polyglot(
         return;
     }
 
-    let first_chunk = depth.min(config.first_chunk);
+    let first_chunk = config.depth.min(config.first_chunk);
 
     dbg!(memusage().to_string());
 
@@ -389,7 +381,7 @@ pub fn polyglot(
         queries,
         |mut cumulative, mut repositories, executor| {
             dbg!(memusage().to_string());
-            let mut rw = commit_rw(commit, Some(depth), &repository.repo).unwrap();
+            let mut rw = commit_rw(commit, Some(config.depth), &repository.repo).unwrap();
             let commits = repositories.pre_process_chunk(&mut rw, &repository, first_chunk);
             cumulative.commit_prepared(commits.len())?;
             dbg!(memusage().to_string());

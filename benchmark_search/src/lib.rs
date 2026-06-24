@@ -79,6 +79,17 @@ pub struct Config {
     pub depth: usize,
 }
 
+impl Config {
+    pub fn freq1(config: hyperast_vcs_git::processing::RepoConfig, depth: usize) -> Self {
+        Self {
+            config,
+            first_chunk: 1,
+            chunk_interval: 1,
+            depth,
+        }
+    }
+}
+
 pub enum LogEntry<R> {
     PrepareRepository,
     PrepareCommits(usize),

@@ -6,6 +6,13 @@ pub fn resolve_language(language: &str) -> Option<tree_sitter::Language> {
         "Java" | "java" => Some(hyperast_gen_ts_java::language()),
         #[cfg(feature = "cpp")]
         "Cpp" | "cpp" => Some(hyperast_gen_ts_cpp::language()),
+        #[cfg(feature = "python")]
+        "Python" | "python" => Some(hyperast_gen_ts_python::language()),
+        #[cfg(feature = "typescript")]
+        "TypeScript" | "typescript" => Some(hyperast_gen_ts_typescript::language()),
+        #[cfg(feature = "rust")]
+        "Rust" | "rust" => Some(hyperast_gen_ts_rust::language()),
+
         _ => None,
     }
 }

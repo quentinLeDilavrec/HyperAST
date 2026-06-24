@@ -26,6 +26,8 @@ struct Cli {
     depth: usize,
     #[clap(long)]
     fetch: bool,
+    #[clap(long)]
+    language: Option<String>,
     #[clap(long, value_parser = hyperast_benchmark_search::parse_timeout, default_value_t = Timeout::MAX)]
     timeout: Timeout,
     #[clap(subcommand)]
@@ -76,7 +78,6 @@ enum Bench {
         sub: Option<std::path::PathBuf>,
         #[clap(short = 's')]
         s: Vec<usize>,
-        language: String,
         #[clap(long)]
         /// cache the result of the search, associated to files in the case of Java, in the case of JavaMaven I still don't know.
         cached: bool,
@@ -101,10 +102,11 @@ fn main() {
     let name = &args.name;
     let commit = &args.commit;
     let depth = args.depth;
+    let language = args.language.unwrap_or("Java".to_string());
     let repo = hyperast_vcs_git::git::Forge::Github.repo(user, name);
 
     if args.fetch {
-        repo.fetch();
+        repo.fetch_with_cb(|s| eprintln!("{}", s)).unwrap();
         eprintln!("fetched {}/{}", user, name);
         return;
     }
@@ -125,9 +127,9 @@ fn main() {
             prepare,
             cache,
         } => {
+            let filter = choose_filter(&language);
             let repository = repo.nofetch();
-            let language = "Java";
-            let language = hyperast_vcs_git::resolve_language(language).unwrap();
+            let language = hyperast_vcs_git::resolve_language(&language).unwrap();
             let queries = hyperast_benchmark_search::ReadSearches::default();
             (if cache {
                 if !prepare && !blob && !tree {
@@ -139,7 +141,9 @@ fn main() {
                 no_hyperast::baseline_prepare_blob_tree
             } else {
                 unimplemented!()
-            })(repository, commit, depth, &language, queries, timeout);
+            })(
+                repository, commit, depth, &language, queries, timeout, filter,
+            );
         }
         Bench::TSQ2 {
             prepare,
@@ -149,9 +153,9 @@ fn main() {
             sub,
             s,
         } => {
+            let filter = choose_filter(&language);
             let repository = repo.nofetch();
-            let language = "Java";
-            let language = hyperast_vcs_git::resolve_language(language).unwrap();
+            let language = hyperast_vcs_git::resolve_language(&language).unwrap();
             let queries = hyperast_benchmark_search::ReadSearches::default();
             let sub = sub
                 .map(|path| read_subpatterns_file(&path))
@@ -163,11 +167,11 @@ fn main() {
                 if blob && tree {
                     if sub.is_empty() {
                         no_hyperast::baseline_our_executor_prepare_cache_trees_and_blobs(
-                            repository, commit, depth, &language, queries, timeout,
+                            repository, commit, depth, &language, queries, timeout, filter,
                         );
                     } else {
                         no_hyperast::baseline_our_executor_prepare_cache_trees_and_blobs_precomp(
-                            repository, commit, depth, &language, &sub, queries, timeout,
+                            repository, commit, depth, &language, &sub, queries, timeout, filter,
                         );
                     }
                 } else if tree {
@@ -182,11 +186,11 @@ fn main() {
                 }
             } else if blob && tree && cache {
                 no_hyperast::baseline_our_executor_cache_trees_and_blobs_memo(
-                    repository, commit, depth, &language, queries, timeout,
+                    repository, commit, depth, &language, queries, timeout, filter,
                 );
             } else if blob && tree {
                 no_hyperast::baseline_our_executor_cache_trees_and_blobs(
-                    repository, commit, depth, &language, queries, timeout,
+                    repository, commit, depth, &language, queries, timeout, filter,
                 );
             } else if tree {
                 todo!()
@@ -194,19 +198,25 @@ fn main() {
                 todo!()
             } else {
                 no_hyperast::baseline_our_executor(
-                    repository, commit, depth, &language, queries, timeout,
+                    repository, commit, depth, &language, queries, timeout, filter,
                 );
             }
         }
         Bench::OURS {
             sub,
-            language,
             s,
             cached,
             nospace,
         } => {
             use hyperast_vcs_git::processing::RepoConfig;
-            let c: RepoConfig = FromStr::from_str(&language).unwrap();
+            let c;
+            let language = if language.starts_with("_") {
+                c = RepoConfig::Any;
+                language.trim_start_matches("_")
+            } else {
+                c = FromStr::from_str(&language).unwrap();
+                &language
+            };
             let queries = if let Some(input) = args.input {
                 hyperast_benchmark_search::ReadSearches::new(input)
             } else {
@@ -220,29 +230,56 @@ fn main() {
             let sub = s.iter().map(|i| sub[*i].as_str()).collect::<Vec<_>>();
 
             use hyperast_benchmark_search::with_hyperast;
-            if language == "Java" {
+            macro_rules! per_blob {
+                ($t:path) => {
+                    if cached {
+                        with_hyperast::per_blob_cached::<$t>
+                    } else if nospace {
+                        with_hyperast::per_blob_nospaces::<$t>
+                    } else {
+                        with_hyperast::per_blob::<$t>
+                    }
+                };
+            }
+            if c == RepoConfig::Rust {
+                let config = hyperast_benchmark_search::Config::freq1(c, depth);
                 let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-                let config = hyperast_benchmark_search::Config {
-                    config: RepoConfig::Java,
-                    first_chunk: 1,
-                    chunk_interval: 1,
-                    depth,
-                };
-                let per_blob = if cached {
-                    with_hyperast::per_blob_cached::<hyperast_gen_ts_java::TStore>
-                } else if nospace {
-                    with_hyperast::per_blob_nospaces::<hyperast_gen_ts_java::TStore>
+                per_blob!(hyperast_gen_ts_rust::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::Python {
+                let config = hyperast_benchmark_search::Config::freq1(c, depth);
+                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
+                per_blob!(hyperast_gen_ts_python::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::Any {
+                if cfg!(debug_assertions) {
+                    eprintln!("WARNING this feature is still buggy with non polyglot queries")
                 } else {
-                    with_hyperast::per_blob::<hyperast_gen_ts_java::TStore>
-                };
-                per_blob(repo, &sub, commit, config, &language, queries, timeout);
+                    panic!("this feature is still buggy with non polyglot queries");
+                }
+                let config = hyperast_benchmark_search::Config::freq1(c, depth);
+                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
+                per_blob!(hyperast_gen_ts_python::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if language.eq_ignore_ascii_case("Java") {
+                assert_eq!(c, RepoConfig::Java);
+                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
+                let config = hyperast_benchmark_search::Config::freq1(c, depth);
+                per_blob!(hyperast_gen_ts_java::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
             } else if c == RepoConfig::JavaMaven {
                 assert!(!cached);
+                let config = hyperast_benchmark_search::Config::freq1(c, depth);
                 let language = hyperast_vcs_git::resolve_language("Java").unwrap();
-                with_hyperast::polyglot(repo, &sub, commit, depth, &language, queries, timeout);
+                with_hyperast::polyglot(repo, &sub, commit, config, &language, queries, timeout);
                 // } else if language == RepoConfig::Cpp {
                 //     todo!();
             } else if c == RepoConfig::CppMake {
+                // the build sys enabled querying is not the priority
                 todo!();
             } else {
                 unimplemented!("new generators are needed to support additional languages")
@@ -255,6 +292,41 @@ fn main() {
             }
             write_speed::run_write_benchmark();
         }
+    }
+}
+
+fn choose_filter(language: &str) -> fn(&str) -> bool {
+    fn match_java(name: &str) -> bool {
+        name.ends_with(".java")
+    }
+    fn match_cpp(name: &str) -> bool {
+        name.ends_with(".cpp") || name.ends_with(".hpp")
+    }
+    fn match_c(name: &str) -> bool {
+        name.ends_with(".c") || name.ends_with(".h")
+    }
+    fn match_typescript(name: &str) -> bool {
+        name.ends_with(".ts") || name.ends_with(".d.ts")
+    }
+    fn match_javascript(name: &str) -> bool {
+        name.ends_with(".js")
+    }
+    fn match_rust(name: &str) -> bool {
+        name.ends_with(".rs")
+    }
+    fn match_python(name: &str) -> bool {
+        name.ends_with(".py")
+    }
+
+    match language.to_lowercase().as_ref() {
+        "java" => match_java,
+        "cpp" => match_cpp,
+        "c" => match_c,
+        "typescript" => match_typescript,
+        "javascript" => match_javascript,
+        "rust" => match_rust,
+        "python" => match_python,
+        l => panic!("must provide a filter for language: {}", l),
     }
 }
 

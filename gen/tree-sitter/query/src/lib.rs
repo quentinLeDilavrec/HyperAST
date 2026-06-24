@@ -46,7 +46,7 @@ pub mod code2query;
 #[cfg(feature = "impl")]
 pub mod refinements;
 
-#[cfg(feature = "lattice")]
+#[cfg(all(feature = "lattice", feature = "impl"))]
 pub mod lattice_graph;
 
 pub mod meta_queries;

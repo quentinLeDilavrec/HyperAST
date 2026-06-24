@@ -258,6 +258,7 @@ pub fn baseline(
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = Cumulative::with_timeout(timeout);
     multi_run(
@@ -267,15 +268,9 @@ pub fn baseline(
         language,
         queries,
         tree_sitter_execute_count,
-        |cumulative, repository, _, executor| {
+        move |cumulative, repository, _, executor| {
             parse_and_execute_on_commits_once_per_file(
-                cumulative,
-                repository,
-                commit,
-                depth,
-                &language,
-                |name| name.ends_with(".java"),
-                executor,
+                cumulative, repository, commit, depth, &language, filter, executor,
             )
         },
     );
@@ -289,6 +284,7 @@ pub fn baseline_prepare_blob_tree(
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = Cumulative::with_timeout(timeout);
     let cache = HashMap::<FileId, (tree_sitter::Tree, git2::Blob)>::new();
@@ -301,14 +297,7 @@ pub fn baseline_prepare_blob_tree(
         tree_sitter_execute_count,
         |cumulative, repository, cache, executor| {
             parse_and_execute_on_commits_prepare_cache_trees_and_blobs2(
-                cumulative,
-                cache,
-                repository,
-                commit,
-                depth,
-                &language,
-                |name| name.ends_with(".java"),
-                executor,
+                cumulative, cache, repository, commit, depth, &language, filter, executor,
             )
         },
     );
@@ -323,6 +312,7 @@ pub fn baseline_our_executor(
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     multi_run(
@@ -334,13 +324,7 @@ pub fn baseline_our_executor(
         tsquery_execute_count,
         |cumulative, repository, _, executor| {
             parse_and_execute_on_commits_once_per_file(
-                cumulative,
-                repository,
-                commit,
-                depth,
-                &language,
-                |name| name.ends_with(".java"),
-                executor,
+                cumulative, repository, commit, depth, &language, filter, executor,
             )
         },
     );
@@ -354,6 +338,7 @@ pub fn baseline_our_executor_cache_trees_and_blobs(
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     // the cache which avoids re-parsing files and re-resolving blobs
@@ -368,14 +353,7 @@ pub fn baseline_our_executor_cache_trees_and_blobs(
         tsquery_execute_count,
         |cumulative, repository, cache, executor| {
             parse_and_execute_on_commits_cache_trees_and_blobs(
-                cumulative,
-                cache,
-                repository,
-                commit,
-                depth,
-                &language,
-                |name| name.ends_with(".java"),
-                executor,
+                cumulative, cache, repository, commit, depth, &language, filter, executor,
             )
         },
     );
@@ -389,6 +367,7 @@ pub fn baseline_our_executor_prepare_cache_trees_and_blobs(
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     let cache = HashMap::<FileId, (tree_sitter::Tree, git2::Blob)>::new();
@@ -401,14 +380,7 @@ pub fn baseline_our_executor_prepare_cache_trees_and_blobs(
         tsquery_execute_count,
         |cumulative, repository, cache, executor| {
             parse_and_execute_on_commits_prepare_cache_trees_and_blobs2(
-                cumulative,
-                cache,
-                repository,
-                commit,
-                depth,
-                &language,
-                |name| name.ends_with(".java"),
-                executor,
+                cumulative, cache, repository, commit, depth, &language, filter, executor,
             )
         },
     );
@@ -422,6 +394,7 @@ pub fn baseline_our_executor_cache_trees_and_blobs_memo(
     language: &tree_sitter::Language,
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     // the cache which avoids re-parsing files and re-resolving blobs
@@ -436,14 +409,7 @@ pub fn baseline_our_executor_cache_trees_and_blobs_memo(
         tsquery_execute_count,
         |cumulative, repository, cache, executor| {
             parse_and_execute_on_commits_cache_trees_and_blobs_memo(
-                cumulative,
-                cache,
-                repository,
-                commit,
-                depth,
-                &language,
-                |name| name.ends_with(".java"),
-                executor,
+                cumulative, cache, repository, commit, depth, &language, filter, executor,
             )
         },
     );
@@ -458,6 +424,7 @@ pub fn baseline_our_executor_prepare_cache_trees_and_blobs_precomp(
     precomp: &[&str],
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
 ) {
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     let cache = (
@@ -479,7 +446,7 @@ pub fn baseline_our_executor_prepare_cache_trees_and_blobs_precomp(
                 commit,
                 depth,
                 &language,
-                |name| name.ends_with(".java"),
+                filter,
                 executor,
             )
         },
@@ -495,7 +462,7 @@ fn parse_and_execute_on_commits_once_per_file<
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
     let repository: &git2::Repository = &repository;
@@ -559,7 +526,7 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs<'a, R: Default>(
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
     let rw = commit_rw(commit, Some(depth), repository).unwrap();
@@ -631,7 +598,7 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs_memo<
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
     let rw = commit_rw(commit, Some(depth), repository).unwrap();
@@ -713,7 +680,7 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs<'a, R: Default>(
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
     let mut rw = commit_rw(commit, Some(depth), repository)
@@ -824,7 +791,7 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs2<'a, R: Default>(
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
     let rw = commit_rw(commit, Some(depth), repository)
@@ -895,7 +862,7 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp<'a, R: Def
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl for<'t> FileSkippingExecutor<
         P<'t> = (&'t [u8], &'t tree_sitter::Tree),
         R = R,
@@ -1011,7 +978,7 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp2<'a, R: De
     commit: &str,
     depth: usize,
     language: &tree_sitter::Language,
-    filter: impl Fn(&str) -> bool,
+    filter: impl Clone + Fn(&str) -> bool,
     executor: impl for<'t> FileSkippingExecutor<
         P<'t> = (&'t [u8], &'t tree_sitter::Tree),
         R = R,

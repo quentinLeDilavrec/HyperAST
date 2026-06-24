@@ -585,9 +585,13 @@ where
         let Some(cs) = n.children() else {
             return false;
         };
+        let k = decomp_t!(HAST::TS, n);
         let mut cs = cs.iter_children();
         loop {
-            let Some(id) = cs.next() else { unreachable!() };
+            let Some(id) = cs.next() else {
+                // when in a file with only spaces
+                return false;
+            };
             let n = stores.node_store().resolve(&id);
             let k = decomp_t!(HAST::TS, &n);
             if !k.is_spaces() {

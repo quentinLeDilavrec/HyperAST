@@ -282,7 +282,7 @@ impl HyperType for Type {
     }
 
     fn is_file(&self) -> bool {
-        todo!()
+        self == &Type::Program
     }
 
     fn is_spaces(&self) -> bool {
@@ -295,7 +295,7 @@ impl HyperType for Type {
     }
 
     fn is_syntax(&self) -> bool {
-        todo!()
+        self.is_syntax()
     }
 
     fn as_shared(&self) -> hyperast::types::Shared {

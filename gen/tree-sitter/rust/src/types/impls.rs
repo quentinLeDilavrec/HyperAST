@@ -134,7 +134,6 @@ fn id_for_node_kind(kind: &str, named: bool) -> u16 {
     unimplemented!("need treesitter grammar")
 }
 
-// 356 + directory  + spaces
 const COUNT: u16 = 358;
 
 impl Display for Type {
@@ -282,7 +281,7 @@ impl HyperType for Type {
     }
 
     fn is_file(&self) -> bool {
-        todo!()
+        self == &Type::SourceFile
     }
 
     fn is_spaces(&self) -> bool {
@@ -295,7 +294,7 @@ impl HyperType for Type {
     }
 
     fn is_syntax(&self) -> bool {
-        todo!()
+        self.is_syntax()
     }
 
     fn as_shared(&self) -> hyperast::types::Shared {

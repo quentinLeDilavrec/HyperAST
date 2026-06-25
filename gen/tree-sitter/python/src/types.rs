@@ -38,7 +38,14 @@ macro_rules! declare_type {
                     TStore::SPACES => Type::Spaces,
                     TStore::_ERROR => Type::_ERROR,
                     TStore::ERROR => Type::ERROR,
-                    x => S_T_L[x as usize],
+                    1376 => Type::_ERROR, // weird, look at `test_plot_py_error_type` to reproduce
+                    x => if let Some(t) = S_T_L.get(x as usize) { *t } else {
+                        panic!("id of python type should be in 0..{} but is {x}", S_T_L.len());
+                        // dbg!(x);
+                        // dbg!(crate::language().node_kind_for_id(x));
+                        // panic!();
+                        // Type::_ERROR
+                    },
                 }
             }
             #[allow(unreachable_patterns)]

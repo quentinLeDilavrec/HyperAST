@@ -340,6 +340,23 @@ fn test_java() {
 }
 
 #[test]
+fn test_any_turso() {
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("hyperast_vcs_git=trace"),
+    )
+    .init();
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+
+    let repo = crate::git::Forge::Github.repo("tursodatabase", "turso");
+    let config = crate::processing::RepoConfig::Any;
+    let handle = preprocessed.register_config(repo, config);
+    let handle = &handle.fetch();
+    let _commits = preprocessed
+        .pre_process_with_limit(handle, "", "f15d6c17aba5be052ea20893f7a52448ec63b370", 2)
+        .unwrap();
+}
+
+#[test]
 #[ignore] // not a normal test
 fn test_java_at_path() {
     use std::io::Write;

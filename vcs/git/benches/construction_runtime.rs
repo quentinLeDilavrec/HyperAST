@@ -1,18 +1,25 @@
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::measurement::Measurement;
+use criterion::{
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, criterion_group, criterion_main,
+};
 
+use hyperast::types::HyperAST;
 use hyperast_vcs_git::git::Forge;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
 use hyperast_vcs_git::processing::RepoConfig;
 
-fn construction_group(c: &mut Criterion) {
-    let mut group = c.benchmark_group("HyperAST Construction");
+struct Input {
+    repo: hyperast_vcs_git::git::Repo,
+    commit: &'static str,
+    config: RepoConfig,
+    fetch: bool,
+}
 
-    struct Input {
-        repo: hyperast_vcs_git::git::Repo,
-        commit: &'static str,
-        config: RepoConfig,
-        fetch: bool,
-    }
+fn construction_group(c: &mut Criterion) {
+    let resummarize = c.resummarize;
+    let Ok(throughput_kind) = c.throughput.parse();
+
+    let mut group = c.benchmark_group("HyperAST Construction");
 
     let inputs: &[Input] = &[
         // Input {
@@ -165,21 +172,70 @@ fn construction_group(c: &mut Criterion) {
             config: RepoConfig::Rust,
             fetch: true,
         },
+        Input {
+            repo: Forge::Github.repo("tursodatabase", "turso"),
+            commit: "f15d6c17aba5be052ea20893f7a52448ec63b370",
+            config: RepoConfig::Rust,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("tursodatabase", "turso"),
+            commit: "f15d6c17aba5be052ea20893f7a52448ec63b370",
+            config: RepoConfig::Any, // Rust C Python Typescript Java
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("kraj", "musl"),
+            commit: "8cb84492b0245d70b2cd0edd523e2b55c7ad67a9",
+            config: RepoConfig::C,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("tursodatabase", "libsql"),
+            commit: "ef758d96b9424a2d506f7e417f84b42b9b9a5412",
+            config: RepoConfig::C,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("tursodatabase", "libsql"),
+            commit: "ef758d96b9424a2d506f7e417f84b42b9b9a5412",
+            config: RepoConfig::Rust,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("sqlite", "sqlite"),
+            commit: "19688708136ddfac9ea459ce393d8f4391fb057b",
+            config: RepoConfig::C,
+            fetch: true,
+        },
+        Input {
+            repo: Forge::Github.repo("sqlite", "sqlite"),
+            commit: "19688708136ddfac9ea459ce393d8f4391fb057b",
+            config: RepoConfig::Any, // C TCL Javascript Java
+            fetch: true,
+        },
     ];
 
     for p in inputs.iter() {
-        group.throughput(criterion::Throughput::Elements(1));
+        dbg!(p.repo.name(), p.config);
+        let parameter = format!("{}_{:?}", p.repo.name(), p.config);
+        if resummarize {
+            thrpt(&throughput_kind, &mut group, p);
+            group.only_resumarize(BenchmarkId::new("HyperAST", parameter));
+            continue;
+        }
         group.bench_with_input_prepared(
-            BenchmarkId::new("HyperAST", format!("{}_{:?}", p.repo.name(), p.config)),
+            BenchmarkId::new("HyperAST", parameter),
             &mut &p,
-            |_, p| {
+            |group, p| {
                 if p.fetch {
                     p.repo
                         .fetch_with_cb(|s| {
-                            println!("{}", s);
+                            eprintln!("{}", s);
                         })
                         .unwrap();
                 };
+                thrpt(&throughput_kind, group, p);
             },
             |b, (p, _)| {
                 b.iter_batched(
@@ -214,6 +270,58 @@ fn single_commit<'repo>(
         .walk()?
         .take(1)
         .map(|x| x.expect("a valid commit oid")))
+}
+
+#[allow(dead_code)]
+pub enum ThroughputKind {
+    // proportional to snapshot sizes
+    SnapshotSize,
+    None,
+}
+
+impl std::fmt::Display for ThroughputKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ThroughputKind::SnapshotSize => write!(f, "SnapshotSize"),
+            ThroughputKind::None => write!(f, "None"),
+        }
+    }
+}
+
+impl std::str::FromStr for ThroughputKind {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "SnapshotSize" => Ok(ThroughputKind::SnapshotSize),
+            "None" => Ok(ThroughputKind::None),
+            _ => Ok(ThroughputKind::SnapshotSize),
+        }
+    }
+}
+
+fn thrpt(
+    throughput_kind: &ThroughputKind,
+    group: &mut BenchmarkGroup<'_, impl Measurement>,
+    p: &Input,
+) {
+    if let ThroughputKind::SnapshotSize = throughput_kind {
+        let mut repositories = PreProcessedRepositories::default();
+        repositories.register_config(p.repo.clone(), p.config);
+        let repo = repositories
+            .get_config(p.repo.clone())
+            .ok_or_else(|| "missing config for repository".to_string())
+            .unwrap();
+        let r = repo.nofetch();
+        let mut rw = single_commit(p.commit, &r.repo).unwrap();
+        let c = repositories.pre_process_chunk(&mut rw, &r, usize::MAX);
+        let id = repositories.get_commit(&r.config, &c[0]).unwrap().ast_root;
+        let n = repositories.processor.main_stores.resolve(&id);
+        use hyperast::types::WithStats;
+        let throughput = n.size() as u64;
+        group.throughput(criterion::Throughput::Elements(throughput));
+    } else {
+    }
 }
 
 criterion_group!(

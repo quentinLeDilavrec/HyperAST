@@ -678,7 +678,14 @@ where
         let init = self.init_val(text, &TNode(cursor.node()));
         let xx = TTreeCursor(cursor);
         use hyperast::tree_gen::_handle_file_bounds;
-        let mut acc = _handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
+        let mut acc = _handle_file_bounds(self, text, xx, &mut global, init, |slf, g, s, acc| {
+            if tree_gen::validate_spacing(s) {
+                Self::make_space(slf, g, s, acc)
+            } else {
+                log::warn!("invalid spacing: {:?}", s);
+                Self::make_space(slf, g, s, acc)
+            }
+        });
 
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
 

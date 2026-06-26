@@ -856,8 +856,7 @@ pub fn validate_spacing(text: &[u8]) -> bool {
 pub fn try_get_spacing(padding_start: usize, pos: usize, text: &[u8]) -> Option<Vec<u8>> {
     if padding_start != pos {
         let spaces = &text[padding_start..pos];
-        let f = |x: &u8| *x != b' ' && *x != b'\n' && *x != b'\t' && *x != b'\r';
-        if spaces.iter().any(f) {
+        if !validate_spacing(spaces) {
             return None;
         }
         let spaces = spaces.to_vec();
@@ -909,7 +908,7 @@ pub fn handle_file_bounds<G>(
     xx: <G as ZippedTreeGen>::TreeCursor<'_>,
     global: &mut <G as TreeGen>::Global,
     init: <G as TreeGen>::Acc,
-    mut make_space: impl FnMut(
+    mut make_leaf: impl FnMut(
         &mut G,
         &<G as TreeGen>::Global,
         &[u8],
@@ -921,7 +920,7 @@ where
     <G as TreeGen>::Acc: Accumulator + WithByteRange,
 {
     _handle_file_bounds(g, text, xx, global, init, |g, global, text, acc| {
-        let node = make_space(g, global, text);
+        let node = make_leaf(g, global, text);
         acc.push(node);
     })
 }
@@ -934,28 +933,30 @@ pub fn _handle_file_bounds<G>(
     mut xx: <G as ZippedTreeGen>::TreeCursor<'_>,
     global: &mut <G as TreeGen>::Global,
     mut init: <G as TreeGen>::Acc,
-    mut make_space: impl FnMut(&mut G, &<G as TreeGen>::Global, &[u8], &mut <G as TreeGen>::Acc),
+    mut make_leaf: impl FnMut(&mut G, &<G as TreeGen>::Global, &[u8], &mut <G as TreeGen>::Acc),
 ) -> <G as TreeGen>::Acc
 where
     G: ZippedTreeGen<Text = [u8]>,
     G::Global: TotalBytesGlobalData,
     <G as TreeGen>::Acc: Accumulator + WithByteRange,
 {
-    let spacing = get_spacing(global.sum_byte_length(), init.begin_byte(), text);
-    if let Some(spacing) = spacing {
+    let padding_start = global.sum_byte_length();
+    let pos = init.begin_byte();
+    if padding_start != pos {
         global.down();
-        global.set_sum_byte_length(init.begin_byte());
-        make_space(g, global, &spacing, &mut init);
+        global.set_sum_byte_length(pos);
+        make_leaf(g, global, &text[padding_start..pos], &mut init);
         global.right();
     }
     let mut stack = init.into();
     g.r#gen(text, &mut stack, &mut xx, global);
     let mut acc = stack.finalize();
     if has_final_space(&0, global.sum_byte_length(), text) {
-        let spacing = get_spacing(global.sum_byte_length(), text.len(), text);
-        if let Some(spacing) = spacing {
+        let padding_start = global.sum_byte_length();
+        let pos = text.len();
+        if padding_start != pos {
             global.right();
-            make_space(g, global, &spacing, &mut acc);
+            make_leaf(g, global, &text[padding_start..pos], &mut acc);
         }
     }
     acc

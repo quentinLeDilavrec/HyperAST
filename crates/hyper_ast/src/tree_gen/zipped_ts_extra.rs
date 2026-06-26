@@ -32,6 +32,7 @@ use super::parser::TreeCursor as _;
 use super::utils_ts::_make_leaf;
 use super::utils_ts::TNode;
 use super::utils_ts::TTreeCursor;
+use super::validate_spacing;
 use super::{Accumulator, WithByteRange};
 use super::{BasicAccumulator, SubTreeMetrics};
 use super::{BasicGlobalData, GlobalData, Spaces, TotalBytesGlobalData as _};
@@ -378,7 +379,6 @@ where
         text: &Self::Text,
         mut acc: Self::Acc,
     ) {
-        use super::validate_spacing as validate;
         let padding = acc.padding_start;
         let start = acc.start_byte;
         let end = acc.end_byte;
@@ -439,7 +439,7 @@ where
             //                       | node  | error |  ...
             // no space to produce
             let error = &text[cursor..end];
-            if validate(error) {
+            if validate_spacing(error) {
                 space!(error);
                 global.set_sum_byte_length(end);
             } else {
@@ -449,7 +449,7 @@ where
         } else if comp!(padding < start < end == cursor) {
             //            |  space  | node  |     ...
             let space = &text[padding..start];
-            if validate(space) {
+            if validate_spacing(space) {
                 space!(space);
             } else {
                 error!(space);
@@ -457,13 +457,13 @@ where
         } else if comp!(padding < start < cursor < end) {
             //            |  space  | node  | error |  ...
             let space = &text[padding..start];
-            if validate(space) {
+            if validate_spacing(space) {
                 space!(space);
             } else {
                 error!(space);
             }
             let error = &text[cursor..end];
-            if validate(error) {
+            if validate_spacing(error) {
                 space!(error);
                 global.set_sum_byte_length(end);
             } else {
@@ -473,7 +473,7 @@ where
         } else if comp!(padding < start == cursor == end) {
             //            |  space  |
             let space = &text[padding..start];
-            if validate(space) {
+            if validate_spacing(space) {
                 space!(space);
             } else {
                 error!(space);
@@ -746,7 +746,13 @@ where
         let mut init = self.init_val(text, &TNode(cursor.node()));
         let mut xx = TTreeCursor(cursor);
         debug_assert_eq!(global.sum_byte_length(), init.padding_start);
-        let mut acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
+        let mut acc = handle_file_bounds(self, text, xx, &mut global, init, |slf, g, s| {
+            if validate_spacing(s) {
+                Self::make_space(slf, g, s)
+            } else {
+                Self::make_error(slf, g, s)
+            }
+        });
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
         // TODO what if making the file node was handled (at least in part) by the parent generator
         self.make(&mut global, acc, label)

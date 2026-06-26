@@ -114,6 +114,8 @@ impl TypeStore for TStore {
         decomp_t!(hyperast_gen_ts_java);
         #[cfg(feature = "cpp")]
         decomp_t!(hyperast_gen_ts_cpp);
+        #[cfg(feature = "c")]
+        decomp_t!(hyperast_gen_ts_c);
         #[cfg(feature = "python")]
         decomp_t!(hyperast_gen_ts_python);
         #[cfg(feature = "typescript")]

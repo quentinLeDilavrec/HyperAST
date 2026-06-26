@@ -156,7 +156,7 @@ impl std::ops::Deref for Input {
     }
 }
 
-pub fn check_commit(p: &InputRepo) -> Result<(), hyperast_vcs_git::git::Error> {
+pub fn check_commit(p: &InputRepo) -> Result<(), hyperast_vcs_git::git::FetchRepoError> {
     use hyperast_vcs_git::git::Oid;
     let oid = Oid::from_str(p.commit).unwrap();
     let repository = if p.fetch {
@@ -164,7 +164,7 @@ pub fn check_commit(p: &InputRepo) -> Result<(), hyperast_vcs_git::git::Error> {
     } else {
         p.gh().nofetch()
     };
-    repository.find_commit(oid).map(|_| ())
+    repository.find_commit(oid).map(|_| ()).map_err(Into::into)
 }
 pub fn prep_commits(
     p: &InputRepo,

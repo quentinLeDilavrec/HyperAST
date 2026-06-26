@@ -9,7 +9,9 @@
 use std::str::FromStr;
 
 use clap::Parser;
-use hyperast_benchmark_search::{Timeout, enable_logging, no_hyperast, read_subpatterns_file};
+use hyperast_benchmark_search::Timeout;
+use hyperast_benchmark_search::help_fetch;
+use hyperast_benchmark_search::{enable_logging, no_hyperast, read_subpatterns_file};
 
 #[cfg(not(target_env = "msvc"))]
 use jemallocator::Jemalloc;
@@ -128,7 +130,7 @@ fn main() {
             cache,
         } => {
             let filter = choose_filter(&language);
-            let repository = repo.nofetch();
+            let repository = help_fetch(&repo);
             let language = hyperast_vcs_git::resolve_language(&language).unwrap();
             let queries = hyperast_benchmark_search::ReadSearches::default();
             (if cache {
@@ -154,7 +156,7 @@ fn main() {
             s,
         } => {
             let filter = choose_filter(&language);
-            let repository = repo.nofetch();
+            let repository = help_fetch(&repo);
             let language = hyperast_vcs_git::resolve_language(&language).unwrap();
             let queries = hyperast_benchmark_search::ReadSearches::default();
             let sub = sub

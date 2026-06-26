@@ -3,7 +3,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-pub use git2::Error;
 pub use git2::ErrorCode;
 pub use git2::Oid;
 pub use git2::Repository;
@@ -198,10 +197,12 @@ where
         log::error!("tried to use the git executable, but failed. {}", err);
     }
 
-    nofetch_repository(url, path)
+    log::warn!("attempting to retrieve the local copy");
+
+    nofetch_repository(url, path).unwrap()
 }
 
-pub fn fetch_with_cb<F>(url: &Url, path: &PathBuf, cb: F) -> Result<Repository, Error>
+pub fn fetch_with_cb<F>(url: &Url, path: &PathBuf, cb: F) -> Result<Repository, FetchRepoError>
 where
     F: Fn(String),
 {
@@ -228,7 +229,10 @@ where
     up_to_date_repo(path, Some(fo), url.clone())
 }
 
-pub fn nofetch_repository<T: TryInto<Url>, U: Into<PathBuf>>(url: T, path: U) -> Repository
+pub fn nofetch_repository<T: TryInto<Url>, U: Into<PathBuf>>(
+    url: T,
+    path: U,
+) -> Result<Repository, FetchRepoError>
 where
     <T as TryInto<Url>>::Error: std::fmt::Debug,
 {
@@ -236,8 +240,7 @@ where
     let mut path: PathBuf = path.into();
     path.push(url.path.clone());
 
-    let repository = up_to_date_repo(&path, None, url);
-    repository.unwrap()
+    up_to_date_repo(&path, None, url)
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
@@ -304,41 +307,45 @@ pub struct Repo {
 }
 
 impl Repo {
+    pub const LOCAL_REPO_PATH: &str = "/tmp/hyperastgitresources/repo/";
     pub fn url(&self) -> String {
         format!("{}{}/{}", self.forge.url(), self.user, self.name)
     }
-    pub fn fetch_with_cb<F>(&self, cb: F) -> Result<Repository, Error>
+    pub fn fetch_with_cb<F>(&self, cb: F) -> Result<Repository, FetchRepoError>
     where
         F: Fn(String),
     {
         let url = self.url();
         let url: Url = url.try_into().unwrap();
-        let path = "/tmp/hyperastgitresources/repo/".to_string();
+        let path = Self::LOCAL_REPO_PATH;
         let mut path: PathBuf = path.into();
         path.push(url.path.clone());
         fetch_with_cb(&url, &path, cb)
     }
     pub fn fetch(&self) -> Repository {
         let url = self.url();
-        let path = "/tmp/hyperastgitresources/repo/".to_string();
+        let path = Self::LOCAL_REPO_PATH;
         fetch_repository(url, path)
     }
     pub fn nofetch(&self) -> Repository {
         let url = self.url();
-        let path = "/tmp/hyperastgitresources/repo/".to_string();
+        let path = Self::LOCAL_REPO_PATH;
+        nofetch_repository(url, path).unwrap()
+    }
+    pub fn try_nofetch(&self) -> Result<Repository, FetchRepoError> {
+        let url = self.url();
+        let path = Self::LOCAL_REPO_PATH;
         nofetch_repository(url, path)
     }
 
     pub fn fetch_to(&self, path: impl Into<PathBuf>) -> Repository {
         let url = self.url();
-        let path = path.into();
-        fetch_repository(url, path)
+        fetch_repository(url, path.into())
     }
 
     pub fn nofetch_to(&self, path: impl Into<PathBuf>) -> Repository {
         let url = self.url();
-        let path = path.into();
-        nofetch_repository(url, path)
+        nofetch_repository(url, path.into()).unwrap()
     }
 
     pub fn forge(&self) -> Forge {
@@ -404,12 +411,47 @@ pub fn fetch_remote(mut x: git2::Remote, head: &str) -> Result<(), git2::Error> 
     x.fetch(&[head], Some(&mut fo), None)
 }
 
+#[derive(Debug)]
+pub enum FetchRepoError {
+    Other(git2::Error),
+    NoRepoAndNoFetch,
+}
+
+impl Display for FetchRepoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FetchRepoError::Other(e) => write!(f, "{}", e),
+            FetchRepoError::NoRepoAndNoFetch => {
+                write!(
+                    f,
+                    "no repository found, you need to enable fetching, or clone first"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for FetchRepoError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            FetchRepoError::Other(e) => Some(e),
+            FetchRepoError::NoRepoAndNoFetch => None,
+        }
+    }
+}
+
+impl From<git2::Error> for FetchRepoError {
+    fn from(e: git2::Error) -> Self {
+        FetchRepoError::Other(e)
+    }
+}
+
 /// avoid mixing providers
 pub fn up_to_date_repo(
     path: &Path,
     fo: Option<git2::FetchOptions>,
     url: Url,
-) -> Result<Repository, git2::Error> {
+) -> Result<Repository, FetchRepoError> {
     if path.join(".git").exists() {
         let repository = match Repository::open(path) {
             Ok(repo) => repo,
@@ -419,9 +461,9 @@ pub fn up_to_date_repo(
                         panic!("failed to remove currupted clone: {}", e)
                     } else {
                         return if let Some(fo) = fo {
-                            clone_helper(url, path, fo)
+                            clone_helper(url, path, fo).map_err(Into::into)
                         } else {
-                            Err(e)
+                            Err(e.into())
                         };
                     }
                 } else {
@@ -444,9 +486,9 @@ pub fn up_to_date_repo(
     } else if path.exists() && path.read_dir().map_or(true, |mut x| x.next().is_some()) {
         todo!()
     } else if let Some(fo) = fo {
-        clone_helper(url, path, fo)
+        clone_helper(url, path, fo).map_err(Into::into)
     } else {
-        panic!("there is no repo there, you can enable the cloning by provinding a fetch callback.")
+        Err(FetchRepoError::NoRepoAndNoFetch)
     }
 }
 

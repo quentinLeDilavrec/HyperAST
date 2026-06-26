@@ -544,3 +544,27 @@ pub fn read_searches() {
         }
     }
 }
+
+/// give a more helpful error message when instantiating a [`git2::Repository`]
+pub fn help_fetch(repo: &hyperast_vcs_git::git::Repo) -> git2::Repository {
+    use hyperast_vcs_git::git::FetchRepoError;
+    match repo.try_nofetch() {
+        Ok(repo) => repo,
+        Err(FetchRepoError::NoRepoAndNoFetch) => {
+            log::error!(
+                "After failing to fetch the repository, attempted to just retrieve the local copy."
+            );
+            log::error!(
+                "But no repository was found at {}.",
+                hyperast_vcs_git::git::Repo::LOCAL_REPO_PATH
+            );
+            panic!(
+                "no repository found at {}, either enable fetching or place the corresponding Git database there",
+                hyperast_vcs_git::git::Repo::LOCAL_REPO_PATH
+            );
+        }
+        Err(FetchRepoError::Other(err)) => {
+            panic!("{}", err);
+        }
+    }
+}

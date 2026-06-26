@@ -107,14 +107,6 @@ impl HyperType for Type {
 }
 
 impl TsType for Type {
-    fn spaces() -> Self {
-        Self::Spaces
-    }
-
-    fn error() -> Self {
-        Self::ERROR
-    }
-
     fn is_repeat(&self) -> bool {
         false
     }
@@ -225,6 +217,19 @@ impl TsEnableTS for TStore {
             return None;
         }
         Some(Type::from_u16(k))
+    }
+
+    fn spaces() -> Type {
+        panic!("no spaces at the file system level")
+    }
+
+    fn error() -> Type {
+        Type::ERROR
+    }
+
+    fn file() -> Type {
+        // NOTE could provide one though
+        panic!("no specific file type at the file system level")
     }
 }
 

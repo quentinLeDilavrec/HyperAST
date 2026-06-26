@@ -394,7 +394,7 @@ where
         global: &<Self as TreeGen>::Global,
         spacing: &[u8],
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
-        let kind = TS::Ty2::spaces();
+        let kind = TS::spaces();
         let interned_kind = TS::intern(kind);
 
         let spacing = std::str::from_utf8(spacing).unwrap().to_string();

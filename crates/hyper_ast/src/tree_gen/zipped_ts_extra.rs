@@ -478,131 +478,49 @@ where
             } else {
                 error!(space);
             }
+        } else if acc.simple.kind.is_error() && start == 0 && comp!(padding < cursor == end) {
+            // kind of an exception
+            // related to the repeat trick
+            log::warn!(
+                "consequence of repeat trick on parent={} and acc={}",
+                parent.simple.kind.as_static_str(),
+                acc.simple.kind.as_static_str()
+            );
         } else {
             unreachable!(
-                "should normally handle all cases {} {} {} {}",
+                "should normally handle all cases including {} {} {} {}",
                 padding, start, end, cursor
             )
         }
-        // if comp!(      padding == start == end == cursor) {
-        //     //                        what ??
-        //     unreachable!(
-        //         "what should we do with {} {} {} {} ?",
-        //         padding, start, end, cursor
-        //     )
-        // } else if comp!(padding == start < end == cursor) {
-        //     //                      | node  |     ...
-        //     // no space to produce
-        // } else if comp!(padding < start < end == cursor) {
-        //     //            |  space  | node  |     ...
-        //     let space = &text[padding..start];
-        //     if validate(space) {
-        //         space!(space);
-        //     } else {
-        //         error!(space);
-        //     }
-        // } else if comp!(padding < start < cursor < end) {
-        //     //            |  space  | node  |     ...
-        //     let space = &text[padding..start];
-        //     if validate(space) {
-        //         space!(space);
-        //     } else {
-        //         error!(@ space);
-        //     }
-        //     let error = &text[cursor..end];
-        //     if !validate(space) {
-        //         error!(@ space);
-        //         global.set_sum_byte_length(end);
-        //     }
-        // } else {
-        //     unreachable!(
-        //         "should normally handle all cases {} {} {} {}",
-        //         padding, start, end, cursor
-        //     )
-        // }
         let node = self.post(|n| parent.push(n), global, text, acc);
         parent.push(node);
-        return;
-        let spacing = super::try_get_spacing2(padding, start, text);
-        if cursor < end {
-            // Only create an error node if tree-sitter is skipping non-whitespaces.
-            // the error node takes the span to realign for next leaf node
-            if super::try_get_spacing(cursor, end, text).is_none() {
-                acc.push(self.make_error(global, &text[cursor..end]));
-                global.set_sum_byte_length(end);
-            }
-        }
-        if let Some(Some(spacing)) = spacing {
-            parent.push(self.make_space(global, &spacing));
-        }
-        let node = self.post(|n| parent.push(n), global, text, acc);
-        parent.push(node);
-        return;
+        if parent.simple.children.len() > 10000 {
+            let kind = parent.simple.kind;
+            let repeat_kind = if let Some(repeat_kind) = kind.as_repeat() {
+                repeat_kind
+            } else {
+                panic!("{} must be associated with a repeat", kind.as_static_str())
+            };
 
-        ////////////////////////
-        ///////////new/////////////
-        ////////////////////////
+            let new_parent = Acc {
+                labeled: false,
+                start_byte: parent.start_byte,
+                end_byte: parent.end_byte,
+                metrics: Default::default(),
+                padding_start: global.sum_byte_length(),
+                simple: BasicAccumulator::new(kind),
+                no_space: vec![],
+                role: Default::default(),
+            };
 
-        let spacing = super::try_get_spacing2(acc.padding_start, acc.start_byte, text);
-        if global.sum_byte_length() < acc.end_byte {
-            // Only create an error node if tree-sitter is skipping non-whitespaces.
-            // the error node takes the span to realign for next leaf node
-            if super::try_get_spacing(global.sum_byte_length(), acc.end_byte, text).is_none() {
-                acc.push(self.make_error(global, &text[global.sum_byte_length()..acc.end_byte]));
-                global.set_sum_byte_length(acc.end_byte);
-            }
-            let node = self.post(|n| parent.push(n), global, text, acc);
+            let mut repeat = std::mem::replace(parent, new_parent.into());
+
+            repeat.simple.kind = repeat_kind;
+            repeat.end_byte = global.sum_byte_length();
+
+            let node = self.post(|n| parent.push(n), global, text, repeat);
             parent.push(node);
-            return;
         }
-        if let Some(Some(spacing)) = spacing {
-            parent.push(self.make_space(global, &spacing));
-            let node = self.post(|n| parent.push(n), global, text, acc);
-            parent.push(node);
-            return;
-        }
-        // if acc.padding_start < acc.start_byte && acc.start_byte < acc.end_byte {
-        //     dbg!(
-        //         global.sum_byte_length(),
-        //         acc.padding_start,
-        //         acc.start_byte,
-        //         acc.end_byte
-        //     );
-        //     dbg!(std::str::from_utf8(
-        //         &text[acc.padding_start..acc.start_byte]
-        //     ));
-        //     dbg!(std::str::from_utf8(&text[acc.start_byte..acc.end_byte]));
-        //     acc.push(self.make_error(global, &text[acc.padding_start..acc.start_byte]));
-        //     acc.push(self.make_error(global, &text[acc.start_byte..acc.end_byte]));
-        //     // global.set_sum_byte_length(acc.start_byte);
-        // }
-
-        // else if acc.padding_start < acc.start_byte {
-        //     dbg!(
-        //         global.sum_byte_length(),
-        //         acc.padding_start,
-        //         acc.start_byte,
-        //         acc.end_byte
-        //     );
-        //     dbg!(std::str::from_utf8(
-        //         &text[acc.padding_start..acc.start_byte]
-        //     ));
-        //     acc.push(self.make_error(global, &text[acc.padding_start..acc.start_byte]));
-        //     // global.set_sum_byte_length(acc.start_byte);
-        // } else if acc.start_byte < acc.end_byte {
-        //     dbg!(
-        //         global.sum_byte_length(),
-        //         acc.padding_start,
-        //         acc.start_byte,
-        //         acc.end_byte
-        //     );
-        //     dbg!(std::str::from_utf8(&text[acc.start_byte..acc.end_byte]));
-        //     acc.push(self.make_error(global, &text[acc.start_byte..acc.end_byte]));
-        // } else {
-        //     panic!();
-        // }
-        let node = self.post(|n| parent.push(n), global, text, acc);
-        parent.push(node);
     }
 
     fn post(

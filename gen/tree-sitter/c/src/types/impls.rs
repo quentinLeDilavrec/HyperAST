@@ -61,6 +61,14 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
         fn is_leaf(self) -> bool {
             false
         }
+
+        fn as_repeat(self) -> Option<Self> {
+            match self {
+                Self::ERROR => Some(Self::_ERROR),
+                Self::_ERROR => Some(Self::_ERROR),
+                _ => None
+            }
+        }
     }
 
     impl TypeStore for TStore {

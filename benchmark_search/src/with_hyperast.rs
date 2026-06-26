@@ -13,7 +13,7 @@ use std::ops::AddAssign;
 use hyperast::compat::HashMap;
 use hyperast::position::structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence};
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{HyperAST, HyperType, NodeStore};
+use hyperast::types::{HyperAST, HyperType, LabelStore, Labeled, NodeStore};
 use hyperast::types::{WithHashs, WithPrecompQueries, WithRoles, WithStats};
 use hyperast::utils::memusage;
 use hyperast_tsquery::Query;
@@ -475,6 +475,14 @@ where
                 } else if k.is_file() {
                     pos = executor.execute(stores, pos, &mut count);
                     down = false;
+                } else if k.is_error() {
+                    dbg!(n.child_count(), n.size());
+                    if let Some(l) = n.try_get_label() {
+                        dbg!(stores.label_store.resolve(l));
+                    }
+                    panic!("there should be no error nodes at the file system level");
+                } else {
+                    dbg!();
                 }
             } else {
                 let Some(p) = pos.parent() else {

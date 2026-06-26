@@ -828,17 +828,24 @@ impl Query {
 }
 
 impl Query {
-    pub fn big(source: &[&str], language: Language) -> Result<Self, QueryError> {
-        let mut source = source.iter();
-        let s = source.next().unwrap_or(&"");
+    pub fn big(
+        mut source: impl Iterator<Item = impl AsRef<str>>,
+        language: Language,
+    ) -> Result<Self, QueryError> {
+        let s = source.next();
+        let s = match &s {
+            Some(s) => s.as_ref(),
+            None => &"",
+        };
         let mut byte_offset = s.len();
         let mut query = Self::new(s, language.clone())?;
         for source in source {
+            let source = source.as_ref();
             let step_offset = query.steps.count();
             let mut q = Self::new(source, language.clone())?;
             let mut capture_map = vec![];
             for c in q.capture_names {
-                if let Some(i) = query.capture_names.iter().position(|x| x == &c) {
+                if let Some(i) = query.capture_names.iter().position(|x| x == c) {
                     capture_map.push(CaptureId::new(num::cast(i).unwrap()));
                 } else {
                     capture_map.push(CaptureId::new(
@@ -900,12 +907,6 @@ impl Query {
 
             query.wildcard_root_pattern_count += q.wildcard_root_pattern_count;
 
-            if !q.pattern_map2.is_empty() {
-                todo!() // NOTE probably better to process precomputeds after Self::big
-            }
-            if q.precomputed_patterns.is_some() {
-                todo!() // NOTE probably better to process precomputeds after Self::big
-            }
             for p in q.text_predicates.iter_mut() {
                 for p in p {
                     p.remap(&capture_map);
@@ -918,14 +919,23 @@ impl Query {
             query.general_predicates.extend(q.general_predicates);
             q.property_settings.check_empty();
             query.property_settings.extend(q.property_settings);
-            if q.used_precomputed != 0 {
-                todo!() // NOTE probably better to process precomputeds after Self::big
-            }
 
             byte_offset = source.len();
         }
+
+        if !query.pattern_map2.is_empty() {
+            todo!()
+        }
+        if query.precomputed_patterns.is_some() {
+            todo!()
+        }
+
+        if query.used_precomputed != 0 {
+            todo!()
+        }
         Ok(query)
     }
+
     pub fn new(source: &str, language: Language) -> Result<Self, QueryError> {
         let ptr: *mut ffi::TSQuery = Self::init_tsquery(source, language)?;
         let query: *mut super::ffi_extra::TSQuery = unsafe { std::mem::transmute(ptr) };
@@ -1380,9 +1390,6 @@ impl Query {
         precomp.used_precomputed = (1 << precomp_len) - 1;
         log::trace!("finished query building");
 
-        // dbg!(query.wildcard_root_pattern_count);
-        // dbg!(&query.pattern_map);
-
         Ok((precomp, query))
     }
 
@@ -1412,8 +1419,6 @@ impl Query {
     }
 
     pub fn init_tsquery(source: &str, language: Language) -> Result<*mut ffi::TSQuery, QueryError> {
-        // log::trace!("{:?}", language);
-        // log::trace!("{:?}", source);
         let mut error_offset = 0u32;
         let mut error_type: ffi::TSQueryError = 0;
         let bytes = source.as_bytes();
@@ -1517,12 +1522,14 @@ impl Query {
     pub fn enabled_pattern_count(&self) -> usize {
         self.enabled_pattern_count as usize
     }
+
     pub fn enabled_pattern_index(&self, pid: PatternId) -> Option<u16> {
         // log::error!("{:?}", self.enabled_pattern_map);
         // log::error!("{}", pid.to_usize());
         let i = self.enabled_pattern_map[pid.to_usize()];
         (i != u16::MAX).then_some(i)
     }
+
     #[allow(clippy::result_large_err)]
     pub fn with_one_pattern_enabled(mut self, i: u16) -> Result<Self, Self> {
         if i == u16::MAX
@@ -1544,6 +1551,7 @@ impl Query {
         self.pattern_map = vec![pattern];
         Ok(self)
     }
+
     pub fn get_each_pat_start_byte(&self) -> Vec<usize> {
         let mut r = vec![];
         for (i, j) in self.enabled_pattern_map.iter().enumerate() {
@@ -1556,7 +1564,7 @@ impl Query {
     pub fn capture_index_for_name(&self, name: &str) -> Option<CaptureId> {
         self.capture_names
             .iter()
-            .position(|x| *x == name)
+            .position(|x| x == name)
             .map(|i| CaptureId::new(i as u32))
     }
 

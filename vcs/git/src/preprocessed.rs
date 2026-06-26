@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::iter::Peekable;
 use std::path::{Components, PathBuf};
 use std::time::{Duration, Instant};
@@ -13,6 +12,7 @@ use hyperast::types::{AnyType, Childrn, WithChildren};
 
 use crate::git::{all_commits_between, all_first_parents_between, retrieve_commit};
 use crate::processing::ConfiguredRepo2;
+use crate::processing::caches::OidMap;
 use crate::processing::erased::ProcessorMap;
 use crate::processing::file_sys;
 use crate::{Commit, DefaultMetrics};
@@ -24,7 +24,7 @@ use crate::{Commit, DefaultMetrics};
 /// and exposing apis to hyperAST users/maker
 pub struct PreProcessedRepository {
     pub name: String,
-    pub commits: HashMap<git2::Oid, Commit>,
+    pub commits: OidMap<Commit>,
 
     pub processor: RepositoryProcessor,
 }
@@ -290,10 +290,9 @@ impl PreProcessedRepository {
         &mut self,
         repository: &mut Repository,
     ) -> (usize, usize) {
+        use std::collections::HashSet;
         let mut oids = HashSet::<_>::default();
-        repository
-            .odb()
-            .unwrap()
+        (repository.odb().unwrap())
             .foreach(|&oid| {
                 // easy deterministic sampling of objects
                 if (oid.as_bytes()[0] & 0b11000000) != 0 {

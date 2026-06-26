@@ -46,8 +46,8 @@ impl From<super::Parameter> for MavenProc {
     fn from(parameter: super::Parameter) -> Self {
         Self {
             parameter,
-            cache: MavenCaches::default(),
-            commits: HashMap::default(),
+            cache: Default::default(),
+            commits: Default::default(),
         }
     }
 }

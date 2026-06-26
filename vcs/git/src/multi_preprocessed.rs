@@ -17,6 +17,8 @@ use crate::processors::cpp::CppProc;
 type CppProcessorHolder = ProcessorHolder<CppProc>;
 #[cfg(feature = "c")]
 use crate::processors::c::CProc;
+#[cfg(feature = "c")]
+type CProcessorHolder = ProcessorHolder<CProc>;
 #[cfg(feature = "python")]
 use crate::processors::python::PythonProc;
 #[cfg(feature = "python")]
@@ -323,6 +325,11 @@ impl PreProcessedRepositories {
             let h = pr.commit_proc_mut::<CppProcessorHolder>();
             h.register_param(t)
         };
+        let c = |pr: &mut ProcessorMap, q: hyperast_tsquery::ZeroSepArrayStr| {
+            let t = crate::processors::c::Parameter::new(q);
+            let h = pr.commit_proc_mut::<CProcessorHolder>();
+            h.register_param(t)
+        };
         let java = |pr: &mut ProcessorMap, q: hyperast_tsquery::ZeroSepArrayStr| {
             let t = crate::processors::java::Parameter::with_query(q);
             let h = pr.commit_proc_mut::<JavaProcessorHolder>();
@@ -392,6 +399,10 @@ impl PreProcessedRepositories {
             }
             RepoConfig::Rust => {
                 let config = rust(processor_map, query.into()).erase();
+                ConfiguredRepoHandle2 { spec, config }
+            }
+            RepoConfig::C => {
+                let config = c(processor_map, query.into()).erase();
                 ConfiguredRepoHandle2 { spec, config }
             }
             _ => todo!(),

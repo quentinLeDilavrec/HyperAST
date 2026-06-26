@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::store::{SimpleStores, defaults::LabelIdentifier};
+use hyperast::tree_gen::add_md_precomp_queries;
 use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 use hyperast::types::LabelStore as _;
 
@@ -73,10 +74,6 @@ impl JavaPreprocessFileSys {
         if tree.root_node().has_error() {
             eprintln!("{}", tree.root_node().to_sexp());
         };
-        // self.java_md_cache.insert(
-        //     full_node.local.compressed_node,
-        //     PrecompQueries(full_node.local.precomp_queries),
-        // );
         let full_node = FullNode {
             id: full_node.local.compressed_node,
             metrics: full_node.local.metrics,
@@ -255,10 +252,6 @@ impl Processor<JavaAcc> for JavaProcessor<'_, '_, JavaAcc> {
     fn post(&mut self, acc: JavaAcc) -> Option<<JavaAcc as Accumulator>::Unlabeled> {
         let name = acc.primary.name.clone();
         let full_node = make(acc, &mut self.prepro.main_stores);
-        let key = full_node.id;
-        // self.prepro
-        //     .java_md_cache
-        //     .insert(key, MD::from(full_node.clone()));
         let name = self.prepro.main_stores.label_store.get_or_insert(name);
         if self.stack.is_empty() {
             return Some(full_node);
@@ -295,20 +288,14 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> <JavaAcc as Accumula
         hyperast::store::nodes::legion::eq_node(&interned_kind, Some(&label_id), &primary.children);
     let insertion = node_store.prepare_insertion(&hashable, eq);
 
-    if let Some(_id) = insertion.occupied_id() {
-        unimplemented!("I think it should probably stay unused");
-        // let metrics = primary.metrics.map_hashs(|h| h.build());
-        // return Local {
-        //     compressed_node: id,
-        //     metrics,
-        //     #[cfg(feature = "impact")]
-        //     ana: None,
-        //     mcc: Mcc::new(&kind),
-        //     role: None,
-        //     precomp_queries: Default::default(),
-        //     stmt_count: 0,
-        //     member_import_count: 0,
-        // };
+    if let Some(id) = insertion.occupied_id() {
+        let metrics = primary.metrics.map_hashs(|h| h.build());
+        let precomp_queries = acc.precomp_queries;
+        return FullNode {
+            id,
+            metrics,
+            precomp_queries,
+        };
     }
 
     let mut dyn_builder =
@@ -321,13 +308,16 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores<TStore>) -> <JavaAcc as Accumula
     let hashs = metrics.add_md_metrics(&mut dyn_builder, children_is_empty);
     hashs.persist(&mut dyn_builder);
 
+    let precomp_queries = acc.precomp_queries;
+    add_md_precomp_queries(&mut dyn_builder, precomp_queries.0);
+
     let vacant = insertion.vacant();
-    let node_id = vacant.insert_built(dyn_builder.build());
+    let id = vacant.insert_built(dyn_builder.build());
 
     FullNode {
-        id: node_id,
+        id,
         metrics,
-        precomp_queries: acc.precomp_queries,
+        precomp_queries,
     }
     // Local {
     //     compressed_node: node_id,

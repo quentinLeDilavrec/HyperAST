@@ -673,12 +673,13 @@ where
     const LOWEST_RESERVED: u16 = Self::META_DIR;
     fn try_obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Option<Self::Ty2>;
     fn obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
+    fn error() -> Self::Ty2;
+    fn spaces() -> Self::Ty2;
+    fn file() -> Self::Ty2;
 }
 
 #[cfg(feature = "ts_type")]
 pub trait TsType: crate::types::HyperType + Copy {
-    fn spaces() -> Self;
-    fn error() -> Self;
     fn is_repeat(&self) -> bool;
     /// returns true if current node should be treated as a leaf node,
     /// i.e. we skip generating children and set the label with the content of the span

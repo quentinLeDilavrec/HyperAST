@@ -633,7 +633,7 @@ where
         global: &<Self as TreeGen>::Global,
         spacing: &[u8],
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
-        let kind = TS::Ty2::spaces();
+        let kind = TS::spaces();
         let interned_kind = TS::intern(kind);
 
         let spacing = std::str::from_utf8(spacing).unwrap().to_string();
@@ -691,7 +691,7 @@ where
         global: &<Self as TreeGen>::Global,
         text: &[u8],
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
-        let kind = TS::Ty2::error();
+        let kind = TS::error();
         let interned_kind = TS::intern(kind);
         // debug_assert_eq!(kind, TS::resolve(interned_kind));
         let text = std::str::from_utf8(text).unwrap().to_string();
@@ -753,6 +753,9 @@ where
                 Self::make_error(slf, g, s)
             }
         });
+        if acc.simple.kind.is_error() {
+            acc.simple.kind = TS::file();
+        }
         let label = Some(std::str::from_utf8(name).unwrap().to_owned());
         // TODO what if making the file node was handled (at least in part) by the parent generator
         self.make(&mut global, acc, label)

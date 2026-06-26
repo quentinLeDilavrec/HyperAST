@@ -37,17 +37,21 @@ impl TsEnableTS for TStore {
         }
         Some(Type::from_u16(k))
     }
+
+    fn spaces() -> Type {
+        Type::Spaces
+    }
+
+    fn error() -> Type {
+        Type::ERROR
+    }
+
+    fn file() -> Type {
+        Type::Document
+    }
 }
 
 impl TsType for Type {
-    fn spaces() -> Self {
-        Self::Spaces
-    }
-
-    fn error() -> Self {
-        Self::ERROR
-    }
-
     fn is_repeat(&self) -> bool {
         self.is_repeat()
     }

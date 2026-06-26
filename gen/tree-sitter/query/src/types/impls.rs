@@ -23,16 +23,12 @@ impl hyperast::types::ETypeStore for TStore {
 }
 
 impl TsEnableTS for TStore {
-    fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
-        n: &N,
-    ) -> <Self as hyperast::types::ETypeStore>::Ty2 {
+    fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Type {
         let k = n.kind_id();
         Type::from_u16(k)
     }
 
-    fn try_obtain_type<N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
-        n: &N,
-    ) -> Option<Self::Ty2> {
+    fn try_obtain_type<N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Option<Type> {
         let k = n.kind_id();
         static LEN: u16 = S_T_L.len() as u16;
         if LEN <= k && k < TStore::LOWEST_RESERVED {
@@ -40,17 +36,21 @@ impl TsEnableTS for TStore {
         }
         Some(Type::from_u16(k))
     }
+
+    fn spaces() -> Type {
+        Type::Spaces
+    }
+
+    fn error() -> Type {
+        Type::ERROR
+    }
+
+    fn file() -> Type {
+        Type::Program
+    }
 }
 
 impl TsType for Type {
-    fn spaces() -> Self {
-        Self::Spaces
-    }
-
-    fn error() -> Self {
-        Self::ERROR
-    }
-
     fn is_repeat(&self) -> bool {
         self.is_repeat()
     }

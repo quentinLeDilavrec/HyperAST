@@ -223,11 +223,9 @@ fn main() {
                 c = FromStr::from_str(&language).unwrap();
                 &language
             };
-            let queries = if let Some(input) = args.input {
-                hyperast_benchmark_search::ReadSearches::new(input)
-            } else {
-                hyperast_benchmark_search::ReadSearches::default()
-            };
+            let queries = (args.input)
+                .map(hyperast_benchmark_search::ReadSearches::new)
+                .unwrap_or_default();
             let sub = sub
                 .map(|path| read_subpatterns_file(&path))
                 .unwrap_or_default();

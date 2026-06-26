@@ -8,6 +8,9 @@ impl std::hash::Hasher for OidHash {
     }
 
     fn write(&mut self, bytes: &[u8]) {
+        if self.0 > 0 {
+            return;
+        }
         self.0 = u64::from_be_bytes([
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ])

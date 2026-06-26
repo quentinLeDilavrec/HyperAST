@@ -40,12 +40,16 @@ impl std::str::FromStr for RepoConfig {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "CppMake" => Self::CppMake,
-            "Cpp" => Self::CppMake,
-            "cpp" => Self::CppMake,
+            "Cpp" => Self::Cpp,
+            "cpp" => Self::Cpp,
+            "C" => Self::C,
+            "c" => Self::C,
             "JavaMaven" => Self::JavaMaven,
-            "Java" => Self::JavaMaven,
-            "java" => Self::JavaMaven,
+            "Java" => Self::Java,
+            "java" => Self::Java,
             "typescript" => Self::Typescript,
+            "Typescript" => Self::Typescript,
+            "TypeScript" => Self::Typescript,
             "javascript" => Self::Typescript,
             "Python" => Self::Python,
             "python" => Self::Python,
@@ -54,7 +58,7 @@ impl std::str::FromStr for RepoConfig {
             "Rust" => Self::Rust,
             "rust" => Self::Rust,
             "any" => Self::Any,
-            x => return Err(format!("'{}' is not available config", x)),
+            x => return Err(format!("'{}' is not an available config", x)),
         })
     }
 }

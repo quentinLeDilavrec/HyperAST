@@ -215,6 +215,57 @@ impl ArrayStr for std::sync::Arc<[&str]> {
     }
 }
 
+impl ArrayStr for std::slice::Iter<'_, &str>
+where
+    Self: Clone,
+{
+    fn iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.clone().map(|s| *s))
+    }
+
+    fn len(&self) -> usize {
+        <std::slice::Iter<'_, _> as ExactSizeIterator>::len(self)
+    }
+}
+
+impl ArrayStr for std::slice::Iter<'_, String>
+where
+    Self: Clone,
+{
+    fn iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.clone().map(|s| s.as_str()))
+    }
+
+    fn len(&self) -> usize {
+        <std::slice::Iter<'_, _> as ExactSizeIterator>::len(self)
+    }
+}
+mod aa {
+    fn f() {
+        vec![0].iter();
+    }
+}
+
+impl ArrayStr for Vec<String> {
+    fn iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(<[String]>::iter(self).map(|s| s.as_str()))
+    }
+
+    fn len(&self) -> usize {
+        std::vec::Vec::<_>::len(self)
+    }
+}
+
+impl ArrayStr for Vec<&str> {
+    fn iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(<[&str]>::iter(self).map(|s| *s))
+    }
+
+    fn len(&self) -> usize {
+        std::vec::Vec::<_>::len(self)
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ZeroSepArrayStr {
     len: usize,

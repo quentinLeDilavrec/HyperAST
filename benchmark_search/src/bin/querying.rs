@@ -164,7 +164,11 @@ fn main() {
                 .unwrap_or_default();
             assert!(s.len() <= sub.len());
             // only select wanted subpatterns
-            let sub = s.iter().map(|i| sub[*i].as_str()).collect::<Vec<_>>();
+            let sub = if s.is_empty() {
+                sub.iter().map(|s| s.as_str()).collect::<Vec<_>>()
+            } else {
+                s.iter().map(|i| sub[*i].as_str()).collect::<Vec<_>>()
+            };
             if prepare {
                 if blob && tree {
                     if sub.is_empty() {
@@ -229,7 +233,11 @@ fn main() {
                 .unwrap_or_default();
             assert!(s.len() <= sub.len());
             // only select wanted subpatterns
-            let sub = s.iter().map(|i| sub[*i].as_str()).collect::<Vec<_>>();
+            let sub = if s.is_empty() {
+                sub.iter().map(|s| s.as_str()).collect::<Vec<_>>()
+            } else {
+                s.iter().map(|i| sub[*i].as_str()).collect::<Vec<_>>()
+            };
 
             use hyperast_benchmark_search::with_hyperast;
             macro_rules! per_blob {

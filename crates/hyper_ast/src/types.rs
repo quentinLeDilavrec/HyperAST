@@ -111,6 +111,22 @@ role_impl!(
     // Label => "label",
     // Placement => "placement",
 
+    // // TypeScript
+    Property => "property",
+    Kind => "kind",
+    Parameter => "parameter",
+    OptionalChain => "optional_chain",
+    Declaration => "declaration",
+    Source => "source",
+    Increment => "increment",
+    Flags => "flags",
+    Finalizer => "finalizer",
+    Handler => "handler",
+    IndexType => "index_type",
+    Decorator => "decorator",
+    Sign => "sign",
+
+
     // // Rust
     List => "list",
     Bounds => "bounds",

@@ -105,7 +105,7 @@ fn removed_tracking(
         println!("matches_links");
     }
 
-    let mut prev_oid = None;
+    let mut prev_oid: Option<hyperast_vcs_git::git::Oid> = None;
     let mut old_matches_count = vec![];
     let mut old_matches_positions: Vec<Vec<_>> =
         vec![Default::default(); query.enabled_pattern_count()];
@@ -131,8 +131,7 @@ fn removed_tracking(
         let matches_links: Vec<String> = matches
             .into_iter()
             .map(|x| {
-                let x: String = x
-                    .into_iter()
+                x.into_iter()
                     .map(|position| {
                         format!(
                             "{},",
@@ -143,8 +142,7 @@ fn removed_tracking(
                             )
                         )
                     })
-                    .collect();
-                x
+                    .collect::<String>()
                 // format!(",[{:?}]", x)
             })
             .collect();

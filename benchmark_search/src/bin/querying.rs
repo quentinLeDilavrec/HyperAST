@@ -251,48 +251,47 @@ fn main() {
                     }
                 };
             }
-            if c == RepoConfig::Rust {
+            if c == RepoConfig::Any {
                 let config = hyperast_benchmark_search::Config::freq1(c, depth);
                 let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-                per_blob!(hyperast_gen_ts_rust::TStore)(
-                    repo, &sub, commit, config, &language, queries, timeout,
-                );
-            } else if c == RepoConfig::Python {
-                let config = hyperast_benchmark_search::Config::freq1(c, depth);
-                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-                per_blob!(hyperast_gen_ts_python::TStore)(
-                    repo, &sub, commit, config, &language, queries, timeout,
-                );
-            } else if c == RepoConfig::Any {
-                if cfg!(debug_assertions) {
-                    eprintln!("WARNING this feature is still buggy with non polyglot queries")
-                } else {
-                    panic!("this feature is still buggy with non polyglot queries");
-                }
-                let config = hyperast_benchmark_search::Config::freq1(c, depth);
-                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-                per_blob!(hyperast_gen_ts_python::TStore)(
-                    repo, &sub, commit, config, &language, queries, timeout,
-                );
-            } else if language.eq_ignore_ascii_case("Java") {
-                assert_eq!(c, RepoConfig::Java);
-                let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-                let config = hyperast_benchmark_search::Config::freq1(c, depth);
-                per_blob!(hyperast_gen_ts_java::TStore)(
-                    repo, &sub, commit, config, &language, queries, timeout,
-                );
+                with_hyperast::polyglot(repo, &sub, commit, config, &language, queries, timeout);
+                return;
             } else if c == RepoConfig::JavaMaven {
                 assert!(!cached);
                 let config = hyperast_benchmark_search::Config::freq1(c, depth);
                 let language = hyperast_vcs_git::resolve_language("Java").unwrap();
                 with_hyperast::polyglot(repo, &sub, commit, config, &language, queries, timeout);
-                // } else if language == RepoConfig::Cpp {
-                //     todo!();
+                return;
             } else if c == RepoConfig::CppMake {
                 // the build sys enabled querying is not the priority
                 todo!();
-            } else {
-                unimplemented!("new generators are needed to support additional languages")
+            }
+            let config = hyperast_benchmark_search::Config::freq1(c, depth);
+            let language = hyperast_vcs_git::resolve_language(&language).unwrap();
+            if c == RepoConfig::Rust {
+                per_blob!(hyperast_gen_ts_rust::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::Python {
+                per_blob!(hyperast_gen_ts_python::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::Typescript {
+                per_blob!(hyperast_gen_ts_typescript::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::C {
+                per_blob!(hyperast_gen_ts_c::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::Cpp {
+                per_blob!(hyperast_gen_ts_cpp::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
+            } else if c == RepoConfig::Java {
+                per_blob!(hyperast_gen_ts_java::TStore)(
+                    repo, &sub, commit, config, &language, queries, timeout,
+                );
             }
         }
         Bench::WRITE => {

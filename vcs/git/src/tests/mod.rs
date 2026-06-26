@@ -14,6 +14,7 @@ use std::env;
 use std::str::FromStr;
 
 use hyperast::store::nodes::legion::RawHAST;
+use hyperast::types::{Childrn, HyperAST};
 #[cfg(feature = "impact")]
 use hyperast::utils::memusage;
 
@@ -357,6 +358,72 @@ fn test_any_turso() {
 }
 
 #[test]
+// microsoft TypeScript 8ef3e2f3d43c8c92bda9510c47f7d4d2b3aeca33
+// https://github.com/microsoft/TypeScript/blob/main/tests/cases/fourslash/reallyLargeFile.ts
+fn test_typescript_typescript() {
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("hyperast_vcs_git=trace"),
+    )
+    .init();
+    let mut preprocessed = multi_preprocessed::PreProcessedRepositories::default();
+
+    let repo = crate::git::Forge::Github.repo("microsoft", "TypeScript");
+    let config = crate::processing::RepoConfig::Typescript;
+    let before = "8ef3e2f3d43c8c92bda9510c47f7d4d2b3aeca33";
+    let path = std::path::Path::new("tests/cases/fourslash/reallyLargeFile.ts");
+    let handle = preprocessed.register_config(repo, config);
+    let handle = &handle.fetch();
+    use crate::git::all_commits_between;
+    let rw = all_commits_between(&handle.repo, before, "").unwrap();
+    let commits = rw
+        .map(|oid| {
+            let oid = oid.unwrap();
+            let builder = crate::preprocessed::CommitBuilder::start(&handle.repo, oid);
+            let processor_map = &mut preprocessed.processor.processing_systems;
+            dbg!(&processor_map);
+            let commit_processor = processor_map
+                .by_id_mut(handle.config)
+                .unwrap()
+                .get_mut(handle.config);
+            let path = path.to_owned();
+            let _id = commit_processor
+                .prepare_processing_at_path(&handle.repo, builder, path, handle.config)
+                .process(&mut preprocessed.processor);
+            oid
+        })
+        .collect::<Vec<_>>();
+
+    let commitid = commits[0];
+    let commit = preprocessed.get_commit(&handle.config, &commitid).unwrap();
+    dbg!(&commit.memory_used.to_string());
+    dbg!(std::time::Duration::from_nanos(
+        commit.processing_time as u64
+    ));
+    let stores = &preprocessed.processor.main_stores;
+    use crate::preprocessed::child_by_name;
+    let id = commit.ast_root;
+    let id = child_by_name(stores, id, "tests").unwrap();
+    let id = child_by_name(stores, id, "cases").unwrap();
+    let id = child_by_name(stores, id, "fourslash").unwrap();
+    let id = child_by_name(stores, id, "reallyLargeFile.ts").unwrap();
+    let id = {
+        let k = stores.resolve_type(&id);
+        let n = stores.node_store.resolve(id);
+        use hyperast::types::WithChildren;
+        dbg!(&k);
+        dbg!(n.children().unwrap().iter_children().count());
+        dbg!(n.child_count());
+        // let default_label_identifier = stores.label_store.get("getlimits.py").unwrap();
+        // n.get_child_by_name(&default_label_identifier)
+        id
+    };
+
+    eprintln!("{}", hyperast::nodes::SyntaxSerializer::new(stores, id));
+    panic!();
+    // python_aux(stores, id, &[]);
+}
+
+#[test]
 #[ignore] // not a normal test
 fn test_java_at_path() {
     use std::io::Write;
@@ -389,23 +456,23 @@ fn test_java_at_path() {
     let handle = &handle.fetch();
     use crate::git::all_commits_between;
     let rw = all_commits_between(&handle.repo, before, after).unwrap();
-    let mut rw = rw.take(2).map(|x| x.unwrap());
-    let mut r = Vec::with_capacity(rw.size_hint().0);
-    for _ in 0.. {
-        let Some(oid) = rw.next() else { break };
-        let builder = crate::preprocessed::CommitBuilder::start(&handle.repo, oid);
-        let processor_map = &mut preprocessed.processor.processing_systems;
-        dbg!(&processor_map);
-        let commit_processor = processor_map
-            .by_id_mut(handle.config)
-            .unwrap()
-            .get_mut(handle.config);
-        let path = path.clone();
-        let _id = commit_processor
-            .prepare_processing_at_path(&handle.repo, builder, path, handle.config)
-            .process(&mut preprocessed.processor);
-        r.push(oid);
-    }
+    let rw = rw.take(2).map(|x| x.unwrap());
+    let r = rw
+        .map(|oid| {
+            let builder = crate::preprocessed::CommitBuilder::start(&handle.repo, oid);
+            let processor_map = &mut preprocessed.processor.processing_systems;
+            dbg!(&processor_map);
+            let commit_processor = processor_map
+                .by_id_mut(handle.config)
+                .unwrap()
+                .get_mut(handle.config);
+            let path = path.clone();
+            let _id = commit_processor
+                .prepare_processing_at_path(&handle.repo, builder, path, handle.config)
+                .process(&mut preprocessed.processor);
+            oid
+        })
+        .collect::<Vec<_>>();
     dbg!(r.len());
 }
 

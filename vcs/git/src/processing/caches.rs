@@ -13,10 +13,11 @@ impl std::hash::Hasher for OidHash {
         ])
     }
 }
-type OidHasher = core::hash::BuildHasherDefault<OidHash>;
 
-pub(crate) type OidMap<T> = std::collections::HashMap<git2::Oid, T, OidHasher>;
-pub(crate) type NamedMap<T> = hyperast::compat::HashMap<(git2::Oid, ObjectName), T>;
+type OidHasher = std::hash::BuildHasherDefault<OidHash>;
+
+pub(crate) type OidMap<T> = hyperast::compat::HashMap<git2::Oid, T, OidHasher>;
+pub(crate) type NamedMap<T> = hyperast::compat::HashMap<(git2::Oid, ObjectName), T, OidHasher>;
 
 #[cfg(feature = "maven")]
 #[derive(Default)]

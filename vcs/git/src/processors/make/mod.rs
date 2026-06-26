@@ -9,12 +9,13 @@ use std::{fmt::Debug, path::PathBuf};
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::caches::OidMap;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
 pub struct MakeProc {
     parameter: Parameter,
     cache: crate::processing::caches::Make,
-    pub(super) commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+    pub(super) commits: OidMap<crate::Commit>,
 }
 type MakeProcessorHolder = crate::processing::ProcessorHolder<MakeProc>;
 

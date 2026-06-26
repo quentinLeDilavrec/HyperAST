@@ -8,6 +8,7 @@ pub mod types;
 use hyperast::store::defaults::{LabelIdentifier, NodeIdentifier};
 
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use crate::processing::caches::OidMap;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::{Accumulator, BasicDirAcc, DefaultMetrics};
 
@@ -35,7 +36,7 @@ pub struct Parameter {
 pub(crate) struct FileSysProc {
     parameter: Parameter,
     cache: caches::FileSys,
-    commits: std::collections::HashMap<git2::Oid, crate::Commit>,
+    commits: OidMap<crate::Commit>,
 }
 
 pub struct FileSysAcc {

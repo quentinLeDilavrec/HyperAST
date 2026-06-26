@@ -210,7 +210,7 @@ where
         let mut prev = Duration::ZERO;
         writeln!(
             f,
-            "{:>20};{:>12};{:>9};{:>14};{:>6};{:>6}",
+            "{:>20};{:>14};{:>9};{:>22};{};{:>10}",
             "task",
             "cumulative(us)",
             "delta(us)",
@@ -277,7 +277,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
         match self.task {
             LogEntry::PrepareRepository => write!(
                 f,
-                "{:>20};{:>12};{:>9};{:>14};{:>6}",
+                "{:>20};{:>14};{:>9};{:>22};{:>6}",
                 "prep repo",
                 duration.as_micros(),
                 delta.as_micros(),
@@ -288,7 +288,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
                 let since = *duration - *self.first_commit_prep;
                 write!(
                     f,
-                    "{:>20};{:>12};{:>9};{:>14};{:>6}",
+                    "{:>20};{:>14};{:>9};{:>22};{:>6}",
                     if *x > 1 {
                         format!("prep {x} commits")
                     } else {
@@ -302,7 +302,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
             }
             LogEntry::PrepareFiles(x) => write!(
                 f,
-                "{:>20};{:>12};{:>9};{:>14};{:>6}",
+                "{:>20};{:>14};{:>9};{:>22};{:>6}",
                 if *x > 1 {
                     format!("prep {x} files")
                 } else {
@@ -315,7 +315,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
             ),
             LogEntry::CompileQuery => write!(
                 f,
-                "{:>20};{:>12};{:>9};{:>14};{:>6}",
+                "{:>20};{:>14};{:>9};{:>22};{:>6}",
                 "compile query",
                 duration.as_micros(),
                 delta.as_micros(),
@@ -324,7 +324,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
             ),
             LogEntry::ExecuteQueryOnFile(v) => write!(
                 f,
-                "{:>20};{:>12};{:>9};{:>14};{:>6}",
+                "{:>20};{:>14};{:>9};{:>22};{:>6}",
                 "exec on file",
                 duration.as_micros(),
                 delta.as_micros(),
@@ -334,7 +334,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
             LogEntry::ExecuteQueryOnCommit(v, size) if *size == 0 => {
                 write!(
                     f,
-                    "{:>20};{:>12};{:>9};{:>14};{:>6};",
+                    "{:>20};{:>14};{:>9};{:>22};{:>6};",
                     "exec on commit",
                     duration.as_micros(),
                     delta.as_micros(),
@@ -345,7 +345,7 @@ impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
             LogEntry::ExecuteQueryOnCommit(v, size) => {
                 write!(
                     f,
-                    "{:>20};{:>12};{:>9};{:>14};{:>6};{:>6}",
+                    "{:>20};{:>14};{:>9};{:>22};{:>6};{:>6}",
                     "exec on commit",
                     duration.as_micros(),
                     delta.as_micros(),
@@ -393,7 +393,7 @@ where
         use std::io::Write;
         writeln!(
             non_blocking,
-            "{:>20};{:>12};{:>9};{:>14};{:>6};{:>6}",
+            "{:>20};{:>14};{:>9};{:>14};{:>6};{:>6}",
             "task",
             "cumulative(us)",
             "delta(us)",

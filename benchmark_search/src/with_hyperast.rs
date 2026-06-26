@@ -107,7 +107,11 @@ impl<R: AddAssign + Clone> AddAssign<&RichResult<R>> for RichResult<R> {
 
 impl<R> Display for crate::CsvHeader<RichResult<R>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "value;status_count;goto_count;node_count")
+        write!(
+            f,
+            "{:>10};{:>12};{:>10};{:>10}",
+            "value", "status_count", "goto_count", "node_count"
+        )
     }
 }
 
@@ -115,7 +119,7 @@ impl<R: Display> Display for RichResult<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}; {}; {}; {}",
+            "{:>10};{:>12};{:>10};{:>10}",
             self.result, self.status_count, self.goto_count, self.node_count
         )
     }

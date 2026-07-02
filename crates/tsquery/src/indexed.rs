@@ -1,7 +1,5 @@
-use std::{
-    fmt::Display,
-    ops::{Index, IndexMut},
-};
+use std::fmt::Display;
+use std::ops::{Index, IndexMut};
 
 use num::ToPrimitive;
 
@@ -502,9 +500,8 @@ impl From<&crate::utils::Array<crate::ffi::TSFieldId>> for NegatedFields {
 pub struct Symbol(u16);
 
 impl Symbol {
-    pub const ERROR: Symbol = Symbol(u16::MAX - 1);
-    pub const _ERROR: Symbol = Symbol(u16::MAX - 2);
-    pub const NONE: Symbol = Symbol(u16::MAX);
+    pub const ERROR: Symbol = Symbol(u16::MAX);
+    pub const _ERROR: Symbol = Symbol(u16::MAX - 1);
     pub const END: Symbol = Symbol(0);
     pub const WILDCARD_SYMBOL: Symbol = Symbol(0);
     // const WILDCARD_SYMBOL: index::Symbol = index::Symbol(0);

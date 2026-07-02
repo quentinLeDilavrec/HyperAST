@@ -174,7 +174,7 @@ where
         let t = self.kind;
         let lang = t.get_lang();
         if t.is_directory() {
-            return 0.into();
+            return Symbol::END; // not sure about what would be the best fallback
         }
         use hyperast::types::LangRef;
         let id = lang.ts_symbol(t);

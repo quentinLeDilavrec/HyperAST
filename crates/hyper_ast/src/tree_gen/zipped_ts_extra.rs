@@ -307,7 +307,7 @@ where
     ) -> PreResult<Self::Acc> {
         let node = cursor.node();
         let kind = TS::obtain_type(&node);
-        if (!HIDDEN_NODES && kind.is_hidden()) || kind.is_repeat() {
+        if (!HIDDEN_NODES && kind.is_hidden()) || kind.should_ignore() {
             if stack.parent().unwrap().simple.children.len() < 120 {
                 return PreResult::Ignore;
             }

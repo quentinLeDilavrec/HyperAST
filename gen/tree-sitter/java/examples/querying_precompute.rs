@@ -75,7 +75,7 @@ pub const QUERIES: &[(&[&str], &str)] = &[
             // )"#,
         ],
         r#"(program
-(class_declaration 
+(class_declaration
   name: (_) @name
   body: (_
     (method_declaration
@@ -267,10 +267,7 @@ fn prep_stepped<'store>(
         // }
     };
 
-    let tree = match legion_with_refs::tree_sitter_parse(text) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = legion_with_refs::tree_sitter_parse(text);
     println!("{}", tree.root_node().to_sexp());
     let full_node = java_tree_gen.generate_file(b"", text, tree.walk());
     eprintln!(

@@ -83,10 +83,7 @@ fn tsg_hyperast_stepped<'a, 'c, 'd>(
     // choose the stepped query implementation (like the treesitter one)
     use hyperast_gen_ts_java::tsg::stepped_query as impls;
 
-    let tree = match legion_with_refs::tree_sitter_parse(text.as_bytes()) {
-        Ok(t) => t,
-        Err(t) => t,
-    };
+    let tree = legion_with_refs::tree_sitter_parse(text.as_bytes());
 
     let mut java_tree_gen = legion_with_refs::JavaTreeGen::new(stores, md_cache);
 

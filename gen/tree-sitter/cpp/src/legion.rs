@@ -13,6 +13,7 @@ use hyperast::tree_gen;
 use hyperast::tree_gen::TotalBytesGlobalData as _;
 use hyperast::tree_gen::TsType;
 use hyperast::tree_gen::add_md_precomp_queries;
+use hyperast::tree_gen::compute_indentation;
 use hyperast::tree_gen::handle_file_bounds;
 use hyperast::tree_gen::parser::Node as _;
 use hyperast::tree_gen::parser::TreeCursor;
@@ -23,7 +24,6 @@ use hyperast::tree_gen::{BasicGlobalData, NoOpMore};
 use hyperast::tree_gen::{Parents, PreResult};
 use hyperast::tree_gen::{SpacedGlobalData, TextedGlobalData};
 use hyperast::tree_gen::{TreeGen, ZippedTreeGen};
-use hyperast::tree_gen::{compute_indentation, get_spacing};
 
 use hyperast::full::FullNode;
 use hyperast::nodes::Space;
@@ -453,7 +453,7 @@ where
                 space!(error);
                 global.set_sum_byte_length(end);
             } else {
-                error!(@ error);
+                error!(error);
                 global.set_sum_byte_length(end);
             }
         } else if comp!(padding < start < end == cursor) {
@@ -477,7 +477,7 @@ where
                 space!(error);
                 global.set_sum_byte_length(end);
             } else {
-                error!(@ error);
+                error!(error);
                 global.set_sum_byte_length(end);
             }
         } else {
@@ -492,28 +492,11 @@ where
 
     fn post(
         &mut self,
-        mut acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
+        _acc_node: impl FnMut(<Self::Acc as Accumulator>::Node),
         global: &mut Self::Global,
         text: &[u8],
-        mut acc: Self::Acc,
+        acc: Self::Acc,
     ) -> <Self::Acc as Accumulator>::Node {
-        // let spacing = get_spacing(acc.padding_start, acc.start_byte, text);
-        // if global.sum_byte_length() < acc.end_byte {
-        //     // Only create an error node if tree-sitter is skipping non-whitespaces.
-        //     // the error node takes the span to realign for next leaf node
-        //     if tree_gen::try_get_spacing(global.sum_byte_length(), acc.end_byte, text).is_none() {
-        //         let local = self.make_error(&text[global.sum_byte_length()..acc.end_byte]);
-        //         acc.push(FullNode {
-        //             global: global.simple(),
-        //             local,
-        //         });
-        //         global.set_sum_byte_length(acc.end_byte);
-        //     }
-        // }
-        // if let Some(spacing) = spacing {
-        //     // debug_assert_ne!(parent.simple.children.len(), 0, "{:?}", parent.simple);
-        //     acc_node(self.make_space(global, &spacing));
-        // }
         let label = if acc.labeled {
             std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
                 .ok()

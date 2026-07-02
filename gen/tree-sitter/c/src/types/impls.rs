@@ -185,8 +185,7 @@ impl LangRef<AnyType> for C {
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
-        // TODO check lang
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
     }
 }
 
@@ -214,7 +213,13 @@ impl LangRef<Type> for C {
     }
 
     fn ts_symbol(&self, t: Type) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        // direct conversion is fine now, we ended up keeping the same representation
+        let id = id_for_node_kind(t.as_static_str(), t.is_named());
+        if !t.is_error() && !t.is_spaces() && id != 0 {
+            // apparently the TS languages do not give a symbol for "ERROR
+            assert_eq!(id, t as u16, "{}", t.as_static_str());
+        }
+        t as u16
     }
 }
 
@@ -233,7 +238,13 @@ impl LangRef<TType> for Lang {
     }
 
     fn ts_symbol(&self, t: TType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        // direct conversion is fine now, we ended up keeping the same representation
+        let id = id_for_node_kind(t.as_static_str(), t.is_named());
+        if !t.is_error() && !t.is_spaces() && id != 0 {
+            // apparently the TS languages do not give a symbol for "ERROR
+            assert_eq!(id, t.e() as u16, "{}", t.as_static_str());
+        }
+        t.e() as u16
     }
 }
 
@@ -333,7 +344,20 @@ impl HyperType for Type {
     }
 
     fn is_named(&self) -> bool {
-        self.is_named()
+        // these are special cases that alias regular expression rules...
+        super::is!(
+            self,
+            HashInclude,
+            HashDefine,
+            HashIf,
+            HashElse,
+            HashEndif,
+            HashIfdef,
+            HashIfndef,
+            HashElif,
+            HashElifdef,
+            HashElifndef,
+        ) || self.is_named()
     }
     fn get_lang(&self) -> hyperast::types::LangWrapper<Self>
     where

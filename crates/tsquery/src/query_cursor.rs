@@ -548,12 +548,15 @@ where
                 {
                     // TODO check if it properly passes a double pointer
                     log::trace!(
-                        "  split state for capture. pattern:{}, step:{} {} {} {}",
+                        "  split state for capture. pattern:{}, step:{} {} {} {} {} {} {}",
                         state!().pattern_index,
                         state!().step_index,
                         later_sibling_can_match,
                         state!(@step).contains_captures(),
                         query.step_is_fallible(state!().step_index),
+                        status.has_later_siblings(),
+                        status.has_later_named_siblings(),
+                        status.can_have_later_siblings_with_this_field()
                     );
                     copy_count += 1;
                 }

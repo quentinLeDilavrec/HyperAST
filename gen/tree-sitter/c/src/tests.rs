@@ -27,18 +27,64 @@ pub(crate) fn cpp_tree_sitter_simple() {
 }
 
 #[test]
-pub(crate) fn cpp_simple_test() {
-    let text = { EX.as_bytes() };
-    let tree = tree_sitter_parse(text);
+pub(crate) fn c_simple_test() {
+    let text = EX;
+    let tree = tree_sitter_parse(text.as_bytes());
     println!("{:#?}", tree.root_node().to_sexp());
     let mut stores = SimpleStores::default();
     let mut md_cache = Default::default();
     let mut tree_gen = CTreeGen::new(&mut stores, &mut md_cache);
-    let x = tree_gen.generate_file(b"", text, tree.walk()).local;
-    let x = x.compressed_node;
+    let x = tree_gen.generate_file(b"", text.as_bytes(), tree.walk());
+    let x = x.local.compressed_node;
     println!("{}", hyperast::nodes::SyntaxSerializer::new(&stores, x));
     println!("{}", hyperast::nodes::SexpSerializer::new(&stores, x));
     println!("{}", hyperast::nodes::TextSerializer::new(&stores, x));
+    assert_eq!(
+        text,
+        hyperast::nodes::TextSerializer::new(&stores, x).to_string()
+    );
+}
+
+// https://github.com/tursodatabase/libsql/blob/6f451a1fabacbcbc9960b232b4c1605a5021979b/libsql-sqlite3/src/shell.c.in
+#[test]
+pub(crate) fn c_sql_shell_main_begining_test() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/tests/shell_main_begining.c");
+    let text = std::fs::read_to_string(&path).unwrap();
+    let tree = tree_sitter_parse(text.as_bytes());
+    println!("{:#?}", tree.root_node().to_sexp());
+    let mut stores = SimpleStores::default();
+    let mut tree_gen = crate::legion_ts_simp::CTreeGen::bare(&mut stores);
+    let x = tree_gen.generate_file(b"", text.as_bytes(), tree.walk());
+    let x = x.local.compressed_node;
+    println!(
+        "{}",
+        hyperast::nodes::IndentedSerializer::<_, _, hyperast::nodes::Json, true>::new(&stores, x)
+    );
+    pretty_assertions::assert_eq!(
+        text,
+        hyperast::nodes::TextSerializer::new(&stores, x).to_string()
+    );
+}
+
+#[test]
+pub(crate) fn c_preproc_space_define_test() {
+    let text = r##"#  define data shellState"##;
+    // # define session_close_all(X,Y)
+    let tree = tree_sitter_parse(text.as_bytes());
+    println!("{:#?}", tree.root_node().to_sexp());
+    let mut stores = SimpleStores::default();
+    let mut tree_gen = crate::legion_ts_simp::CTreeGen::bare(&mut stores);
+    let x = tree_gen.generate_file(b"", text.as_bytes(), tree.walk());
+    let x = x.local.compressed_node;
+    println!(
+        "{}",
+        hyperast::nodes::IndentedSerializer::<_, _, hyperast::nodes::Json, true>::new(&stores, x)
+    );
+    pretty_assertions::assert_eq!(
+        text,
+        hyperast::nodes::TextSerializer::new(&stores, x).to_string()
+    );
 }
 
 use crate::Type;

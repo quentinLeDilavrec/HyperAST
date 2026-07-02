@@ -192,12 +192,19 @@ where
             if role.is_some() && s.role() == role {
                 can_have_later_siblings_with_this_field = true;
             }
+            while !s.kind().is_supertype() && !s.is_visible() {
+                if let TreeCursorStep::None = s.goto_first_child_internal() {
+                    break;
+                }
+                if role.is_some() && s.role() == role {
+                    can_have_later_siblings_with_this_field = true;
+                }
+            }
             has_later_siblings = true;
             if s.kind().is_supertype() {
                 has_later_named_siblings = true;
             }
             if s.is_visible() {
-                has_later_siblings = true;
                 use super::Node;
                 if s.is_named() {
                     has_later_named_siblings = true;

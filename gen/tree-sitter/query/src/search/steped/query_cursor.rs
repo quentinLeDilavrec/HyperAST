@@ -297,7 +297,6 @@ where
                 }
                 let ss = state!(@step).supertype_symbol;
                 if Symbol::from(ss) != Symbol::END {
-                    self.cursor.current_status();
                     let has_supertype =
                         status.contains_supertype(state!(@step).supertype_symbol.into());
                     if !has_supertype {

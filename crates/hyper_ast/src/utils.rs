@@ -1,8 +1,6 @@
 use core::fmt;
-use std::{
-    hash::{BuildHasher, Hash, Hasher},
-    str::FromStr,
-};
+use std::hash::{BuildHasher, Hash, Hasher};
+use std::str::FromStr;
 
 pub fn hash<T: ?Sized + Hash>(x: &T) -> u64 {
     hashbrown::hash_map::DefaultHashBuilder::default().hash_one(x)
@@ -29,7 +27,7 @@ pub struct MemoryUsage {
 
 impl fmt::Display for MemoryUsage {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}", self.allocated)
+        self.allocated.fmt(fmt)
     }
 }
 

@@ -419,6 +419,7 @@ where
                 $a == $b && comp!( $b $($t)* )
             };
         }
+        let mut delayed = None;
         if comp!(      padding == start == end == cursor) {
             //                        what ??
             log::info!(
@@ -434,18 +435,11 @@ where
             // )
         } else if comp!(padding == start < end == cursor) {
             //                      | node  |     ...
-            // no space to produce
+            // no space to produce, no trailing
         } else if comp!(padding == start < cursor < end) {
             //                       | node  | error |  ...
             // no space to produce
-            let error = &text[cursor..end];
-            if validate_spacing(error) {
-                space!(error);
-                global.set_sum_byte_length(end);
-            } else {
-                // error!(error);
-                // global.set_sum_byte_length(end);
-            }
+            delayed = Some(cursor..end);
         } else if comp!(padding < start < end == cursor) {
             //            |  space  | node  |     ...
             let space = &text[padding..start];
@@ -454,6 +448,7 @@ where
             } else {
                 error!(space);
             }
+            // no trailing
         } else if comp!(padding < start < cursor < end) {
             //            |  space  | node  | error |  ...
             let space = &text[padding..start];
@@ -462,14 +457,7 @@ where
             } else {
                 error!(space);
             }
-            let error = &text[cursor..end];
-            if validate_spacing(error) {
-                space!(error);
-                global.set_sum_byte_length(end);
-            } else {
-                error!(error);
-                global.set_sum_byte_length(end);
-            }
+            delayed = Some(cursor..end);
         } else if comp!(padding < start == cursor == end) {
             //            |  space  |
             let space = &text[padding..start];
@@ -478,6 +466,7 @@ where
             } else {
                 error!(space);
             }
+            // no trailing
         } else if acc.simple.kind.is_error() && start == 0 && comp!(padding < cursor == end) {
             // kind of an exception
             // related to the repeat trick
@@ -492,8 +481,21 @@ where
                 padding, start, end, cursor
             )
         }
-        let node = self.post(|n| parent.push(n), global, text, acc);
-        parent.push(node);
+        if start < end {
+            // the condition handles the MISSINGs
+            let node = self.post(|n| parent.push(n), global, text, acc);
+            parent.push(node);
+        }
+        if let Some(delayed) = delayed {
+            let error = &text[cursor..end];
+            if validate_spacing(error) {
+                space!(error);
+                global.set_sum_byte_length(end);
+            } else {
+                error!(error);
+                global.set_sum_byte_length(end);
+            }
+        }
         if parent.simple.children.len() > 10000 {
             let kind = parent.simple.kind;
             let repeat_kind = if let Some(repeat_kind) = kind.as_repeat() {

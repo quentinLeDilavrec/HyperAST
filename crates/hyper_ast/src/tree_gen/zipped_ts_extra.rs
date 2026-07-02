@@ -360,7 +360,7 @@ where
     ) -> Self::Acc {
         let kind = TS::obtain_type(node);
         Acc {
-            labeled: node.has_label(),
+            labeled: node.child_count() == 0 && kind.is_named(),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
             metrics: Default::default(),

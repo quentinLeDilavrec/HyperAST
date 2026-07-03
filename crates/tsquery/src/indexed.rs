@@ -495,7 +495,7 @@ impl From<&crate::utils::Array<crate::ffi::TSFieldId>> for NegatedFields {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
 #[repr(transparent)]
 pub struct Symbol(u16);
 
@@ -512,11 +512,12 @@ impl Symbol {
     pub fn is_error(&self) -> bool {
         self == &Self::ERROR || self == &Self::_ERROR
     }
-}
+    pub(crate) fn from_ts_symbol(symbol: tree_sitter::ffi::TSSymbol) -> Self {
+        Symbol(symbol)
+    }
 
-impl From<u16> for Symbol {
-    fn from(value: u16) -> Self {
-        Symbol(value)
+    pub(crate) fn symbol_name(self, query: &crate::Query) -> Option<&str> {
+        crate::query::symbol_name(query, self.0)
     }
 }
 

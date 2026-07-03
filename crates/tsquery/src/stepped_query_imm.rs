@@ -362,9 +362,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let qm = self.matchs.next()?;
         let stores = self.node.0.stores;
-        let i = self
-            .q
-            .query
+        let i = (self.q.query)
             .enabled_pattern_index(qm.pattern_index)
             .unwrap();
         Some(self::MyQMatch {

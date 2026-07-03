@@ -21,6 +21,7 @@ use crate::PatternId;
 use crate::Precomps;
 use crate::QueryError;
 use crate::QueryErrorKind;
+use crate::Symbol;
 use crate::ffi;
 use crate::indexed;
 use crate::indexed::PredStepId;
@@ -102,9 +103,9 @@ impl From<&crate::ffi_extra::TSPatternEntry> for PatternEntry {
 #[derive(Clone, Debug)]
 pub(crate) struct QueryStep {
     // optional when done variant
-    symbol: ffi::TSSymbol,
+    symbol: Symbol,
     // optional
-    supertype_symbol: ffi::TSSymbol,
+    supertype_symbol: Symbol,
     // optional
     pub(crate) field: ffi::TSFieldId,
     // optional
@@ -457,12 +458,12 @@ impl PrecomputedPatterns {
                     }
                 };
                 (symbol, $imm:expr, $last:expr) => {
-                    if step.symbol != 0 {
+                    if step.symbol != Symbol::END {
                         hsh!(hash_single_step2, $imm, $last);
                     }
                 };
                 (field & symbol, $imm:expr, $last:expr) => {
-                    if step.field != 0 && step.symbol != 0 {
+                    if step.field != 0 && step.symbol != Symbol::END {
                         hsh!(hash_single_step12, $imm, $last);
                     }
                 };
@@ -567,14 +568,14 @@ impl PrecomputedPatterns {
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
-                if step.symbol != 0 {
+                if step.symbol != Symbol::END {
                     let mut hasher = hasher.div();
                     hash_single_step2(query, id, false, false, &mut hasher.0);
                     let mut id = id;
                     id.inc();
                     self.matches_aux(stepid, id, query, hasher, res);
                 }
-                if step.symbol != 0 {
+                if step.symbol != Symbol::END {
                     let mut hasher = hasher.div();
                     hash_single_step12(query, id, false, false, &mut hasher.0);
                     let mut id = id;
@@ -784,7 +785,7 @@ impl Query {
             let half_size = size / 2;
             let mid_index = base_index + half_size;
             let pattern_entry: &PatternEntry = &self.pattern_map[mid_index];
-            let mid_symbol = self.steps[pattern_entry.step_index].symbol as usize;
+            let mid_symbol = self.steps[pattern_entry.step_index].symbol.to_usize();
             // dbg!(mid_symbol);
             // dbg!(query_step::symbol_name(self, mid_symbol as u16));
             if needle.to_usize() > mid_symbol {
@@ -799,7 +800,7 @@ impl Query {
         // );
 
         let pattern_entry: &PatternEntry = &self.pattern_map[base_index];
-        let mut symbol = self.steps[pattern_entry.step_index].symbol as usize;
+        let mut symbol = self.steps[pattern_entry.step_index].symbol.to_usize();
         // dbg!(symbol);
         // dbg!(query_step::symbol_name(self, symbol as u16));
 
@@ -807,7 +808,7 @@ impl Query {
             base_index += 1;
             if base_index < self.pattern_map.len() {
                 let pattern_entry: &PatternEntry = &self.pattern_map[base_index];
-                symbol = self.steps[pattern_entry.step_index].symbol as usize;
+                symbol = self.steps[pattern_entry.step_index].symbol.to_usize();
             }
         }
 
@@ -1974,116 +1975,109 @@ impl Debug for Query {
 
 impl Display for Query {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        pub(crate) fn print_query_step(
-            query: &Query,
-            step: &QueryStep,
-            f: &mut std::fmt::Formatter<'_>,
-        ) -> std::fmt::Result {
-            const WILDCARD_SYMBOL: u16 = 0;
-            write!(f, "{{")?;
-            if step.done() {
-                write!(f, "   ")?;
-            } else {
-                write!(f, "{:>2} ", step.depth)?;
-            }
-            if step.done() {
-                write!(f, "DONE")?;
-            } else if step.is_dead_end() {
-                write!(f, "dead_end")?;
-            } else if step.is_pass_through() {
-                write!(f, "pass_through")?;
-            } else {
-                write!(f, "symbol: ")?;
-                if step.supertype_symbol != WILDCARD_SYMBOL {
-                    if let Some(s) = symbol_name(query, step.supertype_symbol) {
-                        write!(f, "{}/", s)?
-                    } else {
-                        write!(f, "{}/", step.supertype_symbol)?
-                    }
-                }
-                if step.symbol != WILDCARD_SYMBOL {
-                    if let Some(s) = symbol_name(query, step.symbol) {
-                        write!(f, "{}", s)?
-                    } else {
-                        write!(f, "{}", step.symbol)?
-                    }
-                } else {
-                    write!(f, "*")?
-                }
-            }
-            if step.is_named() {
-                write!(f, ", named")?;
-            }
-            if step.is_immediate() {
-                write!(f, ", immediate")?;
-            }
-            if step.is_last_child() {
-                write!(f, ", last_child")?;
-            }
-            if step.alternative_is_immediate() {
-                write!(f, ", alternative_is_immediate")?;
-            }
-            if step.contains_captures() {
-                write!(f, ", contains_captures")?;
-            }
-            if step.root_pattern_guaranteed() {
-                write!(f, ", root_pattern_guaranteed")?;
-            }
-            if step.parent_pattern_guaranteed() {
-                write!(f, ", parent_pattern_guaranteed")?;
-            }
-            // if step.is_neg() {
-            //     write!(f, ", neg")?;
-            // }
-            if let Some(imm) = step.immediate_pred() {
-                write!(f, ", imm:{}", imm)?;
-            }
-
-            if step.field > 0 {
-                if let Some(s) = field_name(query, step.field) {
-                    write!(f, ", field: {}", s)?
-                } else {
-                    write!(f, ", field: {}", step.field)?
-                }
-            }
-            if let Some(alt) = step.alternative_index() {
-                write!(f, ", alternative: {}", alt)?;
-            }
-            write!(f, "}}")?;
-            // NOTE C is not always zerowing the 7 unused bits so lets mask them
-            write!(f, " bitfield: {:b}", step.bit_field)
-        }
-
-        pub(crate) fn symbol_name(
-            query: &Query,
-            symbol: tree_sitter::ffi::TSSymbol,
-        ) -> Option<&str> {
-            let ptr = unsafe { tree_sitter::ffi::ts_language_symbol_name(query.language, symbol) };
-            if !ptr.is_null() {
-                Some(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap())
-            } else {
-                None
-            }
-        }
-
-        pub(crate) fn field_name(
-            query: &Query,
-            field: tree_sitter::ffi::TSFieldId,
-        ) -> Option<&str> {
-            let ptr =
-                unsafe { tree_sitter::ffi::ts_language_field_name_for_id(query.language, field) };
-            if !ptr.is_null() {
-                Some(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap())
-            } else {
-                None
-            }
-        }
         for (i, step) in self.steps.iter().enumerate() {
             write!(f, "  {:>2}: ", i)?;
             print_query_step(self, step, f)?;
             writeln!(f, ",")?;
         }
         Ok(())
+    }
+}
+
+pub(crate) fn print_query_step(
+    query: &Query,
+    step: &QueryStep,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    write!(f, "{{")?;
+    if step.done() {
+        write!(f, "   ")?;
+    } else {
+        write!(f, "{:>2} ", step.depth)?;
+    }
+    if step.done() {
+        write!(f, "DONE")?;
+    } else if step.is_dead_end() {
+        write!(f, "dead_end")?;
+    } else if step.is_pass_through() {
+        write!(f, "pass_through")?;
+    } else {
+        write!(f, "symbol: ")?;
+        if step.supertype_symbol != Symbol::WILDCARD_SYMBOL {
+            if let Some(s) = step.supertype_symbol.symbol_name(query) {
+                write!(f, "{}/", s)?
+            } else {
+                write!(f, "{}/", step.supertype_symbol.to_usize())?
+            }
+        }
+        if step.symbol != Symbol::WILDCARD_SYMBOL {
+            if let Some(s) = step.symbol.symbol_name(query) {
+                write!(f, "{}", s)?
+            } else {
+                write!(f, "{}", step.symbol.to_usize())?
+            }
+        } else {
+            write!(f, "*")?
+        }
+    }
+    if step.is_named() {
+        write!(f, ", named")?;
+    }
+    if step.is_immediate() {
+        write!(f, ", immediate")?;
+    }
+    if step.is_last_child() {
+        write!(f, ", last_child")?;
+    }
+    if step.alternative_is_immediate() {
+        write!(f, ", alternative_is_immediate")?;
+    }
+    if step.contains_captures() {
+        write!(f, ", contains_captures")?;
+    }
+    if step.root_pattern_guaranteed() {
+        write!(f, ", root_pattern_guaranteed")?;
+    }
+    if step.parent_pattern_guaranteed() {
+        write!(f, ", parent_pattern_guaranteed")?;
+    }
+    // if step.is_neg() {
+    //     write!(f, ", neg")?;
+    // }
+    if let Some(imm) = step.immediate_pred() {
+        write!(f, ", imm:{}", imm)?;
+    }
+
+    if step.field > 0 {
+        if let Some(s) = field_name(query, step.field) {
+            write!(f, ", field: {}", s)?
+        } else {
+            write!(f, ", field: {}", step.field)?
+        }
+    }
+    if let Some(alt) = step.alternative_index() {
+        write!(f, ", alternative: {}", alt)?;
+    }
+    write!(f, "}}")?;
+    // NOTE C is not always zerowing the 7 unused bits so lets mask them
+    write!(f, " bitfield: {:b}", step.bit_field)
+}
+
+pub(crate) fn symbol_name(query: &Query, symbol: tree_sitter::ffi::TSSymbol) -> Option<&str> {
+    let ptr = unsafe { tree_sitter::ffi::ts_language_symbol_name(query.language, symbol) };
+    if !ptr.is_null() {
+        Some(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap())
+    } else {
+        None
+    }
+}
+
+pub(crate) fn field_name(query: &Query, field: tree_sitter::ffi::TSFieldId) -> Option<&str> {
+    let ptr = unsafe { tree_sitter::ffi::ts_language_field_name_for_id(query.language, field) };
+    if !ptr.is_null() {
+        Some(unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str().unwrap())
+    } else {
+        None
     }
 }
 
@@ -2134,8 +2128,8 @@ impl From<&crate::ffi_extra::TSQueryStep> for QueryStep {
         }
         let bit_field = r;
         QueryStep {
-            symbol: x.symbol,
-            supertype_symbol: x.supertype_symbol,
+            symbol: Symbol::from_ts_symbol(x.symbol),
+            supertype_symbol: Symbol::from_ts_symbol(x.supertype_symbol),
             field: x.field,
             capture_ids,
             depth: x.depth,
@@ -2192,11 +2186,11 @@ mod tests {
             if s.done() {
                 continue;
             }
-            if s.symbol == 0 {
+            if s.symbol == Symbol::END {
                 continue;
             }
             dbg!(s);
-            if symbol_name(&query, s.symbol) == Some("identifier") {
+            if s.symbol.symbol_name(&query) == Some("identifier") {
                 // in combination to adding imm pred to every identifier in the textual query format
                 assert!(s.has_immediate_pred());
             }
@@ -2518,6 +2512,8 @@ mod exp_union {
                 }
                 _ => panic!(),
             }
+            let symbol = Symbol::from_ts_symbol(symbol);
+            let supertype_symbol = Symbol::from_ts_symbol(supertype_symbol);
             super::QueryStep {
                 symbol,
                 supertype_symbol,

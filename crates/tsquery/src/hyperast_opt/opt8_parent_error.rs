@@ -182,10 +182,9 @@ where
         let n = stack.last().unwrap();
         let t = decomp_t!(HAST::TS, n);
         assert_eq!(t, self.stores.resolve_type(&s.node()));
-        let id = t.get_lang().ts_symbol(t);
         assert_eq!(
             self.pos.misc_stacks.errors.bit(self.pos.stack.len() - 1),
-            Symbol::from(id) == Symbol::ERROR
+            Symbol::from_type(t) == Symbol::ERROR
         );
 
         self.pos.misc_stacks.errors.bit(self.pos.stack.len() - 1)
@@ -294,7 +293,7 @@ where
         // dbg!(n.child_count());
 
         if k.is_supertype() {
-            let symbol = lang.ts_symbol(k).into();
+            let symbol = Symbol::from_type(k);
             supertypes.push(symbol);
         }
 

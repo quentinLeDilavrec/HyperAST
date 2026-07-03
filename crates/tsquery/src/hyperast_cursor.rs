@@ -378,11 +378,9 @@ where
         let n = self.pos.node().unwrap();
         let t = self.stores.resolve_type(n);
         if t.is_directory() {
-            return 0.into();
+            return Symbol::END;
         }
-        use hyperast::types::LangRef;
-        let id = t.get_lang().ts_symbol(t);
-        id.into()
+        Symbol::from_type(t)
     }
 
     fn is_named(&self) -> bool {

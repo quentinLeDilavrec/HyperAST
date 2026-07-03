@@ -128,7 +128,7 @@ impl<'a> Cursor for TreeCursor<'a> {
                 );
             }
             supertypes.set_len(supertype_count as usize);
-            let supertypes = supertypes.into_iter().map(Into::into).collect();
+            let supertypes = supertypes.into_iter().map(Symbol::from_ts_symbol).collect();
             TSStatus {
                 has_later_siblings,
                 has_later_named_siblings,
@@ -187,7 +187,7 @@ impl<'a> super::TextLending<'a> for tree_sitter::Node<'_> {
 impl super::Node for tree_sitter::Node<'_> {
     type IdF = ffi::TSFieldId;
     fn symbol(&self) -> Symbol {
-        self.kind_id().into()
+        Symbol::from_ts_symbol(self.kind_id())
     }
 
     fn is_named(&self) -> bool {

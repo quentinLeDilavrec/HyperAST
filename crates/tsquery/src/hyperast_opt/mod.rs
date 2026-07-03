@@ -109,9 +109,7 @@ use cursor_utils::{kind, resolve};
 
 pub fn symbol<HAST: HyperAST>(stores: &HAST, id: HAST::IdN) -> Symbol {
     let t = stores.resolve_type(&id);
-    use hyperast::types::LangRef;
-    let id = t.get_lang().ts_symbol(t);
-    id.into()
+    Symbol::from_type(t)
 }
 
 pub fn is_visible<HAST: HyperAST>(stores: &HAST, k: <HAST::TS as TypeStore>::Ty) -> bool {

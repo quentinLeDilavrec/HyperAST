@@ -171,11 +171,9 @@ where
         let t = self.kind;
         let lang = t.get_lang();
         if t.is_directory() {
-            return 0.into();
+            return Symbol::END;
         }
-        use hyperast::types::LangRef;
-        let id = lang.ts_symbol(t);
-        id.into()
+        Symbol::from_type(t)
     }
 
     fn is_named(&self) -> bool {

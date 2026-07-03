@@ -179,7 +179,7 @@ where
         let k = decomp_t!(HAST::TS, &n);
 
         if k.is_supertype() {
-            let symbol = lang.ts_symbol(k).into();
+            let symbol = Symbol::from_type(k);
             supertypes.push(symbol);
         }
 

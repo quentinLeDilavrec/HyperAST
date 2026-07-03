@@ -176,9 +176,7 @@ where
         if t.is_directory() {
             return Symbol::END; // not sure about what would be the best fallback
         }
-        use hyperast::types::LangRef;
-        let id = lang.ts_symbol(t);
-        id.into()
+        Symbol::from_type(t)
     }
 
     fn is_named(&self) -> bool {

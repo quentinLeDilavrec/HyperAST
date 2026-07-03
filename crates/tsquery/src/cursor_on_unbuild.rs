@@ -458,8 +458,9 @@ where
     &'acc Acc: tree_gen::WithLabel,
 {
     fn symbol(&self) -> Symbol {
-        let id = HAST::TS::ts_symbol(self.kind());
-        id.into()
+        // let id = HAST::TS::ts_symbol();
+        // id.into()
+        Symbol::from_type(self.kind())
     }
 
     fn is_named(&self) -> bool {

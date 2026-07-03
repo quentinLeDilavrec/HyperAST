@@ -456,9 +456,19 @@ pub fn up_to_date_repo(
         let repository = match Repository::open(path) {
             Ok(repo) => repo,
             Err(e) if e.code() == git2::ErrorCode::NotFound => {
-                if path.starts_with("/tmp") {
+                let _r = Repository::open(path.join(".git"));
+                if let Ok(r) = _r {
+                    return Ok(r);
+                } else if let Err(e) = _r
+                    && e.code() != git2::ErrorCode::NotFound
+                {
+                    dbg!(e.to_string());
+                    return Err(FetchRepoError::NoRepoAndNoFetch);
+                }
+
+                if path.is_absolute() && path.starts_with("/tmp") && fo.is_some() {
                     if let Err(e) = fs::remove_dir_all(path.join(".git")) {
-                        panic!("failed to remove currupted clone: {}", e)
+                        panic!("failed to remove corrupted clone: {}", e)
                     } else {
                         return if let Some(fo) = fo {
                             clone_helper(url, path, fo).map_err(Into::into)

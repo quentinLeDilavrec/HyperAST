@@ -967,7 +967,7 @@ pub trait TypeStore {
         t.get_lang().ts_symbol(t)
     }
     fn decompress_type(erazed: &impl PolyglotHolder, tid: std::any::TypeId) -> Self::Ty {
-        *unsafe { erazed.unerase_ref_unchecked::<Self::Ty>(tid) }
+        Self::try_decompress_type(erazed, tid)
             .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
     }
     fn try_decompress_type(
@@ -995,11 +995,8 @@ where
 {
     type TTy = Self::Ty;
     fn decompress_ttype(erazed: &impl ErasedHolder, tid: std::any::TypeId) -> Self::TTy {
-        *unsafe {
-            erazed
-                .unerase_ref_unchecked::<Self::TTy>(tid)
-                .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
-        }
+        *unsafe { erazed.unerase_ref_unchecked::<Self::TTy>(tid) }
+            .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
     }
 }
 

@@ -221,6 +221,7 @@ pub struct QueryMatch<Node> {
     id: indexed::StateId,
 }
 
+/// defined in tree_cursor.h
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub enum TreeCursorStep {
@@ -231,10 +232,6 @@ pub enum TreeCursorStep {
     // TreeCursorStepVisible
     Visible,
 }
-
-// pub trait CursorLending<'a> {
-//     type NodeRef: Node<IdF = <Self::Node as Node>::IdF, TP<'a> = <Self::Node as Node>::TP<'a>>;
-// }
 
 pub trait WithField {
     type IdF;
@@ -443,7 +440,7 @@ impl<Node: self::Node> QueryMatch<Node> {
     ) -> bool {
         text_predicates.all(|predicate| match predicate {
             TextPredicateCapture::EqCapture(left, right, is_positive, match_all_nodes) => {
-                // WARN sligntly different sem as we compare nodes structurally and not textually
+                // WARN slightly different sem as we compare nodes structurally and not textually
                 // bad for comparing the name of a type ref with the name of a variable ref
                 let nodes_1 = self.nodes_for_capture_index(*left);
                 let mut nodes_2 = self.nodes_for_capture_index(*right);

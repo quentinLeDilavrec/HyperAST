@@ -504,14 +504,15 @@ impl Symbol {
     pub const _ERROR: Symbol = Symbol(u16::MAX - 1);
     pub const END: Symbol = Symbol(0);
     pub const WILDCARD_SYMBOL: Symbol = Symbol(0);
-    // const WILDCARD_SYMBOL: index::Symbol = index::Symbol(0);
 
     pub(crate) fn to_usize(self) -> usize {
         self.0 as usize
     }
+
     pub fn is_error(&self) -> bool {
         self == &Self::ERROR || self == &Self::_ERROR
     }
+
     pub(crate) fn from_ts_symbol(symbol: tree_sitter::ffi::TSSymbol) -> Self {
         Symbol(symbol)
     }

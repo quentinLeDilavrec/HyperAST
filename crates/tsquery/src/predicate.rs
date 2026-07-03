@@ -35,6 +35,7 @@ impl<P> PerPatternBuilder<P> {
         self.curr.as_ref().unwrap().len()
     }
 }
+
 /// Efficiently packs/indexes elements P per PatternId
 #[derive(Debug)]
 pub struct PerPattern<P>(Box<[Box<[P]>]>);
@@ -91,44 +92,23 @@ impl Clone for PerPattern<QueryPredicate> {
 
 impl Clone for PerPattern<(tree_sitter::QueryProperty, IsPositive)> {
     fn clone(&self) -> Self {
-        Self(
-            self.0
-                .iter()
-                .map(|x| {
-                    x.iter()
-                        .map(|(x, b)| {
-                            (
-                                tree_sitter::QueryProperty {
-                                    key: x.key.clone(),
-                                    value: x.value.clone(),
-                                    capture_id: x.capture_id,
-                                },
-                                *b,
-                            )
-                        })
-                        .collect()
-                })
-                .collect(),
-        )
+        let inner = |x: &Box<[_]>| x.iter().map(|(x, b)| (qp_clone(x), *b)).collect();
+        Self(self.0.iter().map(inner).collect())
     }
 }
 
 impl Clone for PerPattern<tree_sitter::QueryProperty> {
     fn clone(&self) -> Self {
-        Self(
-            self.0
-                .iter()
-                .map(|x| {
-                    x.iter()
-                        .map(|x| tree_sitter::QueryProperty {
-                            key: x.key.clone(),
-                            value: x.value.clone(),
-                            capture_id: x.capture_id,
-                        })
-                        .collect()
-                })
-                .collect(),
-        )
+        let inner = |x: &Box<[_]>| x.iter().map(qp_clone).collect();
+        Self(self.0.iter().map(inner).collect())
+    }
+}
+
+fn qp_clone(x: &tree_sitter::QueryProperty) -> tree_sitter::QueryProperty {
+    tree_sitter::QueryProperty {
+        key: x.key.clone(),
+        value: x.value.clone(),
+        capture_id: x.capture_id,
     }
 }
 

@@ -137,3 +137,17 @@ pub struct TSQuery {
     pub(crate) language: *const ffi::TSLanguage,
     pub(crate) wildcard_root_pattern_count: u16,
 }
+
+unsafe extern "C" {
+    /// defined in tree_cursor.h
+    pub(crate) fn ts_tree_cursor_current_status(
+        self_: *const ffi::TSTreeCursor,
+        field_id: *mut ffi::TSFieldId,
+        has_later_siblings: *mut bool,
+        has_later_named_siblings: *mut bool,
+        can_have_later_siblings_with_this_field: *mut bool,
+        supertypes: *mut ffi::TSSymbol,
+        // unsigned *
+        supertype_count: *mut std::os::raw::c_uint,
+    ) -> crate::TreeCursorStep;
+}

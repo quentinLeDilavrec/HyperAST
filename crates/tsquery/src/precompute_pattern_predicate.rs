@@ -1,7 +1,6 @@
-use hyperast::{
-    tree_gen,
-    types::{self, ETypeStore, HyperAST, HyperASTShared, StoreRefAssoc},
-};
+use hyperast::tree_gen;
+use hyperast::types;
+use hyperast::types::{ETypeStore, HyperAST, HyperASTShared, StoreRefAssoc};
 
 #[derive(Default)]
 pub struct PreparedQuerying<Q, TS, Acc>(Q, std::marker::PhantomData<(TS, Acc)>);

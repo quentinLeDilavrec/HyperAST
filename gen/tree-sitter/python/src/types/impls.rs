@@ -197,9 +197,7 @@ impl LangRef<AnyType> for Lang {
         // &From::<&'static dyn HyperType>::from(&S_T_L[t as usize])
     }
     fn to_u16(&self, t: AnyType) -> u16 {
-        // t as u16
-        let t = t.as_any().downcast_ref::<Type>().unwrap();
-        *t as u16
+        Lang.ts_symbol(*t.as_any().downcast_ref::<Type>().unwrap())
     }
 
     fn name(&self) -> &'static str {
@@ -208,7 +206,7 @@ impl LangRef<AnyType> for Lang {
     }
 
     fn ts_symbol(&self, t: AnyType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
+        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
     }
 }
 

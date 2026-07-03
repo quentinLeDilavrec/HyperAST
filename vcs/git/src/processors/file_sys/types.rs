@@ -257,10 +257,8 @@ impl LangRef<AnyType> for Lang {
         Self::name()
     }
 
-    fn ts_symbol(&self, _t: AnyType) -> u16 {
-        // TODO check lang
-        // id_for_node_kind(t.as_static_str(), t.is_named())
-        unimplemented!()
+    fn ts_symbol(&self, t: AnyType) -> u16 {
+        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
     }
 }
 

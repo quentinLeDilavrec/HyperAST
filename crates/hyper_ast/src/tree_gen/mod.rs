@@ -665,6 +665,7 @@ pub trait TsEnabledTS: crate::types::ETypeStore
 where
     Self::Ty2: TsType,
 {
+    const END: u16 = u16::MIN;
     const ERROR: u16 = u16::MAX;
     const _ERROR: u16 = u16::MAX - 1;
     const SPACES: u16 = u16::MAX - 2;

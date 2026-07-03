@@ -338,7 +338,7 @@ impl<T> LangRef<T> for LangWrapper<T> {
 }
 
 // trait object used to facilitate erasing node types
-pub trait HyperType: Display + Debug {
+pub trait HyperType: Display + Debug + Send + Sync {
     fn as_shared(&self) -> Shared;
     /// returns an union of all abstract types that apply
     fn as_abstract(&self) -> Abstracts;
@@ -958,14 +958,7 @@ pub trait LabelStore<L: ?Sized> {
 type TypeInternalSize = u16;
 
 pub trait TypeStore {
-    type Ty: 'static
-        + HyperType
-        + Eq
-        + std::hash::Hash
-        + Copy
-        + Send
-        + Sync
-        + crate::store::nodes::Compo;
+    type Ty: 'static + HyperType + Eq + Hash + Copy + Compo;
 
     fn type_to_u16(t: Self::Ty) -> TypeInternalSize {
         t.get_lang().to_u16(t)
@@ -1146,7 +1139,7 @@ impl<L: LLang<Self, I = u16>> Deref for TypeU16<L> {
     }
 }
 
-impl<L: LLang<Self, I = u16> + std::fmt::Debug> HyperType for TypeU16<L>
+impl<L: LLang<Self, I = u16>> HyperType for TypeU16<L>
 where
     L::E: HyperType,
 {
@@ -1329,7 +1322,7 @@ pub trait AstLending<'a, __ImplBound = &'a Self>:
 
 pub type LendT<'t, HAST> = <HAST as AstLending<'t>>::RT;
 
-pub trait TypedLending<'a, Ty: HyperType + Hash + Copy + Eq + Send + Sync, __ImplBound = &'a Self>:
+pub trait TypedLending<'a, Ty: HyperType + Hash + Copy + Eq, __ImplBound = &'a Self>:
     AstLending<'a, __ImplBound>
 {
     type TT: Deref<Target = <Self as AstLending<'a, __ImplBound>>::RT> + Typed<Type = Ty>;
@@ -1359,8 +1352,6 @@ pub struct TypeIndex {
 #[repr(transparent)]
 pub struct AnyType(pub(crate) &'static dyn HyperType);
 
-unsafe impl Send for AnyType {}
-unsafe impl Sync for AnyType {}
 impl PartialEq for AnyType {
     fn eq(&self, other: &Self) -> bool {
         self.generic_eq(other.0)

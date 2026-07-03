@@ -145,9 +145,7 @@ impl<N, L, T> CompressedNode<N, L, T> {
 
 // CompressedNode
 
-impl<N, L, T: HyperType + Copy + Hash + Eq + Send + Sync> crate::types::Typed
-    for CompressedNode<N, L, T>
-{
+impl<N, L, T: HyperType + Copy + Hash + Eq> crate::types::Typed for CompressedNode<N, L, T> {
     type Type = T;
 
     fn get_type(&self) -> T {
@@ -265,8 +263,8 @@ impl<N, L, T> crate::store::nodes::PolyglotHolder for CompressedNode<N, L, T> {
     }
 }
 
-impl<N: NodeId<IdN = N> + Eq + Clone, L: Eq, T: Copy + Hash + Eq + HyperType + Send + Sync>
-    crate::types::Tree for CompressedNode<N, L, T>
+impl<N: NodeId<IdN = N> + Eq + Clone, L: Eq, T: Copy + Hash + Eq + HyperType> crate::types::Tree
+    for CompressedNode<N, L, T>
 where
     N::IdN: Copy,
 {

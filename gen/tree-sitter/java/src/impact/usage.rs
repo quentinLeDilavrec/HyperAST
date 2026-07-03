@@ -1,4 +1,3 @@
-use core::fmt;
 use std::fmt::Debug;
 
 use num::{ToPrimitive, Zero, cast, one, zero};
@@ -72,7 +71,7 @@ macro_rules! missing_rule {
 }
 
 /// Main traversal of HyperAST
-/// Recusive traversal, it goes through declaration without handling them particularly
+/// Recursive traversal, it goes through declaration without handling them particularly
 /// thus is should not search for references to `this` or `super`
 impl<'a, IdN, HAST> RefsFinder<'a, IdN, HAST>
 where
@@ -805,7 +804,7 @@ where
     }
 }
 
-/// prerequisite: recusive traversal limited to expressions ie. should not cross declarations
+/// prerequisite: recursive traversal limited to expressions ie. should not cross declarations
 impl<'a, IdN, HAST> RefsFinder<'a, IdN, HAST>
 where
     HAST: TypedHyperAST<'a, TIdN<IdN>, IdN = IdN, Label = LabelIdentifier>,
@@ -2210,7 +2209,7 @@ where
             }
         } else if o_t == Type::This {
             panic!();
-            // [ ] There should be a ref finder (the recusive part that go though decls) specialized for this,
+            // [ ] There should be a ref finder (the recursive part that go though decls) specialized for this,
             // as it needs to handle going through type declarations (because it changes how `this` should be match).
             // NOTE but just the exact match should be ok matching this if it is what ze want to match,
             // only the recursive search needs to be specialized,
@@ -3041,7 +3040,7 @@ where
         }
 
         impl<W: std::io::Write> std::fmt::Write for IoOut<W> {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
+            fn write_str(&mut self, s: &str) -> std::fmt::Result {
                 self.stream
                     .write_all(s.as_bytes())
                     .map_err(|_| std::fmt::Error)

@@ -115,16 +115,6 @@ impl hyperast::types::RoleStore for TStore {
     }
 }
 
-#[cfg(feature = "impl")]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    crate::language().id_for_node_kind(kind, named)
-}
-
-#[cfg(not(feature = "impl"))]
-fn id_for_node_kind(_kind: &str, _named: bool) -> u16 {
-    unimplemented!("need treesitter grammar")
-}
-
 #[cfg(test)]
 pub fn as_any(t: &Type) -> AnyType {
     let t = <Xml as hyperast::types::Lang<Type>>::to_u16(*t);
@@ -209,15 +199,6 @@ impl LangRef<Type> for Xml {
     fn to_u16(&self, t: Type) -> u16 {
         t as u16
     }
-
-    fn ts_symbol(&self, t: Type) -> u16 {
-        assert!(t != Type::Spaces || t != Type::Directory);
-        debug_assert_eq!(
-            Lang.to_u16(t),
-            id_for_node_kind(t.as_static_str(), t.is_named())
-        );
-        Lang.to_u16(t)
-    }
 }
 
 impl LangRef<AnyType> for Xml {
@@ -234,13 +215,9 @@ impl LangRef<AnyType> for Xml {
         let t: &Type = t.as_any().downcast_ref().unwrap();
         Lang.to_u16(*t)
     }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
-    }
 }
 
-impl LangRef<hyperast::types::TypeU16<Self>> for Lang {
+impl LangRef<TType> for Lang {
     fn make(&self, t: u16) -> &'static TType {
         // TODO could make one safe, but not priority
         unsafe { std::mem::transmute(&S_T_L[t as usize]) }
@@ -252,10 +229,6 @@ impl LangRef<hyperast::types::TypeU16<Self>> for Lang {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
         Self::NAME
-    }
-
-    fn ts_symbol(&self, t: TType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
     }
 }
 
@@ -448,14 +421,14 @@ impl TryFrom<&str> for Type {
     }
 }
 
-impl hyperast::types::LLang<hyperast::types::TypeU16<Self>> for Xml {
+impl hyperast::types::LLang<TType> for Xml {
     type I = u16;
 
     type E = Type;
 
     const TE: &[Self::E] = S_T_L;
 
-    fn as_lang_wrapper() -> hyperast::types::LangWrapper<hyperast::types::TypeU16<Self>> {
+    fn as_lang_wrapper() -> hyperast::types::LangWrapper<TType> {
         From::<&'static dyn LangRef<_>>::from(&Lang)
     }
 }

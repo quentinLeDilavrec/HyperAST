@@ -110,21 +110,13 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
         }
     }
 
-    fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-        crate::language().id_for_node_kind(kind, named)
-    }
-
     pub trait CEnabledTypeStore:
         hyperast::types::ETypeStore<Ty2 = Type> + Clone + hyperast::tree_gen::utils_ts::TsEnabledTS
     {
         // fn intern(t: Type) -> Self::Ty;
         fn resolve(t: Self::Ty) -> Type;
     }
-}else{
-    fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-        unimplemented!("need treesitter grammar")
-    }
-
+} else { // cfg(not(feature = "impl"))
     pub trait CEnabledTypeStore: TypeStore {
         // fn intern(t: Type) -> Self::Ty;
         fn resolve(t: Self::Ty) -> Type;
@@ -168,28 +160,22 @@ impl C {
     // std::any::type_name::<Lang>() // WAITING for const_type_name feature stability
 }
 
-impl LangRef<AnyType> for C {
+impl LangRef<AnyType> for Lang {
     fn make(&self, _t: u16) -> &'static AnyType {
         panic!()
         // &From::<&'static dyn HyperType>::from(&S_T_L[t as usize])
     }
     fn to_u16(&self, t: AnyType) -> u16 {
-        // t as u16
-        let t = t.as_any().downcast_ref::<Type>().unwrap();
-        *t as u16
+        self.to_u16(*t.as_any().downcast_ref::<TType>().unwrap())
     }
 
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<C>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
-    }
 }
 
-impl LangRef<Type> for C {
+impl LangRef<Type> for Lang {
     fn make(&self, t: u16) -> &'static Type {
         if t == TStore::ERROR {
             &Type::ERROR
@@ -203,6 +189,7 @@ impl LangRef<Type> for C {
             &S_T_L[t as usize]
         }
     }
+
     fn to_u16(&self, t: Type) -> u16 {
         t as u16
     }
@@ -211,23 +198,15 @@ impl LangRef<Type> for C {
         debug_assert_eq!(std::any::type_name::<C>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: Type) -> u16 {
-        // direct conversion is fine now, we ended up keeping the same representation
-        let id = id_for_node_kind(t.as_static_str(), t.is_named());
-        if !t.is_error() && !t.is_spaces() && id != 0 {
-            // apparently the TS languages do not give a symbol for "ERROR
-            assert_eq!(id, t as u16, "{}", t.as_static_str());
-        }
-        t as u16
-    }
 }
 
 impl LangRef<TType> for Lang {
     fn make(&self, t: u16) -> &'static TType {
+        let t: &'static Type = Lang.make(t);
         // TODO could make one safe, but not priority
-        unsafe { std::mem::transmute(&S_T_L[t as usize]) }
+        unsafe { std::mem::transmute(t) }
     }
+
     fn to_u16(&self, t: TType) -> u16 {
         t.e() as u16
     }
@@ -236,19 +215,9 @@ impl LangRef<TType> for Lang {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: TType) -> u16 {
-        // direct conversion is fine now, we ended up keeping the same representation
-        let id = id_for_node_kind(t.as_static_str(), t.is_named());
-        if !t.is_error() && !t.is_spaces() && id != 0 {
-            // apparently the TS languages do not give a symbol for "ERROR
-            assert_eq!(id, t.e() as u16, "{}", t.as_static_str());
-        }
-        t.e() as u16
-    }
 }
 
-impl hyperast::types::Lang<Type> for C {
+impl hyperast::types::Lang<Type> for Lang {
     const INST: Self = Lang;
     fn make(t: u16) -> &'static Type {
         Lang.make(t)
@@ -359,6 +328,7 @@ impl HyperType for Type {
             HashElifndef,
         ) || self.is_named()
     }
+
     fn get_lang(&self) -> hyperast::types::LangWrapper<Self>
     where
         Self: Sized,

@@ -123,15 +123,9 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
     {
         fn resolve(t: Self::Ty) -> Type;
     }
-    fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-        crate::language().id_for_node_kind(kind, named)
-    }
 } else {
     pub trait JavaEnabledTypeStore: hyperast::types::ETypeStore<Ty2 = Type> + Clone {
         fn resolve(t: Self::Ty) -> Type;
-    }
-    fn id_for_node_kind(_kind: &str, _named: bool) -> u16 {
-        unimplemented!("need treesitter grammar")
     }
 }}
 
@@ -197,13 +191,8 @@ impl LangRef<Type> for Java {
         debug_assert_eq!(std::any::type_name::<Java>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: Type) -> u16 {
-        assert!(t != Type::Spaces || t != Type::Directory);
-        debug_assert_eq!(t as u16, id_for_node_kind(t.as_static_str(), t.is_named()));
-        t as u16
-    }
 }
+
 impl LangRef<AnyType> for Java {
     fn make(&self, t: u16) -> &'static AnyType {
         todo!("{}", t)
@@ -216,10 +205,6 @@ impl LangRef<AnyType> for Java {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<Java>(), Self::NAME);
         Self::NAME
-    }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
     }
 }
 
@@ -235,16 +220,6 @@ impl LangRef<TType> for Lang {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<Java>(), Self::NAME);
         Self::NAME
-    }
-
-    fn ts_symbol(&self, t: TType) -> u16 {
-        let t: Type = *t.as_any().downcast_ref().unwrap();
-        assert!(t != Type::Spaces || t != Type::Directory);
-        // debug_assert_eq!(
-        //     Lang.to_u16(t),
-        //     id_for_node_kind(t.as_static_str(), t.is_named())
-        // );
-        Lang.to_u16(t)
     }
 }
 

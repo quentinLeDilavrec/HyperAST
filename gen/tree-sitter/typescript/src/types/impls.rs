@@ -83,12 +83,6 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
         type Ty = TypeU16<Ts>;
     }
 
-    // impl TsEnabledTypeStore for TStore {
-    //     fn resolve(t: Self::Ty) -> Type {
-    //         t.e()
-    //     }
-    // }
-
     impl RoleStore for TStore {
         type IdF = u16;
 
@@ -112,17 +106,6 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
     }
 }}
 
-// pub trait TsEnabledTypeStore: hyperast::types::ETypeStore<Ty2 = Type> + Clone + TsEnableTS {
-//     fn resolve(t: Self::Ty) -> Type;
-// }
-
-impl Type {
-    pub fn resolve(t: u16) -> Self {
-        assert!(t < COUNT);
-        unsafe { std::mem::transmute(t) }
-    }
-}
-
 impl<IdN: Clone + Eq + UniformNodeId> NodeId for TIdN<IdN> {
     type IdN = IdN;
 
@@ -138,18 +121,6 @@ impl<IdN: Clone + Eq + UniformNodeId> NodeId for TIdN<IdN> {
         todo!()
     }
 }
-
-#[cfg(feature = "impl")]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    crate::language().id_for_node_kind(kind, named)
-}
-#[cfg(not(feature = "impl"))]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    unimplemented!("need treesitter grammar")
-}
-
-// 356 + directory  + spaces
-const COUNT: u16 = 358;
 
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -215,10 +186,6 @@ impl LangRef<AnyType> for Ts {
         debug_assert_eq!(std::any::type_name::<Ts>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
-    }
 }
 
 impl LangRef<Type> for Ts {
@@ -243,10 +210,6 @@ impl LangRef<Type> for Ts {
         debug_assert_eq!(std::any::type_name::<Ts>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: Type) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
-    }
 }
 
 impl LangRef<TType> for Lang {
@@ -261,10 +224,6 @@ impl LangRef<TType> for Lang {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
         Self::NAME
-    }
-
-    fn ts_symbol(&self, t: TType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
     }
 }
 

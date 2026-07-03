@@ -526,6 +526,6 @@ impl Symbol {
 impl Symbol {
     pub fn from_type<Ty: 'static + hyperast::types::HyperType>(ty: Ty) -> Self {
         use hyperast::types::LangRef;
-        Symbol(ty.get_lang().ts_symbol(ty))
+        Symbol(ty.get_lang().to_u16(ty))
     }
 }

@@ -306,8 +306,8 @@ pub trait Lang<T>: LangRef<T> + 'static + Send + Sync {
 pub trait LangRef<T> {
     fn name(&self) -> &'static str;
     fn make(&self, t: TypeInternalSize) -> &'static T;
+    // used for tree-sitter queries
     fn to_u16(&self, t: T) -> TypeInternalSize;
-    fn ts_symbol(&self, t: T) -> u16;
 }
 
 #[derive(Clone, Copy)]
@@ -330,10 +330,6 @@ impl<T> LangRef<T> for LangWrapper<T> {
 
     fn name(&self) -> &'static str {
         self.0.name()
-    }
-
-    fn ts_symbol(&self, t: T) -> u16 {
-        self.0.ts_symbol(t)
     }
 }
 
@@ -865,7 +861,6 @@ impl NodeId for u16 {
     unsafe fn from_id(id: Self::IdN) -> Self {
         id
     }
-
     unsafe fn from_ref_id(id: &Self::IdN) -> &Self {
         id
     }
@@ -910,6 +905,7 @@ pub trait DecompressedFrom<HAST: HyperASTShared> {
 pub trait NodeStoreMut<T: Stored> {
     fn get_or_insert(&mut self, node: T) -> T::TreeId;
 }
+
 pub trait NodeStoreExt<T: TypedTree> {
     fn build_then_insert(
         &mut self,
@@ -918,24 +914,6 @@ pub trait NodeStoreExt<T: TypedTree> {
         l: Option<T::Label>,
         cs: Vec<T::TreeId>,
     ) -> T::TreeId;
-}
-
-pub trait VersionedNodeStore<'a, IdN: NodeId>: NodeStore<IdN> {
-    fn resolve_root(&self, version: (u8, u8, u8), node: IdN);
-}
-
-pub trait VersionedNodeStoreMut<'a, T: Stored>: NodeStoreMut<T>
-where
-    T::TreeId: Clone,
-{
-    // fn insert_as_root(&mut self, version: (u8, u8, u8), node: T) -> T::TreeId;
-    //  {
-    //     let r = self.get_or_insert(node);
-    //     self.as_root(version, r.clone());
-    //     r
-    // }
-
-    fn as_root(&mut self, version: (u8, u8, u8), node: T::TreeId);
 }
 
 pub type OwnedLabel = String;
@@ -960,16 +938,11 @@ type TypeInternalSize = u16;
 pub trait TypeStore {
     type Ty: 'static + HyperType + Eq + Hash + Copy + Compo;
 
-    fn type_to_u16(t: Self::Ty) -> TypeInternalSize {
-        t.get_lang().to_u16(t)
-    }
-    fn ts_symbol(t: Self::Ty) -> TypeInternalSize {
-        t.get_lang().ts_symbol(t)
-    }
     fn decompress_type(erazed: &impl PolyglotHolder, tid: std::any::TypeId) -> Self::Ty {
         Self::try_decompress_type(erazed, tid)
             .unwrap_or_else(|| unimplemented!("override 'decompress_type'"))
     }
+
     fn try_decompress_type(
         erazed: &impl PolyglotHolder,
         tid: std::any::TypeId,
@@ -1036,27 +1009,18 @@ mod lang_test {
         fn name(&self) -> &'static str {
             todo!()
         }
-
         fn make(&self, t: TypeInternalSize) -> &'static TyTest {
             todo!()
         }
-
         fn to_u16(&self, t: TyTest) -> TypeInternalSize {
-            todo!()
-        }
-
-        fn ts_symbol(&self, t: TyTest) -> u16 {
             todo!()
         }
     }
 
     impl LLang<TypeU16<Self>> for LLangTest {
         type I = u16;
-
         type E = TyTest;
-
         const TE: &[Self::E] = &[TyTest::A, TyTest::B, TyTest::C];
-
         fn as_lang_wrapper() -> LangWrapper<TypeU16<Self>> {
             unimplemented!("not important here")
         }

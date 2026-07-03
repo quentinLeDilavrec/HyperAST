@@ -129,15 +129,6 @@ impl<IdN: Clone + Eq + UniformNodeId> NodeId for TIdN<IdN> {
     }
 }
 
-#[cfg(feature = "impl")]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    crate::language().id_for_node_kind(kind, named)
-}
-#[cfg(not(feature = "impl"))]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    unimplemented!("need treesitter grammar")
-}
-
 const COUNT: u16 = 358;
 
 impl Display for Type {
@@ -204,10 +195,6 @@ impl LangRef<AnyType> for Lang {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
-    }
 }
 
 impl LangRef<Type> for Lang {
@@ -232,10 +219,6 @@ impl LangRef<Type> for Lang {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: Type) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
-    }
 }
 
 impl LangRef<TType> for Lang {
@@ -250,10 +233,6 @@ impl LangRef<TType> for Lang {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::NAME);
         Self::NAME
-    }
-
-    fn ts_symbol(&self, t: TType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
     }
 }
 

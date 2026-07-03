@@ -100,15 +100,6 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
     }
 }}
 
-#[cfg(feature = "impl")]
-fn id_for_node_kind(kind: &str, named: bool) -> u16 {
-    tree_sitter_query::language().id_for_node_kind(kind, named)
-}
-#[cfg(not(feature = "impl"))]
-fn id_for_node_kind(_kind: &str, _named: bool) -> u16 {
-    unimplemented!("need treesitter grammar")
-}
-
 pub trait TsQueryEnabledTypeStore<T>:
     hyperast::types::ETypeStore<Ty2 = Type> + Clone + TsEnabledTS
 {
@@ -168,10 +159,6 @@ impl LangRef<AnyType> for TsQuery {
         debug_assert_eq!(std::any::type_name::<TsQuery>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
-    }
 }
 
 impl LangRef<Type> for TsQuery {
@@ -196,10 +183,6 @@ impl LangRef<Type> for TsQuery {
         debug_assert_eq!(std::any::type_name::<TsQuery>(), Self::NAME);
         Self::NAME
     }
-
-    fn ts_symbol(&self, t: Type) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
-    }
 }
 
 impl LangRef<TType> for TsQuery {
@@ -214,10 +197,6 @@ impl LangRef<TType> for TsQuery {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<TsQuery>(), Self::NAME);
         Self::NAME
-    }
-
-    fn ts_symbol(&self, t: TType) -> u16 {
-        id_for_node_kind(t.as_static_str(), t.is_named())
     }
 }
 

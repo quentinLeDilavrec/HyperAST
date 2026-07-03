@@ -256,10 +256,6 @@ impl LangRef<AnyType> for Lang {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::name());
         Self::name()
     }
-
-    fn ts_symbol(&self, t: AnyType) -> u16 {
-        Lang.ts_symbol(*t.as_any().downcast_ref::<TType>().unwrap())
-    }
 }
 
 impl LangRef<Type> for Lang {
@@ -284,11 +280,6 @@ impl LangRef<Type> for Lang {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::name());
         Self::name()
     }
-
-    fn ts_symbol(&self, _t: Type) -> u16 {
-        unimplemented!()
-        // id_for_node_kind(t.as_static_str(), t.is_named())
-    }
 }
 
 impl LangRef<TType> for Lang {
@@ -304,11 +295,6 @@ impl LangRef<TType> for Lang {
     fn name(&self) -> &'static str {
         debug_assert_eq!(std::any::type_name::<Lang>(), Self::name());
         Self::name()
-    }
-
-    fn ts_symbol(&self, _t: TType) -> u16 {
-        unimplemented!()
-        // id_for_node_kind(t.as_static_str(), t.is_named())
     }
 }
 

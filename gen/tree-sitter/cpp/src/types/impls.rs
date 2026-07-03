@@ -3,7 +3,7 @@
 
 use std::fmt::Display;
 
-use hyperast::tree_gen::TsEnableTS;
+use hyperast::tree_gen::TsEnabledTS;
 use hyperast::tree_gen::TsType;
 use hyperast::types::{AnyType, TypeU16};
 use hyperast::types::{LangRef, TypeStore, TypeTrait, TypedNodeId};
@@ -16,7 +16,7 @@ use super::TType;
 use super::{Cpp, Lang};
 use super::{S_T_L, Type};
 
-impl TsEnableTS for TStore {
+impl TsEnabledTS for TStore {
     fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Type {
         let k = n.kind_id();
         Type::from_u16(k)
@@ -107,7 +107,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
     }
 
     pub trait CppEnabledTypeStore:
-        hyperast::types::ETypeStore<Ty2 = Type> + Clone + hyperast::tree_gen::TsEnableTS
+        hyperast::types::ETypeStore<Ty2 = Type> + Clone + hyperast::tree_gen::TsEnabledTS
     {
         // fn intern(t: Type) -> Self::Ty;
         fn resolve(t: Self::Ty) -> Type;

@@ -3,7 +3,7 @@
 
 use std::fmt::Display;
 
-use hyperast::tree_gen::utils_ts::{TsEnableTS, TsType};
+use hyperast::tree_gen::utils_ts::{TsEnabledTS, TsType};
 use hyperast::types::{AnyType, TypeU16};
 use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
 use hyperast::types::{NodeId, UniformNodeId};
@@ -19,7 +19,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
     use hyperast::types::LangWrapper;
     use super::Role;
 
-    impl TsEnableTS for TStore {
+    impl TsEnabledTS for TStore {
         fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
             n: &N,
         ) -> Type {

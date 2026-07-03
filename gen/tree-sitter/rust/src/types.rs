@@ -1,7 +1,7 @@
 //! Definition of the Java tree-sitter node types.
 // TODO auto generate the variants, conversions, and predicates
 
-use hyperast::tree_gen::TsEnableTS;
+use hyperast::tree_gen::TsEnabledTS;
 
 pub mod impls;
 pub mod more;

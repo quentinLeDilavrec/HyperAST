@@ -38,7 +38,7 @@ use super::{BasicAccumulator, SubTreeMetrics};
 use super::{BasicGlobalData, GlobalData, Spaces, TotalBytesGlobalData as _};
 use super::{Parents, PreResult};
 use super::{SpacedGlobalData, TextedGlobalData};
-use super::{TsEnableTS, TsType};
+use super::{TsEnabledTS, TsType};
 
 pub type LabelIdentifier = crate::store::labels::DefaultLabelIdentifier;
 
@@ -269,7 +269,7 @@ impl<'stores, 'cache, TS, E> TsTreeGen<'stores, 'cache, TS, E, true> {
 
 impl<TS, E, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, E, HIDDEN_NODES>
 where
-    TS: TsEnableTS,
+    TS: TsEnabledTS,
     TS::Ty2: TsType,
     E: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
 {
@@ -544,7 +544,7 @@ where
 
 impl<'store, TS, E, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, E, HIDDEN_NODES>
 where
-    TS: TsEnableTS,
+    TS: TsEnabledTS,
     TS::Ty2: TsType,
     E: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
 {
@@ -685,7 +685,7 @@ where
 impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
     for TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
-    TS: TsEnableTS,
+    TS: TsEnabledTS,
     TS::Ty2: TsType,
     More: Extra<SimpleStores<TS>, Acc<TS::Ty2>>,
 {

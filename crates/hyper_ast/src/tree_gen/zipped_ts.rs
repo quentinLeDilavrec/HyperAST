@@ -16,7 +16,7 @@ use crate::store::nodes::legion::eq_node;
 use crate::store::nodes::legion::{DedupMap, NodeIdentifier};
 use crate::store::nodes::legion::{dyn_builder, subtree_builder};
 use crate::tree_gen::handle_file_bounds;
-use crate::tree_gen::{TsEnableTS, TsType};
+use crate::tree_gen::{TsEnabledTS, TsType};
 use crate::types::LabelStore as _;
 use crate::types::Role;
 use crate::types::{ETypeStore, HyperType};
@@ -177,7 +177,7 @@ impl<'acc, T> super::WithLabel for &'acc Acc<T> {
     type L = &'acc str;
 }
 
-impl<'store, 'cache, TS: TsEnableTS>
+impl<'store, 'cache, TS: TsEnabledTS>
     TsTreeGen<'store, 'cache, TS, super::NoOpMore<TS, Acc<TS::Ty2>>, true>
 where
     TS::Ty2: TsType,
@@ -253,7 +253,7 @@ impl<'stores, 'cache, TS, More> TsTreeGen<'stores, 'cache, TS, More, true> {
 
 impl<TS, More, const HIDDEN_NODES: bool> ZippedTreeGen for TsTreeGen<'_, '_, TS, More, HIDDEN_NODES>
 where
-    TS: TsEnableTS,
+    TS: TsEnabledTS,
     TS::Ty2: TsType,
     More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
@@ -385,7 +385,7 @@ where
 
 impl<'store, TS, More, const HIDDEN_NODES: bool> TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
-    TS: TsEnableTS,
+    TS: TsEnabledTS,
     TS::Ty2: TsType,
     More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {
@@ -445,7 +445,7 @@ where
 impl<'store, TS, More, const HIDDEN_NODES: bool> TreeGen
     for TsTreeGen<'store, '_, TS, More, HIDDEN_NODES>
 where
-    TS: TsEnableTS,
+    TS: TsEnabledTS,
     TS::Ty2: TsType,
     More: super::More<SimpleStores<TS>, Acc = Acc<TS::Ty2>>,
 {

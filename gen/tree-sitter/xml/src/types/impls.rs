@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use hyperast::tree_gen::{TsEnableTS, TsType};
+use hyperast::tree_gen::{TsEnabledTS, TsType};
 use hyperast::types::{AnyType, TypeU16};
 use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
 use hyperast::types::{NodeId, UniformNodeId};
@@ -19,7 +19,7 @@ impl hyperast::types::ETypeStore for TStore {
     }
 }
 
-impl TsEnableTS for TStore {
+impl TsEnabledTS for TStore {
     fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
         n: &N,
     ) -> <Self as hyperast::types::ETypeStore>::Ty2 {

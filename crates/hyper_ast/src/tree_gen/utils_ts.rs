@@ -1,6 +1,6 @@
 use crate::tree_gen::parser::Node;
 
-pub use super::TsEnableTS;
+pub use super::TsEnabledTS;
 pub use super::TsType;
 pub fn tree_sitter_parse(text: &[u8], language: &tree_sitter::Language) -> tree_sitter::Tree {
     let mut parser = tree_sitter::Parser::new();

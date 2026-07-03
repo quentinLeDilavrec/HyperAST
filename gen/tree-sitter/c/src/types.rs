@@ -1,6 +1,6 @@
 //! Definition of the C tree-sitter node types.
 
-use hyperast::tree_gen::TsEnableTS;
+use hyperast::tree_gen::TsEnabledTS;
 
 pub mod impls;
 pub mod more;

@@ -661,7 +661,7 @@ pub use zipped::PreResult;
 pub use zipped::ZippedTreeGen;
 
 #[cfg(feature = "ts_type")]
-pub trait TsEnableTS: crate::types::ETypeStore
+pub trait TsEnabledTS: crate::types::ETypeStore
 where
     Self::Ty2: TsType,
 {

@@ -5,7 +5,6 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 use hyperast::types::AnyType;
-use hyperast::types::Lang;
 
 use hyperast::store::nodes::fetched;
 
@@ -51,22 +50,15 @@ impl FetchedHyperAST {
         let ns = self.node_store.read().unwrap();
         let n: HashedNodeRef<'_, NodeIdentifier> = ns.try_resolve(*n).unwrap();
         let lang = n.get_lang();
-        let raw = n.get_raw_type();
         match lang {
             hyperast_gen_ts_java::Lang::NAME => {
-                let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_java::Lang::make(raw);
-                t.into()
+                AnyType::from_fetched::<hyperast_gen_ts_java::Type, hyperast_gen_ts_java::Lang>(&n)
             }
             hyperast_gen_ts_cpp::Lang::NAME => {
-                let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_cpp::Lang::make(raw);
-                t.into()
+                AnyType::from_fetched::<hyperast_gen_ts_cpp::Type, hyperast_gen_ts_cpp::Lang>(&n)
             }
             hyperast_gen_ts_xml::Lang::NAME => {
-                let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_xml::Lang::make(raw);
-                t.into()
+                AnyType::from_fetched::<hyperast_gen_ts_xml::Type, hyperast_gen_ts_xml::Lang>(&n)
             }
             l => unreachable!("{}", l),
         }
@@ -172,25 +164,19 @@ impl<'a> hyperast::types::HyperAST for LockedFetchedHyperAST<'a> {
         let ns = &self.node_store;
         let Some(n) = ns.try_resolve::<NodeIdentifier>(*id) else {
             use hyperast::types::HyperType;
-            return hyperast_gen_ts_java::Type::Dot.as_static().into();
+            let t = hyperast_gen_ts_java::Type::Dot.as_static();
+            return unsafe { AnyType::make(t) };
         };
         let lang = n.get_lang();
-        let raw = n.get_raw_type();
         match lang {
             hyperast_gen_ts_java::Lang::NAME => {
-                let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_java::Lang::make(raw);
-                t.into()
+                AnyType::from_fetched::<hyperast_gen_ts_java::Type, hyperast_gen_ts_java::Lang>(&n)
             }
             hyperast_gen_ts_cpp::Lang::NAME => {
-                let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_cpp::Lang::make(raw);
-                t.into()
+                AnyType::from_fetched::<hyperast_gen_ts_cpp::Type, hyperast_gen_ts_cpp::Lang>(&n)
             }
             hyperast_gen_ts_xml::Lang::NAME => {
-                let t: &'static dyn hyperast::types::HyperType =
-                    hyperast_gen_ts_xml::Lang::make(raw);
-                t.into()
+                AnyType::from_fetched::<hyperast_gen_ts_xml::Type, hyperast_gen_ts_xml::Lang>(&n)
             }
             l => unreachable!("{}", l),
         }

@@ -266,7 +266,7 @@ impl<Id: 'static + TypedNodeId<IdN = NodeIdentifier>> crate::types::Typed
         match self.0.get_component::<Id::Ty>() {
             Ok(t) => {
                 let t: &'static dyn HyperType = t.as_static();
-                t.into()
+                AnyType(t)
             }
             Err(e @ ComponentError::NotFound { .. }) => {
                 todo!("{:?}", e)

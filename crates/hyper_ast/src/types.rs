@@ -1365,11 +1365,47 @@ impl Display for AnyType {
         std::fmt::Display::fmt(&self.0, f)
     }
 }
-impl From<&'static dyn HyperType> for AnyType {
-    fn from(value: &'static dyn HyperType) -> Self {
+
+impl AnyType {
+    // TODO better polyglot support should help with making this safer
+    // - use case 1: creating an error
+    //   - e.g. in HyperApp if we do not find a node, or it has yet to be retrieved
+    // - use case 2: creating a placeholder
+    //   - e.g. display a dot in HyperApp streamed rendering
+    /// Allows creating an `AnyType` from a static `HyperType` reference.
+    /// WARN Make sure you use it in the right context, as others might expect to be able to downcast.
+    pub unsafe fn make(value: &'static dyn HyperType) -> Self {
         Self(value)
     }
+
+    #[cfg(feature = "fetched")]
+    pub fn from_fetched<T: HyperType + 'static, L: Lang<T>>(
+        n: &crate::store::nodes::fetched::HashedNodeRef<
+            crate::store::nodes::fetched::NodeIdentifier,
+        >,
+    ) -> Self {
+        let raw = n.get_raw_type();
+        let t: &'static dyn HyperType = <L as Lang<T>>::make(raw);
+        AnyType(t)
+    }
+
+    #[cfg(feature = "legion")]
+    pub fn from_polyglot<L: LLang<TypeU16<L>, I = u16>>(
+        erazed: &impl crate::store::nodes::PolyglotHolder,
+    ) -> Option<Self>
+    where
+        L::E: HyperType,
+    {
+        use HyperType;
+        let tid = std::any::TypeId::of::<TypeU16<L>>();
+        erazed
+            .unerase_ref::<TypeU16<L>>(tid)
+            .map(|x| *x)
+            .map(|x| x.as_static().into())
+            .map(AnyType)
+    }
 }
+
 impl Deref for AnyType {
     type Target = dyn HyperType;
 
@@ -1445,7 +1481,7 @@ impl HyperType for AnyType {
     {
         // self.0.get_lang()
         // NOTE quite surprising Oo
-        // the type inference is working in our favour
+        // the type inference is working in our favor
         // TODO post on https://users.rust-lang.org/t/understanding-trait-object-safety-return-types/73425 or https://stackoverflow.com/questions/54465400/why-does-returning-self-in-trait-work-but-returning-optionself-requires or https://www.reddit.com/r/rust/comments/lbbobv/3_things_to_try_when_you_cant_make_a_trait_object/
         self.0.lang_ref()
     }

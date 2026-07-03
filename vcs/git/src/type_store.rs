@@ -95,17 +95,12 @@ impl TypeStore for TStore {
         erazed: &impl hyperast::store::nodes::PolyglotHolder,
         _tid: std::any::TypeId,
     ) -> Option<Self::Ty> {
-        use HyperType;
         let id = erazed.lang_id();
         macro_rules! decomp_t {
             ($p:path) => {{
                 use $p as types;
                 if id.is::<types::Lang>() {
-                    let tid = std::any::TypeId::of::<types::TType>();
-                    let x = erazed
-                        .unerase_ref::<types::TType>(tid)
-                        .map(|x| *x)
-                        .map(|x| x.as_static().into());
+                    let x = AnyType::from_polyglot::<types::Lang>(erazed);
                     return Some(x.unwrap());
                 }
             }};

@@ -577,7 +577,7 @@ macro_rules! variant_store {
                     },
                 )*}
             }
-            pub fn get_raw_type(&self) -> u16 {
+            pub(crate) fn get_raw_type(&self) -> u16 {
                 match self.s_ref {$(
                     VariantRef::$c{ entities: variants::$c{kind,..}, ..} => {
                         kind[self.index as usize]

@@ -166,7 +166,7 @@ pub fn as_any(t: &Type) -> AnyType {
     let t = <Cpp as hyperast::types::Lang<Type>>::to_u16(*t);
     let t = <Cpp as hyperast::types::Lang<Type>>::make(t);
     let t: &'static dyn hyperast::types::HyperType = t;
-    t.into()
+    unsafe { AnyType::make(t) }
 }
 
 impl LangRef<AnyType> for Cpp {

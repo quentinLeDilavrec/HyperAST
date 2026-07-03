@@ -1041,9 +1041,10 @@ impl<'a> FetchedViewImpl<'a> {
                     }
                 } else {
                     let kind: &'static dyn HyperType = &hyperast_gen_ts_cpp::Type::ERROR;
+                    let kind = unsafe { AnyType::make(kind) };
                     imp.additions = None;
                     imp.deletions = None;
-                    let a = imp.ui_typed_impl2(ui, AnyType::from(kind), 0);
+                    let a = imp.ui_typed_impl2(ui, kind, 0);
                     match a {
                         Action::PartialFocused(x) => Action::PartialFocused(x),
                         Action::Focused(x) => Action::PartialFocused(x),

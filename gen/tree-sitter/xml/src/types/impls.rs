@@ -130,7 +130,7 @@ pub fn as_any(t: &Type) -> AnyType {
     let t = <Xml as hyperast::types::Lang<Type>>::to_u16(*t);
     let t = <Xml as hyperast::types::Lang<Type>>::make(t);
     let t: &'static dyn HyperType = t;
-    t.into()
+    unsafe { AnyType::make(t) }
 }
 
 // #[cfg(not(feature = "impl"))]

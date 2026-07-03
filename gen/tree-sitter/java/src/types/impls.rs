@@ -116,7 +116,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
         let t = <Java as hyperast::types::Lang<Type>>::to_u16(*t);
         let t = <Java as hyperast::types::Lang<Type>>::make(t);
         let t: &'static dyn HyperType = t;
-        t.into()
+        unsafe { AnyType::make(t) }
     }
     pub trait JavaEnabledTypeStore:
         hyperast::types::ETypeStore<Ty2 = Type> + Clone + hyperast::tree_gen::TsEnabledTS

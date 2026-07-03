@@ -671,8 +671,8 @@ where
     const DIRECTORY: u16 = u16::MAX - 3;
     const META_DIR: u16 = u16::MAX - 4;
     const LOWEST_RESERVED: u16 = Self::META_DIR;
-    fn try_obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Option<Self::Ty2>;
-    fn obtain_type<N: crate::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
+    fn try_obtain_type<N: parser::NodeWithU16TypeId>(n: &N) -> Option<Self::Ty2>;
+    fn obtain_type<N: parser::NodeWithU16TypeId>(n: &N) -> Self::Ty2;
     fn error() -> Self::Ty2;
     fn spaces() -> Self::Ty2;
     fn file() -> Self::Ty2;
@@ -1018,7 +1018,7 @@ pub trait More<HAST: StoreRefAssoc> {
         stores: <HAST as StoreRefAssoc>::S<'_>,
         acc: &Self::Acc,
         label: Option<&str>,
-    ) -> crate::tree_gen::PrecompQueries;
+    ) -> PrecompQueries;
 }
 
 #[repr(transparent)]

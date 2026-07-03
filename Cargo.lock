@@ -4395,7 +4395,6 @@ dependencies = [
  "serde",
  "test-log",
  "tree-sitter",
- "tree-sitter-cpp 0.23.1",
  "tree-sitter-cpp 0.23.4",
 ]
 

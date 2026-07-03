@@ -25,7 +25,6 @@ legion = { workspace = true, optional = true }
 serde = { version = "1.0.130" }
 
 tree-sitter-cpp = { version = "0.23.1", optional = true }
-tree-sitter-cpp_alt = { package = "tree-sitter-cpp", git = "https://github.com/quentinLeDilavrec/tree-sitter-cpp", version = "0.23.1", rev = "81216ae5ba2778522eee06392cf0352b9410e4fe", optional = true }
 
 
 [dev-dependencies]
@@ -59,5 +58,3 @@ ts = [
     "dep:tree-sitter-cpp",
     "hyperast/ts",
 ]
-alt_grammar = []
-impl_alt_grammar = ["alt_grammar", "impl_intern", "dep:tree-sitter-cpp_alt"]

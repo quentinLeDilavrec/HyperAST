@@ -386,8 +386,7 @@ pub mod file_and_range;
 #[allow(unused)] // TODO remove all not working function and test the remaining ones
 mod spaces_related;
 pub use spaces_related::{
-    compute_position_and_nodes_with_no_spaces, compute_position_with_no_spaces,
-    global_pos_with_spaces, path_with_spaces,
+    compute_position_and_nodes_with_no_spaces, compute_position_with_no_spaces, path_with_spaces,
 };
 
 pub mod computing_offset_bottom_up;

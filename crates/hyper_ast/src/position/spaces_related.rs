@@ -103,15 +103,6 @@ impl<'store, Idx: PrimInt, HAST>
     }
 }
 
-pub fn global_pos_with_spaces<T, NS, It: Iterator>(
-    _root: (),
-    // increasing order
-    _no_spaces: &mut It,
-    _node_store: &NS,
-) -> (Vec<It::Item>,) {
-    todo!()
-}
-
 pub fn compute_position_with_no_spaces<'store, HAST, It: Iterator>(
     root: HAST::IdN,
     offsets: &mut It,

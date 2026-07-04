@@ -105,7 +105,7 @@ use legion::storage::{
 use super::super::GatherAttrErazed;
 use super::*;
 
-/// A builder of entities for a archetypal store, here legion.
+/// An entity built dynamically for a archetypal store, here legion.
 pub struct BuiltEntity {
     inner: Common<fn() -> Box<dyn UnknownComponentStorage>>,
 }

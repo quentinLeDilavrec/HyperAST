@@ -81,6 +81,7 @@ pub mod primint_it {
     }
 }
 
+#[cfg(feature = "experimental")]
 mod slice_interning;
 
 pub mod test_utils;

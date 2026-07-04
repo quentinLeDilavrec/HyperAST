@@ -33,7 +33,8 @@
 //!       mem optimization,
 //! ## with hidden nodes (spaces, abtract nodes,....)
 
-use std::{fmt::Debug, path::PathBuf};
+use std::fmt::Debug;
+use std::path::PathBuf;
 
 use crate::store::defaults::NodeIdentifier;
 use crate::types::{HyperAST, NodeId, TypedNodeId};

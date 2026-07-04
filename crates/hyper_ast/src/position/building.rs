@@ -1,12 +1,15 @@
 //! Declares interfaces for position builders,
-//! while offering statemachine traits to orchestrate them staticaly.
+//! while offering state machine traits to orchestrate them statically.
 //!
 //! Converting positions is a frequent operation, so performances is a major concern.
 //!
-//! The statemachines here are a "zero cost" abstraction, as they are completely monomorphised.
+//! The state machines here are a "zero cost" abstraction, as they are completely monomorphized.
 //!
 //! With all these traits it is also easier to do multiple conversions with a single traversal,
 //! with no impact to performances of "mono" convertions.
+//!
+//! If you want to implement your own position take inspiration from existing ones.
+//! It is also possible to compose positions using [`CompoundPositionPreparer`], check at uses for examples.
 
 pub trait Transition<O> {
     fn transit(self) -> O;

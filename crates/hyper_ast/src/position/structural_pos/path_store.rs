@@ -1,16 +1,16 @@
 use num::{one, zero};
 use std::fmt::Debug;
 
-use super::{
-    ExploreStructuralPositions, Scout, SpHandle, StructuralPosition, StructuralPositionStore,
-};
 use crate::PrimInt;
 use crate::position::{Position, TreePath};
 use crate::store::defaults::LabelIdentifier;
-use crate::types::{
-    AnyType, HyperAST, LendT, NodeId, NodeStore, Tree, Typed, WithChildren, WithSerialization,
-    WithStats,
-};
+use crate::types::{AnyType, LendT, NodeId, Tree, Typed};
+use crate::types::{HyperAST, NodeStore as _};
+use crate::types::{WithChildren as _, WithSerialization, WithStats};
+
+use super::ExploreStructuralPositions;
+use super::{Scout, StructuralPosition};
+use super::{SpHandle, StructuralPositionStore};
 
 impl<IdN, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
     pub fn with_position(x: StructuralPosition<IdN, Idx>) -> Self {
@@ -61,10 +61,9 @@ impl<IdN: NodeId, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
     ) -> Vec<Position>
     where
         HAST: HyperAST<IdN = IdN, Label = LabelIdentifier, Idx = Idx>,
-        for<'t> LendT<'t, HAST>:
-            Typed<Type = AnyType> + WithSerialization + WithChildren + WithStats,
+        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithStats,
         HAST::Idx: Debug,
-        IdN: Copy + Eq + Debug + NodeId,
+        IdN: Copy + Eq,
         IdN: NodeId<IdN = IdN> + Debug,
     {
         let mut r = vec![];
@@ -90,8 +89,7 @@ impl<IdN: NodeId, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
         scout: &Scout<IdN, Idx>,
     ) -> Result<(), String>
     where
-        HAST: HyperAST<IdN = IdN, Label = LabelIdentifier>,
-        for<'t> LendT<'t, HAST>: WithChildren<ChildIdx = Idx>,
+        HAST: HyperAST<IdN = IdN, Idx = Idx, Label = LabelIdentifier>,
         HAST::Idx: Debug,
         IdN: Copy + Eq + Debug + NodeId<IdN = IdN>,
     {
@@ -141,7 +139,6 @@ impl<IdN: NodeId, Idx: PrimInt> StructuralPositionStore<IdN, Idx> {
     pub fn check<'store, HAST>(&self, stores: &'store HAST) -> Result<(), String>
     where
         HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>: WithChildren,
         HAST::Idx: Debug,
         IdN: Copy + Eq + Debug + NodeId,
         IdN::IdN: NodeId<IdN = IdN::IdN>,

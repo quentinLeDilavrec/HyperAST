@@ -1,13 +1,15 @@
-use num::{one, traits::NumAssign, zero};
+use num::traits::NumAssign;
+use num::{one, zero};
 use std::fmt::Debug;
 
 use super::{Position, StructuralPosition, StructuralPositionStore};
 use crate::PrimInt;
 use crate::position::{TreePath, TreePathMut};
-use crate::types::{
-    AnyType, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, NodeId, Typed,
-    WithChildren, WithSerialization,
-};
+use crate::types::LabelStore as _;
+use crate::types::{AnyType, Children, Childrn, LendT};
+use crate::types::{HyperAST, HyperType};
+use crate::types::{Labeled, NodeId, Typed};
+use crate::types::{WithChildren, WithSerialization};
 
 #[derive(Clone, Debug)]
 pub struct Scout<IdN, Idx> {
@@ -41,6 +43,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> TreePath<IdN, Idx> for Scout<IdN, Idx> {
     fn offset(&self) -> Option<&Idx> {
         self.path.offset()
     }
+
     fn check<HAST>(&self, stores: &HAST) -> Result<(), ()>
     where
         HAST: HyperAST<IdN = IdN::IdN>,
@@ -81,11 +84,13 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
         self.path.pop();
         assert_eq!(self.path.parents.len(), self.path.offsets.len());
     }
+
     pub fn make_child(&self, node: IdN, i: Idx) -> Self {
         let mut s = self.clone();
         s.path.goto(node, i);
         s
     }
+
     pub fn up(&mut self, x: &StructuralPositionStore<IdN, Idx>) -> Option<IdN> {
         if self.path.parents.is_empty() {
             self.path = StructuralPosition::empty();
@@ -102,6 +107,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
         }
     }
 }
+
 impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
     pub fn make_position<'store, HAST>(
         &self,
@@ -110,7 +116,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
     ) -> Position
     where
         HAST: HyperAST<IdN = IdN, Idx = Idx>,
-        for<'t> crate::types::LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
+        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
         HAST::Idx: Debug,
         IdN: Copy + Debug + NodeId<IdN = IdN>,
     {

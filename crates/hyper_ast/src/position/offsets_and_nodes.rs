@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use super::{TreePath, TreePathMut, tags};
 use crate::PrimInt;
-use crate::types::{HyperAST, NodeId, NodeStore, Tree, WithChildren};
+use crate::types::{HyperAST, NodeId, NodeStore as _, Tree as _, WithChildren as _};
 
 /// BottomUp content
 #[derive(Clone)]

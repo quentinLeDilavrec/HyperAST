@@ -1,11 +1,15 @@
 use num::zero;
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
-use super::{Position, Scout, SpHandle, StructuralPosition, StructuralPositionStore};
 use crate::PrimInt;
 use crate::position::{TreePath, TreePathMut, TypedTreePath};
+use crate::store::defaults::LabelIdentifier;
+use crate::types::HyperAST;
 use crate::types::{NodeId, TypedNodeId};
-use crate::{store::defaults::LabelIdentifier, types::HyperAST};
+
+use super::{Position, Scout, StructuralPosition};
+use super::{SpHandle, StructuralPositionStore};
 
 #[derive(Clone, Debug)]
 pub struct TypedScout<TIdN: TypedNodeId, Idx> {

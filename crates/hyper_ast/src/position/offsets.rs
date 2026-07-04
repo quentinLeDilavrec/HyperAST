@@ -92,7 +92,7 @@ impl<IdN: Copy, Idx: PrimInt> RootedOffsets<IdN, Idx> {
     }
 }
 
-// TODO try with a slice, i.e. without putting a ref on offests slice
+// TODO try with a slice, i.e. without putting a ref on offsets slice
 pub struct RootedOffsetsRef<'a, IdN, Idx> {
     root: IdN,
     /// offsets to go through a tree from top to bottom

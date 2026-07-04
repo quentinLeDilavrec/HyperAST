@@ -1,4 +1,3 @@
-use core::fmt;
 use std::fmt::{Debug, Display};
 
 use crate::PrimInt;
@@ -28,7 +27,7 @@ impl<T: PrimInt> RowCol<T> {
 }
 
 impl<T: PrimInt> Debug for RowCol<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RowCol")
             .field("row", &self.row)
             .field("col", &self.col)
@@ -37,7 +36,7 @@ impl<T: PrimInt> Debug for RowCol<T> {
 }
 
 impl<T: PrimInt + Display> Display for RowCol<T> {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -176,7 +175,6 @@ mod impl_receivers {
 
     // impl<IdN, Idx, T: PrimInt> top_down::ReceiveInFile<IdN, Idx, Self> for super::Position<PathBuf, IdO> {
     //     type S1 = Self;
-
     //     type S2 = Self;
 
     //     fn finish(self) -> Self {

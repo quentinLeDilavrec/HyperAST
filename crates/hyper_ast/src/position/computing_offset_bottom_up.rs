@@ -1,8 +1,8 @@
 use super::Position;
-use crate::types::{
-    Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, NodeStore, WithChildren,
-    WithSerialization,
-};
+use crate::types::{Children as _, Childrn as _, WithChildren as _};
+use crate::types::{HyperAST, LendT, WithSerialization};
+use crate::types::{HyperType as _, Labeled as _};
+use crate::types::{LabelStore as _, NodeStore as _};
 
 ///
 ///
@@ -33,7 +33,7 @@ pub fn extract_position<'store, HAST>(
 ) -> Position
 where
     HAST: HyperAST,
-    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     HAST::IdN: Copy,
 {
     if parents.is_empty() {
@@ -86,7 +86,7 @@ where
 pub fn extract_position_it_rec<'store, HAST, It, It2>(stores: &'store HAST, mut it: It) -> Position
 where
     HAST: HyperAST,
-    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = (HAST::IdN, usize)> + Into<It2>,
     It2: Iterator<Item = HAST::IdN>,
 {
@@ -139,7 +139,7 @@ where
 pub fn extract_position_it<'store, HAST, It, It2>(stores: &'store HAST, mut it: It) -> Position
 where
     HAST: HyperAST,
-    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = (HAST::IdN, HAST::Idx)> + Into<It2>,
     It2: Iterator<Item = HAST::IdN>,
 {

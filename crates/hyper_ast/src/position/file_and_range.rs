@@ -1,10 +1,9 @@
 use crate::PrimInt;
-use core::fmt;
 use std::fmt::{Debug, Display};
 use std::path::PathBuf;
 
 #[derive(PartialEq, Eq, Hash, Clone, Default)]
-pub struct Position<F, T: PrimInt> {
+pub struct Position<F, T> {
     file: F,
     start: T,
     len: T,
@@ -32,7 +31,7 @@ impl<T: PrimInt> Position<PathBuf, T> {
 }
 
 impl<F: Debug, T: PrimInt> Debug for Position<F, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Position")
             .field("file", &self.file)
             .field("start", &self.start)
@@ -42,7 +41,7 @@ impl<F: Debug, T: PrimInt> Debug for Position<F, T> {
 }
 
 impl<T: PrimInt + Display> Display for Position<PathBuf, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{{\"start\":{},\"len\":{},\"file\":{:?}}}",

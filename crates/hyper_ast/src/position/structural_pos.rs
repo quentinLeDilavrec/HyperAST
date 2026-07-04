@@ -1,14 +1,17 @@
 use num::{one, zero};
-use std::{fmt::Debug, path::PathBuf};
+use std::fmt::Debug;
+use std::path::PathBuf;
+
+use crate::PrimInt;
+use crate::store::defaults::NodeIdentifier;
+use crate::types::{AnyType, HyperType, Labeled, LendT, NodeId, Typed, TypedNodeId};
+use crate::types::{Children, Childrn, WithChildren};
+use crate::types::{HyperAST, LabelStore, NodeStore};
+use crate::types::{WithSerialization, WithStats};
 
 use super::building;
-use super::building::{ReceiveRows, bottom_up, top_down, top_down::SetNode};
+use super::building::{bottom_up, top_down};
 use super::{Position, WithHyperAstPositionConverter, position_accessors, tags};
-use crate::types::{
-    AnyType, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, LendT, NodeId, NodeStore,
-    Typed, TypedNodeId, WithChildren, WithSerialization, WithStats,
-};
-use crate::{PrimInt, store::defaults::NodeIdentifier};
 
 pub use super::offsets_and_nodes::StructuralPosition;
 
@@ -243,7 +246,7 @@ where
                 ) -> usize
                 where
                     HAST::IdN: NodeId<IdN = HAST::IdN> + Eq + Debug,
-                    for<'t> LendT<'t, HAST>: WithStats + WithSerialization + WithChildren,
+                    for<'t> LendT<'t, HAST>: WithStats + WithSerialization,
                 {
                     let b = stores.node_store().resolve(x);
                     let l = b.line_count();
@@ -308,7 +311,7 @@ where
     where
         S: position_accessors::WithPreOrderOffsets<Idx = HAST::Idx>
             + position_accessors::RootedPosition<HAST::IdN>,
-        for<'t> LendT<'t, HAST>: WithSerialization + WithChildren + WithStats,
+        for<'t> LendT<'t, HAST>: WithSerialization + WithStats,
         B: top_down::ReceiveDir<HAST::IdN, HAST::Idx, O> + top_down::CreateBuilder,
         B::SB1<O>: top_down::ReceiveInFile<HAST::IdN, HAST::Idx, usize, O>,
     {
@@ -361,6 +364,7 @@ where
                     no_s_idx += one();
                 }
             }
+            use building::ReceiveRows;
             use top_down::ReceiveIdxNoSpace;
             use top_down::ReceiveOffset;
             builder = builder
@@ -372,6 +376,7 @@ where
         }
         let n = stores.resolve(&x);
         use building::SetLineSpan;
+        use top_down::SetNode;
         if let Some(len) = n.try_bytes_len() {
             let lines = n.line_count();
             let node = x;
@@ -390,7 +395,7 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, I
     where
         'a: 'store,
         HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
+        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
         HAST::Idx: Debug,
         IdN: Debug + NodeId,
         IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
@@ -427,7 +432,7 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, I
     ) -> Position
     where
         HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization + WithChildren,
+        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
         IdN: Copy + Debug + NodeId,
         IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
     {
@@ -580,51 +585,31 @@ impl<IdN, Idx> StructuralPositionStore2<IdN, Idx> {
         if self.persisted.0 < h.0 {
             self.nodes[h.0 - 1] = node;
             self.offsets[h.0 - 1] += num::one();
-            h
-        } else if let Some(p) = self.parent(h) {
-            if self.persisted.0 == self.nodes.len() {
-                self.nodes.push(node);
-                self.offsets.push(self.offsets[h.0 - 1] + num::one());
-                self.parents.push(p);
-                let mut h = self.persisted;
-                h.0 += 1;
-                h
-            } else {
-                assert!(self.nodes.len() > self.persisted.0);
-                self.nodes[self.persisted.0] = node;
-                self.offsets[self.persisted.0] = self.offsets[h.0 - 1] + num::one();
-                self.parents[self.persisted.0] = p;
-                let mut h = self.persisted;
-                h.0 += 1;
-                h
-            }
-        } else {
+            return h;
+        }
+        let Some(p) = self.parent(h) else {
             unreachable!()
+        };
+        if self.persisted.0 == self.nodes.len() {
+            self.nodes.push(node);
+            self.offsets.push(self.offsets[h.0 - 1] + num::one());
+            self.parents.push(p);
+            let mut h = self.persisted;
+            h.0 += 1;
+            h
+        } else {
+            assert!(self.nodes.len() > self.persisted.0);
+            self.nodes[self.persisted.0] = node;
+            self.offsets[self.persisted.0] = self.offsets[h.0 - 1] + num::one();
+            self.parents[self.persisted.0] = p;
+            let mut h = self.persisted;
+            h.0 += 1;
+            h
         }
     }
 
     fn down(&mut self, h: Handle, node: IdN, offset: Idx) -> Handle {
-        if self.persisted.0 <= h.0 {
-            let mut c = h;
-            c.0 += 1;
-            if self.nodes.len() == c.0 - 1 {
-                assert_eq!(self.offsets.len(), c.0 - 1);
-                self.nodes.push(node);
-                self.offsets.push(offset);
-                self.parents.push(h);
-            } else if self.nodes.len() < c.0 - 1 {
-                dbg!(self.nodes.len());
-                dbg!(self.offsets.len());
-                dbg!(self.persisted.0);
-                dbg!(c.0);
-                panic!()
-            } else {
-                self.nodes[c.0 - 1] = node;
-                self.offsets[c.0 - 1] = offset;
-                self.parents[c.0 - 1] = h;
-            }
-            c
-        } else {
+        if self.persisted.0 > h.0 {
             let mut h = h;
             h.0 -= 1;
             self.nodes[self.persisted.0] = node;
@@ -632,8 +617,27 @@ impl<IdN, Idx> StructuralPositionStore2<IdN, Idx> {
             self.parents[self.persisted.0] = h;
             let mut r = self.persisted;
             r.0 += 1;
-            r
+            return r;
         }
+        let mut c = h;
+        c.0 += 1;
+        if self.nodes.len() == c.0 - 1 {
+            assert_eq!(self.offsets.len(), c.0 - 1);
+            self.nodes.push(node);
+            self.offsets.push(offset);
+            self.parents.push(h);
+        } else if self.nodes.len() < c.0 - 1 {
+            dbg!(self.nodes.len());
+            dbg!(self.offsets.len());
+            dbg!(self.persisted.0);
+            dbg!(c.0);
+            panic!()
+        } else {
+            self.nodes[c.0 - 1] = node;
+            self.offsets[c.0 - 1] = offset;
+            self.parents[c.0 - 1] = h;
+        }
+        c
     }
 }
 

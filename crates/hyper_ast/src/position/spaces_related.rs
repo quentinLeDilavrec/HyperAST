@@ -7,10 +7,9 @@ use super::Position;
 use super::WithHyperAstPositionConverter;
 use crate::PrimInt;
 use crate::position::building;
-use crate::types::{
-    self, Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, NodeStore, TypeStore,
-    WithChildren, WithSerialization,
-};
+use crate::types::{Children as _, Childrn as _, WithChildren as _};
+use crate::types::{HyperAST, LabelStore, LendT, NodeStore, TypeStore};
+use crate::types::{HyperType, Labeled, WithSerialization};
 
 pub fn path_with_spaces<'store, HAST>(
     root: HAST::IdN,
@@ -18,9 +17,8 @@ pub fn path_with_spaces<'store, HAST>(
     stores: &'store HAST,
 ) -> (Vec<HAST::Idx>, HAST::IdN)
 where
-    HAST::IdN: Clone,
     HAST: HyperAST,
-    for<'t> types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
 {
     let mut x = root;
     let mut path_ids = vec![];
@@ -98,49 +96,20 @@ impl<'store, Idx: PrimInt, HAST>
         _stores: &'store HAST,
     ) -> Filtered<Vec<It::Item>, node_filters::Full>
     where
-        HAST::IdN: Clone,
         HAST: HyperAST,
-        for<'t> types::LendT<'t, HAST>: WithSerialization,
+        for<'t> LendT<'t, HAST>: WithSerialization,
     {
         todo!()
     }
 }
 
 pub fn global_pos_with_spaces<T, NS, It: Iterator>(
-    _root: T::TreeId,
+    _root: (),
     // increasing order
     _no_spaces: &mut It,
     _node_store: &NS,
-) -> (Vec<It::Item>,)
-where
-    It::Item: Clone + PrimInt,
-    T::TreeId: Clone,
-    // NS: types::NodeStore<T::TreeId, N = T>,
-    T: types::Tree<ChildIdx = It::Item> + types::WithStats,
-{
+) -> (Vec<It::Item>,) {
     todo!()
-    // let mut offset_with_spaces = zero();
-    // let mut offset_without_spaces = zero();
-    // // let mut x = root;
-    // let mut res = vec![];
-    // let (cs, size_no_s) = {
-    //     let b = stores.node_store().resolve(&root);
-    //     (b.children().unwrap().iter_children().collect::<Vec<_>>(),b.get_size())
-    // };
-    // let mut stack = vec![(root, size_no_s, 0, cs)];
-    // while let Some(curr_no_space) = no_spaces.next() {
-    //     loop {
-
-    //         if curr_no_space == offset_without_spaces {
-    //             res.push(offset_with_spaces);
-    //             break;
-    //         }
-    //     }
-    // }
-
-    // (
-    //     res,
-    // )
 }
 
 pub fn compute_position_with_no_spaces<'store, HAST, It: Iterator>(
@@ -150,9 +119,8 @@ pub fn compute_position_with_no_spaces<'store, HAST, It: Iterator>(
 ) -> (Position, HAST::IdN, Vec<It::Item>)
 where
     It::Item: Clone + PrimInt,
-    HAST::IdN: Clone,
     HAST: HyperAST,
-    for<'t> types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
 {
     let (pos, mut path_ids, no_spaces) =
         compute_position_and_nodes_with_no_spaces(root.clone(), offsets, stores);
@@ -165,9 +133,8 @@ pub fn compute_position_and_nodes_with_no_spaces<'store, HAST, It>(
     stores: &'store HAST,
 ) -> (Position, Vec<HAST::IdN>, Vec<It::Item>)
 where
-    HAST::IdN: Clone,
     HAST: HyperAST,
-    for<'t> types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     It: Iterator,
     It::Item: Clone + PrimInt,
 {
@@ -281,8 +248,7 @@ where
         &self,
     ) -> (FileAndOffsetFull, SpFull<HAST::IdN, HAST::Idx>)
     where
-        HAST::IdN: Clone,
-        for<'t> types::LendT<'t, HAST>: WithSerialization,
+        for<'t> LendT<'t, HAST>: WithSerialization,
     {
         let stores = self.stores;
         // get root
@@ -351,8 +317,7 @@ where
         &self,
     ) -> (FileAndOffsetFull, SpFull<HAST::IdN, HAST::Idx>)
     where
-        HAST::IdN: Clone,
-        for<'t> types::LendT<'t, HAST>: WithSerialization,
+        for<'t> LendT<'t, HAST>: WithSerialization,
     {
         let stores = self.stores;
         let mut x = self.src.root();
@@ -443,8 +408,7 @@ where
 
     fn compute_multi_position_with_no_spaces3<B>(&self) -> B::Prepared
     where
-        HAST::IdN: Clone,
-        for<'t> types::LendT<'t, HAST>: WithSerialization,
+        for<'t> LendT<'t, HAST>: WithSerialization,
         B: TopDownPosBuilder<HAST::IdN, HAST::Idx, usize, NoSpacePrepareParams<HAST::Idx>>
             + Default,
     {
@@ -533,9 +497,8 @@ where
 
     pub fn compute_no_spaces<O, B>(&self) -> O
     where
-        HAST::IdN: Clone,
         HAST: HyperAST,
-        for<'t> types::LendT<'t, HAST>: WithSerialization + WithChildren,
+        for<'t> LendT<'t, HAST>: WithSerialization,
         // B: receivers_traits::top_down::ReceiveDir2<HAST::IdN, HAST::Idx, usize, O>
         B: building::top_down::ReceiveDir<HAST::IdN, HAST::Idx, O>
             + building::top_down::CreateBuilder,

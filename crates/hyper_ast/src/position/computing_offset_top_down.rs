@@ -4,10 +4,11 @@ use std::path::PathBuf;
 use num::ToPrimitive;
 
 use super::{Position, StructuralPosition, TreePath};
-use crate::types::{
-    Children, Childrn, HyperAST, HyperType, LabelStore, Labeled, WithChildren, WithSerialization,
-};
-use crate::{PrimInt, types::WithStats};
+use crate::PrimInt;
+use crate::types::{Children as _, Childrn as _, WithChildren as _};
+use crate::types::{HyperAST, LabelStore};
+use crate::types::{HyperType as _, Labeled as _};
+use crate::types::{WithSerialization, WithStats};
 
 /// precondition: root node do not contain a File node
 /// TODO make whole thing more specific to a path in a tree

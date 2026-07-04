@@ -371,7 +371,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
 impl<'stores> TsQueryTreeGen<'stores, '_, crate::TStore> {
     pub fn build_then_insert(
         &mut self,
-        _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
+        _i: NodeIdentifier,
         t: Type,
         l: Option<LabelIdentifier>,
         cs: Vec<NodeIdentifier>,
@@ -507,7 +507,7 @@ impl<'stores> TsQueryTreeGen<'stores, '_, crate::TStore> {
     /// Only take self as shared ref and check if the would be created node would already exist
     pub fn try_build(
         stores: &'stores SimpleStores<crate::TStore>,
-        _i: <hyperast::hashed::HashedNode as hyperast::types::Stored>::TreeId,
+        _i: NodeIdentifier,
         t: Type,
         l: Option<LabelIdentifier>,
         cs: Vec<NodeIdentifier>,

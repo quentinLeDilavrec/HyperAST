@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 use hyperast::cyclomatic::Mcc;
 use hyperast::full::FullNode;
-use hyperast::hashed::{HashedNode, IndexingHashBuilder, MetaDataHashsBuilder};
+use hyperast::hashed::{IndexingHashBuilder, MetaDataHashsBuilder};
 use hyperast::hashed::{SyntaxNodeHashs, SyntaxNodeHashsKinds};
 use hyperast::nodes::Space;
 use hyperast::store::SimpleStores;
@@ -900,18 +900,18 @@ impl<
     More: tree_gen::Prepro<SimpleStores<TS>, Scope = hyperast::scripting::Acc>
         + tree_gen::PreproTSG<SimpleStores<TS>, Acc = Acc<More::Scope>>,
     const HIDDEN_NODES: bool,
-> NodeStoreExt<HashedNode> for JavaTreeGen<'_, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>
+> NodeStoreExt<HashedNodeRef<'_>> for JavaTreeGen<'_, '_, TS, SimpleStores<TS>, More, HIDDEN_NODES>
 where
     TS::Ty: TypeTrait,
 {
     #[allow(unused)]
     fn build_then_insert(
         &mut self,
-        i: <HashedNode as hyperast::types::Stored>::TreeId,
-        t: AnyType, //<HashedNode as types::Typed>::Type,
-        l: Option<<HashedNode as hyperast::types::Labeled>::Label>,
-        cs: Vec<<HashedNode as hyperast::types::Stored>::TreeId>,
-    ) -> <HashedNode as hyperast::types::Stored>::TreeId {
+        i: NodeIdentifier,
+        t: AnyType,
+        l: Option<LabelIdentifier>,
+        cs: Vec<NodeIdentifier>,
+    ) -> NodeIdentifier {
         todo!();
         // if t.is_spaces() {
         //     //     // TODO improve ergonomics

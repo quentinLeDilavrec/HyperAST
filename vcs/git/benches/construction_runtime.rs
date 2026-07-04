@@ -214,6 +214,12 @@ fn construction_group(c: &mut Criterion) {
             config: RepoConfig::Any, // C TCL Javascript Java
             fetch: true,
         },
+        Input {
+            repo: Forge::Github.repo("rust-lang", "rust"),
+            commit: "f46ec5218fe7829ac18323b5ee0b409a63169f27",
+            config: RepoConfig::Rust,
+            fetch: true,
+        },
     ];
 
     for p in inputs.iter() {

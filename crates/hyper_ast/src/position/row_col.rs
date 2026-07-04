@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 use crate::PrimInt;
 
 #[derive(PartialEq, Eq, Hash, Clone, Default)]
-pub struct RowCol<T: PrimInt> {
+pub struct RowCol<T> {
     row: T,
     col: T,
 }
@@ -65,78 +65,6 @@ mod impl_receivers {
         }
     }
 
-    impl<IdN, T: PrimInt> top_down::ReceiveParent<IdN, Self> for super::RowCol<T> {
-        fn push(self, _parent: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, T: PrimInt> bottom_up::ReceiveNode<IdN, Self> for super::RowCol<T> {
-        fn push(self, _node: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, T: PrimInt> bottom_up::SetRoot<IdN, Self> for super::RowCol<T> {
-        fn set_root(self, _root: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, T: PrimInt> top_down::SetNode<IdN, Self> for super::RowCol<T> {
-        fn set_node(self, _node: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt> top_down::ReceiveDirName<Self> for super::RowCol<T> {
-        fn push(self, _dir_name: &str) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt> bottom_up::ReceiveDirName<Self> for super::RowCol<T> {
-        fn push(self, _dir_name: &str) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt> top_down::SetFileName<Self> for super::RowCol<T> {
-        fn set_file_name(self, _file_name: &str) -> Self {
-            self
-        }
-    }
-
-    impl<Idx, T: PrimInt> top_down::ReceiveIdx<Idx, Self> for super::RowCol<T> {
-        fn push(self, _idx: Idx) -> Self {
-            self
-        }
-    }
-
-    impl<Idx, T: PrimInt> bottom_up::ReceiveIdx<Idx, Self> for super::RowCol<T> {
-        fn push(self, _idx: Idx) -> Self {
-            self
-        }
-    }
-
-    impl<Idx, T: PrimInt> top_down::ReceiveIdxNoSpace<Idx, Self> for super::RowCol<T> {
-        fn push(self, _idx: Idx) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt, IdO> top_down::ReceiveOffset<IdO, Self> for super::RowCol<T> {
-        fn push(self, _offset: IdO) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt, IdO> bottom_up::ReceiveOffset<IdO, Self> for super::RowCol<T> {
-        fn push(self, _offset: IdO) -> Self {
-            self
-        }
-    }
-
     impl<T: PrimInt> building::ReceiveRows<T, Self> for super::RowCol<T> {
         fn push(mut self, row: T) -> Self {
             self.row += row;
@@ -151,26 +79,25 @@ mod impl_receivers {
         }
     }
 
-    impl<T: PrimInt, IdO> building::SetLen<IdO, Self> for super::RowCol<T> {
-        fn set(self, _len: IdO) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt> building::SetLineSpan<T, Self> for super::RowCol<T> {
-        fn set(self, _lines: T) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt> top_down::FileSysReceiver for super::RowCol<T> {
-        type InFile<O> = Self;
-    }
-
-    impl<T: PrimInt> building::Transition<super::RowCol<T>> for super::RowCol<T> {
-        fn transit(self) -> super::RowCol<T> {
-            self
-        }
+    building::default_impl_receivers! {
+        impl<T>
+        building::Transition<Self>
+        <IdN> bottom_up::ReceiveNode<IdN, Self>
+        <IdN> bottom_up::SetRoot<IdN, Self>
+        <IdO> top_down::ReceiveOffset<IdO, Self>
+        top_down::ReceiveDirName<Self>
+        bottom_up::ReceiveDirName<Self>
+        <IdN> top_down::SetNode<IdN, Self>
+        <IdO> building::SetLen<IdO, Self>
+        top_down::SetFileName<Self>
+        <Idx> top_down::ReceiveIdx<Idx, Self>
+        <Idx> top_down::ReceiveIdxNoSpace<Idx, Self>
+        <Idx> bottom_up::ReceiveIdx<Idx, Self>
+        <IdO> bottom_up::ReceiveOffset<IdO, Self>
+        building::SetLineSpan<T, Self>
+        <IdN> top_down::ReceiveParent<IdN, Self>
+        top_down::FileSysReceiver
+        for super::RowCol<T>
     }
 
     // impl<IdN, Idx, T: PrimInt> top_down::ReceiveInFile<IdN, Idx, Self> for super::Position<PathBuf, IdO> {

@@ -149,25 +149,6 @@ mod impl_receivers {
         }
     }
 
-    impl<IdN, Idx: PrimInt, C> top_down::ReceiveParent<IdN, Self> for Offsets<Idx, C> {
-        fn push(self, _parent: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt, C> top_down::ReceiveDirName<Self> for Offsets<Idx, C> {
-        fn push(self, _dir_name: &str) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt> top_down::ReceiveIdx<Idx, Self> for Offsets<Idx> {
-        fn push(mut self, idx: Idx) -> Self {
-            self.offsets.push(idx);
-            self
-        }
-    }
-
     impl<Idx: PrimInt> top_down::ReceiveIdx<Idx, Self> for Offsets<Idx, tags::TopDownNoSpace> {
         fn push(mut self, idx: Idx) -> Self {
             self.offsets.push(idx);
@@ -188,53 +169,19 @@ mod impl_receivers {
         }
     }
 
-    impl<Idx: PrimInt, C> top_down::FileSysReceiver for Offsets<Idx, C> {
-        type InFile<O> = Self;
-    }
-
-    impl<Idx: PrimInt, IdO: PrimInt, C> top_down::ReceiveOffset<IdO, Self> for Offsets<Idx, C> {
-        fn push(self, _bytes: IdO) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt, IdO, C> building::SetLen<IdO, Self> for Offsets<Idx, C> {
-        fn set(self, _len: IdO) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt, C, T> building::SetLineSpan<T, Self> for Offsets<Idx, C> {
-        fn set(self, _lines: T) -> Self {
-            self
-        }
-    }
-    impl<IdN, Idx: PrimInt, C> top_down::SetNode<IdN, Self> for Offsets<Idx, C> {
-        fn set_node(self, _node: IdN) -> Self {
-            self
-        }
-    }
-    impl<Idx: PrimInt, C> top_down::SetFileName<Self> for Offsets<Idx, C> {
-        fn set_file_name(self, _file_name: &str) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt, T, C> building::ReceiveRows<T, Self> for Offsets<Idx, C> {
-        fn push(self, _row: T) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt, T, C> building::ReceiveColumns<T, Self> for Offsets<Idx, C> {
-        fn push(self, _col: T) -> Self {
-            self
-        }
-    }
-
-    impl<Idx: PrimInt, C> building::Transition<Self> for Offsets<Idx, C> {
-        fn transit(self) -> Self {
-            self
-        }
+    building::default_impl_receivers! {
+        impl<Idx, C>
+            building::Transition<Self>
+            <IdO> building::ReceiveRows<IdO, Self>
+            <IdO> building::ReceiveColumns<IdO, Self>
+            top_down::ReceiveDirName<Self>
+            <IdN> top_down::ReceiveParent<IdN, Self>
+            <IdO> top_down::ReceiveOffset<IdO, Self>
+            top_down::SetFileName<Self>
+            <IdN> top_down::SetNode<IdN, Self>
+            <IdO> building::SetLen<IdO, Self>
+            <T> building::SetLineSpan<T, Self>
+            top_down::FileSysReceiver
+        for Offsets<Idx, C>
     }
 }

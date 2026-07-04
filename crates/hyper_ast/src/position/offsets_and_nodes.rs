@@ -366,37 +366,12 @@ mod impl_c_p_p_receivers {
         }
     }
 
-    impl<IdN, Idx: PrimInt, C> top_down::ReceiveParent<IdN, Self> for StructuralPosition<IdN, Idx, C> {
-        fn push(self, _parent: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, Idx: PrimInt, C> top_down::ReceiveDirName<Self> for StructuralPosition<IdN, Idx, C> {
-        fn push(self, _dir_name: &str) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, Idx: PrimInt, C> bottom_up::ReceiveDirName<Self> for StructuralPosition<IdN, Idx, C> {
-        fn push(self, _dir_name: &str) -> Self {
-            self
-        }
-    }
-
     // impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdx<Idx, Self> for SolvedStructuralPosition<IdN, Idx, C> {
     //     fn push(mut self, idx: Idx) -> Self {
     //         self.offsets.push(idx);
     //         self
     //     }
     // }
-
-    impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdx<Idx, Self> for StructuralPosition<IdN, Idx, C> {
-        fn push(self, _idx: Idx) -> Self {
-            // self.offsets.push(idx);
-            self
-        }
-    }
 
     // impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdxNoSpace<Idx, Self> for SolvedStructuralPosition<IdN, Idx, C> {
     //     fn push(self, _idx: Idx) -> Self {
@@ -414,28 +389,6 @@ mod impl_c_p_p_receivers {
         }
     }
 
-    impl<IdN, Idx: PrimInt, C> top_down::FileSysReceiver for StructuralPosition<IdN, Idx, C> {
-        type InFile<O> = Self;
-    }
-
-    impl<IdN, Idx: PrimInt, IdO, C> top_down::ReceiveOffset<IdO, Self>
-        for StructuralPosition<IdN, Idx, C>
-    {
-        fn push(self, _bytes: IdO) -> Self {
-            self
-        }
-    }
-    impl<IdN, Idx: PrimInt, IdO, C> building::SetLen<IdO, Self> for StructuralPosition<IdN, Idx, C> {
-        fn set(self, _len: IdO) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, Idx: PrimInt, C, T> building::SetLineSpan<T, Self> for StructuralPosition<IdN, Idx, C> {
-        fn set(self, _lines: T) -> Self {
-            self
-        }
-    }
     // impl<IdN, Idx: PrimInt, C> top_down::SetNode<IdN, SolvedStructuralPosition<IdN, Idx, C>>
     //     for StructuralPosition<IdN, Idx, C>
     // {
@@ -450,28 +403,21 @@ mod impl_c_p_p_receivers {
             self.solved(node)
         }
     }
-    impl<IdN, Idx: PrimInt, C> top_down::SetFileName<Self> for StructuralPosition<IdN, Idx, C> {
-        fn set_file_name(self, _file_name: &str) -> Self {
-            self
-        }
-    }
-    impl<IdN, Idx: PrimInt, IdO, C> building::ReceiveRows<IdO, Self>
+
+    building::default_impl_receivers! {
+        impl<IdN, Idx, C>
+            building::Transition<Self>
+            <IdO> building::ReceiveRows<IdO, Self>
+            <IdO> building::ReceiveColumns<IdO, Self>
+            top_down::ReceiveDirName<Self>
+            bottom_up::ReceiveDirName<Self>
+            top_down::ReceiveParent<IdN, Self>
+            top_down::ReceiveIdx<Idx, Self>
+            <IdO> top_down::ReceiveOffset<IdO, Self>
+            top_down::SetFileName<Self>
+            <IdO> building::SetLen<IdO, Self>
+            <T> building::SetLineSpan<T, Self>
+            top_down::FileSysReceiver
         for StructuralPosition<IdN, Idx, C>
-    {
-        fn push(self, _row: IdO) -> Self {
-            self
-        }
-    }
-    impl<IdN, Idx: PrimInt, IdO, C> building::ReceiveColumns<IdO, Self>
-        for StructuralPosition<IdN, Idx, C>
-    {
-        fn push(self, _col: IdO) -> Self {
-            self
-        }
-    }
-    impl<IdN, Idx: PrimInt, C> building::Transition<Self> for StructuralPosition<IdN, Idx, C> {
-        fn transit(self) -> Self {
-            self
-        }
     }
 }

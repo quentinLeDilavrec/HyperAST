@@ -372,3 +372,168 @@ mod impl_c_p_p_receivers2 {
         }
     }
 }
+
+/// implements default receivers, i.e. just returning self
+///
+/// Do not hesitate to inline or split the impls if you have issues
+macro_rules! default_impl_receivers {
+    // almost look like a multi trait impl
+    (impl<$($t:ident),*> $($rest:tt)*) => {
+        crate::position::building::
+        default_impl_receivers!{@rec1 impl<$($t),*> [] $($rest)*}
+    };
+
+    // # first part: the basic tt muncher collecting the traits and the struct $b
+
+    // terminal tt muncher
+    //   now that traits have been collected and $b is there
+    //   actually call the macro which builds the impls
+    (@rec1 impl<$($t:ident),*> [$($traits:tt)*] for $b:ty) => {
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    // also terminal, but needed for odd numbers of tt due to next rule
+    (@rec1 impl<$($t:ident),*> [$($traits:tt)*] $head1:tt for $b:ty) => {
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)* $head1] for $b}
+    };
+    // intermediate tt muncher (capture 2 tt to avoid hitting decl macro recursion limit)
+    (@rec1 impl<$($t:ident),*> [$($traits:tt)*] $head1:tt $head2:tt $($rest:tt)*) => {
+        crate::position::building::
+        default_impl_receivers!{@rec1 impl<$($t),*> [$($traits)* $head1 $head2] $($rest)*}
+    };
+
+    // # second part: the specialized tt muncher creating the impls now that we have $b
+
+    // terminal tt muncher
+    (@trt impl<$($t:ident),*> [] for $b:ty) => {};
+
+    (@trt impl<$($t:ident),*> [building::Transition<Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),*> building::Transition<Self> for $b {
+            fn transit(self) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idn0:ident>)? bottom_up::ReceiveNode<$idn:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($idn0)?> bottom_up::ReceiveNode<$idn, Self> for $b {
+            fn push(self, _node: $idn) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idn0:ident>)? bottom_up::SetRoot<$idn:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($idn0)?> bottom_up::SetRoot<$idn, Self> for $b {
+            fn set_root(self, _root: $idn) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? building::ReceiveRows<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($ido0)?> building::ReceiveRows<$ido, Self> for $b {
+            fn push(self, _row: IdO) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? building::ReceiveColumns<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($ido0)?> building::ReceiveColumns<$ido, Self> for $b {
+            fn push(self, _col: IdO) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idn0:ident>)? top_down::ReceiveParent<$idn:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($idn0)?> top_down::ReceiveParent<$idn, Self> for $b {
+            fn push(self, _parent: $idn) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [top_down::ReceiveDirName<Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),*> top_down::ReceiveDirName<Self> for $b {
+            fn push(self, _dir_name: &str) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [bottom_up::ReceiveDirName<Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),*> bottom_up::ReceiveDirName<Self> for $b {
+            fn push(self, _dir_name: &str) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idx0:ident>)? top_down::ReceiveIdx<$idx:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($idx0)?> top_down::ReceiveIdx<$idx, Self> for $b {
+            fn push(self, _idx: $idx) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idx0:ident>)? top_down::ReceiveIdxNoSpace<$idx:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($idx0)?> top_down::ReceiveIdxNoSpace<$idx, Self> for $b {
+            fn push(self, _idx: $idx) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idx0:ident>)? bottom_up::ReceiveIdx<$idx:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($idx0)?> bottom_up::ReceiveIdx<$idx, Self> for $b {
+            fn push(self, _idx: $idx) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? top_down::ReceiveOffset<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($ido0)?> top_down::ReceiveOffset<$ido, Self> for $b {
+            fn push(self, _bytes: $ido) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? bottom_up::ReceiveOffset<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* , $($ido0)?> bottom_up::ReceiveOffset<$ido, Self> for $b {
+            fn push(self, _offset: $ido) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [top_down::SetFileName<Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),*> top_down::SetFileName<Self> for $b {
+            fn set_file_name(self, _file_name: &str) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$idn0:ident>)? top_down::SetNode<$idn:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* $(, $idn0)?> top_down::SetNode<$idn, Self> for $b {
+            fn set_node(self, _node: $idn) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? building::SetLen<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* $(, $ido0)?> building::SetLen<$ido, Self> for $b {
+            fn set(self, _len: $ido) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [$(<$t0:ident>)? building::SetLineSpan<$t_:ident, Self> $($traits:tt)*] for $b:ty) => {
+        impl<$($t),* $(, $t0)?> building::SetLineSpan<$t_, Self> for $b {
+            fn set(self, _lines: $t_) -> Self { self }
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [top_down::FileSysReceiver $($traits:tt)*] for $b:ty) => {
+        impl<$($t),*> top_down::FileSysReceiver for $b {
+            type InFile<O> = Self;
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+}
+
+pub(crate) use default_impl_receivers;

@@ -94,75 +94,6 @@ mod impl_receivers {
         }
     }
 
-    impl<IdN, T: PrimInt> top_down::ReceiveParent<IdN, Self> for super::Position<PathBuf, T> {
-        fn push(self, _parent: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, T: PrimInt> bottom_up::ReceiveNode<IdN, Self> for super::Position<PathBuf, T> {
-        fn push(self, _node: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, T: PrimInt> bottom_up::SetRoot<IdN, Self> for super::Position<PathBuf, T> {
-        fn set_root(self, _root: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<IdN, T: PrimInt> top_down::SetNode<IdN, Self> for super::Position<PathBuf, T> {
-        fn set_node(self, _node: IdN) -> Self {
-            self
-        }
-    }
-
-    impl<T: PrimInt> top_down::ReceiveDirName<Self> for super::Position<PathBuf, T> {
-        fn push(mut self, dir_name: &str) -> Self {
-            self.file.push(dir_name);
-            self
-        }
-    }
-
-    impl<T: PrimInt> bottom_up::ReceiveDirName<Self> for super::Position<PathBuf, T> {
-        fn push(mut self, dir_name: &str) -> Self {
-            self.file = std::path::PathBuf::from(dir_name).join(self.file);
-            self
-        }
-    }
-
-    impl<T: PrimInt> top_down::SetFileName<Self> for super::Position<PathBuf, T> {
-        fn set_file_name(mut self, file_name: &str) -> Self {
-            self.file.push(file_name);
-            self
-        }
-    }
-
-    impl<Idx, T: PrimInt> top_down::ReceiveIdx<Idx, Self> for super::Position<PathBuf, T> {
-        fn push(self, _idx: Idx) -> Self {
-            self
-        }
-    }
-
-    impl<Idx, T: PrimInt> bottom_up::ReceiveIdx<Idx, Self> for super::Position<PathBuf, T> {
-        fn push(self, _idx: Idx) -> Self {
-            self
-        }
-    }
-
-    impl<Idx, T: PrimInt> top_down::ReceiveIdxNoSpace<Idx, Self> for super::Position<PathBuf, T> {
-        fn push(self, _idx: Idx) -> Self {
-            self
-        }
-    }
-
-    impl<IdO, T: PrimInt> top_down::ReceiveOffset<IdO, Self> for super::Position<PathBuf, T> {
-        fn push(self, _offset: IdO) -> Self {
-            self
-        }
-    }
-
     impl<T: PrimInt> building::ReceiveRows<T, Self> for super::Position<PathBuf, T> {
         fn push(mut self, row: T) -> Self {
             self.start += row;
@@ -176,18 +107,6 @@ mod impl_receivers {
         }
     }
 
-    impl<IdO, T: PrimInt> bottom_up::ReceiveOffset<IdO, Self> for super::Position<PathBuf, T> {
-        fn push(self, _offset: IdO) -> Self {
-            self
-        }
-    }
-
-    impl<IdO, T: PrimInt> building::SetLen<IdO, Self> for super::Position<PathBuf, T> {
-        fn set(self, _len: IdO) -> Self {
-            self
-        }
-    }
-
     impl<T: PrimInt> building::SetLineSpan<T, Self> for super::Position<PathBuf, T> {
         fn set(mut self, lines: T) -> Self {
             self.len = lines;
@@ -195,13 +114,23 @@ mod impl_receivers {
         }
     }
 
-    impl<T: PrimInt> top_down::FileSysReceiver for super::Position<PathBuf, T> {
-        type InFile<O> = Self;
-    }
-
-    impl<T: PrimInt> building::Transition<super::Position<PathBuf, T>> for super::Position<PathBuf, T> {
-        fn transit(self) -> super::Position<PathBuf, T> {
-            self
-        }
+    building::default_impl_receivers! {
+        impl<T>
+        building::Transition<Self>
+        <IdN> bottom_up::ReceiveNode<IdN, Self>
+        <IdN> bottom_up::SetRoot<IdN, Self>
+        <IdO> top_down::ReceiveOffset<IdO, Self>
+        top_down::ReceiveDirName<Self>
+        bottom_up::ReceiveDirName<Self>
+        <IdN> top_down::SetNode<IdN, Self>
+        <IdO> building::SetLen<IdO, Self>
+        top_down::SetFileName<Self>
+        <Idx> top_down::ReceiveIdx<Idx, Self>
+        <Idx> top_down::ReceiveIdxNoSpace<Idx, Self>
+        <Idx> bottom_up::ReceiveIdx<Idx, Self>
+        <IdO> bottom_up::ReceiveOffset<IdO, Self>
+        <IdN> top_down::ReceiveParent<IdN, Self>
+        top_down::FileSysReceiver
+        for super::Position<PathBuf, T>
     }
 }

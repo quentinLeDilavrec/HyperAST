@@ -1,13 +1,9 @@
 use num::one;
 use std::fmt::Debug;
-use std::path::PathBuf;
 
 use crate::PrimInt;
 use crate::store::defaults::NodeIdentifier;
-use crate::types::WithSerialization;
-use crate::types::{AnyType, HyperType, Labeled, LendT, NodeId, Typed, TypedNodeId};
-use crate::types::{Children, Childrn, WithChildren};
-use crate::types::{HyperAST, LabelStore, NodeStore};
+use crate::types::{NodeId, TypedNodeId};
 
 use super::{Position, tags};
 
@@ -186,129 +182,6 @@ impl<IdN, Idx> ExploreStructuralPositions<'_, IdN, Idx> {
             self.i = i;
         }
         Some(SpHandle(r))
-    }
-}
-
-// TODO separate concerns
-// TODO make_position should be a From<ExploreStructuralPositions> for FileAndOffsetPositionT and moved to relevant place
-// TODO here the remaining logic should be about giving an iterator through the structural position
-impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'a, IdN, Idx> {
-    pub fn make_position<'store, HAST>(self, stores: &'store HAST) -> Position
-    where
-        'a: 'store,
-        HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
-        HAST::Idx: Debug,
-        IdN: Debug + NodeId,
-        IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-    {
-        self.sps.check(stores).unwrap();
-        // let parents = self.parents.iter().peekable();
-        let mut from_file = false;
-        let len = if let Some(x) = self.peek_node() {
-            let b = stores.node_store().resolve(x.as_id());
-            let t = stores.resolve_type(x.as_id());
-            if let Some(y) = b.try_bytes_len() {
-                if t.is_file() {
-                    from_file = true;
-                }
-                y
-            } else {
-                0
-            }
-        } else {
-            0
-        };
-        let offset = 0;
-        let path = vec![];
-        self.make_position_aux(stores, from_file, len, offset, path)
-    }
-
-    fn make_position_aux<'store: 'a, HAST>(
-        mut self,
-        stores: &'store HAST,
-        from_file: bool,
-        len: usize,
-        mut offset: usize,
-        mut path: Vec<&'a str>,
-    ) -> Position
-    where
-        HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
-        IdN: Copy + Debug + NodeId,
-        IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
-    {
-        if from_file {
-            while let Some(p) = self.peek_parent_node() {
-                assert_ne!(p, self.peek_node().unwrap());
-                assert_eq!(p, self.sps.nodes[self.sps.parents[self.i - 1]]);
-                assert_eq!(self.peek_node().unwrap(), self.sps.nodes[self.i - 1]);
-                // println!("nodes: {}, parents:{}, offsets:{}",it.sps.nodes.len(),it.sps.parents.len(),it.sps.offsets.len());
-                let b = stores.node_store().resolve(p.as_id());
-                let t = stores.resolve_type(p.as_id());
-                // println!("T0:{:?}", t);
-                // let o = it.sps.offsets[it]
-                // println!("nodes: ({})", it.sps.nodes.len());
-                // println!("offsets: ({}) {:?}", it.sps.offsets.len(), &it.sps.offsets);
-                // println!("parents: ({}) {:?}", it.sps.parents.len(), &it.sps.parents);
-                // println!(
-                //     "o: {}, o p: {}",
-                //     it.peek_offset().unwrap(),
-                //     it.sps.offsets[it.sps.parents[it.i - 1]]
-                // );
-                let o = self.peek_offset().unwrap();
-                let o: HAST::Idx =
-                    num::cast(o).expect("failed to cast, cannot put value of Idx in ChildIdx");
-                if self.peek_node().unwrap().as_id() != &b.children().unwrap()[o] {
-                    if self.peek_node().unwrap().as_id() != &b.children().unwrap()[o] {
-                        log::error!("backtrace: {}", std::backtrace::Backtrace::force_capture());
-                    }
-                    assert_eq!(
-                        self.peek_node().unwrap().as_id(),
-                        &b.children().unwrap()[o],
-                        "p:{:?} b.cs:{:?} o:{:?} o p:{:?} i p:{}",
-                        p,
-                        b.children().unwrap().iter_children().collect::<Vec<_>>(),
-                        self.peek_offset().unwrap(),
-                        self.sps.offsets[self.sps.parents[self.i - 1]] - one(),
-                        self.sps.parents[self.i - 1],
-                    );
-                }
-                let c: usize = {
-                    let v: Vec<_> = b.children().unwrap().before(o).iter_children().collect();
-                    v.iter()
-                        .map(|x| {
-                            let b = stores.node_store().resolve(x);
-                            // println!("{:?}", b.get_type());
-                            // println!("T1:{:?}", b.get_type());
-                            b.try_bytes_len().unwrap()
-                        })
-                        .sum()
-                };
-                offset += c;
-                if t.is_file() {
-                    self.next();
-                    break;
-                } else {
-                    self.next();
-                }
-            }
-        }
-        for p in self {
-            let b = stores.node_store().resolve(p.as_id());
-            // println!("type {:?}", b.get_type());
-            // if !b.has_label() {
-            //     panic!("{:?} should have a label", b.get_type());
-            // }
-            if let Some(l) = b.try_get_label() {
-                let l = stores.label_store().resolve(l);
-                // println!("value: {}",l);
-                // path = path.join(path)
-                path.push(l)
-            }
-        }
-        let file = PathBuf::from_iter(path.iter().rev());
-        Position::new(file, offset, len)
     }
 }
 

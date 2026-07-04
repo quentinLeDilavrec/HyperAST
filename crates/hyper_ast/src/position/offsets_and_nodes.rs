@@ -353,6 +353,7 @@ mod impl_c_p_p_receivers {
     use super::PrimInt;
     use super::SolvedStructuralPosition;
     use super::StructuralPosition;
+    use building::bottom_up;
     use building::top_down;
 
     impl<IdN, Idx: PrimInt, C> top_down::CreateBuilder for StructuralPosition<IdN, Idx, C> {
@@ -371,17 +372,13 @@ mod impl_c_p_p_receivers {
         }
     }
 
-    impl<IdN, Idx: PrimInt, C> building::top_down::ReceiveDirName<Self>
-        for StructuralPosition<IdN, Idx, C>
-    {
+    impl<IdN, Idx: PrimInt, C> top_down::ReceiveDirName<Self> for StructuralPosition<IdN, Idx, C> {
         fn push(self, _dir_name: &str) -> Self {
             self
         }
     }
 
-    impl<IdN, Idx: PrimInt, C> building::bottom_up::ReceiveDirName<Self>
-        for StructuralPosition<IdN, Idx, C>
-    {
+    impl<IdN, Idx: PrimInt, C> bottom_up::ReceiveDirName<Self> for StructuralPosition<IdN, Idx, C> {
         fn push(self, _dir_name: &str) -> Self {
             self
         }
@@ -394,9 +391,7 @@ mod impl_c_p_p_receivers {
     //     }
     // }
 
-    impl<IdN, Idx: PrimInt, C> building::top_down::ReceiveIdx<Idx, Self>
-        for StructuralPosition<IdN, Idx, C>
-    {
+    impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdx<Idx, Self> for StructuralPosition<IdN, Idx, C> {
         fn push(self, _idx: Idx) -> Self {
             // self.offsets.push(idx);
             self
@@ -410,7 +405,7 @@ mod impl_c_p_p_receivers {
     //     }
     // }
 
-    impl<IdN, Idx: PrimInt, C> building::top_down::ReceiveIdxNoSpace<Idx, Self>
+    impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdxNoSpace<Idx, Self>
         for StructuralPosition<IdN, Idx, C>
     {
         fn push(mut self, idx: Idx) -> Self {
@@ -423,7 +418,7 @@ mod impl_c_p_p_receivers {
         type InFile<O> = Self;
     }
 
-    impl<IdN, Idx: PrimInt, IdO, C> building::top_down::ReceiveOffset<IdO, Self>
+    impl<IdN, Idx: PrimInt, IdO, C> top_down::ReceiveOffset<IdO, Self>
         for StructuralPosition<IdN, Idx, C>
     {
         fn push(self, _bytes: IdO) -> Self {

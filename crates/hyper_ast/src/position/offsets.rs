@@ -140,7 +140,7 @@ mod impl_receivers {
     use crate::PrimInt;
     use building::top_down;
 
-    impl<Idx: PrimInt, C> building::top_down::CreateBuilder for Offsets<Idx, C> {
+    impl<Idx: PrimInt, C> top_down::CreateBuilder for Offsets<Idx, C> {
         fn create() -> Self {
             Self {
                 offsets: vec![],
@@ -155,38 +155,33 @@ mod impl_receivers {
         }
     }
 
-    impl<Idx: PrimInt, C> building::top_down::ReceiveDirName<Self> for Offsets<Idx, C> {
+    impl<Idx: PrimInt, C> top_down::ReceiveDirName<Self> for Offsets<Idx, C> {
         fn push(self, _dir_name: &str) -> Self {
             self
         }
     }
 
-    impl<Idx: PrimInt> building::top_down::ReceiveIdx<Idx, Self> for Offsets<Idx> {
+    impl<Idx: PrimInt> top_down::ReceiveIdx<Idx, Self> for Offsets<Idx> {
         fn push(mut self, idx: Idx) -> Self {
             self.offsets.push(idx);
             self
         }
     }
 
-    impl<Idx: PrimInt> building::top_down::ReceiveIdx<Idx, Self>
-        for Offsets<Idx, tags::TopDownNoSpace>
-    {
+    impl<Idx: PrimInt> top_down::ReceiveIdx<Idx, Self> for Offsets<Idx, tags::TopDownNoSpace> {
         fn push(mut self, idx: Idx) -> Self {
             self.offsets.push(idx);
             self
         }
     }
 
-    impl<Idx: PrimInt> building::top_down::ReceiveIdxNoSpace<Idx, Self> for Offsets<Idx> {
+    impl<Idx: PrimInt> top_down::ReceiveIdxNoSpace<Idx, Self> for Offsets<Idx> {
         fn push(self, _idx: Idx) -> Self {
-            //self.offsets.push(idx);
             self
         }
     }
 
-    impl<Idx: PrimInt> building::top_down::ReceiveIdxNoSpace<Idx, Self>
-        for Offsets<Idx, tags::TopDownNoSpace>
-    {
+    impl<Idx: PrimInt> top_down::ReceiveIdxNoSpace<Idx, Self> for Offsets<Idx, tags::TopDownNoSpace> {
         fn push(mut self, idx: Idx) -> Self {
             self.offsets.push(idx);
             self

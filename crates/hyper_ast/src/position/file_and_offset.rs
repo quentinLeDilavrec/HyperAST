@@ -1,4 +1,3 @@
-use core::fmt;
 use std::fmt::{Debug, Display};
 use std::path::PathBuf;
 
@@ -51,7 +50,7 @@ impl<T: PrimInt> Position<PathBuf, T> {
 }
 
 impl<F: Debug, T: PrimInt> Debug for Position<F, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Position")
             .field("file", &self.file)
             .field("offset", &self.offset)
@@ -61,7 +60,7 @@ impl<F: Debug, T: PrimInt> Debug for Position<F, T> {
 }
 
 impl<T: PrimInt + Display> Display for Position<PathBuf, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{{\"offset\":{},\"len\":{},\"file\":{:?}}}",

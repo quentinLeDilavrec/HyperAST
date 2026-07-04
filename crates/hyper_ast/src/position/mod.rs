@@ -154,3 +154,5 @@ pub use structural_pos::{
 };
 pub type StructuralPosition<IdN = NodeIdentifier, Idx = u16> =
     structural_pos::StructuralPosition<IdN, Idx>;
+
+pub mod conversions_impls;

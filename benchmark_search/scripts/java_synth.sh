@@ -1,10 +1,10 @@
 set -x
 commits=$1
-input=benchmark_search/queries/try_fail_catch_main.scm
-# input=benchmark_search/queries/test_declaration_main.scm
-sub=benchmark_search/queries/try_stmt-fail-try_fail_catch.scm
-# sub=benchmark_search/queries/meth_decl-test_annot-test_declaration.scm
-# subp=(benchmark_search/queries/try_stmt-fail-try_fail_catch.scm -s 2)
+input=benchmark_search/queries/java/try_fail_catch_main.scm
+# input=benchmark_search/queries/java/test_declaration_main.scm
+sub=benchmark_search/queries/java/try_stmt-fail-try_fail_catch.scm
+# sub=benchmark_search/queries/java/meth_decl-test_annot-test_declaration.scm
+# subp=(benchmark_search/queries/java/try_stmt-fail-try_fail_catch.scm -s 2)
 exe=target/release/synth
 # exe=target/debug/synth
 out=benchmark_search/synth_results/try_fail_catch/v6

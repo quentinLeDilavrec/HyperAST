@@ -2,7 +2,7 @@
   (block
     (expression_statement
       (method_invocation
-        (identifier) (#EQ? "fail")
+        (identifier) @fail (#eq? @fail "fail")
       )
     )
   )
@@ -14,7 +14,7 @@
   (block
     (expression_statement
       (method_invocation
-        (identifier) (#EQ? "fail")
+        (identifier) @fail (#eq? @fail "fail")
       )
     ) .
   )
@@ -23,10 +23,10 @@
 
 
 (try_statement
-  (block (_) .
+  (block (_)+ .
     (expression_statement
       (method_invocation
-        (identifier) (#EQ? "fail")
+        (identifier) @fail (#eq? @fail "fail")
       )
     ) .
   )
@@ -35,10 +35,10 @@
 
 
 (try_statement
-  (block (_) . (_) .
+  (block (_)+ . (_) .
     (expression_statement
       (method_invocation
-        (identifier) (#EQ? "fail")
+        (identifier) @fail (#eq? @fail "fail")
       )
     ) .
   )
@@ -50,7 +50,7 @@
   (block . (_) .
     (expression_statement
       (method_invocation
-        (identifier) (#EQ? "fail")
+        (identifier) @fail (#eq? @fail "fail")
       )
     ) .
   )

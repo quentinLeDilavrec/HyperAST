@@ -1,0 +1,14 @@
+(try_statement
+  (block)
+  (except_clause
+    (as_pattern)
+  )
+  (else_clause
+    (block
+      (assert_statement
+        "assert"
+        (false)
+      )
+    )
+  )
+)

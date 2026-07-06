@@ -448,7 +448,7 @@ fn main() {
             if options.nospace {
                 todo!();
             }
-            let queries = hyperast_benchmark_search::ReadSearches::new(input);
+            let queries = hyperast_benchmark_search::search::ReadSearches::new(input);
             let sub = sub
                 .map(|path| read_subpatterns_file(&path))
                 .unwrap_or_default();

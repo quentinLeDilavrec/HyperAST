@@ -1,4 +1,6 @@
-(try_statement)
+(try_statement
+  (catch_clause)
+)
 
 (method_invocation
   (identifier) (#EQ? "fail")

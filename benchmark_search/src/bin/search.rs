@@ -8,9 +8,8 @@
 
 use std::str::FromStr;
 
-use clap::Parser;
-use hyperast_benchmark_search::Timeout;
 use hyperast_benchmark_search::help_fetch;
+use hyperast_benchmark_search::search::{Bench, Cli, ReadSearches};
 use hyperast_benchmark_search::{enable_logging, no_hyperast, read_subpatterns_file};
 
 #[cfg(not(target_env = "msvc"))]
@@ -20,77 +19,6 @@ use jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-#[derive(clap::clap_derive::Parser)]
-struct Cli {
-    user: String,
-    name: String,
-    commit: String,
-    depth: usize,
-    #[clap(long)]
-    fetch: bool,
-    #[clap(long)]
-    language: Option<String>,
-    #[clap(long, value_parser = hyperast_benchmark_search::parse_timeout, default_value_t = Timeout::MAX)]
-    timeout: Timeout,
-    #[clap(subcommand)]
-    bench: Option<Bench>,
-    #[clap(long)]
-    input: Option<std::path::PathBuf>,
-}
-
-#[derive(clap::clap_derive::Subcommand, Clone)]
-// #[derive(clap::clap_derive::ValueEnum, Clone)]
-// #[clap(rename_all = "SCREAMING_SNAKE_CASE")]
-#[allow(non_camel_case_types)]
-enum Bench {
-    /// Tree-Sitter baseline
-    /// using git2 to traverse the repository
-    #[clap(alias = "TS")]
-    TS {
-        #[clap(long)]
-        blob: bool,
-        #[clap(long)]
-        tree: bool,
-        #[clap(long)]
-        prepare: bool,
-        #[clap(long)]
-        cache: bool,
-    },
-    /// Baseline using our reimplementation of the executor,
-    /// but still only using tree-sitter and git2 to process source code.
-    #[clap(alias = "TSQ2")]
-    TSQ2 {
-        #[clap(long)]
-        blob: bool,
-        #[clap(long)]
-        tree: bool,
-        #[clap(long)]
-        prepare: bool,
-        #[clap(long)]
-        cache: bool,
-        #[clap(long)]
-        sub: Option<std::path::PathBuf>,
-        #[clap(short = 's')]
-        s: Vec<usize>,
-    },
-    /// Our approach using our reimplementation of the executor and HyperAST's AST representation.
-    #[clap(alias = "OURS")]
-    OURS {
-        #[clap(long)]
-        sub: Option<std::path::PathBuf>,
-        #[clap(short = 's')]
-        s: Vec<usize>,
-        #[clap(long)]
-        /// cache the result of the search, associated to files in the case of Java, in the case of JavaMaven I still don't know.
-        cached: bool,
-        #[clap(long)]
-        nospace: bool,
-    },
-    /// Write speed (not really part of the benchmark)
-    /// It just give a good order of magnitude of hw perfs)
-    WRITE,
-}
-
 fn main() {
     // let (non_blocking, _guard) = tracing_appender::non_blocking(std::io::stdout());
     // let layer = tracing_subscriber::EnvFilter::try_from_default_env();
@@ -99,6 +27,8 @@ fn main() {
     //     .with_env_filter(layer.unwrap_or_else(|_| "off".into()))
     //     .init();
     enable_logging();
+    use clap::Parser;
+
     let args = Cli::parse();
     let user = &args.user;
     let name = &args.name;
@@ -132,14 +62,19 @@ fn main() {
             let filter = choose_filter(&language);
             let repository = help_fetch(&repo);
             let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-            let queries = hyperast_benchmark_search::ReadSearches::default();
+            let queries = args.input.map(ReadSearches::new).unwrap_or_default();
             (if cache {
                 if !prepare && !blob && !tree {
+                    dbg!();
                     no_hyperast::baseline
                 } else {
                     unimplemented!()
                 }
+            } else if !prepare && blob && tree {
+                dbg!();
+                no_hyperast::baseline_cache_blob_tree
             } else if prepare && blob && tree {
+                dbg!();
                 no_hyperast::baseline_prepare_blob_tree
             } else {
                 unimplemented!()
@@ -158,11 +93,12 @@ fn main() {
             let filter = choose_filter(&language);
             let repository = help_fetch(&repo);
             let language = hyperast_vcs_git::resolve_language(&language).unwrap();
-            let queries = hyperast_benchmark_search::ReadSearches::default();
+            let queries = (args.input).map(ReadSearches::new).unwrap_or_default();
             let sub = sub
                 .map(|path| read_subpatterns_file(&path))
                 .unwrap_or_default();
             assert!(s.len() <= sub.len());
+            dbg!(&sub);
             // only select wanted subpatterns
             let sub = if s.is_empty() {
                 sub.iter().map(|s| s.as_str()).collect::<Vec<_>>()
@@ -172,10 +108,12 @@ fn main() {
             if prepare {
                 if blob && tree {
                     if sub.is_empty() {
+                        dbg!();
                         no_hyperast::baseline_our_executor_prepare_cache_trees_and_blobs(
                             repository, commit, depth, &language, queries, timeout, filter,
                         );
                     } else {
+                        dbg!();
                         no_hyperast::baseline_our_executor_prepare_cache_trees_and_blobs_precomp(
                             repository, commit, depth, &language, &sub, queries, timeout, filter,
                         );
@@ -191,10 +129,12 @@ fn main() {
                     );
                 }
             } else if blob && tree && cache {
+                dbg!();
                 no_hyperast::baseline_our_executor_cache_trees_and_blobs_memo(
                     repository, commit, depth, &language, queries, timeout, filter,
                 );
             } else if blob && tree {
+                dbg!();
                 no_hyperast::baseline_our_executor_cache_trees_and_blobs(
                     repository, commit, depth, &language, queries, timeout, filter,
                 );
@@ -203,6 +143,7 @@ fn main() {
             } else if blob {
                 todo!()
             } else {
+                dbg!();
                 no_hyperast::baseline_our_executor(
                     repository, commit, depth, &language, queries, timeout, filter,
                 );
@@ -223,12 +164,12 @@ fn main() {
                 c = FromStr::from_str(&language).unwrap();
                 &language
             };
-            let queries = (args.input)
-                .map(hyperast_benchmark_search::ReadSearches::new)
-                .unwrap_or_default();
+            let queries = (args.input).map(ReadSearches::new).unwrap_or_default();
             let sub = sub
                 .map(|path| read_subpatterns_file(&path))
                 .unwrap_or_default();
+            dbg!(&sub);
+
             assert!(s.len() <= sub.len());
             // only select wanted subpatterns
             let sub = if s.is_empty() {
@@ -238,6 +179,7 @@ fn main() {
             };
 
             use hyperast_benchmark_search::with_hyperast;
+            // reduce clutter, limit noise and deps to hyperast_vcs_git processors
             macro_rules! per_blob {
                 ($t:path) => {
                     if cached {
@@ -293,7 +235,7 @@ fn main() {
             }
         }
         Bench::WRITE => {
-            for s in hyperast_benchmark_search::ReadSearches::default() {
+            for s in ReadSearches::default() {
                 println!("----------");
                 print!("{}", s);
             }

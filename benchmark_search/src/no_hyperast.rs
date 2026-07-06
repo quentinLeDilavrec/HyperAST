@@ -1,12 +1,12 @@
 use git2::Oid;
-use hyperast::{compat::HashMap, utils::memusage};
+use hyperast::compat::HashMap;
 use std::fmt::Display;
 use std::ops::AddAssign;
 
 use crate::NonBlockingResLogger;
 use crate::TimeoutError as Error;
 use crate::commit_rw;
-use crate::{Cumulative, ResultLogger, Timeout};
+use crate::{ResultLogger, Timeout};
 
 type FileId = Oid;
 
@@ -260,7 +260,7 @@ pub fn baseline(
     timeout: Timeout,
     filter: impl Copy + Fn(&str) -> bool,
 ) {
-    let mut cumulative = Cumulative::with_timeout(timeout);
+    let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     multi_run(
         &mut cumulative,
         &repository,
@@ -286,7 +286,7 @@ pub fn baseline_prepare_blob_tree(
     timeout: Timeout,
     filter: impl Copy + Fn(&str) -> bool,
 ) {
-    let mut cumulative = Cumulative::with_timeout(timeout);
+    let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
     let cache = HashMap::<FileId, (tree_sitter::Tree, git2::Blob)>::new();
     multi_run(
         &mut cumulative,
@@ -297,6 +297,33 @@ pub fn baseline_prepare_blob_tree(
         tree_sitter_execute_count,
         |cumulative, repository, cache, executor| {
             parse_and_execute_on_commits_prepare_cache_trees_and_blobs2(
+                cumulative, cache, repository, commit, depth, &language, filter, executor,
+            )
+        },
+    );
+    cumulative.finish();
+}
+
+pub fn baseline_cache_blob_tree(
+    repository: git2::Repository,
+    commit: &str,
+    depth: usize,
+    language: &tree_sitter::Language,
+    queries: impl Iterator<Item = String>,
+    timeout: Timeout,
+    filter: impl Copy + Fn(&str) -> bool,
+) {
+    let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
+    let cache = HashMap::<FileId, (tree_sitter::Tree, git2::Blob)>::new();
+    multi_run(
+        &mut cumulative,
+        &repository,
+        cache,
+        language,
+        queries,
+        tree_sitter_execute_count,
+        |cumulative, repository, cache, executor| {
+            parse_and_execute_on_commits_cache_trees_and_blobs(
                 cumulative, cache, repository, commit, depth, &language, filter, executor,
             )
         },
@@ -469,7 +496,6 @@ fn parse_and_execute_on_commits_once_per_file<
     let rw = commit_rw(commit, Some(depth), repository).unwrap();
 
     let mut cache = HashMap::<FileId, R>::new();
-    dbg!(memusage().to_string());
 
     // for each commit
     for commit in rw {
@@ -514,7 +540,6 @@ fn parse_and_execute_on_commits_once_per_file<
         .unwrap();
 
         cumulative.commit_result(res)?;
-        dbg!(memusage().to_string());
     }
     Ok(())
 }
@@ -530,8 +555,6 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs<'a, R: Default>(
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
     let rw = commit_rw(commit, Some(depth), repository).unwrap();
-
-    dbg!(memusage().to_string());
 
     // for each commit
     for commit in rw {
@@ -583,7 +606,6 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs<'a, R: Default>(
         .unwrap();
 
         cumulative.commit_result_with_size(res, nodes_per_commit)?;
-        dbg!(memusage().to_string());
     }
     Ok(())
 }
@@ -603,7 +625,6 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs_memo<
 ) -> Result<(), Error> {
     let rw = commit_rw(commit, Some(depth), repository).unwrap();
 
-    dbg!(memusage().to_string());
     let mut cache_res = HashMap::<FileId, R>::new();
 
     // for each commit
@@ -667,7 +688,6 @@ fn parse_and_execute_on_commits_cache_trees_and_blobs_memo<
         .unwrap();
 
         cumulative.commit_result_with_size(res, nodes_per_commit)?;
-        dbg!(memusage().to_string());
     }
     Ok(())
 }
@@ -686,8 +706,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs<'a, R: Default>(
     let mut rw = commit_rw(commit, Some(depth), repository)
         .unwrap()
         .peekable();
-
-    dbg!(memusage().to_string());
 
     // prepare first commit
     if let Some(&commit) = rw.peek() {
@@ -727,7 +745,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs<'a, R: Default>(
         .unwrap();
 
         cumulative.commit_prepared(1)?;
-        dbg!(memusage().to_string());
     }
 
     // for each commit
@@ -778,7 +795,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs<'a, R: Default>(
         .unwrap();
 
         cumulative.commit_result(res)?;
-        dbg!(memusage().to_string());
     }
     Ok(())
 }
@@ -794,11 +810,10 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs2<'a, R: Default>(
     filter: impl Clone + Fn(&str) -> bool,
     executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
 ) -> Result<(), Error> {
+    dbg!();
     let rw = commit_rw(commit, Some(depth), repository)
         .unwrap()
         .peekable();
-
-    dbg!(memusage().to_string());
 
     // for each commit
     for commit in rw {
@@ -849,7 +864,73 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs2<'a, R: Default>(
         }
 
         cumulative.commit_result(res)?;
-        dbg!(memusage().to_string());
+    }
+    Ok(())
+}
+
+#[allow(unused)]
+fn parse_and_execute_on_commits_cache_trees_and_blobs2<'a, R: Default>(
+    cumulative: &mut impl ResultLogger<R>,
+    cache: &mut HashMap<FileId, (tree_sitter::Tree, git2::Blob<'a>)>,
+    repository: &'a git2::Repository,
+    commit: &str,
+    depth: usize,
+    language: &tree_sitter::Language,
+    filter: impl Clone + Fn(&str) -> bool,
+    executor: impl Fn(&[u8], &tree_sitter::Tree, &mut R),
+) -> Result<(), Error> {
+    dbg!();
+    let rw = commit_rw(commit, Some(depth), repository)
+        .unwrap()
+        .peekable();
+
+    // for each commit
+    for commit in rw {
+        log::trace!("Commit: {}", commit);
+        let commit = repository.find_commit(commit).unwrap();
+
+        let mut res = R::default();
+        let root = commit.tree().unwrap();
+        let mut to_search = vec![];
+        // for each file only if never seen before
+        root.walk(git2::TreeWalkMode::PreOrder, |_name, entry| {
+            if entry.kind() != Some(git2::ObjectType::Blob) {
+                return git2::TreeWalkResult::Ok;
+            }
+            let name = entry.name().unwrap();
+            if !filter(name) {
+                return git2::TreeWalkResult::Ok;
+            }
+            let oid = entry.id();
+            let file_id = oid;
+            to_search.push(file_id);
+            if let Some(_) = cache.get(&file_id) {
+            } else {
+                let blob = repository.find_blob(oid).unwrap();
+                let content = blob.content();
+
+                // parse file
+                let mut parser = tree_sitter::Parser::new();
+                parser.set_language(&language).unwrap();
+                let tree = parser.parse(content, None).unwrap();
+
+                // let duration = start_instant.elapsed();
+                cache.insert(file_id, (tree, blob));
+                // cumulative.push((Task::ExecuteQueryOnFile(())));
+            }
+
+            if let Some((tree, blob)) = cache.get(&file_id) {
+                let content = blob.content();
+                //execute query
+                executor(content, &tree, &mut res);
+            }
+
+            // TODO also skip directories already seen
+            git2::TreeWalkResult::Ok
+        })
+        .unwrap();
+
+        cumulative.commit_result(res)?;
     }
     Ok(())
 }
@@ -872,8 +953,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp<'a, R: Def
     let mut rw = commit_rw(commit, Some(depth), repository)
         .unwrap()
         .peekable();
-
-    dbg!(memusage().to_string());
 
     // prepare first commit
     if let Some(&commit) = rw.peek() {
@@ -913,7 +992,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp<'a, R: Def
         .unwrap();
 
         cumulative.commit_prepared(1)?;
-        dbg!(memusage().to_string());
     }
 
     // for each commit
@@ -966,7 +1044,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp<'a, R: Def
         .unwrap();
 
         cumulative.commit_result(res)?;
-        dbg!(memusage().to_string());
     }
     Ok(())
 }
@@ -988,8 +1065,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp2<'a, R: De
     let rw = commit_rw(commit, Some(depth), repository)
         .unwrap()
         .peekable();
-
-    dbg!(memusage().to_string());
 
     // for each commit
     for commit in rw {
@@ -1042,7 +1117,6 @@ fn parse_and_execute_on_commits_prepare_cache_trees_and_blobs_precomp2<'a, R: De
         }
 
         cumulative.commit_result(res)?;
-        dbg!(memusage().to_string());
     }
     Ok(())
 }

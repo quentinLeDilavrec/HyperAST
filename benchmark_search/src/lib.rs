@@ -20,6 +20,8 @@ pub mod queries;
 pub mod synth;
 pub mod synth_init_inst;
 
+pub mod search;
+
 pub use hyperast_gen_ts_tsquery::meta_queries;
 
 use std::fmt::Display;
@@ -98,6 +100,36 @@ pub enum LogEntry<R> {
     ExecuteQueryOnFile(R),
     ExecuteQueryOnCommit(R, usize),
 }
+impl<R> LogEntry<R> {
+    fn name(&self) -> String {
+        match self {
+            LogEntry::PrepareCommits(x) => {
+                format!(
+                    "{:>20}",
+                    if *x > 1 {
+                        format!("prep {x} commits")
+                    } else {
+                        format!("prep {x} commit")
+                    },
+                )
+            }
+            LogEntry::PrepareFiles(x) => format!(
+                "{:>20}",
+                if *x > 1 {
+                    format!("prep {x} files")
+                } else {
+                    format!("prep {x} file")
+                },
+            ),
+            LogEntry::PrepareRepository => format!("{:>20}", "prep repo",),
+            LogEntry::CompileQuery => format!("{:>20}", "compile query",),
+            LogEntry::ExecuteQueryOnFile(_) => format!("{:>20}", "exec on file",),
+            LogEntry::ExecuteQueryOnCommit(_, _) => {
+                format!("{:>20}", "exec on commit",)
+            }
+        }
+    }
+}
 
 pub(crate) trait ResultLogger<R> {
     fn log(&mut self, entry: LogEntry<R>) -> Result<(), TimeoutError>;
@@ -156,7 +188,7 @@ impl<R> ResultLogger<R> for Cumulative<R> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Timeout(std::time::Duration);
 
 pub fn parse_timeout(s: &str) -> Result<Timeout, clap::Error> {
@@ -210,7 +242,7 @@ where
         let mut prev = Duration::ZERO;
         writeln!(
             f,
-            "{:>20};{:>14};{:>9};{:>22};{};{:>10}",
+            "{:>20};{:>14};{:>9};{:>22};{:>6};{:>10}",
             "task",
             "cumulative(us)",
             "delta(us)",
@@ -222,15 +254,16 @@ where
         for (task, duration) in cumulative {
             writeln!(
                 f,
-                "{}",
-                TimedLog::new(&mut first_commit_prep, &mut prev, task, duration)
+                "{};{}",
+                LogTimeTask::new(&mut first_commit_prep, &mut prev, task, duration),
+                LogTask::new(task),
             )?;
         }
         Ok(())
     }
 }
 
-struct TimedLog<'a, R> {
+struct LogTimeTask<'a, R> {
     first_commit_prep: &'a Duration,
     delta: Duration,
     since: Duration,
@@ -238,7 +271,7 @@ struct TimedLog<'a, R> {
     duration: &'a Duration,
 }
 
-impl<'a, R: Display> TimedLog<'a, R> {
+impl<'a, R> LogTimeTask<'a, R> {
     fn new(
         first_commit_prep: &'a mut Duration,
         prev: &'a mut Duration,
@@ -247,17 +280,18 @@ impl<'a, R: Display> TimedLog<'a, R> {
     ) -> Self {
         let delta = *duration - *prev;
         let since = *duration - *first_commit_prep;
+        *prev = *duration;
         match task {
             LogEntry::PrepareCommits(_) => {
                 if *first_commit_prep == Duration::ZERO {
-                    *prev = *duration;
+                    // *prev = *duration;
                     *first_commit_prep = *duration;
                 }
             }
-            LogEntry::ExecuteQueryOnCommit(_, _) => {
-                *prev = *duration;
-            }
-            _ => (),
+            // LogEntry::ExecuteQueryOnCommit(_, _) => {
+            //     *prev = *duration;
+            // }
+            _ => {}
         }
         Self {
             first_commit_prep,
@@ -269,90 +303,51 @@ impl<'a, R: Display> TimedLog<'a, R> {
     }
 }
 
-impl<'a, R: Display> std::fmt::Display for TimedLog<'a, R> {
+impl<'a, R> std::fmt::Display for LogTimeTask<'a, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let duration = self.duration;
         let delta = &self.delta;
-        let since = self.since;
+        let since = if let LogEntry::PrepareCommits(_) = self.task {
+            *duration - *self.first_commit_prep
+        } else {
+            self.since
+        };
+        write!(
+            f,
+            "{:>20};{:>14};{:>9};{:>22}",
+            self.task.name(),
+            duration.as_micros(),
+            delta.as_micros(),
+            since.as_micros(),
+        )
+    }
+}
+
+struct LogTask<'a, R> {
+    task: &'a LogEntry<R>,
+}
+
+impl<'a, R> LogTask<'a, R> {
+    fn new(task: &'a LogEntry<R>) -> Self {
+        Self { task }
+    }
+}
+
+impl<'a, R: Display> std::fmt::Display for LogTask<'a, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.task {
-            LogEntry::PrepareRepository => write!(
-                f,
-                "{:>20};{:>14};{:>9};{:>22};{:>6}",
-                "prep repo",
-                duration.as_micros(),
-                delta.as_micros(),
-                since.as_micros(),
-                ""
-            ),
-            LogEntry::PrepareCommits(x) => {
-                let since = *duration - *self.first_commit_prep;
-                write!(
-                    f,
-                    "{:>20};{:>14};{:>9};{:>22};{:>6}",
-                    if *x > 1 {
-                        format!("prep {x} commits")
-                    } else {
-                        format!("prep {x} commit")
-                    },
-                    duration.as_micros(),
-                    delta.as_micros(),
-                    since.as_micros(),
-                    ""
-                )
+            LogEntry::PrepareRepository
+            | LogEntry::PrepareCommits(_)
+            | LogEntry::PrepareFiles(_)
+            | LogEntry::CompileQuery => {
+                write!(f, "{:>6}", "")
             }
-            LogEntry::PrepareFiles(x) => write!(
-                f,
-                "{:>20};{:>14};{:>9};{:>22};{:>6}",
-                if *x > 1 {
-                    format!("prep {x} files")
-                } else {
-                    format!("prep {x} file")
-                },
-                duration.as_micros(),
-                delta.as_micros(),
-                since.as_micros(),
-                ""
-            ),
-            LogEntry::CompileQuery => write!(
-                f,
-                "{:>20};{:>14};{:>9};{:>22};{:>6}",
-                "compile query",
-                duration.as_micros(),
-                delta.as_micros(),
-                since.as_micros(),
-                ""
-            ),
-            LogEntry::ExecuteQueryOnFile(v) => write!(
-                f,
-                "{:>20};{:>14};{:>9};{:>22};{:>6}",
-                "exec on file",
-                duration.as_micros(),
-                delta.as_micros(),
-                since.as_micros(),
-                v
-            ),
+            LogEntry::ExecuteQueryOnFile(v) => write!(f, "{:>6}", v),
             LogEntry::ExecuteQueryOnCommit(v, size) if *size == 0 => {
-                write!(
-                    f,
-                    "{:>20};{:>14};{:>9};{:>22};{:>6};",
-                    "exec on commit",
-                    duration.as_micros(),
-                    delta.as_micros(),
-                    since.as_micros(),
-                    v,
-                )
+                write!(f, "{:>6};", v)
             }
             LogEntry::ExecuteQueryOnCommit(v, size) => {
-                write!(
-                    f,
-                    "{:>20};{:>14};{:>9};{:>22};{:>6};{:>6}",
-                    "exec on commit",
-                    duration.as_micros(),
-                    delta.as_micros(),
-                    since.as_micros(),
-                    v,
-                    size
-                )
+                write!(f, "{:>6};{:>6}", v, size)
             }
         }
     }
@@ -393,11 +388,12 @@ where
         use std::io::Write;
         writeln!(
             non_blocking,
-            "{:>20};{:>14};{:>9};{:>14};{:>6};{:>6}",
+            "{:>20};{:>14};{:>9};{:>14};{:>8};{:>6};{:>6}",
             "task",
             "cumulative(us)",
             "delta(us)",
             "since_first_commit(us)",
+            "mem",
             CsvHeader::<R>::default(),
             "size"
         )
@@ -426,21 +422,22 @@ impl<R> Display for NonBlockingResLogger<R> {
 impl<R: Display> ResultLogger<R> for NonBlockingResLogger<R> {
     fn log(&mut self, entry: LogEntry<R>) -> Result<(), TimeoutError> {
         let duration = self.start_time.elapsed();
-
+        let mem = hyperast::utils::memusage();
         use std::io::Write;
         writeln!(
             &mut self.writer,
-            "{}",
-            TimedLog::new(
+            "{};{:>8};{}",
+            LogTimeTask::new(
                 &mut self.first_commit_prep,
                 &mut self.prev,
                 &entry,
                 &duration
-            )
+            ),
+            mem,
+            LogTask::new(&entry),
         )
         .unwrap();
 
-        let duration = self.start_time.elapsed();
         if duration > self.timeout.0 {
             Err(TimeoutError(duration))
         } else {
@@ -457,92 +454,6 @@ fn read_multilines(buffer: &mut String) -> &str {
         }
     }
     &buffer[len..]
-}
-
-#[derive(Default)]
-pub struct ReadSearches {
-    buffer: String,
-    finished: bool,
-    file: Option<(usize, Vec<String>)>,
-}
-
-impl ReadSearches {
-    pub fn new(file: std::path::PathBuf) -> Self {
-        let mut b = false;
-        let file = fs::read_to_string(file)
-            .expect("Failed to read provided pattern file")
-            .lines()
-            .fold(vec![String::new()], |mut acc, line| {
-                if line.trim().is_empty() {
-                    if b {
-                        b = false;
-                        acc.push(String::new());
-                    } else {
-                        acc.last_mut().unwrap().push_str(line);
-                        b = true;
-                    }
-                } else {
-                    b = false;
-                    acc.last_mut().unwrap().push_str(line);
-                }
-                acc
-            });
-        dbg!(file.len());
-        dbg!(&file);
-        Self {
-            buffer: String::new(),
-            finished: false,
-            file: Some((0, file)),
-        }
-    }
-}
-
-impl Iterator for ReadSearches {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some((index, patterns)) = &mut self.file {
-            if *index < patterns.len() {
-                let pattern = patterns[*index].clone();
-                *index += 1;
-                return Some(pattern);
-            }
-            return None;
-        }
-        while !self.finished {
-            let s = read_multilines(&mut self.buffer);
-            if s.is_empty() {
-                self.finished = true;
-            } else if s != "\n" {
-                continue;
-            }
-            return Some(self.buffer.drain(..).collect());
-        }
-        None
-    }
-}
-
-pub fn read_searches() {
-    let mut buffer = String::new();
-    loop {
-        let s = read_multilines(&mut buffer);
-
-        let new_block = s == "\n";
-        let empty = s.is_empty();
-
-        if new_block || empty {
-            eprintln!("----------");
-            eprint!("{buffer}");
-        }
-
-        if new_block {
-            buffer = String::new();
-            continue;
-        }
-        if empty {
-            break;
-        }
-    }
 }
 
 /// give a more helpful error message when instantiating a [`git2::Repository`]

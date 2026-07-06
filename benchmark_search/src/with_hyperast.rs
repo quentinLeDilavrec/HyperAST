@@ -13,8 +13,9 @@ use std::ops::AddAssign;
 use hyperast::compat::HashMap;
 use hyperast::position::structural_pos::{CursorHead, CursorHeadMove, CursorWithPersistence};
 use hyperast::store::defaults::NodeIdentifier;
-use hyperast::types::{HyperAST, HyperType, LabelStore, Labeled, NodeStore};
-use hyperast::types::{WithHashs, WithPrecompQueries, WithRoles, WithStats};
+use hyperast::types::WithSerialization;
+use hyperast::types::{HyperAST, LabelStore, NodeStore, RoleStore, TypeStore};
+use hyperast::types::{HyperType, Labeled, WithHashs, WithPrecompQueries, WithRoles, WithStats};
 use hyperast::utils::memusage;
 use hyperast_tsquery::Query;
 use hyperast_vcs_git::multi_preprocessed::PreProcessedRepositories;
@@ -137,11 +138,11 @@ impl CreatedExecutor for hyperast_tsquery::Query {
 
 impl<HAST: HyperAST> Executor<HAST> for hyperast_tsquery::Query
 where
-    HAST::TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
-    <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    HAST::TS: TypeStore + RoleStore,
+    <HAST::TS as RoleStore>::IdF: Into<u16> + From<u16>,
     HAST::IdN: Copy + Debug,
     for<'t> hyperast::types::LendT<'t, HAST>:
-        WithPrecompQueries + WithRoles + WithStats + WithHashs,
+        WithPrecompQueries + WithRoles + WithStats + WithHashs + WithSerialization,
 {
     type P<IdN, Idx> = CursorWithPersistence<IdN, Idx>;
     type R = RichResult<usize>;
@@ -157,10 +158,93 @@ where
             let n = stores.node_store().resolve(&pos.node());
             acc.node_count += n.size();
         }
+        let _ppos = pos.persist();
         let cursor = TreeCursor::new(stores, pos);
         let mut qcursor = self.matches(cursor);
-        while let Some(_) = qcursor.next() {
+        while let Some(_m) = qcursor.next() {
             acc.result += 1;
+            // let m = _m;
+            // let ppos = &_ppos;
+            // let Some(cid) = qcursor.query.capture_index_for_name("root") else {
+            //     continue;
+            // };
+            // let Some(cid2) = qcursor.query.capture_index_for_name("els") else {
+            //     continue;
+            // };
+            // let nodes = m.nodes_for_capture_index(cid);
+            // for n in nodes {
+            //     let id = n.pos.node();
+            //     let size = stores.resolve(&id).size();
+            //     // if size < 1000 {
+            //     //     println!("{}", SyntaxSerializer::new(stores, id));
+            //     // } else {
+            //     //     println!("{}", size);
+            //     //     println!(
+            //     //         "{}",
+            //     //         stores
+            //     //             .label_store()
+            //     //             .resolve(stores.resolve(&id).try_get_label().unwrap())
+            //     //     );
+
+            //     //     let n = m.nodes_for_capture_index(cid2).next().unwrap();
+            //     //     println!("{:?}", stores.resolve(&n.pos.node()).try_bytes_len());
+            //     //     println!("{:?}", stores.resolve(&n.pos.node()).line_count());
+            //     //     // for n in stores
+            //     //     //     .resolve(&n.pos.parent().unwrap())
+            //     //     //     .children()
+            //     //     //     .unwrap()
+            //     //     //     .before(n.pos.offset())
+            //     //     // {
+            //     //     //     println!("{:?}", stores.resolve_type(&n).as_static_str());
+            //     //     //     println!("{:?}", stores.resolve(&n).line_count());
+            //     //     // }
+            //     //     {
+            //     //         let mut sum = 0;
+            //     //         let mut p = n.pos.ref_node();
+            //     //         loop {
+            //     //             let Some(parent) = p.parent() else {
+            //     //                 break;
+            //     //             };
+            //     //             println!("{:?}", stores.resolve_type(&parent).as_static_str());
+            //     //             sum += stores
+            //     //                 .resolve(&parent)
+            //     //                 .children()
+            //     //                 .unwrap()
+            //     //                 .before(p.offset())
+            //     //                 .map(|id| stores.resolve(&id).line_count())
+            //     //                 .sum::<usize>();
+            //     //             if stores.resolve_type(&parent).is_file() {
+            //     //                 println!("parent lc: {}", stores.resolve(&parent).line_count());
+            //     //                 break;
+            //     //             }
+            //     //             if !p.up() {
+            //     //                 break;
+            //     //             }
+            //     //         }
+            //     //         println!("sum: {}", sum);
+            //     //     };
+            //     //     {
+            //     //         let (parents, offsets): (Vec<_>, Vec<_>) =
+            //     //             ppos.ref_node().parents_nodes().into_iter().unzip();
+            //     //         let pos = hyperast::position::StructuralPosition::from((parents, offsets));
+            //     //         let pos = PositionConverter::new(&pos).with_stores(stores).compute_pos_post_order::<_, hyperast::position::file_and_offset::Position<_,_>>();
+            //     //         println!("{}", pos);
+            //     //     }
+            //     //     let (parents, offsets): (Vec<_>, Vec<_>) =
+            //     //         n.pos.ref_node().parents_nodes().into_iter().unzip();
+            //     //     let pos = hyperast::position::StructuralPosition::from((parents, offsets));
+            //     //     let pos: hyperast::position::WithHyperAstPositionConverter<
+            //     //         hyperast::position::StructuralPosition<HAST::IdN, HAST::Idx>,
+            //     //         HAST,
+            //     //     > = PositionConverter::new(&pos).with_stores(stores);
+            //     //     let pos = pos
+            //     //         .compute_pos_post_order::<_, hyperast::position::file_and_offset::Position<
+            //     //             std::path::PathBuf,
+            //     //             _,
+            //     //         >>();
+            //     //     println!("{}", pos);
+            //     // }
+            // }
         }
         acc.status_count += qcursor.status_count;
         acc.goto_count += qcursor.goto_count;
@@ -173,11 +257,11 @@ where
 
 impl<HAST: HyperAST> SkippingExecutor<HAST> for hyperast_tsquery::Query
 where
-    HAST::TS: hyperast::types::TypeStore + hyperast::types::RoleStore,
-    <HAST::TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    HAST::TS: TypeStore + RoleStore,
+    <HAST::TS as RoleStore>::IdF: Into<u16> + From<u16>,
     HAST::IdN: Copy + Debug,
     for<'t> hyperast::types::LendT<'t, HAST>:
-        WithPrecompQueries + WithRoles + WithStats + WithHashs,
+        WithPrecompQueries + WithRoles + WithStats + WithHashs + WithSerialization,
 {
     fn can_skip<N: WithPrecompQueries>(&self, n: &N) -> bool {
         self.used_precomputed != 0 && n.wont_match_given_precomputed_queries(self.used_precomputed)
@@ -193,13 +277,13 @@ pub fn per_blob<TS>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + TypeStore + RoleStore,
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    <TS as RoleStore>::IdF: Into<u16> + From<u16>,
 {
     // let mut cumulative = Cumulative::<usize>::with_timeout(timeout);
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
-    dbg!(memusage().to_string());
+    // dbg!(memusage().to_string());
 
     let (mut repositories, repository) = prepare_hyperast(repo, config.config, sub);
     if let Err(err) = cumulative.repo_prepared() {
@@ -210,7 +294,7 @@ pub fn per_blob<TS>(
 
     let first_chunk = config.depth.min(config.first_chunk);
 
-    dbg!(memusage().to_string());
+    // dbg!(memusage().to_string());
 
     use hyperast::position::structural_pos::CursorWithPersistence;
     multi_run::<_, hyperast_tsquery::Query, _, _>(
@@ -220,11 +304,11 @@ pub fn per_blob<TS>(
         sub,
         queries,
         |cumulative, mut repositories, executor| {
-            dbg!(memusage().to_string());
+            // dbg!(memusage().to_string());
             let mut rw = commit_rw(commit, Some(config.depth), &repository.repo).unwrap();
             let commits = repositories.pre_process_chunk(&mut rw, &repository, first_chunk);
             cumulative.commit_prepared(commits.len())?;
-            dbg!(memusage().to_string());
+            // dbg!(memusage().to_string());
             execute_on_commits_per_blob::<_, TS, _>(
                 config,
                 &mut repositories,
@@ -249,9 +333,9 @@ pub fn per_blob_nospaces<TS>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + TypeStore + RoleStore,
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    <TS as RoleStore>::IdF: Into<u16> + From<u16>,
 {
     // let mut cumulative = Cumulative::<usize>::with_timeout(timeout);
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
@@ -306,9 +390,9 @@ pub fn per_blob_cached<TS>(
     queries: impl Iterator<Item = String>,
     timeout: Timeout,
 ) where
-    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + TypeStore + RoleStore,
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    <TS as hyperast::types::RoleStore>::IdF: Into<u16> + From<u16>,
+    <TS as RoleStore>::IdF: Into<u16> + From<u16>,
 {
     // let mut cumulative = Cumulative::<usize>::with_timeout(timeout);
     let mut cumulative = NonBlockingResLogger::with_timeout(std::io::stdout(), timeout);
@@ -420,7 +504,7 @@ pub(crate) fn execute_on_commits_per_blob<P, TS, R: Default>(
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + TypeStore + RoleStore,
     P: CursorHead<NodeIdentifier, Idx>,
     P: CursorHeadMove<NodeIdentifier, Idx>,
 {
@@ -454,7 +538,6 @@ where
                 let id = pos.node();
                 let k = repositories.processor.main_stores.resolve_type(&id);
                 let n = stores.node_store.resolve(id);
-
                 if executor.can_skip(&n) {
                     down = false;
                     continue;
@@ -467,7 +550,7 @@ where
                     }
                 } else if TS::try_decompress_type(
                     &n,
-                    std::any::TypeId::of::<<TS as hyperast::types::TypeStore>::Ty>(),
+                    std::any::TypeId::of::<<TS as TypeStore>::Ty>(),
                 )
                 .is_none()
                 {
@@ -521,7 +604,7 @@ pub(crate) fn execute_on_commits_per_blob_nospaces<P, TS, R: Default + Display>(
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + TypeStore + RoleStore,
     P: CursorHead<NodeIdentifier, Idx>,
     P: CursorHeadMove<NodeIdentifier, Idx>,
 {
@@ -612,7 +695,7 @@ pub(crate) fn execute_on_commits_per_blob_cached<
 ) -> Result<(), Error>
 where
     hyperast_vcs_git::TStore: hyperast::store::TyDown<TS>,
-    TS: 'static + hyperast::types::TypeStore + hyperast::types::RoleStore,
+    TS: 'static + TypeStore + RoleStore,
     P: CursorHead<NodeIdentifier, Idx>,
     P: CursorHeadMove<NodeIdentifier, Idx>,
 {
@@ -954,6 +1037,6 @@ pub fn sub_java_maven0(
         result.insert(oid, count);
     }
 
-    cumulative.write_to(std::io::stdout());
+    cumulative.finish();
     Ok(())
 }

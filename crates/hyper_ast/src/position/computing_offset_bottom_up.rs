@@ -1,5 +1,5 @@
 use super::Position;
-use crate::types::{Children as _, Childrn as _, WithChildren as _};
+use crate::types::{Children as _, WithChildren as _};
 use crate::types::{HyperAST, LendT, WithSerialization};
 use crate::types::{HyperType as _, Labeled as _};
 use crate::types::{LabelStore as _, NodeStore as _};
@@ -8,7 +8,7 @@ use crate::types::{LabelStore as _, NodeStore as _};
 ///
 /// precondition: slices are read from right to left eg.
 /// [dir, file, class, method, statement] ~> dir/file:20:40
-pub fn extract_file_postion<HAST: HyperAST>(stores: &HAST, parents: &[HAST::IdN]) -> Position {
+pub fn extract_file_position<HAST: HyperAST>(stores: &HAST, parents: &[HAST::IdN]) -> Position {
     if parents.is_empty() {
         Position::default()
     } else {
@@ -16,7 +16,7 @@ pub fn extract_file_postion<HAST: HyperAST>(stores: &HAST, parents: &[HAST::IdN]
         let b = stores.node_store().resolve(p);
         let l = stores.label_store().resolve(b.get_label_unchecked());
 
-        let mut r = extract_file_postion(stores, &parents[..parents.len() - 1]);
+        let mut r = extract_file_position(stores, &parents[..parents.len() - 1]);
         r.inc_path(l);
         r
     }
@@ -45,15 +45,12 @@ where
 
     let b = stores.resolve(&p);
 
-    let c = b
-        .children()
-        .unwrap()
-        .before(o - num::one())
-        .iter_children()
+    let l_sibs = b.children().unwrap().before(o - num::one());
+    let c = l_sibs
         .map(|x| stores.resolve(&x).try_bytes_len().unwrap())
         .sum();
     if stores.resolve_type(&p).is_file() {
-        let mut r = extract_file_postion(stores, parents);
+        let mut r = extract_file_position(stores, parents);
         r.inc_offset(c);
         r
     } else {
@@ -67,7 +64,7 @@ where
     }
 }
 
-pub fn extract_file_postion_it_rec<HAST, It>(stores: &HAST, mut nodes: It) -> Position
+pub fn extract_file_position_it_rec<HAST, It>(stores: &HAST, mut nodes: It) -> Position
 where
     HAST: HyperAST,
     It: Iterator<Item = HAST::IdN>,
@@ -78,7 +75,7 @@ where
     let b = stores.node_store().resolve(&p);
     let l = stores.label_store().resolve(b.get_label_unchecked());
 
-    let mut r = extract_file_postion_it_rec(stores, nodes);
+    let mut r = extract_file_position_it_rec(stores, nodes);
     r.inc_path(l);
     r
 }
@@ -97,15 +94,12 @@ where
 
     let b = stores.node_store().resolve(&p);
 
-    let c = b
-        .children()
-        .unwrap()
-        .before(o - num::one())
-        .iter_children()
+    let l_sibs = b.children().unwrap().before(o - num::one());
+    let c = l_sibs
         .map(|x| stores.resolve(&x).try_bytes_len().unwrap())
         .sum();
     if stores.resolve_type(&p).is_file() {
-        let mut r = extract_file_postion_it_rec(stores, it.into());
+        let mut r = extract_file_position_it_rec(stores, it.into());
         let l = stores.label_store().resolve(b.get_label_unchecked());
         r.inc_path(l);
         r.inc_offset(c);
@@ -117,7 +111,7 @@ where
     }
 }
 
-pub fn extract_file_postion_it<HAST, It>(stores: &HAST, nodes: It) -> Position
+pub fn extract_file_position_it<HAST, It>(stores: &HAST, nodes: It) -> Position
 where
     HAST: HyperAST,
     It: Iterator<Item = HAST::IdN>,
@@ -150,16 +144,13 @@ where
     let mut offset: usize = num::zero();
     while let Some((p, o)) = it.next() {
         let b = stores.resolve(&p);
-        let c: usize = b
-            .children()
-            .unwrap()
-            .before(o - num::one())
-            .iter_children()
+        let l_sibs = b.children().unwrap().before(o - num::one());
+        let c: usize = l_sibs
             .map(|x| stores.resolve(&x).try_bytes_len().unwrap())
             .sum();
         offset += c;
         if stores.resolve_type(&p).is_file() {
-            let mut r = extract_file_postion_it(stores, it.into());
+            let mut r = extract_file_position_it(stores, it.into());
             let l = stores.label_store().resolve(b.get_label_unchecked());
             r.inc_path(l);
             r.inc_offset(offset);

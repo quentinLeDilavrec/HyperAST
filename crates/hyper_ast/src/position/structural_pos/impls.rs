@@ -1,6 +1,13 @@
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use super::*;
+use crate::PrimInt;
+
+use super::CursorWithPersistence;
+use super::CursorWithPersistenceOrderedSet;
+use super::StructuralPositionStore2;
+use super::{CursorHead, CursorHeadMove};
+use super::{ExtRefNode, Handle, PersistedNode, RefNode};
 
 impl<IdN, Idx> PartialEq for CursorWithPersistence<IdN, Idx> {
     fn eq(&self, other: &Self) -> bool {

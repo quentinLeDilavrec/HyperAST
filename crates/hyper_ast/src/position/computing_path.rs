@@ -1,6 +1,6 @@
 //! Gather most of the common behaviors used to compute a path from an offset
 
-use crate::types::{Childrn as _, WithChildren as _};
+use crate::types::WithChildren as _;
 use crate::types::{HyperAST, LendT, WithSerialization};
 
 /// must be in a file
@@ -23,7 +23,7 @@ where
         let Some(cs) = b.children() else {
             break;
         };
-        for (y, child_id) in cs.iter_children().enumerate() {
+        for (y, child_id) in cs.enumerate() {
             let b = stores.resolve(&child_id);
             let len = b.try_bytes_len().unwrap_or(0);
             if offset + len < start {

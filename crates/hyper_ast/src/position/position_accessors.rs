@@ -9,7 +9,7 @@
 
 use crate::PrimInt;
 
-use super::*;
+use super::{HyperAST, NodeId};
 
 pub trait RootedPosition<IdN> {
     fn root(&self) -> IdN;

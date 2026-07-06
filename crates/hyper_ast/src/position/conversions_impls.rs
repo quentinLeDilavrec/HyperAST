@@ -1,7 +1,7 @@
 use num::{one, zero};
 use std::fmt::Debug;
 
-use crate::types::{Children, Childrn, WithChildren};
+use crate::types::{Children, WithChildren};
 use crate::types::{HyperAST, LabelStore, NodeStore};
 use crate::types::{HyperType, Labeled, LendT, NodeId};
 use crate::types::{WithSerialization, WithStats};
@@ -56,8 +56,7 @@ where
                 let t = stores.resolve_type(x.as_id());
                 let v = &b.children().unwrap();
                 assert_eq!(Some(&prev_x), v.get(o));
-                let v = v.before(o);
-                let v: Vec<_> = v.iter_children().collect();
+                let v = v.before(o).collect::<Vec<_>>();
                 fn compute<'store, HAST: HyperAST>(
                     stores: &'store HAST,
                     x: &HAST::IdN,
@@ -72,7 +71,7 @@ where
                     if l == 0 {
                         *col += b.try_bytes_len().unwrap_or_default();
                     } else if let Some(cs) = b.children() {
-                        for x in cs.iter_children() {
+                        for x in cs {
                             if compute(stores, &x, col) > 0 {
                                 break;
                             }
@@ -178,7 +177,7 @@ where
                 .sum();
             let rows = cs.before(o).map(|x| stores.resolve(&x).line_count()).sum();
             let mut no_s_idx = zero();
-            for y in cs.before(o).iter_children() {
+            for y in cs.before(o) {
                 if !stores.resolve_type(&y).is_spaces() {
                     no_s_idx += one();
                 }

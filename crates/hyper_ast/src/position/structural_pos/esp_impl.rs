@@ -1,5 +1,12 @@
-use super::*;
-use crate::position::position_accessors::*;
+use crate::PrimInt;
+use crate::position::position_accessors::{
+    RootedPosition, SolvedPosition, WithFullPostOrderPath, WithOffsets, WithPath,
+    WithPostOrderOffsets, WithPostOrderPath,
+};
+use crate::types::NodeId;
+
+use super::tags;
+use super::{ExploreStructuralPositions, SpHandle};
 
 impl<IdN, Idx> crate::position::node_filter_traits::Full
     for ExploreStructuralPositions<'_, IdN, Idx>
@@ -44,7 +51,7 @@ impl<IdN, Idx: PrimInt> Iterator for IterOffsets<'_, IdN, Idx> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let o = self.0.sps.offsets[self.0.i];
-        self.0.try_go_up().map(|_| o - one())
+        self.0.try_go_up().map(|_| o - num::one())
     }
 }
 
@@ -76,7 +83,7 @@ impl<IdN: Copy, Idx: PrimInt> Iterator for IterOffsetsNodes<'_, IdN, Idx> {
         let o = self.0.sps.offsets[self.0.i];
         self.0
             .try_go_up()
-            .map(|h| (o - one(), self.0.sps.nodes[h.0]))
+            .map(|h| (o - num::one(), self.0.sps.nodes[h.0]))
     }
 }
 
@@ -94,7 +101,7 @@ impl<IdN: NodeId + Eq + Copy, Idx: PrimInt> ExploreStructuralPositions<'_, IdN, 
             return None;
         }
         let i = self.i - 1;
-        let r = self.sps.offsets[i] - one();
+        let r = self.sps.offsets[i] - num::one();
         Some(r)
     }
     pub(in crate::position) fn peek_node(&self) -> Option<IdN> {
@@ -112,17 +119,6 @@ impl<IdN: Copy, Idx> Iterator for ExploreStructuralPositions<'_, IdN, Idx> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.try_go_up().map(|i| self.sps.nodes[i.0])
-        // if self.i == 0 {
-        //     return None;
-        // } //println!("next: {} {}", self.i, self.sps.parents[self.i - 1]);
-        // let i = self.i - 1;
-        // let r = self.sps.nodes[i];
-        // if i > 0 {
-        //     self.i = self.sps.parents[i] + 1;
-        // } else {
-        //     self.i = i;
-        // }
-        // Some(r)
     }
 }
 impl<IdN, Idx> ExploreStructuralPositions<'_, IdN, Idx> {
@@ -131,7 +127,7 @@ impl<IdN, Idx> ExploreStructuralPositions<'_, IdN, Idx> {
     fn try_go_up(&mut self) -> Option<SpHandle> {
         if self.i == 0 {
             return None;
-        } //println!("next: {} {}", self.i, self.sps.parents[self.i - 1]);
+        }
         let i = self.i - 1;
         let r = i;
         if i > 0 {

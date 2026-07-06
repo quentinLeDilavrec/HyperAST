@@ -1,12 +1,10 @@
 //! Gather most of the common behaviors used to compute positions in an HyperAST
 use std::path::PathBuf;
 
-use num::ToPrimitive;
-
 use super::{Position, StructuralPosition, TreePath};
 use crate::PrimInt;
-use crate::types::{Children as _, Childrn as _, WithChildren as _};
-use crate::types::{HyperAST, LabelStore};
+use crate::types::{Children as _, WithChildren as _};
+use crate::types::{HyperAST, LabelStore, LendT, UniformNodeId};
 use crate::types::{HyperType as _, Labeled as _};
 use crate::types::{WithSerialization, WithStats};
 
@@ -20,7 +18,7 @@ pub fn compute_range<'store, It, HAST>(
 where
     HAST: HyperAST,
     HAST::IdN: Copy,
-    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     It: Iterator,
     It::Item: PrimInt,
 {
@@ -31,11 +29,11 @@ where
         let Some(cs) = cs.children() else {
             break;
         };
-        for y in 0..o.to_usize().unwrap() {
+        for y in 0..o.index() {
             let id = &cs[num::cast(y).unwrap()];
             let b = stores.resolve(id);
 
-            offset += b.try_bytes_len().unwrap_or(0).to_usize().unwrap();
+            offset += b.try_bytes_len().unwrap_or(0);
         }
         let Some(a) = cs.get(num::cast(o).unwrap()) else {
             break;
@@ -44,7 +42,7 @@ where
     }
     let b = stores.resolve(&x);
 
-    let len = b.try_bytes_len().unwrap_or(0).to_usize().unwrap();
+    let len = b.try_bytes_len().unwrap_or(0);
     (offset, offset + len, x)
 }
 
@@ -57,7 +55,7 @@ where
     It::Item: Clone,
     HAST::IdN: Clone,
     HAST: HyperAST,
-    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
     It: Iterator<Item = HAST::Idx>,
 {
     let mut offset = 0;
@@ -75,9 +73,9 @@ where
 
         let Some(cs) = b.children() else { break };
         if !t.is_directory() {
-            for y in cs.before(o).iter_children() {
+            for y in cs.before(o) {
                 let b = stores.resolve(&y);
-                offset += b.try_bytes_len().unwrap().to_usize().unwrap();
+                offset += b.try_bytes_len().unwrap();
             }
         }
         let Some(a) = cs.get(o) else { break };
@@ -92,7 +90,7 @@ where
     }
 
     let len = if !t.is_directory() {
-        b.try_bytes_len().unwrap().to_usize().unwrap()
+        b.try_bytes_len().unwrap()
     } else {
         0
     };
@@ -109,7 +107,7 @@ where
     It::Item: crate::types::PrimInt,
     HAST::IdN: Clone,
     HAST: HyperAST,
-    for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
+    for<'t> LendT<'t, HAST>: WithSerialization,
 {
     let mut offset = 0;
     let mut x = root;
@@ -129,13 +127,11 @@ where
             break;
         };
         if !t.is_directory() {
-            for y in cs.before(o).iter_children() {
+            for y in cs.before(o) {
                 let b = stores.resolve(&y);
                 offset += b
                     .try_bytes_len()
                     .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                    .unwrap()
-                    .to_usize()
                     .unwrap();
             }
         }
@@ -157,8 +153,6 @@ where
         b.try_bytes_len()
             .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
             .unwrap()
-            .to_usize()
-            .unwrap()
     } else {
         0
     };
@@ -171,8 +165,8 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
     pub fn make_position<'store, HAST>(&self, stores: &'store HAST) -> Position
     where
         HAST: HyperAST<IdN = IdN, Idx = Idx>,
-        for<'t> crate::types::LendT<'t, HAST>: WithSerialization,
-        IdN: crate::types::UniformNodeId,
+        for<'t> LendT<'t, HAST>: WithSerialization,
+        IdN: UniformNodeId,
     {
         if cfg!(debug_assertions) {
             self.check(stores)
@@ -199,40 +193,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         }
         let mut i = self.parents.len() - 1;
         if from_file {
-            loop {
-                if i == 0 {
-                    break;
-                }
-                let p = self.parents[i - 1];
-                let b = stores.resolve(&p);
-                let t = stores.resolve_type(&p);
-                let o = self.offsets[i];
-                let c: usize = b
-                    .children()
-                    .unwrap()
-                    .before(o - num::one())
-                    .iter_children()
-                    .map(|x| {
-                        stores
-                            .resolve(&x)
-                            .try_bytes_len()
-                            .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                            .unwrap()
-                    })
-                    .sum();
-                offset += c;
-                if t.is_file() {
-                    from_file = false;
-                    i -= 1;
-                    break;
-                } else {
-                    debug_assert!(
-                        !t.is_directory(),
-                        "a file should have been crossed before reaching a dir"
-                    );
-                    i -= 1;
-                }
-            }
+            self.aux(stores, &mut from_file, &mut offset, &mut i);
         }
         if self.parents.is_empty() {
         } else if !from_file {
@@ -255,14 +216,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
                 .children()
                 .unwrap()
                 .before(o - num::one())
-                .iter_children()
-                .map(|x| {
-                    stores
-                        .resolve(&x)
-                        .try_bytes_len()
-                        .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                        .unwrap()
-                })
+                .map(|x| bytes_len(stores, x))
                 .sum();
             offset += c;
         }
@@ -271,11 +225,51 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         Position::new(file, offset, len)
     }
 
+    fn aux<'store, HAST>(
+        &self,
+        stores: &'store HAST,
+        from_file: &mut bool,
+        offset: &mut usize,
+        i: &mut usize,
+    ) where
+        HAST: HyperAST<IdN = IdN, Idx = Idx>,
+        for<'t> LendT<'t, HAST>: WithSerialization,
+        IdN: UniformNodeId,
+    {
+        loop {
+            if *i == 0 {
+                break;
+            }
+            let p = self.parents[*i - 1];
+            let b = stores.resolve(&p);
+            let o = self.offsets[*i];
+            let c: usize = b
+                .children()
+                .unwrap()
+                .before(o - num::one())
+                .map(|x| bytes_len(stores, x))
+                .sum();
+            *offset += c;
+            let t = stores.resolve_type(&p);
+            if t.is_file() {
+                *from_file = false;
+                *i -= 1;
+                break;
+            } else {
+                debug_assert!(
+                    !t.is_directory(),
+                    "a file should have been crossed before reaching a dir"
+                );
+                *i -= 1;
+            }
+        }
+    }
+
     pub fn make_file_line_range<'store, HAST>(&self, stores: &'store HAST) -> (String, usize, usize)
     where
         HAST: HyperAST<IdN = IdN, Idx = Idx>,
-        for<'t> crate::types::LendT<'t, HAST>: WithStats + WithSerialization,
-        IdN: crate::types::UniformNodeId,
+        for<'t> LendT<'t, HAST>: WithStats + WithSerialization,
+        IdN: UniformNodeId,
     {
         if cfg!(debug_assertions) {
             self.check(stores)
@@ -301,35 +295,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
         }
         let mut i = self.parents.len() - 1;
         if from_file {
-            loop {
-                if i == 0 {
-                    break;
-                }
-                let p = self.parents[i - 1];
-                let b = stores.resolve(&p);
-
-                let o = self.offsets[i];
-                let c: usize = b
-                    .children()
-                    .unwrap() // always have children as we are going up
-                    .before(o - num::one())
-                    .iter_children()
-                    .map(|x| stores.resolve(&x).line_count())
-                    .sum();
-                offset += c;
-                let t = stores.resolve_type(&p);
-                if t.is_file() {
-                    from_file = false;
-                    i -= 1;
-                    break;
-                } else {
-                    debug_assert!(
-                        !t.is_directory(),
-                        "a file should have been crossed before reaching a dir"
-                    );
-                    i -= 1;
-                }
-            }
+            self.aux(stores, &mut from_file, &mut offset, &mut i);
         }
         if self.parents.is_empty() {
         } else if !from_file {
@@ -357,14 +323,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
                 .children()
                 .unwrap() // always have children as we are going up
                 .before(o - num::one())
-                .iter_children()
-                .map(|x| {
-                    stores
-                        .resolve(&x)
-                        .try_bytes_len()
-                        .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
-                        .unwrap()
-                })
+                .map(|x| bytes_len(stores, x))
                 .sum();
             offset += c;
         }
@@ -376,10 +335,22 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
     }
 }
 
+fn bytes_len<'store, HAST>(stores: &'store HAST, x: HAST::IdN) -> usize
+where
+    HAST: HyperAST,
+    for<'t> LendT<'t, HAST>: WithSerialization,
+{
+    stores
+        .resolve(&x)
+        .try_bytes_len()
+        .ok_or_else(|| MissingByteLenError(stores.resolve_type(&x)))
+        .unwrap()
+}
+
 /// Not an end-user error.
 /// This error might be raised in case WithSerialization is missing the derived data
 /// meaning:
-///   depending on the type of node, the partiular derived data might not have been added
+///   depending on the type of node, the particular derived data might not have been added
 ///   during the construction of the corresponding subtree
 ///   by Default a Directory does not have a length in bytes
 ///

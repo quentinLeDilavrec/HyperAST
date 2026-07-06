@@ -24,17 +24,14 @@
 //! [offsets_and_nodes]
 //!     - list of offsets
 //! ## collection of path
-//!     Optimisation related, sometimes necessary to have acceptable perfs.
+//!     Optimization related, sometimes necessary to have acceptable perfs.
 //!     - list of paths
 //!     - it of paths
 //!     - topo ordered list of paths
 //!       incremental compute
 //!     - reversed dag of paths
 //!       mem optimization,
-//! ## with hidden nodes (spaces, abtract nodes,....)
-
-use std::fmt::Debug;
-use std::path::PathBuf;
+//! ## with hidden nodes (spaces, abstract nodes,....)
 
 use crate::store::defaults::NodeIdentifier;
 use crate::types::{HyperAST, NodeId, TypedNodeId};
@@ -114,7 +111,7 @@ pub use offsets::*;
 
 pub mod file_and_offset;
 
-pub type Position = file_and_offset::Position<PathBuf, usize>;
+pub type Position = file_and_offset::Position<std::path::PathBuf, usize>;
 
 pub mod offsets_and_nodes;
 pub use offsets_and_nodes::*;
@@ -135,13 +132,7 @@ pub mod computing_offset_bottom_up;
 //pub use computing_offset_bottom_up::{extract_file_postion, extract_position};
 
 mod computing_offset_top_down;
-pub use computing_offset_top_down::{
-    compute_position,
-    compute_position_and_nodes,
-    // compute_position_and_nodes2,
-    // compute_position_and_nodes3,
-    compute_range,
-};
+pub use computing_offset_top_down::{compute_position, compute_position_and_nodes, compute_range};
 
 mod computing_path;
 pub use computing_path::resolve_range;

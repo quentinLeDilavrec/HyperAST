@@ -5,11 +5,12 @@ use std::fmt::Debug;
 use super::{Position, StructuralPosition, StructuralPositionStore};
 use crate::PrimInt;
 use crate::position::{TreePath, TreePathMut};
-use crate::types::LabelStore as _;
-use crate::types::{AnyType, Children, Childrn, LendT};
+use crate::types::WithSerialization;
+use crate::types::{AnyType, Typed};
+use crate::types::{Children, LendT};
 use crate::types::{HyperAST, HyperType};
-use crate::types::{Labeled, NodeId, Typed};
-use crate::types::{WithChildren, WithSerialization};
+use crate::types::{LabelStore as _, WithChildren as _};
+use crate::types::{Labeled, NodeId};
 
 #[derive(Clone, Debug)]
 pub struct Scout<IdN, Idx> {
@@ -149,12 +150,7 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
                 let o = self.path.offsets[i];
                 let o: HAST::Idx = num::cast(o).unwrap();
                 let c: usize = {
-                    let v: Vec<_> = b
-                        .children()
-                        .unwrap()
-                        .before(o - one())
-                        .iter_children()
-                        .collect();
+                    let v: Vec<_> = b.children().unwrap().before(o - one()).collect();
                     v.iter()
                         .map(|x| {
                             let b = stores.resolve(x);
@@ -196,14 +192,12 @@ impl<IdN: Eq + Copy, Idx: PrimInt> Scout<IdN, Idx> {
             let t = stores.resolve_type(&p);
             let o = self.path.offsets[i];
             let o: HAST::Idx = num::cast(o).unwrap();
-            let c: usize = {
-                b.children()
-                    .unwrap()
-                    .before(o - one())
-                    .iter_children()
-                    .map(|x| stores.resolve(&x).try_bytes_len().unwrap())
-                    .sum()
-            };
+            let c: usize = b
+                .children()
+                .unwrap()
+                .before(o - one())
+                .map(|x| stores.resolve(&x).try_bytes_len().unwrap())
+                .sum();
             offset += c;
             if t.is_file() {
                 from_file = false;
@@ -234,15 +228,13 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> super::ExploreStructuralPosition
     where
         'a: 'store,
         HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>:
-            crate::types::Typed<Type = crate::types::AnyType> + WithSerialization,
+        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
         HAST::Idx: Debug,
         IdN: Debug + NodeId,
         IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
     {
         use crate::types::lending::NodeStore;
         self.sps.check(stores).unwrap();
-        // let parents = self.parents.iter().peekable();
         let mut from_file = false;
         let len = if let Some(x) = self.peek_node() {
             let b = stores.node_store().resolve(x.as_id());
@@ -273,8 +265,7 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> super::ExploreStructuralPosition
     ) -> super::Position
     where
         HAST: HyperAST<IdN = IdN::IdN>,
-        for<'t> LendT<'t, HAST>:
-            crate::types::Typed<Type = crate::types::AnyType> + WithSerialization,
+        for<'t> LendT<'t, HAST>: Typed<Type = AnyType> + WithSerialization,
         IdN: Copy + Debug + NodeId,
         IdN::IdN: NodeId<IdN = IdN::IdN> + Eq + Debug,
     {
@@ -284,19 +275,8 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> super::ExploreStructuralPosition
                 assert_ne!(p, self.peek_node().unwrap());
                 assert_eq!(p, self.sps.nodes[self.sps.parents[self.i - 1]]);
                 assert_eq!(self.peek_node().unwrap(), self.sps.nodes[self.i - 1]);
-                // println!("nodes: {}, parents:{}, offsets:{}",it.sps.nodes.len(),it.sps.parents.len(),it.sps.offsets.len());
                 let b = stores.node_store().resolve(p.as_id());
                 let t = stores.resolve_type(p.as_id());
-                // println!("T0:{:?}", t);
-                // let o = it.sps.offsets[it]
-                // println!("nodes: ({})", it.sps.nodes.len());
-                // println!("offsets: ({}) {:?}", it.sps.offsets.len(), &it.sps.offsets);
-                // println!("parents: ({}) {:?}", it.sps.parents.len(), &it.sps.parents);
-                // println!(
-                //     "o: {}, o p: {}",
-                //     it.peek_offset().unwrap(),
-                //     it.sps.offsets[it.sps.parents[it.i - 1]]
-                // );
                 let o = self.peek_offset().unwrap();
                 let o: HAST::Idx =
                     num::cast(o).expect("failed to cast, cannot put value of Idx in ChildIdx");
@@ -309,19 +289,17 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> super::ExploreStructuralPosition
                         &b.children().unwrap()[o],
                         "p:{:?} b.cs:{:?} o:{:?} o p:{:?} i p:{}",
                         p,
-                        b.children().unwrap().iter_children().collect::<Vec<_>>(),
+                        b.children().unwrap().collect::<Vec<_>>(),
                         self.peek_offset().unwrap(),
                         self.sps.offsets[self.sps.parents[self.i - 1]] - one(),
                         self.sps.parents[self.i - 1],
                     );
                 }
                 let c: usize = {
-                    let v: Vec<_> = b.children().unwrap().before(o).iter_children().collect();
+                    let v: Vec<_> = b.children().unwrap().before(o).collect();
                     v.iter()
                         .map(|x| {
                             let b = stores.node_store().resolve(x);
-                            // println!("{:?}", b.get_type());
-                            // println!("T1:{:?}", b.get_type());
                             b.try_bytes_len().unwrap()
                         })
                         .sum()
@@ -337,14 +315,8 @@ impl<'a, IdN: NodeId + Eq + Copy, Idx: PrimInt> super::ExploreStructuralPosition
         }
         for p in self {
             let b = stores.node_store().resolve(p.as_id());
-            // println!("type {:?}", b.get_type());
-            // if !b.has_label() {
-            //     panic!("{:?} should have a label", b.get_type());
-            // }
             if let Some(l) = b.try_get_label() {
                 let l = stores.label_store().resolve(l);
-                // println!("value: {}",l);
-                // path = path.join(path)
                 path.push(l)
             }
         }

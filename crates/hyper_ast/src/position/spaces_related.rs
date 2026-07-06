@@ -7,7 +7,7 @@ use super::Position;
 use super::WithHyperAstPositionConverter;
 use crate::PrimInt;
 use crate::position::building;
-use crate::types::{Children as _, Childrn as _, WithChildren as _};
+use crate::types::{Children as _, WithChildren as _};
 use crate::types::{HyperAST, LabelStore, LendT, NodeStore, TypeStore};
 use crate::types::{HyperType, Labeled, WithSerialization};
 
@@ -34,6 +34,7 @@ where
         let mut with_s_idx = zero();
         if let Some(cs) = b.children() {
             if !t.is_directory() {
+                use crate::types::Childrn as _;
                 for y in cs.iter_children() {
                     let b = stores.node_store().resolve(&y);
                     if !stores.resolve_type(&y).is_spaces() {
@@ -46,14 +47,7 @@ where
                 }
             } else {
                 with_s_idx = o;
-                // for y in 0..o.to_usize().unwrap() {
-                //     let b = stores.node_store().resolve(cs[y]);
-                //     println!("{:?}",b.get_type());
-                // }
             }
-            // if o.to_usize().unwrap() >= cs.len() {
-            //     // dbg!("fail");
-            // }
             if let Some(a) = cs.get(with_s_idx) {
                 x = a.clone();
                 with_spaces.push(with_s_idx);
@@ -149,23 +143,16 @@ where
         let mut no_s_idx = zero();
         if let Some(cs) = b.children() {
             if !t.is_directory() {
-                for y in cs.before(o).iter_children() {
+                for y in cs.before(o) {
                     let b = stores.node_store().resolve(&y);
                     if !stores.resolve_type(&y).is_spaces() {
                         no_s_idx += one();
                     }
-                    offset += b.try_bytes_len().unwrap().to_usize().unwrap();
+                    offset += b.try_bytes_len().unwrap();
                 }
             } else {
                 no_s_idx = o;
-                // for y in 0..o.to_usize().unwrap() {
-                //     let b = stores.node_store().resolve(cs[y]);
-                //     println!("{:?}",b.get_type());
-                // }
             }
-            // if o.to_usize().unwrap() >= cs.len() {
-            //     // dbg!("fail");
-            // }
             if let Some(a) = cs.get(o) {
                 x = a.clone();
                 no_spaces.push(no_s_idx.cast());
@@ -188,7 +175,7 @@ where
     }
 
     let len = if !t.is_directory() {
-        b.try_bytes_len().unwrap().to_usize().unwrap()
+        b.try_bytes_len().unwrap()
     } else {
         0
     };
@@ -269,12 +256,12 @@ where
 
             let mut no_s_idx = zero();
             if !t.is_directory() {
-                for y in cs.before(o).iter_children() {
+                for y in cs.before(o) {
                     let b = stores.node_store().resolve(&y);
                     if !stores.resolve_type(&y).is_spaces() {
                         no_s_idx += one();
                     }
-                    offset += b.try_bytes_len().unwrap().to_usize().unwrap();
+                    offset += b.try_bytes_len().unwrap();
                 }
             } else {
                 no_s_idx = o;
@@ -292,7 +279,7 @@ where
         let b = stores.node_store().resolve(&x);
         let t = stores.resolve_type(&x);
         let len = if !t.is_directory() {
-            b.try_bytes_len().unwrap().to_usize().unwrap()
+            b.try_bytes_len().unwrap()
         } else {
             0
         };
@@ -334,7 +321,7 @@ where
                 }
 
                 let (cs, o) = match (b.children(), offsets_iter.next()) {
-                    (Some(cs), Some(o)) => (cs.iter_children(), o),
+                    (Some(cs), Some(o)) => (cs, o),
                     (None, Some(_)) => panic!("there is no children remaining"),
                     _ => return todo!(),
                 };
@@ -359,19 +346,19 @@ where
             assert!(!t.is_directory());
 
             let (cs, o) = match (b.children(), offsets_iter.next()) {
-                (Some(cs), Some(o)) => (cs.iter_children(), o),
+                (Some(cs), Some(o)) => (cs, o),
                 (None, Some(_)) => panic!("there is no children remaining"),
                 _ => break (stores.node_store().resolve(&x), t),
             };
 
             let mut no_s_idx = zero();
             if !t.is_directory() {
-                for y in cs.before(o).iter_children() {
+                for y in cs.before(o) {
                     let b = stores.node_store().resolve(&y);
                     if !stores.resolve_type(&y).is_spaces() {
                         no_s_idx += one();
                     }
-                    let len = b.try_bytes_len().unwrap().to_usize().unwrap();
+                    let len = b.try_bytes_len().unwrap();
                     offset += len;
                     bbb.inc_offset(len);
                 }
@@ -385,7 +372,7 @@ where
         };
         // construct output
         let len = if !t.is_directory() {
-            b.try_bytes_len().unwrap().to_usize().unwrap()
+            b.try_bytes_len().unwrap()
         } else {
             0
         };
@@ -408,12 +395,6 @@ where
         let mut x = self.src.root();
         let mut offsets_iter = self.src.iter_offsets();
 
-        // let mut aaa = PathBuf::default();
-        // let mut offset = 0;
-        // let mut path_ids = vec![];
-        // let mut no_spaces = vec![];
-        // let mut path = vec![];
-        // iter offsets
         let mut builder = {
             loop {
                 let b = stores.node_store().resolve(&x);
@@ -421,8 +402,6 @@ where
                 // handle name of directory
                 let l = if t.is_directory() {
                     stores.label_store().resolve(b.get_label_unchecked())
-                    // path.push(l);
-                    // aaa.push(l);
                 } else if t.is_file() {
                     assert!(t.is_file());
                     let l = stores.label_store().resolve(b.get_label_unchecked());
@@ -432,7 +411,7 @@ where
                 };
 
                 let (cs, idx) = match (b.children(), offsets_iter.next()) {
-                    (Some(cs), Some(o)) => (cs.iter_children(), o),
+                    (Some(cs), Some(o)) => (cs, o),
                     (None, Some(_)) => panic!("there is no children remaining"),
                     _ => return builder.finish(x),
                 };
@@ -456,18 +435,16 @@ where
 
             let mut no_s_idx = zero();
             let mut byte_offset = 0;
-            for y in cs.before(idx).iter_children() {
+            for y in cs.before(idx) {
                 let b = stores.node_store().resolve(&y);
                 if !stores.resolve_type(&y).is_spaces() {
                     no_s_idx += one();
                 }
-                let len = b.try_bytes_len().unwrap().to_usize().unwrap();
+                let len = b.try_bytes_len().unwrap();
                 byte_offset += len;
             }
             builder.push(x, idx, byte_offset, (no_s_idx,));
             let a = cs.get(idx).expect("no child at path");
-            // no_spaces.push(no_s_idx);
-            // path_ids.push(a.clone());
             x = a.clone();
         };
         // construct output
@@ -477,12 +454,6 @@ where
             0
         };
         let len = num::cast(len).unwrap();
-        // let file = PathBuf::from_iter(path.iter());
-        // path_ids.reverse();
-        // no_spaces.reverse();
-        // path_ids, no_spaces
-        // let o_and_n = todo!();
-        // (Position::new(file, offset, len).into(), o_and_n)
         builder.finish(x, len, ())
     }
 
@@ -514,8 +485,6 @@ where
                 // handle name of directory
                 let l = if t.is_directory() {
                     stores.label_store().resolve(b.get_label_unchecked())
-                    // path.push(l);
-                    // aaa.push(l);
                 } else if t.is_file() {
                     assert!(t.is_file());
                     let l = stores.label_store().resolve(b.get_label_unchecked());
@@ -551,12 +520,12 @@ where
             let mut no_s_idx = zero();
             let mut byte_offset = 0;
             let mut rows = zero();
-            for y in cs.before(idx).iter_children() {
+            for y in cs.before(idx) {
                 let b = stores.node_store().resolve(&y);
                 if !stores.resolve_type(&y).is_spaces() {
                     no_s_idx += one();
                 }
-                let len = b.try_bytes_len().unwrap().to_usize().unwrap();
+                let len = b.try_bytes_len().unwrap();
                 byte_offset += len;
                 // TODO count lines
             }
@@ -568,10 +537,7 @@ where
                 .push(byte_offset)
                 .push(no_s_idx)
                 .push(rows);
-            // builder.push(x, idx, byte_offset, (no_s_idx,));
             let a = cs.get(idx).expect("no child at path");
-            // no_spaces.push(no_s_idx);
-            // path_ids.push(a.clone());
             x = a.clone();
         };
         // construct output

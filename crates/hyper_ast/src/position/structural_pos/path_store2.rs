@@ -1,6 +1,8 @@
-use super::*;
+use crate::PrimInt;
 
-impl<IdN, Idx> Debug for StructuralPositionStore2<IdN, Idx> {
+use super::{Handle, StructuralPositionStore2};
+
+impl<IdN, Idx> std::fmt::Debug for StructuralPositionStore2<IdN, Idx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StructuralPositionStore")
             .field("persisted", &self.persisted)

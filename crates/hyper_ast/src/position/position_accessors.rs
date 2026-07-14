@@ -11,6 +11,10 @@ use crate::PrimInt;
 
 use super::{HyperAST, NodeId};
 
+/// mandatory to convert positions
+///
+/// `RootedWrapper` provides an easy way to enable the capability on positions
+/// that do not have a direct root accessor (e.g. [`super::file_and_offset::Position`])
 pub trait RootedPosition<IdN> {
     fn root(&self) -> IdN;
 }
@@ -19,6 +23,10 @@ pub trait AssistedFrom<S, T> {
     fn compute(&self, store: S) -> T;
 }
 
+/// helper trait directly providing the node it points to
+///
+/// `SolvedWrapper` provides an easy way to enable the capability on positions
+/// that do not have a direct node accessor (e.g. [`super::file_and_offset::Position`])
 pub trait SolvedPosition<IdN> {
     fn node(&self) -> IdN;
 }
@@ -41,11 +49,8 @@ impl SolvedPosition<crate::store::nodes::legion::NodeIdentifier>
     }
 }
 
-pub trait WithOffsets
-where
-    Self::Idx: PrimInt,
-{
-    type Idx;
+pub trait WithOffsets {
+    type Idx: PrimInt;
     // type PreOrderIt: Iterator<Item=Self::Idx>;
     // fn iter_pre_order(&self) -> Self::PreOrderIt;
     // fn iter_pre_order(&self) -> Box<dyn Iterator<Item=Self::Idx>> {
@@ -191,7 +196,7 @@ pub trait WithFullPostOrderPath<IdN>: RootedPosition<IdN> + WithPostOrderPath<Id
 }
 
 /// - p should only return each node once
-/// - resolved children should corespond
+/// - resolved children should correspond
 #[cfg(debug_assertions)]
 pub fn assert_invariants_post_full<IdN, P, HAST>(p: &P, store: &HAST)
 where

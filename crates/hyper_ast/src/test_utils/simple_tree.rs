@@ -11,10 +11,11 @@ use crate::types::{
     WithChildren, WithStats,
 };
 
+#[derive(Clone)]
 pub struct SimpleTree<K, DD = ()> {
     kind: K,
     label: Option<String>,
-    children: Vec<SimpleTree<K, DD>>,
+    pub(crate) children: Vec<SimpleTree<K, DD>>,
     #[doc(hidden)]
     pub derived_data: DD,
 }
@@ -41,39 +42,83 @@ impl<K, DD> SimpleTree<K, DD> {
     }
 }
 
+type BytesLen = usize;
+
+fn store_aux<DD>(
+    ls: &mut LS<u16>,
+    ns: &mut NS<Tree>,
+    node: &SimpleTree<u8, DD>,
+    f: impl Fn(Tree, &SimpleTree<u8, DD>) -> Tree + Copy,
+) -> Tree {
+    let lid = node
+        .label
+        .as_ref()
+        .map(|x| ls.get_or_insert(x.as_str()))
+        .unwrap_or(0);
+    let mut size = 1;
+    let mut height = 0;
+    let children = node
+        .children
+        .iter()
+        .map(|x| {
+            let t = store_aux(ls, ns, x, f);
+            size += t.size;
+            height = height.max(t.height);
+            ns.get_or_insert(t)
+        })
+        .collect();
+    height += 1;
+    let t = Tree {
+        t: node.kind,
+        label: lid,
+        children,
+        size,
+        height,
+        bytes: 0,
+    };
+    f(t, node)
+}
+
 fn store(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> u16 {
-    fn store_aux(ls: &mut LS<u16>, ns: &mut NS<Tree>, node: &SimpleTree<u8>) -> Tree {
-        let lid = node
-            .label
-            .as_ref()
-            .map(|x| ls.get_or_insert(x.as_str()))
-            .unwrap_or(0);
-        let mut size = 1;
-        let mut height = 0;
-        let children = node
-            .children
-            .iter()
-            .map(|x| {
-                let t = store_aux(ls, ns, x);
-                size += t.size;
-                height = height.max(t.height);
-                ns.get_or_insert(t)
-            })
-            .collect();
-        height += 1;
-        Tree {
-            t: node.kind,
-            label: lid,
-            children,
-            size,
-            height,
-        }
-    }
-    let t = store_aux(ls, ns, node);
-    ns.get_or_insert(t)
+    let t = store_aux(ls, ns, node, |t, _| t);
+    dbg!(ns.get_or_insert(t))
+}
+
+fn store_with_bytes_len(
+    ls: &mut LS<u16>,
+    ns: &mut NS<Tree>,
+    node: &SimpleTree<u8, BytesLen>,
+) -> u16 {
+    let t = store_aux(ls, ns, node, |mut t, n| {
+        t.bytes = n.derived_data;
+        t
+    });
+    dbg!(ns.get_or_insert(t))
 }
 
 use crate::store::SimpleStores;
+pub fn tree_to_stores(x: SimpleTree<u8>) -> (SimpleStores<TStore, NS<Tree>, LS<u16>>, u16) {
+    let (mut label_store, mut compressed_node_store) = make_stores();
+    let x = store(&mut label_store, &mut compressed_node_store, &x);
+    let stores = SimpleStores {
+        type_store: std::marker::PhantomData::<TStore>,
+        node_store: compressed_node_store,
+        label_store,
+    };
+    (stores, x)
+}
+pub fn tree_bytes_len_to_stores(
+    x: SimpleTree<u8, usize>,
+) -> (SimpleStores<TStore, NS<Tree>, LS<u16>>, u16) {
+    let (mut label_store, mut compressed_node_store) = make_stores();
+    let x = store_with_bytes_len(&mut label_store, &mut compressed_node_store, &x);
+    let stores = SimpleStores {
+        type_store: std::marker::PhantomData::<TStore>,
+        node_store: compressed_node_store,
+        label_store,
+    };
+    (stores, x)
+}
 pub fn vpair_to_stores(
     (src, dst): (SimpleTree<u8>, SimpleTree<u8>),
 ) -> (SimpleStores<TStore, NS<Tree>, LS<u16>>, u16, u16) {
@@ -185,6 +230,7 @@ pub struct Tree {
     pub children: Vec<u16>,
     pub size: u16,
     pub height: u16,
+    pub bytes: usize,
 }
 
 impl types::NodeStoreExt<Tree> for NS<Tree> {
@@ -201,6 +247,7 @@ impl types::NodeStoreExt<Tree> for NS<Tree> {
             children: cs,
             size: 0,
             height: 0,
+            bytes: 0,
         };
         self.get_or_insert(node)
     }
@@ -216,15 +263,16 @@ impl types::Typed for Tree {
 
 impl types::WithSerialization for Tree {
     fn try_bytes_len(&self) -> Option<usize> {
-        todo!()
+        Some(self.bytes)
     }
 }
 
-impl<T> types::WithSerialization for TreeRef<'_, T> {
+impl<T: types::WithSerialization> types::WithSerialization for TreeRef<'_, T> {
     fn try_bytes_len(&self) -> Option<usize> {
-        todo!()
+        self.0.try_bytes_len()
     }
 }
+
 impl<T> Clone for TreeRef<'_, T> {
     fn clone(&self) -> Self {
         Self(self.0)
@@ -364,11 +412,6 @@ where
 {
     type ChildIdx = T::ChildIdx;
 
-    // type Children<'a>
-    //     = T::Children<'a>
-    // where
-    //     Self: 'a;
-
     fn child_count(&self) -> Self::ChildIdx {
         self.0.child_count()
     }
@@ -398,7 +441,7 @@ impl WithStats for Tree {
     }
 
     fn line_count(&self) -> usize {
-        todo!()
+        0
     }
 }
 
@@ -543,18 +586,13 @@ where
     T::TreeId: PrimInt,
 {
     fn get_or_insert(&mut self, node: T) -> T::TreeId {
-        if let Some(i) = self
-            .v
-            .iter()
-            .enumerate()
-            .find_map(|(i, x)| if x == &node { Some(i) } else { None })
-        {
-            cast(i).unwrap()
-        } else {
+        let mut it = self.v.iter().enumerate();
+        let Some(i) = it.find_map(|(i, x)| (x == &node).then(|| i)) else {
             let l = self.v.len();
             self.v.push(node);
-            cast(l).unwrap()
-        }
+            return cast(l).unwrap();
+        };
+        cast(i).unwrap()
     }
 }
 
@@ -629,28 +667,30 @@ impl<I: PrimInt> LabelStore<types::SlicedLabel> for LS<I> {
     }
 }
 
-#[allow(unused_macros)]
+#[cfg(test)]
 macro_rules! tree {
     ( $k:expr ) => {
-        SimpleTree::new($k, None, vec![])
+        crate::test_utils::simple_tree::SimpleTree::new($k as u8, None, vec![])
     };
     ( $k:expr, $l:expr) => {
-        SimpleTree::new($k, Some($l), vec![])
+        crate::test_utils::simple_tree::SimpleTree::new($k as u8, Some($l), vec![])
     };
     ( $k:expr, $l:expr; [$($x:expr),+ $(,)?]) => {
-        SimpleTree::new($k, Some($l), vec![$($x),+])
+        crate::test_utils::simple_tree::SimpleTree::new($k as u8, Some($l), vec![$($x),+])
     };
     ( $k:expr; [$($x:expr),+ $(,)?]) => {
-        SimpleTree::new($k, None, vec![$($x),+])
+        crate::test_utils::simple_tree::SimpleTree::new($k as u8, None, vec![$($x),+])
     };
 }
+#[cfg(test)]
+pub(crate) use tree;
 
 pub struct TStore;
 
 #[derive(Clone, Copy, std::hash::Hash, PartialEq, Eq, Debug)]
 #[repr(transparent)]
 #[cfg_attr(feature = "bevy_ecs", derive(bevy_ecs::prelude::Component))] // todo only for bevy
-pub struct Ty(u8);
+pub struct Ty(pub(crate) u8);
 
 impl Display for Ty {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -680,7 +720,10 @@ impl HyperType for Ty {
     }
 
     fn as_static_str(&self) -> &'static str {
-        todo!()
+        static S: &str =
+            " 0 1 2 3 4 5 6 7 8 9101112131415161718192021222324252627282930313233343536373839";
+        let i = self.0 as usize * 2;
+        &S[i..i + 2]
     }
 
     fn generic_eq(&self, other: &dyn HyperType) -> bool
@@ -694,15 +737,15 @@ impl HyperType for Ty {
     }
 
     fn is_file(&self) -> bool {
-        false
+        self.0 == 30
     }
 
     fn is_directory(&self) -> bool {
-        false
+        self.0 == 33
     }
 
     fn is_spaces(&self) -> bool {
-        todo!()
+        self.0 == 32
     }
 
     fn is_syntax(&self) -> bool {

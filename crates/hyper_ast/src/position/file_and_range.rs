@@ -74,8 +74,8 @@ mod impl_receivers {
     use building::top_down;
     use std::path::PathBuf;
 
-    impl<T: PrimInt> top_down::CreateBuilder for super::Position<PathBuf, T> {
-        fn create() -> Self {
+    impl<T: PrimInt, IdN> top_down::CreateBuilder<IdN> for super::Position<PathBuf, T> {
+        fn create(_root: IdN) -> Self {
             Self {
                 file: Default::default(),
                 start: num::zero(),
@@ -131,6 +131,7 @@ mod impl_receivers {
         <IdO> bottom_up::ReceiveOffset<IdO, Self>
         <IdN> top_down::ReceiveParent<IdN, Self>
         top_down::FileSysReceiver
+        bottom_up::FileSysReceiver
         for super::Position<PathBuf, T>
     }
 }

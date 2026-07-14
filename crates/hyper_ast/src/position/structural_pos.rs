@@ -1,9 +1,7 @@
-use num::one;
 use std::fmt::Debug;
 
-use crate::PrimInt;
 use crate::store::defaults::NodeIdentifier;
-use crate::types::{NodeId, TypedNodeId};
+use crate::types::TypedNodeId;
 
 use super::{Position, tags};
 

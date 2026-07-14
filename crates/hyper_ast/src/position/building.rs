@@ -29,8 +29,8 @@ pub trait SetLineSpan<T, O> {
 
 pub mod top_down {
     use super::*;
-    pub trait CreateBuilder {
-        fn create() -> Self;
+    pub trait CreateBuilder<IdN> {
+        fn create(root: IdN) -> Self;
     }
     pub trait ReceiveDirName<O> {
         fn push(self, dir_name: &str) -> O;
@@ -53,9 +53,6 @@ pub mod top_down {
     pub trait SetFileName<O> {
         fn set_file_name(self, file_name: &str) -> O;
     }
-    // pub trait FileSysReceiver {
-    //     type InFile;
-    // }
 
     pub trait ReceiveDir<IdN, Idx, O>:
         Sized
@@ -92,6 +89,7 @@ pub mod top_down {
         type S2: ReceiveOffset<IdO, Self::S3>;
         type S3: ReceiveIdxNoSpace<Idx, Self::S4>;
         type S4: ReceiveRows<IdO, Self>;
+
         type O0: SetLineSpan<IdO, Self::O1>;
         type O1: SetNode<IdN, O>;
     }
@@ -102,8 +100,8 @@ pub mod top_down {
             + SetNode<IdN, O>
             + ReceiveOffset<IdO, T>
             + ReceiveRows<IdO, T>
-            // TODO should not be possible to add rows after having added columns
-            + ReceiveColumns<IdO, T>
+            // // TODO should not be possible to add rows after having added columns
+            // + ReceiveColumns<IdO, T>
             + ReceiveIdx<Idx, T>
             + SetLen<IdO, T>
             + SetLineSpan<IdO, T>
@@ -182,7 +180,7 @@ pub mod bottom_up {
         type SA5: ReceiveIdx<Idx, Self::SA1>;
         type SB1<OO>;
     }
-    impl<IdN, Idx, IdO, O, T> ReceiveInFile<IdN, Idx, IdO, O> for T
+    impl<IdN, Idx, IdO, O, T: FileSysReceiver> ReceiveInFile<IdN, Idx, IdO, O> for T
     where
         T: ReceiveIdx<Idx, T>
             + ReceiveNode<IdN, T>
@@ -192,10 +190,10 @@ pub mod bottom_up {
             + ReceiveRows<IdO, T>
             // TODO should not be possible to add rows after having added columns
             + ReceiveIdx<Idx, T>
-            + ReceiveDirName<T>
+            + ReceiveDirName<T::InFile<O>>
             + SetLen<IdO, T>
             + SetLineSpan<IdO, T>,
-        T: Transition<T>,
+        T: Transition<T::InFile<O>>,
         T: Transition<O>,
     {
         type SA0 = T;
@@ -204,7 +202,7 @@ pub mod bottom_up {
         type SA3 = T;
         type SA4 = T;
         type SA5 = T;
-        type SB1<OO> = T;
+        type SB1<OO> = T::InFile<O>;
     }
     pub trait ReceiveDir<IdN, Idx, O>:
         Sized + ReceiveNode<IdN, Self::S1> + SetRoot<IdN, O>
@@ -231,13 +229,13 @@ mod impl_c_p_p_receivers2 {
     use super::top_down;
     use crate::PrimInt;
 
-    impl<A: top_down::CreateBuilder, B: top_down::CreateBuilder> top_down::CreateBuilder
-        for CompoundPositionPreparer<A, B>
+    impl<IdN: Copy, A: top_down::CreateBuilder<IdN>, B: top_down::CreateBuilder<IdN>>
+        top_down::CreateBuilder<IdN> for CompoundPositionPreparer<A, B>
     {
-        fn create() -> Self {
+        fn create(root: IdN) -> Self {
             Self(
-                top_down::CreateBuilder::create(),
-                top_down::CreateBuilder::create(),
+                top_down::CreateBuilder::create(root),
+                top_down::CreateBuilder::create(root),
             )
         }
     }
@@ -431,14 +429,14 @@ macro_rules! default_impl_receivers {
     };
     (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? building::ReceiveRows<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
         impl<$($t),* , $($ido0)?> building::ReceiveRows<$ido, Self> for $b {
-            fn push(self, _row: IdO) -> Self { self }
+            fn push(self, _row: $ido) -> Self { self }
         }
         crate::position::building::
         default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
     };
     (@trt impl<$($t:ident),*> [$(<$ido0:ident>)? building::ReceiveColumns<$ido:ident, Self> $($traits:tt)*] for $b:ty) => {
         impl<$($t),* , $($ido0)?> building::ReceiveColumns<$ido, Self> for $b {
-            fn push(self, _col: IdO) -> Self { self }
+            fn push(self, _col: $ido) -> Self { self }
         }
         crate::position::building::
         default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
@@ -529,6 +527,13 @@ macro_rules! default_impl_receivers {
     };
     (@trt impl<$($t:ident),*> [top_down::FileSysReceiver $($traits:tt)*] for $b:ty) => {
         impl<$($t),*> top_down::FileSysReceiver for $b {
+            type InFile<O> = Self;
+        }
+        crate::position::building::
+        default_impl_receivers!{@trt impl<$($t),*> [$($traits)*] for $b}
+    };
+    (@trt impl<$($t:ident),*> [bottom_up::FileSysReceiver $($traits:tt)*] for $b:ty) => {
+        impl<$($t),*> bottom_up::FileSysReceiver for $b {
             type InFile<O> = Self;
         }
         crate::position::building::

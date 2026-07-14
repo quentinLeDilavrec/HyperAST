@@ -461,22 +461,16 @@ where
     where
         HAST: HyperAST,
         for<'t> LendT<'t, HAST>: WithSerialization,
-        // B: receivers_traits::top_down::ReceiveDir2<HAST::IdN, HAST::Idx, usize, O>
         B: building::top_down::ReceiveDir<HAST::IdN, HAST::Idx, O>
-            + building::top_down::CreateBuilder,
+            + building::top_down::CreateBuilder<HAST::IdN>,
         B::SB1<O>: building::top_down::ReceiveInFile<HAST::IdN, HAST::Idx, usize, O>,
     {
-        let mut builder: B = building::top_down::CreateBuilder::create();
         let stores = self.stores;
         let mut x = self.src.root();
         let mut offsets_iter = self.src.iter_offsets();
 
-        // let mut aaa = PathBuf::default();
-        // let mut offset = 0;
-        // let mut path_ids = vec![];
-        // let mut no_spaces = vec![];
-        // let mut path = vec![];
-        // iter offsets
+        let mut builder: B = building::top_down::CreateBuilder::create(x.clone());
+
         use building::{Transition, top_down::ReceiveIdx};
         let mut builder: B::SB1<O> = {
             loop {

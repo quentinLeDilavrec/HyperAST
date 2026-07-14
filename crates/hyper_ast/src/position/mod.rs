@@ -88,14 +88,23 @@ pub struct WithHyperAstPositionConverter<'store, 'src, SrcPos, HAST> {
 
 pub mod building;
 
+/// different layouts for path and positions
+///
+/// these serves mostly as implementation markers,
+/// from a user perspective they should probably not show up much.
+///
+/// For example, with top down offsets,
+/// the traversal should be implemented differently if it is pre- or post- order,
+/// as to choose if we iterate the list of offsets in order or in reverse order
 pub mod tags {
-    #[derive(Clone, Copy, Debug)]
+    // TODO maybe make a NoSpace generic struct, it would help factorize some implementations
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct TopDownNoSpace;
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct TopDownFull;
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct BottomUpNoSpace;
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct BottomUpFull;
 }
 
@@ -112,6 +121,8 @@ pub use offsets::*;
 pub mod file_and_offset;
 
 pub type Position = file_and_offset::Position<std::path::PathBuf, usize>;
+pub type RootedPosition<IdN> =
+    rooted_wrapper::RootedWrapper<IdN, file_and_offset::Position<std::path::PathBuf, usize>>;
 
 pub mod offsets_and_nodes;
 pub use offsets_and_nodes::*;
@@ -134,7 +145,7 @@ pub mod computing_offset_bottom_up;
 mod computing_offset_top_down;
 pub use computing_offset_top_down::{compute_position, compute_position_and_nodes, compute_range};
 
-mod computing_path;
+pub mod computing_path;
 pub use computing_path::resolve_range;
 
 // advanced optimization, uses a dag StructuralPositionStore to share parent paths
@@ -147,3 +158,9 @@ pub type StructuralPosition<IdN = NodeIdentifier, Idx = u16> =
     structural_pos::StructuralPosition<IdN, Idx>;
 
 pub mod conversions_impls;
+
+pub mod conversion_observer;
+pub mod rooted_wrapper;
+
+#[cfg(test)]
+mod tests;

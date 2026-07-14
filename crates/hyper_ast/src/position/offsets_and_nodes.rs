@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use super::{TreePath, TreePathMut, tags};
+use super::{TreePath, TreePathMut, position_accessors, tags};
 use crate::PrimInt;
 use crate::types::{HyperAST, NodeId, NodeStore as _, Tree as _, WithChildren as _};
 
@@ -14,13 +14,13 @@ pub struct StructuralPosition<IdN, Idx, Config = tags::TopDownFull> {
 
 impl<IdN, C, Idx> super::node_filter_traits::Full for StructuralPosition<IdN, Idx, C> {}
 
-impl<IdN: Debug, Idx: Debug> std::fmt::Debug for StructuralPosition<IdN, Idx, tags::TopDownFull> {
+impl<IdN: Debug, Idx: Debug> Debug for StructuralPosition<IdN, Idx, tags::TopDownFull> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SP{{{:?} {:?} TopDown}}", &self.parents, &self.offsets)
     }
 }
 
-impl<IdN: Debug, Idx: Debug> std::fmt::Debug for StructuralPosition<IdN, Idx, tags::BottomUpFull> {
+impl<IdN: Debug, Idx: Debug> Debug for StructuralPosition<IdN, Idx, tags::BottomUpFull> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "SP{{{:?} {:?} BottomUp}}", &self.parents, &self.offsets)
     }
@@ -98,17 +98,13 @@ impl<IdN, Idx, C> StructuralPosition<IdN, Idx, C> {
     }
 }
 
-impl<IdN, Idx: PrimInt, C> super::position_accessors::WithOffsets
-    for StructuralPosition<IdN, Idx, C>
-{
+impl<IdN, Idx: PrimInt, C> position_accessors::WithOffsets for StructuralPosition<IdN, Idx, C> {
     type Idx = Idx;
 }
 
-impl<IdN, Idx: PrimInt> super::position_accessors::WithPath<IdN> for StructuralPosition<IdN, Idx> {}
+impl<IdN, Idx: PrimInt, C> position_accessors::WithPath<IdN> for StructuralPosition<IdN, Idx, C> {}
 
-impl<IdN, Idx: PrimInt> super::position_accessors::WithPreOrderOffsets
-    for StructuralPosition<IdN, Idx>
-{
+impl<IdN, Idx: PrimInt> position_accessors::WithPreOrderOffsets for StructuralPosition<IdN, Idx> {
     type It<'a>
         = SPIter<'a, Idx>
     where
@@ -122,9 +118,7 @@ impl<IdN, Idx: PrimInt> super::position_accessors::WithPreOrderOffsets
     }
 }
 
-impl<IdN, Idx: PrimInt> super::position_accessors::WithPostOrderOffsets
-    for StructuralPosition<IdN, Idx>
-{
+impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets for StructuralPosition<IdN, Idx> {
     fn iter(&self) -> impl Iterator<Item = Self::Idx> {
         self.offsets[1..]
             .iter()
@@ -134,16 +128,16 @@ impl<IdN, Idx: PrimInt> super::position_accessors::WithPostOrderOffsets
     }
 }
 
-impl<IdN: Copy, Idx: PrimInt> super::position_accessors::WithPostOrderPath<IdN>
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithPostOrderPath<IdN>
     for StructuralPosition<IdN, Idx>
 {
     fn iter_offsets_and_parents(&self) -> impl Iterator<Item = (Self::Idx, IdN)> {
-        super::position_accessors::WithPostOrderOffsets::iter(self)
+        position_accessors::WithPostOrderOffsets::iter(self)
             .zip(self.parents.iter().rev().skip(1).cloned())
     }
 }
 
-impl<IdN: Copy, Idx: PrimInt> super::position_accessors::RootedPosition<IdN>
+impl<IdN: Copy, Idx: PrimInt> position_accessors::RootedPosition<IdN>
     for StructuralPosition<IdN, Idx>
 {
     fn root(&self) -> IdN {
@@ -157,7 +151,7 @@ impl<IdN: Copy, Idx: PrimInt> StructuralPosition<IdN, Idx> {
     }
 }
 
-impl<IdN: Copy, Idx: PrimInt> super::position_accessors::WithFullPostOrderPath<IdN>
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithFullPostOrderPath<IdN>
     for StructuralPosition<IdN, Idx>
 {
     fn iter_with_nodes(&self) -> (IdN, impl Iterator<Item = (Self::Idx, IdN)>) {
@@ -166,7 +160,7 @@ impl<IdN: Copy, Idx: PrimInt> super::position_accessors::WithFullPostOrderPath<I
     }
 }
 
-impl<IdN: Copy, Idx: PrimInt> super::position_accessors::SolvedPosition<IdN>
+impl<IdN: Copy, Idx: PrimInt> position_accessors::SolvedPosition<IdN>
     for StructuralPosition<IdN, Idx>
 {
     fn node(&self) -> IdN {
@@ -174,7 +168,7 @@ impl<IdN: Copy, Idx: PrimInt> super::position_accessors::SolvedPosition<IdN>
     }
 }
 
-impl<IdN: Copy, Idx: PrimInt> super::position_accessors::SolvedPosition<IdN>
+impl<IdN: Copy, Idx: PrimInt> position_accessors::SolvedPosition<IdN>
     for &StructuralPosition<IdN, Idx>
 {
     fn node(&self) -> IdN {
@@ -193,13 +187,25 @@ impl<Idx: PrimInt> Iterator for SPIter<'_, Idx> {
 }
 
 /// BottomUp content
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SolvedStructuralPosition<IdN, Idx, Config = tags::TopDownFull> {
     pub(super) parents: Vec<IdN>,
     pub(super) offsets: Vec<Idx>,
     pub(super) node: IdN,
     _phantom: std::marker::PhantomData<Config>,
 }
+
+impl<IdN: Debug, Idx: Debug, Config: Debug> Debug for SolvedStructuralPosition<IdN, Idx, Config> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SolvedStructuralPosition")
+            .field("parents", &format_args!("{:?}", &self.parents))
+            .field("offsets", &format_args!("{:?}", &self.offsets))
+            .field("node", &self.node)
+            .field("config", &std::any::type_name::<Config>())
+            .finish()
+    }
+}
+
 impl<IdN, Idx, C> From<SolvedStructuralPosition<IdN, Idx, C>> for (IdN, Vec<Idx>) {
     fn from(val: SolvedStructuralPosition<IdN, Idx, C>) -> Self {
         (val.node, val.offsets)
@@ -214,15 +220,9 @@ impl<IdN, Idx, C> From<SolvedStructuralPosition<IdN, Idx, C>> for StructuralPosi
         }
     }
 }
-// #[derive(Clone, Debug)]
-// pub struct RootedStructuralPosition<IdN, Idx> {
-//     pub(super) nodes: Vec<IdN>,
-//     pub(super) offsets: Vec<Idx>,
-//     pub(super) root: IdN,
-// }
 
-impl<IdN: Copy, Idx: PrimInt> super::position_accessors::SolvedPosition<IdN>
-    for SolvedStructuralPosition<IdN, Idx>
+impl<IdN: Copy, Idx: PrimInt, C> position_accessors::SolvedPosition<IdN>
+    for SolvedStructuralPosition<IdN, Idx, C>
 {
     fn node(&self) -> IdN {
         self.node
@@ -347,7 +347,114 @@ impl<IdN, Idx: num::Zero> From<IdN> for StructuralPosition<IdN, Idx> {
     }
 }
 
+impl<IdN: Clone, Idx> position_accessors::RootedPosition<IdN>
+    for SolvedStructuralPosition<IdN, Idx>
+{
+    fn root(&self) -> IdN {
+        self.parents[0].clone()
+    }
+}
+
+impl<IdN, Idx: PrimInt, C> position_accessors::WithOffsets
+    for SolvedStructuralPosition<IdN, Idx, C>
+{
+    type Idx = Idx;
+}
+
+impl<IdN: Clone, Idx: PrimInt> position_accessors::WithPreOrderOffsets
+    for SolvedStructuralPosition<IdN, Idx>
+{
+    type It<'a>
+        = std::iter::Copied<std::slice::Iter<'a, Idx>>
+    where
+        Self: 'a,
+        Self::Idx: 'a;
+
+    fn iter_offsets(&self) -> Self::It<'_> {
+        self.offsets.iter().copied()
+    }
+}
+
+impl<IdN, Idx> super::node_filter_traits::Full for SolvedStructuralPosition<IdN, Idx> {}
+
+impl<IdN, Idx> super::node_filter_traits::Full
+    for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
+{
+}
+
+impl<IdN, Idx: PrimInt, C> position_accessors::WithPath<IdN>
+    for SolvedStructuralPosition<IdN, Idx, C>
+{
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets
+    for SolvedStructuralPosition<IdN, Idx>
+{
+    fn iter(&self) -> impl Iterator<Item = Self::Idx> {
+        self.offsets[1..]
+            .iter()
+            .rev()
+            .cloned()
+            .map(|o| o - num::one())
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithPostOrderPath<IdN>
+    for SolvedStructuralPosition<IdN, Idx>
+{
+    fn iter_offsets_and_parents(&self) -> impl Iterator<Item = (Self::Idx, IdN)> {
+        position_accessors::WithPostOrderOffsets::iter(self)
+            .zip(self.parents.iter().rev().skip(1).cloned())
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithFullPostOrderPath<IdN>
+    for SolvedStructuralPosition<IdN, Idx>
+{
+    fn iter_with_nodes(&self) -> (IdN, impl Iterator<Item = (Self::Idx, IdN)>) {
+        use crate::position::position_accessors::SolvedPosition;
+        use crate::position::position_accessors::WithPostOrderPath;
+        (self.node(), self.iter_offsets_and_parents())
+    }
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets
+    for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
+{
+    fn iter(&self) -> impl Iterator<Item = Self::Idx> {
+        self.offsets[..self.offsets.len()].iter().cloned()
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithPostOrderPath<IdN>
+    for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
+{
+    fn iter_offsets_and_parents(&self) -> impl Iterator<Item = (Self::Idx, IdN)> {
+        position_accessors::WithPostOrderOffsets::iter(self).zip(self.parents.iter().rev().cloned())
+    }
+}
+
+impl<IdN: Clone, Idx> position_accessors::RootedPosition<IdN>
+    for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
+{
+    fn root(&self) -> IdN {
+        self.parents.last().cloned().unwrap()
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithFullPostOrderPath<IdN>
+    for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
+{
+    fn iter_with_nodes(&self) -> (IdN, impl Iterator<Item = (Self::Idx, IdN)>) {
+        use crate::position::position_accessors::SolvedPosition;
+        use crate::position::position_accessors::WithPostOrderPath;
+        (self.node(), self.iter_offsets_and_parents())
+    }
+}
+
 mod impl_c_p_p_receivers {
+
+    use crate::position::tags;
 
     use super::super::building;
     use super::PrimInt;
@@ -356,8 +463,8 @@ mod impl_c_p_p_receivers {
     use building::bottom_up;
     use building::top_down;
 
-    impl<IdN, Idx: PrimInt, C> top_down::CreateBuilder for StructuralPosition<IdN, Idx, C> {
-        fn create() -> Self {
+    impl<IdN, Idx: PrimInt, C> top_down::CreateBuilder<IdN> for StructuralPosition<IdN, Idx, C> {
+        fn create(_root: IdN) -> Self {
             Self {
                 offsets: vec![],
                 parents: vec![],
@@ -366,22 +473,47 @@ mod impl_c_p_p_receivers {
         }
     }
 
-    // impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdx<Idx, Self> for SolvedStructuralPosition<IdN, Idx, C> {
-    //     fn push(mut self, idx: Idx) -> Self {
-    //         self.offsets.push(idx);
-    //         self
-    //     }
-    // }
+    impl<IdN, Idx, C> top_down::ReceiveParent<IdN, Self> for StructuralPosition<IdN, Idx, C> {
+        fn push(mut self, parent: IdN) -> Self {
+            self.parents.push(parent);
+            self
+        }
+    }
 
-    // impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdxNoSpace<Idx, Self> for SolvedStructuralPosition<IdN, Idx, C> {
-    //     fn push(self, _idx: Idx) -> Self {
-    //         //self.offsets.push(idx);
-    //         self
-    //     }
-    // }
+    impl<IdN, Idx> top_down::ReceiveIdx<Idx, Self> for StructuralPosition<IdN, Idx, tags::TopDownFull> {
+        fn push(mut self, idx: Idx) -> Self {
+            self.offsets.push(idx);
+            self
+        }
+    }
 
-    impl<IdN, Idx: PrimInt, C> top_down::ReceiveIdxNoSpace<Idx, Self>
-        for StructuralPosition<IdN, Idx, C>
+    impl<IdN, Idx> top_down::ReceiveIdx<Idx, Self>
+        for StructuralPosition<IdN, Idx, tags::BottomUpFull>
+    {
+        fn push(mut self, idx: Idx) -> Self {
+            self.offsets.insert(0, idx);
+            self
+        }
+    }
+
+    impl<IdN, Idx> top_down::ReceiveIdxNoSpace<Idx, Self>
+        for StructuralPosition<IdN, Idx, tags::TopDownFull>
+    {
+        fn push(self, _idx: Idx) -> Self {
+            self
+        }
+    }
+
+    impl<IdN, Idx> top_down::ReceiveIdxNoSpace<Idx, Self>
+        for StructuralPosition<IdN, Idx, tags::BottomUpFull>
+    {
+        fn push(self, _idx: Idx) -> Self {
+            self
+        }
+    }
+
+    impl<IdN, Idx> top_down::ReceiveIdxNoSpace<Idx, Self>
+        for StructuralPosition<IdN, Idx, tags::TopDownNoSpace>
     {
         fn push(mut self, idx: Idx) -> Self {
             self.offsets.push(idx);
@@ -411,8 +543,6 @@ mod impl_c_p_p_receivers {
             <IdO> building::ReceiveColumns<IdO, Self>
             top_down::ReceiveDirName<Self>
             bottom_up::ReceiveDirName<Self>
-            top_down::ReceiveParent<IdN, Self>
-            top_down::ReceiveIdx<Idx, Self>
             <IdO> top_down::ReceiveOffset<IdO, Self>
             top_down::SetFileName<Self>
             <IdO> building::SetLen<IdO, Self>

@@ -47,8 +47,8 @@ mod impl_receivers {
     use building::bottom_up;
     use building::top_down;
 
-    impl<T: PrimInt> top_down::CreateBuilder for super::RowCol<T> {
-        fn create() -> Self {
+    impl<T: PrimInt, IdN> top_down::CreateBuilder<IdN> for super::RowCol<T> {
+        fn create(_root: IdN) -> Self {
             Self {
                 row: num::zero(),
                 col: num::zero(),
@@ -97,6 +97,7 @@ mod impl_receivers {
         building::SetLineSpan<T, Self>
         <IdN> top_down::ReceiveParent<IdN, Self>
         top_down::FileSysReceiver
+        bottom_up::FileSysReceiver
         for super::RowCol<T>
     }
 

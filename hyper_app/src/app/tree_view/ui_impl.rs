@@ -119,14 +119,7 @@ impl<'a> FetchedViewImpl<'a> {
                 let label = if let Some(label) = label_store.try_resolve(&label) {
                     label
                 } else {
-                    if !(self.store.labels_pending.lock().unwrap())
-                        .iter()
-                        .any(|x| x.contains(&label))
-                    {
-                        (self.store.labels_waiting.lock().unwrap())
-                            .get_or_insert(Default::default())
-                            .insert(label);
-                    }
+                    self.store.demand_label(label);
                     "..."
                 };
                 let mut label = egui::RichText::new(label);
@@ -489,14 +482,7 @@ impl<'a> FetchedViewImpl<'a> {
                 .replace("\t", "\\t")
                 .replace(" ", "·")
         } else {
-            if !(self.store.labels_pending.lock().unwrap())
-                .iter()
-                .any(|x| x.contains(&label))
-            {
-                (self.store.labels_waiting.lock().unwrap())
-                    .get_or_insert(Default::default())
-                    .insert(label);
-            }
+            self.store.demand_label(label);
             "...".to_string()
         };
         let no_change = self.additions.is_none() && self.deletions.is_none();
@@ -1015,14 +1001,7 @@ impl<'a> FetchedViewImpl<'a> {
                 ..Default::default()
             });
             _size = None;
-            if !(self.store.nodes_pending.lock().unwrap())
-                .iter()
-                .any(|x| x.contains(c))
-            {
-                (self.store.nodes_waiting.lock().unwrap())
-                    .get_or_insert(Default::default())
-                    .insert(*c);
-            }
+            self.store.demand_node(*c);
             if let Some(focus) = &imp.focus {
                 wasm_rs_dbg::dbg!(&focus);
                 imp.draw_count += 1;

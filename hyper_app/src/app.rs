@@ -1266,17 +1266,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 if new {
                     wasm_rs_dbg::dbg!(x.results.len());
                     let store = &data.store;
-                    let node_store = store.node_store.read().unwrap();
-                    let pending = store.nodes_pending.lock().unwrap();
-                    let mut waiting = store.nodes_waiting.lock().unwrap();
-                    let waiting = waiting.get_or_insert_default();
-                    for x in x.iter_nodes_ids() {
-                        if pending.iter().any(|y| y.contains(&x)) || node_store.contains(x) {
-                            continue;
-                        }
-                        wasm_rs_dbg::dbg!(x);
-                        waiting.insert(x);
-                    }
+                    store.demand_nodes(x.iter_nodes_ids());
                 }
                 let fetched_files = &mut data.fetched_files;
                 let api_addr = &data.api_addr;
@@ -1332,17 +1322,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 if new {
                     wasm_rs_dbg::dbg!(x.results.len());
                     let store = &data.store;
-                    let node_store = store.node_store.read().unwrap();
-                    let pending = store.nodes_pending.lock().unwrap();
-                    let mut waiting = store.nodes_waiting.lock().unwrap();
-                    let waiting = waiting.get_or_insert_default();
-                    for x in x.iter_nodes_ids() {
-                        if pending.iter().any(|y| y.contains(&x)) || node_store.contains(x) {
-                            continue;
-                        }
-                        wasm_rs_dbg::dbg!(x);
-                        waiting.insert(x);
-                    }
+                    store.demand_nodes(x.iter_nodes_ids());
                 }
                 let api_addr = &data.api_addr;
 

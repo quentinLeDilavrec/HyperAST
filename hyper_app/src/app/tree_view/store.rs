@@ -14,7 +14,9 @@ pub use fetched::{LabelIdentifier, NodeIdentifier};
 
 #[derive(Default)]
 pub struct FetchedHyperAST {
+    // the label store
     pub(crate) label_store: RwLock<FetchedLabels>,
+    /// the node store
     pub(crate) node_store: RwLock<NodeStore>,
     // /// each set is fetched sequentially, non blocking
     // /// pushed ids are tested against all pending sets because they might not have entered the store
@@ -27,12 +29,12 @@ pub struct FetchedHyperAST {
     // /// new set every 200 elements, due to id serialized size in url
     // labels_waiting: std::sync::Mutex<VecDeque<HashSet<LabelIdentifier>>>,
     /// pending ie. nodes in flight
-    pub(crate) nodes_pending: Mutex<VecDeque<HashSet<NodeIdentifier>>>,
-    pub(crate) nodes_waiting: Mutex<Option<HashSet<NodeIdentifier>>>,
-    pub(crate) labels_pending: Mutex<VecDeque<HashSet<LabelIdentifier>>>,
-    pub(crate) labels_waiting: Mutex<Option<HashSet<LabelIdentifier>>>,
-    /// timer to avoid flooding
-    pub(crate) timer: Mutex<Option<f32>>,
+    nodes_pending: Mutex<VecDeque<HashSet<NodeIdentifier>>>,
+    nodes_waiting: Mutex<Option<HashSet<NodeIdentifier>>>,
+    labels_pending: Mutex<VecDeque<HashSet<LabelIdentifier>>>,
+    labels_waiting: Mutex<Option<HashSet<LabelIdentifier>>>,
+    /// timer to avoid flooding server with requests
+    timer: Mutex<Option<f32>>,
 }
 
 impl FetchedHyperAST {
@@ -46,21 +48,108 @@ impl FetchedHyperAST {
             labels_waiting: RefCell::new(self.labels_waiting.lock().unwrap()),
         }
     }
+
     pub fn resolve_type(&self, n: &NodeIdentifier) -> AnyType {
         let ns = self.node_store.read().unwrap();
         let n: HashedNodeRef<'_, NodeIdentifier> = ns.try_resolve(*n).unwrap();
         let lang = n.get_lang();
-        match lang {
-            hyperast_gen_ts_java::Lang::NAME => {
-                AnyType::from_fetched::<hyperast_gen_ts_java::Type, hyperast_gen_ts_java::Lang>(&n)
+        resolve_type(n, lang)
+    }
+
+    /// Demand fetching of nodes from the server.
+    pub(crate) fn demand_nodes(&self, ids: impl Iterator<Item = NodeIdentifier>) {
+        let node_store = self.node_store.read().unwrap();
+        let pending = self.nodes_pending.lock().unwrap();
+        let mut waiting = self.nodes_waiting.lock().unwrap();
+        let waiting = waiting.get_or_insert_default();
+        for x in ids {
+            if pending.iter().any(|y| y.contains(&x)) || node_store.contains(x) {
+                continue;
             }
-            hyperast_gen_ts_cpp::Lang::NAME => {
-                AnyType::from_fetched::<hyperast_gen_ts_cpp::Type, hyperast_gen_ts_cpp::Lang>(&n)
-            }
-            hyperast_gen_ts_xml::Lang::NAME => {
-                AnyType::from_fetched::<hyperast_gen_ts_xml::Type, hyperast_gen_ts_xml::Lang>(&n)
-            }
-            l => unreachable!("{}", l),
+            wasm_rs_dbg::dbg!(x);
+            waiting.insert(x);
+        }
+    }
+
+    /// Demand fetching of a single node from the server.
+    pub(crate) fn demand_node(&self, id: NodeIdentifier) {
+        let pendings = self.nodes_pending.lock().unwrap();
+        if !pendings.iter().any(|x| x.contains(&id)) {
+            let mut waiting = self.nodes_waiting.lock().unwrap();
+            waiting.get_or_insert_default().insert(id);
+        }
+    }
+
+    /// take and mark waiting nodes as pending to fetch them from the server.
+    #[must_use]
+    pub(crate) fn prepare_fetching_nodes(&self) -> Option<HashSet<NodeIdentifier>> {
+        let waiting = self.nodes_waiting.lock().unwrap().take()?;
+        let mut pendings = self.nodes_pending.lock().unwrap();
+        pendings.push_back(waiting.clone());
+        Some(waiting)
+    }
+
+    pub fn extend_nodes(
+        &self,
+        ids: HashSet<NodeIdentifier>,
+        mut simple_packed: fetched::SimplePacked<String>,
+    ) {
+        // TODO look at the behavior of this pop
+        let p = self.nodes_pending.lock().unwrap().pop_front().unwrap();
+        if ids != p {
+            log::warn!("different set of nodes was fetched than expected");
+        }
+        let mut node_store = self.node_store.write().unwrap();
+        // Hack to avoid duplicates
+        for x in &mut simple_packed.storages_variants {
+            x.remove_if(|id| node_store.contains(*id));
+        }
+        node_store.extend(simple_packed);
+    }
+
+    /// Demand fetching a label from the server.
+    pub(crate) fn demand_label(&self, id: LabelIdentifier) {
+        let pendings = self.labels_pending.lock().unwrap();
+        if !pendings.iter().any(|x| x.contains(&id)) {
+            let mut waiting = self.labels_waiting.lock().unwrap();
+            waiting.get_or_insert_default().insert(id);
+        }
+    }
+
+    /// take and mark waiting labels as pending to fetch them from the server.
+    #[must_use]
+    pub(crate) fn prepare_fetching_labels(&self) -> Option<HashSet<LabelIdentifier>> {
+        let waiting = self.labels_waiting.lock().unwrap().take()?;
+        let mut pendings = self.labels_pending.lock().unwrap();
+        pendings.push_back(waiting.clone());
+        Some(waiting)
+    }
+
+    pub fn extend_labels(&self, fetched_labels: crate::app::code_aspects::FetchedLabels) {
+        // TODO look at the behavior of this pop
+        self.labels_pending.lock().unwrap().pop_front();
+        let mut hash_map = self.label_store.write().unwrap();
+        let label_ids = fetched_labels.label_ids.into_iter();
+        for (k, v) in label_ids.zip(fetched_labels.labels) {
+            hash_map.insert(k, v);
+        }
+    }
+
+    /// check timer to avoid flooding server with requests
+    pub(crate) fn update_timer(&self, ui: &mut egui::Ui) -> bool {
+        let mut lock = self.timer.lock().unwrap();
+        let Some(mut timer) = lock.take() else {
+            *lock = Some(0.0);
+            return true;
+        };
+        let dt = ui.input(|mem| mem.unstable_dt);
+        timer += dt;
+        if timer < std::time::Duration::from_secs(1).as_secs_f32() {
+            *lock = Some(timer);
+            true
+        } else {
+            *lock = Some(0.0);
+            false
         }
     }
 }
@@ -92,7 +181,7 @@ impl<'b> hyperast::types::NodeStore<NodeIdentifier> for LockedFetchedHyperAST<'b
             if !self.nodes_pending.iter().any(|x| x.contains(id)) {
                 self.nodes_waiting
                     .borrow_mut()
-                    .get_or_insert(Default::default())
+                    .get_or_insert_default()
                     .insert(*id);
             }
             // unimplemented!()
@@ -123,7 +212,7 @@ impl<'b> hyperast::types::LabelStore<str> for LockedFetchedHyperAST<'b> {
             if !self.labels_pending.iter().any(|x| x.contains(id)) {
                 self.labels_waiting
                     .borrow_mut()
-                    .get_or_insert(Default::default())
+                    .get_or_insert_default()
                     .insert(*id);
             }
             "."
@@ -168,18 +257,7 @@ impl<'a> hyperast::types::HyperAST for LockedFetchedHyperAST<'a> {
             return unsafe { AnyType::make(t) };
         };
         let lang = n.get_lang();
-        match lang {
-            hyperast_gen_ts_java::Lang::NAME => {
-                AnyType::from_fetched::<hyperast_gen_ts_java::Type, hyperast_gen_ts_java::Lang>(&n)
-            }
-            hyperast_gen_ts_cpp::Lang::NAME => {
-                AnyType::from_fetched::<hyperast_gen_ts_cpp::Type, hyperast_gen_ts_cpp::Lang>(&n)
-            }
-            hyperast_gen_ts_xml::Lang::NAME => {
-                AnyType::from_fetched::<hyperast_gen_ts_xml::Type, hyperast_gen_ts_xml::Lang>(&n)
-            }
-            l => unreachable!("{}", l),
-        }
+        resolve_type(n, lang)
     }
 }
 
@@ -188,4 +266,18 @@ impl std::hash::Hash for FetchedHyperAST {
         self.label_store.read().unwrap().len().hash(state);
         self.node_store.read().unwrap().len().hash(state);
     }
+}
+
+fn resolve_type(n: HashedNodeRef<'_, NodeIdentifier>, lang: &str) -> AnyType {
+    macro_rules! aux {
+        ($g:ident) => {
+            if lang == $g::Lang::NAME {
+                return AnyType::from_fetched::<$g::Type, $g::Lang>(&n);
+            }
+        };
+    }
+    aux!(hyperast_gen_ts_java);
+    aux!(hyperast_gen_ts_cpp);
+    aux!(hyperast_gen_ts_xml);
+    unreachable!("{}", lang)
 }

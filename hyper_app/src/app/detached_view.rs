@@ -478,11 +478,7 @@ fn show_element_content(
     }
     let node_store = store.node_store.read().unwrap();
     let Some(r) = node_store.try_resolve::<AnyType>(*id) else {
-        let pendings = store.nodes_pending.lock().unwrap();
-        if !pendings.iter().any(|x| x.contains(id)) {
-            let mut waiting = store.nodes_waiting.lock().unwrap();
-            waiting.get_or_insert(Default::default()).insert(*id);
-        }
+        store.demand_node(*id);
         return;
     };
     if options.kind {
@@ -528,18 +524,15 @@ fn retrieve_extra(
     name: &mut Option<String>,
     r_id: NodeIdentifier,
 ) {
-    use hyperast::types::{AnyType, Labeled as _};
+    use hyperast::types::AnyType;
+    use hyperast::types::Labeled as _;
     use hyperast::types::{HyperType as _, WithChildren as _};
     if value.is_some() && name.is_some() {
         return;
     }
     let node_store = store.node_store.read().unwrap();
     let Some(r) = node_store.try_resolve::<AnyType>(r_id) else {
-        let pending = store.nodes_pending.lock().unwrap();
-        if !pending.iter().any(|x| x.contains(&r_id)) {
-            let mut waiting = store.nodes_waiting.lock().unwrap();
-            waiting.get_or_insert(Default::default()).insert(r_id);
-        }
+        store.demand_node(r_id);
         return;
     };
     use hyperast::types::Shared;
@@ -548,29 +541,19 @@ fn retrieve_extra(
         let Some(l) = r.try_get_label() else {
             return;
         };
-        if let Some(l) = store.label_store.read().unwrap().try_resolve(&l) {
+        if let Some(l) = store.label_store.read().unwrap().try_resolve(l) {
             *value = Some(l.to_owned());
-        } else if !(store.labels_pending.lock().unwrap())
-            .iter()
-            .any(|x| x.contains(l))
-        {
-            (store.labels_waiting.lock().unwrap())
-                .get_or_insert(Default::default())
-                .insert(*l);
+        } else {
+            store.demand_label(*l);
         }
     } else if t.as_shared() == Shared::Identifier && name.is_none() {
         let Some(l) = r.try_get_label() else {
             return;
         };
-        if let Some(l) = store.label_store.read().unwrap().try_resolve(&l) {
+        if let Some(l) = store.label_store.read().unwrap().try_resolve(l) {
             *name = Some(l.to_owned());
-        } else if !(store.labels_pending.lock().unwrap())
-            .iter()
-            .any(|x| x.contains(l))
-        {
-            (store.labels_waiting.lock().unwrap())
-                .get_or_insert(Default::default())
-                .insert(*l);
+        } else {
+            store.demand_label(*l);
         }
     } else if let Some(cs) = r.children() {
         cs.0.iter().for_each(|x| q.push_back(*x));
@@ -592,14 +575,21 @@ struct O {
 impl O {
     fn on_input(self, ctx: &egui::Context, id: egui::Id) {
         const NONE: egui::Modifiers = egui::Modifiers::NONE;
-        macro_rules! keys { ($($id:ident, $key:ident,)*) => {{
+        macro_rules! keys { ($($id:ident: $key:ident,)*) => {{
             let o = ctx.input_mut(|inp|{ O {$(
                 $id: self.$id ^ inp.consume_key(NONE, egui::Key::$key)
             ),*}});
             ctx.memory_mut(|mem| mem.data.insert_temp::<O>(id, o));
         }}}
         keys!(
-            id, I, commit, C, file, F, path, P, kind, K, label, L, size, S, extra, Y,
+            id: I,
+            commit: C,
+            file: F,
+            path: P,
+            kind: K,
+            label: L,
+            size: S,
+            extra: Y,
         )
     }
 }

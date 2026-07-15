@@ -385,7 +385,7 @@ pub(super) fn remote_fetch_nodes_by_ids(
 ) -> Promise<Result<Resource<()>, String>> {
     let mut url = format!("http://{}/fetch-ids", api_addr,);
     // TODO group ids by arch
-    for id in ids {
+    for id in &ids {
         url.push('/');
         let id = id.to_u32();
         url += &id.to_string();
@@ -393,19 +393,14 @@ pub(super) fn remote_fetch_nodes_by_ids(
     let request = ehttp::Request::get(&url);
     let store = store.clone();
     fetch(ctx.clone(), request, move |response| {
-        store.nodes_pending.lock().unwrap().pop_front();
         let res = Resource::<FetchedNodes>::from_resp(response);
-        let mut node_store = store.node_store.write().unwrap();
-        let mut raw = res.content.unwrap().node_store;
-        // Hack
-        for x in &mut raw.storages_variants {
-            x.remove_if(|id| node_store.contains(*id));
-        }
-        node_store.extend(raw);
-        Resource {
-            response: res.response,
-            content: Some(()),
-        }
+        res.map(|simple_packed| store.extend_nodes(ids, simple_packed.node_store))
+        // let content = res.content;
+        // store.extend_nodes(ids, content.map(|x| x.node_store));
+        // Resource {
+        //     response: res.response,
+        //     content: Some(()),
+        // }
     })
 }
 
@@ -426,16 +421,13 @@ pub(super) fn remote_fetch_labels(
     let request = ehttp::Request::get(&url);
     let store = store.clone();
     fetch(ctx.clone(), request, move |response| {
-        // TODO look at the behavior of this pop
-        store.labels_pending.lock().unwrap().pop_front();
         let res = Resource::<FetchedLabels>::from_resp(response);
-        res.map(|fetched_labels| {
-            let mut hash_map = store.label_store.write().unwrap();
-            let label_ids = fetched_labels.label_ids.into_iter();
-            for (k, v) in label_ids.zip(fetched_labels.labels) {
-                hash_map.insert(k, v);
-            }
-        })
+        res.map(|fetched_labels| store.extend_labels(fetched_labels))
+        // store.extend_labels(res.content);
+        // Resource {
+        //     response: res.response,
+        //     content: Some(()),
+        // }
     })
 }
 
@@ -465,6 +457,6 @@ pub struct FetchedNode {
 
 #[derive(serde::Deserialize, Clone, Debug)]
 pub struct FetchedLabels {
-    label_ids: Vec<LabelIdentifier>,
-    labels: Vec<String>,
+    pub(crate) label_ids: Vec<LabelIdentifier>,
+    pub(crate) labels: Vec<String>,
 }

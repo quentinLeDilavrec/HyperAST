@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use std::time::Duration;
 
 use super::code_aspects::{HighLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids};
 
@@ -119,20 +118,18 @@ impl<'a> FetchedViewImpl<'a> {
             let cs = r.children();
             let size = r.size();
             self.global_pos = Some(size as u32);
-            if let Some(cs) = cs {
-                if let Some(label) = l {
-                    let cs = cs.0.to_vec();
-                    // NOTE: Why would it be an issue ?
-                    // if let Some(label) = self.store.label_store.read().unwrap().try_resolve(&label) {
-                    //     assert_eq!("", label, "{:?} {:?} {:?}", root, cs.len(), node_store);
-                    // }
-                    drop(node_store);
-                    self.ui_both_impl(ui, kind, size as u32, *root, label, cs.as_ref())
-                } else {
-                    let cs = cs.0.to_vec();
-                    drop(node_store);
-                    self.ui_children_impl2(ui, kind, size as u32, *root, cs.as_ref())
-                }
+            if let (Some(cs), Some(label)) = (&cs, l) {
+                let cs = cs.0.to_vec();
+                // NOTE: Why would it be an issue ?
+                // if let Some(label) = self.store.label_store.read().unwrap().try_resolve(&label) {
+                //     assert_eq!("", label, "{:?} {:?} {:?}", root, cs.len(), node_store);
+                // }
+                drop(node_store);
+                self.ui_both_impl(ui, kind, size as u32, *root, label, cs.as_ref())
+            } else if let Some(cs) = cs {
+                let cs = cs.0.to_vec();
+                drop(node_store);
+                self.ui_children_impl2(ui, kind, size as u32, *root, cs.as_ref())
             } else if let Some(label) = l {
                 drop(node_store);
                 self.ui_labeled_impl2(ui, kind, size as u32, *root, label)
@@ -141,56 +138,23 @@ impl<'a> FetchedViewImpl<'a> {
                 self.ui_typed_impl2(ui, kind, size as u32)
             }
         } else {
-            if !(self.store.nodes_pending.lock().unwrap())
-                .iter()
-                .any(|x| x.contains(root))
-            {
-                (self.store.nodes_waiting.lock().unwrap())
-                    .get_or_insert(Default::default())
-                    .insert(*root);
-            }
+            drop(node_store);
+            self.store.demand_node(*root);
             Action::Keep
         };
 
-        let mut lock = self.store.timer.lock().unwrap();
-        if let Some(mut timer) = lock.take() {
-            let dt = ui.input(|mem| mem.unstable_dt);
-            timer += dt;
-            if timer < Duration::from_secs(1).as_secs_f32() {
-                *lock = Some(timer);
-                return action;
-            } else {
-                *lock = Some(0.0);
-            }
-        } else {
-            *lock = Some(0.0);
+        if self.store.update_timer(ui) {
             return action;
         }
-        drop(lock);
 
-        if let Some(waiting) = self.store.nodes_waiting.lock().unwrap().take() {
-            (self.store.nodes_pending.lock().unwrap()).push_back(waiting.clone());
-            remote_fetch_nodes_by_ids(
-                ui.ctx(),
-                api_addr,
-                self.store.clone(),
-                &self.aspects.commit.repo,
-                waiting,
-            )
-            .ready();
-            // TODO need to use promise ?
+        let repo = &self.aspects.commit.repo;
+        if let Some(waiting) = self.store.prepare_fetching_nodes() {
+            let store = self.store.clone();
+            remote_fetch_nodes_by_ids(ui.ctx(), api_addr, store, repo, waiting).ready();
         };
-        if let Some(waiting) = self.store.labels_waiting.lock().unwrap().take() {
-            (self.store.labels_pending.lock().unwrap()).push_back(waiting.clone());
-            remote_fetch_labels(
-                ui.ctx(),
-                api_addr,
-                self.store.clone(),
-                &self.aspects.commit.repo,
-                waiting,
-            )
-            .ready();
-            // TODO need to use promise ?
+        if let Some(waiting) = self.store.prepare_fetching_labels() {
+            let store = self.store.clone();
+            remote_fetch_labels(ui.ctx(), api_addr, store, repo, waiting).ready();
         };
         action
     }

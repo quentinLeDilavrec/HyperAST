@@ -34,7 +34,10 @@ pub(crate) fn ui_detached<'a>(
         future: hovered_fut,
     } = ui_detached_nodes(ui, store, link_config, col_width, it);
     if let (Some(hovered_fut), Some(released_past)) = (hovered_fut, released_past) {
-        additional_links.push([hovered_fut, released_past]);
+        let value = [hovered_fut, released_past];
+        if !additional_links.contains(&value) {
+            additional_links.push(value);
+        }
     }
     for [m, src] in additional_links {
         let m_rect = *rendered.get(m).unwrap();

@@ -107,7 +107,7 @@ impl<'a> FetchedViewImpl<'a> {
         if self.focus.is_some() {
             load_with_default_open.set_open(true)
         } else if self.open_changed
-            && (!add.is_empty() || !del.is_empty() || !self.hightlights.is_empty())
+            && (!add.is_empty() || !del.is_empty() || !self.highlights.is_empty())
         {
             load_with_default_open.set_open(true)
         }
@@ -179,7 +179,7 @@ impl<'a> FetchedViewImpl<'a> {
         );
         rect.max.x += 10.0;
 
-        for handle in &mut self.hightlights {
+        for handle in &mut self.highlights {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
         self.prefill_cache = Some(prefill);
@@ -239,7 +239,7 @@ impl<'a> FetchedViewImpl<'a> {
         if self.focus.is_some() {
             load_with_default_open.set_open(true)
         } else if self.open_changed
-            && (!add.is_empty() || !del.is_empty() || !self.hightlights.is_empty())
+            && (!add.is_empty() || !del.is_empty() || !self.highlights.is_empty())
         {
             load_with_default_open.set_open(true)
         }
@@ -279,7 +279,7 @@ impl<'a> FetchedViewImpl<'a> {
             );
         }
 
-        for handle in &mut self.hightlights {
+        for handle in &mut self.highlights {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
 
@@ -439,7 +439,7 @@ impl<'a> FetchedViewImpl<'a> {
             );
         }
 
-        for handle in &mut self.hightlights {
+        for handle in &mut self.highlights {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
 
@@ -608,7 +608,7 @@ impl<'a> FetchedViewImpl<'a> {
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
         prefill.head = ui.available_rect_before_wrap().min.y - min.y;
 
-        for handle in &mut self.hightlights {
+        for handle in &mut self.highlights {
             if handle.path.is_empty() {
                 selection_highlight(ui, handle, min, rect, self.root_ui_id);
             }
@@ -694,7 +694,7 @@ impl<'a> FetchedViewImpl<'a> {
 
         prefill.head = ui.available_rect_before_wrap().min.y - min.y;
 
-        for handle in &mut self.hightlights {
+        for handle in &mut self.highlights {
             selection_highlight(ui, handle, min, rect, self.root_ui_id);
         }
         self.prefill_cache = Some(prefill);
@@ -858,8 +858,8 @@ impl<'a> FetchedViewImpl<'a> {
         {
             return ControlFlow::Break(());
         }
-        let hightlights: Vec<_> =
-            vec_extract_if_polyfill::MakeExtractIf::extract_if(&mut self.hightlights, |handle| {
+        let highlights: Vec<_> =
+            vec_extract_if_polyfill::MakeExtractIf::extract_if(&mut self.highlights, |handle| {
                 !handle.path.is_empty() && handle.path[0] == i
             })
             .map(|handle| HighLightHandle {
@@ -909,7 +909,7 @@ impl<'a> FetchedViewImpl<'a> {
                     prefill_cache: None,
                     min_before_count: 0,
                     draw_count: 0,
-                    hightlights,
+                    highlights,
                     focus,
                     path,
                     root_ui_id: self.root_ui_id,
@@ -933,7 +933,7 @@ impl<'a> FetchedViewImpl<'a> {
                 prefill_cache: prefill_old.next.take().map(|b| *b),
                 min_before_count: 0,
                 draw_count: 0,
-                hightlights,
+                highlights,
                 focus,
                 path,
                 root_ui_id: self.root_ui_id,
@@ -949,7 +949,7 @@ impl<'a> FetchedViewImpl<'a> {
                 prefill_cache: None,
                 min_before_count: 0,
                 draw_count: 0,
-                hightlights,
+                highlights,
                 focus,
                 path,
                 root_ui_id: self.root_ui_id,
@@ -1036,7 +1036,7 @@ impl<'a> FetchedViewImpl<'a> {
             } else if self.open_changed
                 && (!self.additions.unwrap_or_default().is_empty()
                     || !self.deletions.unwrap_or_default().is_empty()
-                    || !self.hightlights.is_empty())
+                    || !self.highlights.is_empty())
             {
                 let mut prefill = imp.prefill_cache.take().unwrap_or_default();
                 imp.draw_count += 1;

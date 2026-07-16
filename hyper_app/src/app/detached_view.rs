@@ -10,14 +10,16 @@ use super::types::CodeRange;
 
 const DEBUG: bool = false;
 
-pub type DetachedViewOptions = egui_addon::fancy_links::Config;
+pub type LinkConfig = egui_addon::fancy_links::Config;
+
+const D_LINE: &'static str = "drag line";
 
 pub(crate) fn ui_detached<'a>(
     ui: &mut egui::Ui,
     store: Arc<FetchedHyperAST>,
     timeline_window: egui::Rect,
     total_cols: usize,
-    detached_view_options: &DetachedViewOptions,
+    link_config: &LinkConfig,
     additional_links: &mut Vec<[CodeRange; 2]>,
     it: impl Iterator<Item = (usize, &'a mut [TrackingResult])>,
 ) {
@@ -30,14 +32,14 @@ pub(crate) fn ui_detached<'a>(
         element: rendered,
         past: released_past,
         future: hovered_fut,
-    } = ui_detached_nodes(ui, store, detached_view_options, col_width, it);
+    } = ui_detached_nodes(ui, store, link_config, col_width, it);
     if let (Some(hovered_fut), Some(released_past)) = (hovered_fut, released_past) {
         additional_links.push([hovered_fut, released_past]);
     }
     for [m, src] in additional_links {
         let m_rect = *rendered.get(m).unwrap();
         let src_rect = *rendered.get(src).unwrap();
-        detached_view_options
+        link_config
             .source(src_rect)
             .sink(m_rect)
             .paint(ui.painter());
@@ -47,262 +49,139 @@ pub(crate) fn ui_detached<'a>(
 fn ui_detached_nodes<'a>(
     ui: &mut egui::Ui,
     store: Arc<FetchedHyperAST>,
-    options: &DetachedViewOptions,
+    options: &LinkConfig,
     col_width: f32,
     it: impl Iterator<Item = (f32, &'a mut [TrackingResult])>,
 ) -> DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>> {
-    let line_id = egui::Id::new("drag line");
     let mut result = DetachedElementResp::default();
-    for (default_x, res) in it {
-        for (i, r) in res.iter_mut().enumerate() {
-            ui_detached_node(
-                ui,
-                &store,
-                options,
-                col_width,
-                line_id,
-                default_x,
-                i,
-                &mut result,
-                r,
+    let tracking_results = it.flat_map(|(d, x)| x.iter_mut().enumerate().map(move |y| (d, y)));
+    for (default_x, (i, r)) in tracking_results {
+        let show = |ui: &mut _, x: &_, id, o: &_| show_element(ui, &store, options, x, id, o);
+        let x = &mut r.src;
+        let id = ui.id().with(&x);
+        let default_pos = (default_x + col_width / 2.0, i as f32 * 50.0);
+        let resp = show_detached_element(ui, x, id, default_pos, show);
+        if DEBUG {
+            ui.painter().debug_rect(
+                resp.response.rect.expand(20.0),
+                egui::Color32::RED,
+                format!("{default_x} {i} {:?}", x.path_ids),
             );
+        }
+        interact_detached_element(ui, &mut result, x, id, &resp);
+        let resp = resp.inner.element;
+        let src_rect = resp.rect;
+        for x in &mut r.matched {
+            if let Some(m_pos) = result.element.get(&x) {
+                options.source(src_rect).sink(*m_pos).paint(ui.painter());
+                continue;
+            }
+            let id = ui.id().with(&x);
+            let default_pos = (default_x, i as f32 * 50.0);
+            let resp = show_detached_element(ui, x, id, default_pos, show);
+            if DEBUG {
+                ui.painter().debug_rect(
+                    resp.response.rect.expand(20.0),
+                    egui::Color32::BLUE,
+                    format!(
+                        "{default_x} {i} {:?}\n{:?}\n{}",
+                        x.file,
+                        x.path_ids,
+                        all(&result, x)
+                    ),
+                );
+            }
+            interact_detached_element(ui, &mut result, x, id, &resp);
+            let m_rect = resp.inner.element.rect;
+            options.source(src_rect).sink(m_rect).paint(ui.painter());
         }
     }
     result
 }
 
-fn ui_detached_node(
+fn interact_detached_element(
     ui: &mut egui::Ui,
-    store: &Arc<FetchedHyperAST>,
-    options: &DetachedViewOptions,
-    col_width: f32,
-    line_id: egui::Id,
-    default_x: f32,
-    i: usize,
     result: &mut DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>>,
-    r: &mut TrackingResult,
+    x: &mut CodeRange,
+    id: egui::Id,
+    resp: &egui::InnerResponse<DetachedElementResp>,
 ) {
+    let line_id = D_LINE.into();
     use egui::Color32;
     const COL: Color32 = Color32::BLUE;
-    let src = &mut r.src;
-    let src_id = ui.id().with(&src);
-    let src_rect = {
-        let default_pos = (default_x + col_width / 2.0, i as f32 * 50.0);
-        let resp = show_detached_element_aux(ui, store, options, src, src_id, default_pos);
-        if DEBUG {
-            ui.painter().debug_rect(
-                resp.response.rect.expand(20.0),
-                egui::Color32::RED,
-                format!("{default_x} {i} {:?}", src.path_ids),
-            );
-        }
-        if let Some(fut) = resp.inner.future {
-            result.future = Some(src.clone());
-            if fut.double_clicked() {
-            } else if fut.is_pointer_button_down_on() {
-                let id = src_id;
-                ui.memory_mut(|mem| {
-                    if let Some(i) = mem.data.get_temp(line_id) {
-                        if id.with("fut_interact") != i {
-                            panic!();
-                        }
-                    } else {
-                        mem.data.insert_temp(line_id, id.with("fut_interact"));
-                    }
-                });
-                ui.ctx().set_dragged_id(line_id);
-            }
-        }
-        if let Some(past) = resp.inner.past {
-            result.past = Some(src.clone());
-            if past.double_clicked() {
-            } else if past.is_pointer_button_down_on() {
-                let id = src_id;
-                ui.memory_mut(|mem| {
-                    if let Some(i) = mem.data.get_temp(line_id) {
-                        if id.with("past_interact") != i {
-                            panic!();
-                        }
-                    } else {
-                        mem.data.insert_temp(line_id, id.with("past_interact"));
-                    }
-                });
-                ui.ctx().set_dragged_id(line_id);
-            }
-        }
-        let is_dragged = ui.ctx().is_being_dragged(line_id);
-        if is_dragged {
-            let state = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id));
-            let state = if let Some(mut p) = state {
-                if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                    p.1 = pos;
-                }
-                Some(p)
-            } else {
-                ui.ctx().pointer_latest_pos().map(|x| (x, x))
-            };
-            if let Some(p) = state {
-                ui.painter().line_segment(p.into(), (2.0, COL));
-                ui.memory_mut(|mem| mem.data.insert_temp::<(Pos2, Pos2)>(line_id, p));
-            }
-        } else if ui
-            .memory_mut(|mem| mem.data.get_temp(line_id) == Some(src_id.with("past_interact")))
-        {
-            let Some(mut p) = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id))
-            else {
-                panic!()
-            };
-            if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                p.1 = pos;
-            }
-            ui.painter().line_segment(p.into(), (2.0, COL));
-            result.past = Some(src.clone());
-            ui.memory_mut(|mem| {
-                mem.data.remove::<(Pos2, Pos2)>(line_id);
-                mem.data.remove::<egui::Id>(line_id)
-            });
-        } else if ui
-            .memory_mut(|mem| mem.data.get_temp(line_id) == Some(src_id.with("fut_interact")))
-        {
-            let Some(mut p) = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id))
-            else {
-                panic!()
-            };
-            if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                p.1 = pos;
-            }
-            ui.painter().line_segment(p.into(), (2.0, COL));
-            result.future = Some(src.clone());
-            ui.memory_mut(|mem| {
-                mem.data.remove::<(Pos2, Pos2)>(line_id);
-                mem.data.remove::<egui::Id>(line_id)
-            });
-        }
-        result.element.insert(src.clone(), resp.inner.element.rect);
-        resp.inner.element.rect
-    };
-    for m in &mut r.matched {
-        let id = ui.id().with(&m);
-        let m_rect = if let Some(m_pos) = result.element.get(&m) {
-            *m_pos
-        } else {
-            let default_pos = (default_x, i as f32 * 50.0);
-            let resp = show_detached_element_aux(ui, store, options, &m, id, default_pos);
-
-            if DEBUG {
-                let all = (result.element.iter())
-                    .map(|x| format!(
-                        "                           {} {} {} {} {} {:?} {:?}\n                           {:?} {:?}\n",
-                        m.file.commit == x.0.file.commit,
-                        m.file == x.0.file,
-                        m.path == x.0.path,
-                        m.range == x.0.range,
-                        m.path_ids == x.0.path_ids,
-                        x.0.path,
-                        x.0.path_ids,
-                        x.0.file.commit.id,
-                        x.0.file.file_path,
-                    ))
-                    .collect::<String>();
-                ui.painter().debug_rect(
-                    resp.response.rect.expand(20.0),
-                    egui::Color32::BLUE,
-                    format!("{default_x} {i} {:?}\n{:?}\n{}", m.file, m.path_ids, all),
-                );
-            }
-            result.element.insert(m.clone(), resp.inner.element.rect);
-            if let Some(_) = resp.inner.future {
-                result.future = Some(m.clone());
-            }
-            if let Some(_) = resp.inner.past {
-                result.past = Some(m.clone());
-            }
-            if let Some(past) = resp.inner.past {
-                if past.double_clicked() {
-                } else {
-                    if past.is_pointer_button_down_on() {
-                        ui.memory_mut(|mem| {
-                            if let Some(i) = mem.data.get_temp(line_id) {
-                                if id.with("past_interact") != i {
-                                    panic!();
-                                }
-                            } else {
-                                mem.data.insert_temp(line_id, id.with("past_interact"));
-                            }
-                        });
-                        ui.ctx().set_dragged_id(line_id);
-                    }
-                }
-            }
-            if let Some(fut) = resp.inner.future {
-                if fut.double_clicked() {
-                } else {
-                    if fut.is_pointer_button_down_on() {
-                        ui.memory_mut(|mem| {
-                            if let Some(i) = mem.data.get_temp(line_id) {
-                                if id.with("fut_interact") != i {
-                                    panic!();
-                                }
-                            } else {
-                                mem.data.insert_temp(line_id, id.with("fut_interact"));
-                            }
-                        });
-                        ui.ctx().set_dragged_id(line_id);
-                    }
-                }
-            }
-            let is_dragged = ui.ctx().is_being_dragged(line_id);
-            if is_dragged {
-                let state = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id));
-                let state = if let Some(mut p) = state {
-                    if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                        p.1 = pos;
-                    }
-                    Some(p)
-                } else {
-                    ui.ctx().pointer_latest_pos().map(|x| (x, x))
-                };
-                if let Some(p) = state {
-                    ui.painter().line_segment(p.into(), (2.0, COL));
-                    ui.memory_mut(|mem| mem.data.insert_temp::<(Pos2, Pos2)>(line_id, p));
-                }
-            } else if ui
-                .memory_mut(|mem| mem.data.get_temp(line_id) == Some(id.with("past_interact")))
-            {
-                let Some(mut p) = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id))
-                else {
-                    panic!()
-                };
-                if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                    p.1 = pos;
-                }
-                ui.painter().line_segment(p.into(), (2.0, COL));
-                result.past = Some(m.clone());
-                ui.memory_mut(|mem| {
-                    mem.data.remove::<(Pos2, Pos2)>(line_id);
-                    mem.data.remove::<egui::Id>(line_id)
-                });
-            } else if ui
-                .memory_mut(|mem| mem.data.get_temp(line_id) == Some(id.with("fut_interact")))
-            {
-                let Some(mut p) = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id))
-                else {
-                    panic!()
-                };
-                if let Some(pos) = ui.ctx().pointer_latest_pos() {
-                    p.1 = pos;
-                }
-                ui.painter().line_segment(p.into(), (2.0, COL));
-                result.future = Some(m.clone());
-                ui.memory_mut(|mem| {
-                    mem.data.remove::<(Pos2, Pos2)>(line_id);
-                    mem.data.remove::<egui::Id>(line_id)
-                });
-            }
-            resp.inner.element.rect
-        };
-        options.source(src_rect).sink(m_rect).paint(ui.painter());
+    result.element.insert(x.clone(), resp.inner.element.rect);
+    if resp.inner.future.is_some() {
+        result.future = Some(x.clone());
     }
+    if resp.inner.past.is_some() {
+        result.past = Some(x.clone());
+    }
+    let past_interact = id.with("past_interact");
+    if let Some(past) = &resp.inner.past {
+        if past.double_clicked() {
+        } else if past.is_pointer_button_down_on() {
+            start_link_drag(ui, line_id, past_interact);
+        }
+    }
+    let fut_interact = id.with("fut_interact");
+    if let Some(fut) = &resp.inner.future {
+        if fut.double_clicked() {
+        } else if fut.is_pointer_button_down_on() {
+            start_link_drag(ui, line_id, fut_interact);
+        }
+    }
+    if ui.ctx().is_being_dragged(line_id) {
+        link_dragged(ui, line_id, COL);
+    } else if ui.memory_mut(|mem| mem.data.get_temp(line_id) == Some(past_interact)) {
+        finish_link_drag(ui, line_id, COL);
+        result.past = Some(x.clone());
+    } else if ui.memory_mut(|mem| mem.data.get_temp(line_id) == Some(fut_interact)) {
+        finish_link_drag(ui, line_id, COL);
+        result.future = Some(x.clone());
+    }
+}
+
+fn start_link_drag(ui: &mut egui::Ui, line_id: egui::Id, interact_id: egui::Id) {
+    ui.memory_mut(|mem| {
+        if let Some(i) = mem.data.get_temp(line_id) {
+            if interact_id != i {
+                panic!();
+            }
+        } else {
+            mem.data.insert_temp(line_id, interact_id);
+        }
+    });
+    ui.ctx().set_dragged_id(line_id);
+}
+
+fn link_dragged(ui: &mut egui::Ui, line_id: egui::Id, col: egui::Color32) {
+    let state = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id));
+    let state = if let Some(mut p) = state {
+        if let Some(pos) = ui.ctx().pointer_latest_pos() {
+            p.1 = pos;
+        }
+        Some(p)
+    } else {
+        ui.ctx().pointer_latest_pos().map(|x| (x, x))
+    };
+    if let Some(p) = state {
+        ui.painter().line_segment(p.into(), (2.0, col));
+        ui.memory_mut(|mem| mem.data.insert_temp::<(Pos2, Pos2)>(line_id, p));
+    }
+}
+
+fn finish_link_drag(ui: &mut egui::Ui, line_id: egui::Id, col: egui::Color32) {
+    let Some(mut p) = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id)) else {
+        panic!()
+    };
+    if let Some(pos) = ui.ctx().pointer_latest_pos() {
+        p.1 = pos;
+    }
+    ui.painter().line_segment(p.into(), (2.0, col));
+    ui.memory_mut(|mem| {
+        mem.data.remove::<(Pos2, Pos2)>(line_id);
+        mem.data.remove::<egui::Id>(line_id)
+    });
 }
 
 #[derive(Default)]
@@ -312,23 +191,20 @@ struct DetachedElementResp<R = egui::Response, T = R> {
     future: Option<R>,
 }
 
-fn show_detached_element_aux(
+fn show_detached_element<R>(
     ui: &mut egui::Ui,
-    store: &Arc<FetchedHyperAST>,
-    global_opt: &DetachedViewOptions,
     x: &CodeRange,
     id: egui::Id,
     default_pos: (f32, f32),
-) -> egui::InnerResponse<DetachedElementResp> {
+    show: impl FnOnce(&mut egui::Ui, &CodeRange, egui::Id, &O) -> R,
+) -> egui::InnerResponse<R> {
     let p = ui.available_rect_before_wrap().left_bottom();
     let options = ui
         .memory_mut(|mem| mem.data.get_temp::<O>(id))
         .unwrap_or_default();
     let area = egui::Area::new(id)
         .default_pos(default_pos)
-        .show(ui.ctx(), |ui| {
-            show_element(ui, store, global_opt, x, id, &options)
-        });
+        .show(ui.ctx(), |ui| show(ui, x, id, &options));
     if area.response.hovered() {
         options.on_input(ui.ctx(), id);
         egui::Area::new("full".into())
@@ -351,7 +227,7 @@ fn show_detached_element_aux(
 fn show_element(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
-    _global_opt: &DetachedViewOptions,
+    _global_opt: &LinkConfig,
     x: &CodeRange,
     id: egui::Id,
     options: &O,
@@ -381,87 +257,82 @@ fn show_element(
     let min = cui.min_rect().min;
     let size = cui.min_rect().size();
     let s = 25.0;
-    let past_resp = {
-        let mut out = epaint::Mesh::default();
-        let top = min;
-        let mut bot = min;
-        bot.y += size.y;
-        let rect = egui::Rect::from_min_max(top + (-2.0 * s, 0.0).into(), bot);
-        let right_paint = |col| {
-            let transp = egui::Color32::TRANSPARENT;
-            out.colored_vertex(epaint::pos2(top.x - s, top.y - s), transp);
-            out.colored_vertex(epaint::pos2(top.x, top.y), col);
-            out.colored_vertex(epaint::pos2(bot.x, bot.y), col);
-            out.colored_vertex(epaint::pos2(bot.x - s, bot.y + s), transp);
-            out.add_triangle(0, 1, 2);
-            out.add_triangle(0, 2, 3);
-            ui.painter().set(past, out);
-        };
-
-        if (ui.ctx().pointer_hover_pos()).map_or(false, |x| rect.contains(x)) {
-            let resp = ui.interact(rect, id.with("past_interact"), egui::Sense::click());
-            let col = if resp.clicked() {
-                egui::Color32::BLUE //.gamma_multiply(0.5)
-            } else {
-                egui::Color32::RED.gamma_multiply(0.5)
-            };
-            right_paint(col);
-            Some(resp)
-        } else if ui.memory_mut(|mem| {
-            mem.data.get_temp::<egui::Id>(egui::Id::new("drag line"))
-                == Some(id.with("past_interact"))
-        }) {
-            right_paint(egui::Color32::BLUE);
-            None
-        } else {
-            None
-        }
-    };
-    let fut_resp = {
-        let mut out = epaint::Mesh::default();
-        let mut top = min;
-        top.x += size.x;
-        let mut bot = top;
-        bot.y += size.y;
-        let rect = egui::Rect::from_min_max(top, bot + (2.0 * s, 0.0).into());
-        let left_paint = |col| {
-            let transp = egui::Color32::TRANSPARENT;
-            out.colored_vertex(epaint::pos2(top.x, top.y), col);
-            out.colored_vertex(epaint::pos2(top.x + s, top.y - s), transp);
-            out.colored_vertex(epaint::pos2(bot.x + s, bot.y + s), transp);
-            out.colored_vertex(epaint::pos2(bot.x, bot.y), col);
-            out.add_triangle(0, 1, 2);
-            out.add_triangle(0, 2, 3);
-            ui.painter().set(futur, out);
-        };
-        if ui
-            .ctx()
-            .pointer_hover_pos()
-            .map_or(false, |x| rect.contains(x))
-        {
-            let resp = ui.interact(rect, id.with("fut_interact"), egui::Sense::click());
-            let col = if resp.clicked() {
-                egui::Color32::BLUE //.gamma_multiply(0.5)
-            } else {
-                egui::Color32::GREEN.gamma_multiply(0.5)
-            };
-            left_paint(col);
-            Some(resp)
-        } else if ui.memory_mut(|mem| {
-            mem.data.get_temp::<egui::Id>(egui::Id::new("drag line"))
-                == Some(id.with("fut_interact"))
-        }) {
-            left_paint(egui::Color32::BLUE);
-            None
-        } else {
-            None
-        }
-    };
-    let response = prepared.end(ui);
+    let other = egui::Color32::BLUE;
+    let transp = egui::Color32::TRANSPARENT;
     DetachedElementResp {
-        element: response,
-        past: past_resp,
-        future: fut_resp,
+        past: {
+            let id = id.with("past_interact");
+            let col = egui::Color32::RED;
+            let top = min;
+            let mut bot = min;
+            bot.y += size.y;
+            let rect = egui::Rect::from_min_max(top + (-2.0 * s, 0.0).into(), bot);
+            let points = [
+                (top.x - s, top.y - s),
+                (top.x, top.y),
+                (bot.x, bot.y),
+                (bot.x - s, bot.y + s),
+            ];
+            link_side_hghlt(ui, past, col, other, id, rect, |col| {
+                quad(col, transp, points)
+            })
+        },
+        future: {
+            let id = id.with("fut_interact");
+            let col = egui::Color32::GREEN;
+            let mut top = min;
+            top.x += size.x;
+            let mut bot = top;
+            bot.y += size.y;
+            let rect = egui::Rect::from_min_max(top, bot + (2.0 * s, 0.0).into());
+            let points = [
+                (top.x, top.y),
+                (top.x + s, top.y - s),
+                (bot.x + s, bot.y + s),
+                (bot.x, bot.y),
+            ];
+            link_side_hghlt(ui, futur, col, other, id, rect, |col| {
+                quad(transp, col, points)
+            })
+        },
+        element: prepared.end(ui),
+    }
+}
+
+fn quad(col1: egui::Color32, col2: egui::Color32, quad: [(f32, f32); 4]) -> egui::Mesh {
+    let mut out = epaint::Mesh::default();
+    out.colored_vertex(quad[0].into(), col2);
+    out.colored_vertex(quad[1].into(), col1);
+    out.colored_vertex(quad[2].into(), col1);
+    out.colored_vertex(quad[3].into(), col2);
+    out.add_triangle(0, 1, 2);
+    out.add_triangle(0, 2, 3);
+    out
+}
+
+fn link_side_hghlt(
+    ui: &mut egui::Ui,
+    shape_id: egui::layers::ShapeIdx,
+    col: egui::Color32,
+    other: egui::Color32,
+    id: egui::Id,
+    rect: egui::Rect,
+    mesh: impl Fn(egui::Color32) -> egui::Mesh,
+) -> Option<egui::Response> {
+    if (ui.ctx().pointer_hover_pos()).map_or(false, |x| rect.contains(x)) {
+        let resp = ui.interact(rect, id, egui::Sense::click());
+        let col = if resp.clicked() {
+            other //.gamma_multiply(0.5)
+        } else {
+            col.gamma_multiply(0.5)
+        };
+        ui.painter().set(shape_id, mesh(col));
+        Some(resp)
+    } else if ui.memory_mut(|mem| mem.data.get_temp(D_LINE.into()) == Some(id)) {
+        ui.painter().set(shape_id, mesh(other));
+        None
+    } else {
+        None
     }
 }
 
@@ -606,4 +477,24 @@ impl Default for O {
             extra: false,
         }
     }
+}
+
+fn all(
+    result: &DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>>,
+    x: &CodeRange,
+) -> String {
+    (result.element.iter())
+            .map(|y| format!(
+                "                           {} {} {} {} {} {:?} {:?}\n                           {:?} {:?}\n",
+                x.file.commit == y.0.file.commit,
+                x.file == y.0.file,
+                x.path == y.0.path,
+                x.range == y.0.range,
+                x.path_ids == y.0.path_ids,
+                y.0.path,
+                y.0.path_ids,
+                y.0.file.commit.id,
+                y.0.file.file_path,
+            ))
+            .collect::<String>()
 }

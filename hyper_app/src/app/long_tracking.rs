@@ -23,7 +23,7 @@ use super::types::{Commit, CommitId};
 use super::utils_egui::MyUiExt as _;
 use crate::utils_poll::{AccumulableResult, Buffered, MultiBuffered, Resource};
 
-use super::detached_view::DetachedViewOptions;
+use super::detached_view::LinkConfig;
 
 type AccumulableTrackingResults = AccumulableResult<TrackingResultsWithChanges, Vec<String>>;
 type LongTrackingResults = VecDeque<(
@@ -39,7 +39,7 @@ pub(crate) struct LongTracking {
     pub(crate) ser_view: bool,
     pub(crate) tree_view: bool,
     pub(crate) detatched_view: bool,
-    pub(crate) detatched_view_options: DetachedViewOptions,
+    pub(crate) detatched_view_link_config: LinkConfig,
     pub(crate) origins: Vec<CodeRange>,
     pub(crate) origin_index: usize,
     #[serde(skip)] // TODO remove that
@@ -63,7 +63,7 @@ impl Default for LongTracking {
             ser_view: false,
             tree_view: true,
             detatched_view: false,
-            detatched_view_options: Default::default(),
+            detatched_view_link_config: Default::default(),
             origins: vec![Default::default()],
             origin_index: Default::default(),
             results: VecDeque::from(vec![Default::default()]),
@@ -140,7 +140,7 @@ pub(crate) fn show_config(
     ui.checkbox(&mut tracking.detatched_view, "detatched view");
     if tracking.detatched_view {
         ui.indent("detached_options", |ui| {
-            tracking.detatched_view_options.ui(ui);
+            tracking.detatched_view_link_config.ui(ui);
         });
     }
     ui.add(egui::Label::new(

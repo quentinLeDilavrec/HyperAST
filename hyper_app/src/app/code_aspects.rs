@@ -262,13 +262,6 @@ impl<'a> Focus<'a> {
     }
 }
 
-// impl<'a> From<(&'a [usize], &'a [NodeIdentifier])> for Focus<'a> {
-//     fn from((offsets, ids): (&'a [usize], &'a [NodeIdentifier])) -> Self {
-//         assert!(offsets.is_empty() > ids.is_empty());
-//         Focus { offsets, ids }
-//     }
-// }
-
 impl Focus<'_> {
     pub fn is_empty(&self) -> bool {
         if self.offsets.is_empty() {
@@ -395,12 +388,6 @@ pub(super) fn remote_fetch_nodes_by_ids(
     fetch(ctx.clone(), request, move |response| {
         let res = Resource::<FetchedNodes>::from_resp(response);
         res.map(|simple_packed| store.extend_nodes(ids, simple_packed.node_store))
-        // let content = res.content;
-        // store.extend_nodes(ids, content.map(|x| x.node_store));
-        // Resource {
-        //     response: res.response,
-        //     content: Some(()),
-        // }
     })
 }
 

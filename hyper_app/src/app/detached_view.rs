@@ -17,8 +17,8 @@ pub(crate) fn ui_detached<'a>(
     store: Arc<FetchedHyperAST>,
     timeline_window: egui::Rect,
     total_cols: usize,
-    detatched_view_options: &DetachedViewOptions,
-    additionnal_links: &mut Vec<[CodeRange; 2]>,
+    detached_view_options: &DetachedViewOptions,
+    additional_links: &mut Vec<[CodeRange; 2]>,
     it: impl Iterator<Item = (usize, &'a mut [TrackingResult])>,
 ) {
     let col_width = timeline_window.width() / total_cols as f32;
@@ -30,14 +30,14 @@ pub(crate) fn ui_detached<'a>(
         element: rendered,
         past: released_past,
         future: hovered_fut,
-    } = ui_detached_nodes(ui, store, detatched_view_options, col_width, it);
+    } = ui_detached_nodes(ui, store, detached_view_options, col_width, it);
     if let (Some(hovered_fut), Some(released_past)) = (hovered_fut, released_past) {
-        additionnal_links.push([hovered_fut, released_past]);
+        additional_links.push([hovered_fut, released_past]);
     }
-    for [m, src] in additionnal_links {
+    for [m, src] in additional_links {
         let m_rect = *rendered.get(m).unwrap();
         let src_rect = *rendered.get(src).unwrap();
-        detatched_view_options
+        detached_view_options
             .source(src_rect)
             .sink(m_rect)
             .paint(ui.painter());

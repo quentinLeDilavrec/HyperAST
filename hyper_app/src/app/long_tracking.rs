@@ -47,8 +47,10 @@ pub(crate) struct LongTracking {
     #[serde(skip)]
     pub(crate) tree_viewer: BufferedPerCommit<Result<Resource<FetchedView>, String>>,
     #[serde(skip)]
-    pub(crate) additional_links: Vec<[CodeRange; 2]>,
+    pub(crate) manual_links: Vec<[CodeRange; 2]>,
+    pub(crate) manual_rm_links: HashSet<[CodeRange; 2]>,
 }
+
 impl LongTracking {
     pub(crate) fn repo(&self) -> &super::Repo {
         let code = self.origins.get(0).unwrap();
@@ -68,7 +70,8 @@ impl Default for LongTracking {
             origin_index: Default::default(),
             results: VecDeque::from(vec![Default::default()]),
             tree_viewer: Default::default(),
-            additional_links: Default::default(),
+            manual_links: Default::default(),
+            manual_rm_links: Default::default(),
         }
     }
 }
@@ -1192,7 +1195,8 @@ pub(crate) fn show_results(
             timeline_window,
             total_cols,
             &long_tracking.detatched_view_link_config,
-            &mut long_tracking.additional_links,
+            &mut long_tracking.manual_links,
+            &mut long_tracking.manual_rm_links,
             tracking_results,
         );
     }

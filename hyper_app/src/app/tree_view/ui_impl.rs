@@ -1003,7 +1003,6 @@ impl<'a> FetchedViewImpl<'a> {
             _size = None;
             self.store.demand_node(*c);
             if let Some(focus) = &imp.focus {
-                wasm_rs_dbg::dbg!(&focus);
                 imp.draw_count += 1;
                 if let Some(x) = self.focus.as_ref().unwrap().ids.first() {
                     imp.additions = None;

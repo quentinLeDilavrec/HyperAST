@@ -228,6 +228,12 @@ impl Hash for CodeRange {
     }
 }
 
+impl CodeRange {
+    pub fn short_commit_and_path(&self) -> String {
+        format!("{}{:?}", self.file.commit.id.prefix(6), self.path)
+    }
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize, Default)]
 #[serde(default)]
 pub(crate) struct ComputeConfigTracking {

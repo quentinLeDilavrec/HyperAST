@@ -1,4 +1,3 @@
-use egui::Pos2;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
@@ -12,7 +11,8 @@ const DEBUG: bool = false;
 
 pub type LinkConfig = egui_addon::fancy_links::Config;
 
-const D_LINE: &'static str = "drag line";
+/// color used to highlight elements getting linked
+const SEL_COLOR: egui::Color32 = egui::Color32::BLUE;
 
 pub(crate) fn ui_detached<'a>(
     ui: &mut egui::Ui,
@@ -20,7 +20,8 @@ pub(crate) fn ui_detached<'a>(
     timeline_window: egui::Rect,
     total_cols: usize,
     link_config: &LinkConfig,
-    additional_links: &mut Vec<[CodeRange; 2]>,
+    manual_links: &mut Vec<[CodeRange; 2]>,
+    manual_rm_links: &mut ahash::HashSet<[CodeRange; 2]>,
     it: impl Iterator<Item = (usize, &'a mut [TrackingResult])>,
 ) {
     let col_width = timeline_window.width() / total_cols as f32;
@@ -30,16 +31,57 @@ pub(crate) fn ui_detached<'a>(
     });
     let DetachedElementResp {
         element: rendered,
-        past: released_past,
-        future: hovered_fut,
-    } = ui_detached_nodes(ui, store, link_config, col_width, it);
-    if let (Some(hovered_fut), Some(released_past)) = (hovered_fut, released_past) {
-        let value = [hovered_fut, released_past];
-        if !additional_links.contains(&value) {
-            additional_links.push(value);
+        past,
+        future,
+        already_linked,
+    } = ui_detached_nodes(
+        ui,
+        store,
+        link_config,
+        col_width,
+        it,
+        manual_rm_links,
+        manual_links,
+    );
+    if let (Some(fut), Some(past)) = (future, past) {
+        let value = [fut, past];
+        if let Some(index) = manual_links.iter().position(|v| v == &value) {
+            log::info!(
+                "manual unlink {} -> {}",
+                value[0].short_commit_and_path(),
+                value[1].short_commit_and_path(),
+            );
+            manual_links.remove(index);
+        } else if let Some(already_linked) = already_linked
+            && already_linked == value[1]
+        {
+            if manual_rm_links.contains(&value) {
+                log::info!(
+                    "show link {} -> {}",
+                    value[0].short_commit_and_path(),
+                    value[1].short_commit_and_path(),
+                );
+                manual_rm_links.remove(&value);
+                manual_rm_links.remove(&[value[1].clone(), value[0].clone()]);
+            } else {
+                log::info!(
+                    "hide link {} -> {}",
+                    value[0].short_commit_and_path(),
+                    value[1].short_commit_and_path(),
+                );
+                manual_rm_links.insert(value.clone());
+                manual_rm_links.insert([value[1].clone(), value[0].clone()]);
+            }
+        } else {
+            log::info!(
+                "manual link {} -> {}",
+                value[0].short_commit_and_path(),
+                value[1].short_commit_and_path(),
+            );
+            manual_links.push(value);
         }
     }
-    for [m, src] in additional_links {
+    for [m, src] in manual_links {
         let m_rect = *rendered.get(m).unwrap();
         let src_rect = *rendered.get(src).unwrap();
         link_config
@@ -55,28 +97,33 @@ fn ui_detached_nodes<'a>(
     options: &LinkConfig,
     col_width: f32,
     it: impl Iterator<Item = (f32, &'a mut [TrackingResult])>,
+    manual_rm_links: &mut ahash::HashSet<[CodeRange; 2]>,
+    manual_links: &mut Vec<[CodeRange; 2]>,
 ) -> DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>> {
+    let mut hovered_sink = None;
     let mut result = DetachedElementResp::default();
     let tracking_results = it.flat_map(|(d, x)| x.iter_mut().enumerate().map(move |y| (d, y)));
     for (default_x, (i, r)) in tracking_results {
         let show = |ui: &mut _, x: &_, id, o: &_| show_element(ui, &store, options, x, id, o);
-        let x = &mut r.src;
-        let id = ui.id().with(&x);
-        let default_pos = (default_x + col_width / 2.0, i as f32 * 50.0);
-        let resp = show_detached_element(ui, x, id, default_pos, show);
+        let src = &mut r.src;
+        let id = ui.id().with(&src);
+        let default_pos = (default_x + col_width / 2.0, i as f32 * 100.0);
+        let resp = show_detached_element(ui, src, id, default_pos, show);
         if DEBUG {
             ui.painter().debug_rect(
                 resp.response.rect.expand(20.0),
                 egui::Color32::RED,
-                format!("{default_x} {i} {:?}", x.path_ids),
+                format!("{default_x} {i} {:?}", src.path_ids),
             );
         }
-        interact_detached_element(ui, &mut result, x, id, &resp);
+        interact_detached_element(ui, &mut result, src, id, &resp, None, &mut hovered_sink);
         let resp = resp.inner.element;
         let src_rect = resp.rect;
         for x in &mut r.matched {
             if let Some(m_pos) = result.element.get(&x) {
-                options.source(src_rect).sink(*m_pos).paint(ui.painter());
+                if !manual_rm_links.contains(&[src.clone(), x.clone()]) {
+                    options.source(src_rect).sink(*m_pos).paint(ui.painter());
+                }
                 continue;
             }
             let id = ui.id().with(&x);
@@ -94,12 +141,86 @@ fn ui_detached_nodes<'a>(
                     ),
                 );
             }
-            interact_detached_element(ui, &mut result, x, id, &resp);
+            interact_detached_element(ui, &mut result, x, id, &resp, Some(&src), &mut hovered_sink);
+
             let m_rect = resp.inner.element.rect;
-            options.source(src_rect).sink(m_rect).paint(ui.painter());
+            if !manual_rm_links.contains(&[src.clone(), x.clone()]) {
+                options.source(src_rect).sink(m_rect).paint(ui.painter());
+            }
         }
     }
-    result
+    if let Some(p) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx()) {
+        if let Some(pos) = hovered_sink.or(ui.ctx().pointer_latest_pos()) {
+            let col = if let Some(_) = hovered_sink {
+                let value = if p.right_side {
+                    [p.code.clone(), result.past.clone().unwrap()]
+                } else {
+                    [result.future.clone().unwrap(), p.code.clone()]
+                };
+                if let Some(_) = manual_links.iter().position(|v| v == &value) {
+                    egui::Color32::RED
+                } else if let Some(already_linked) = p.already_linked.first()
+                    && already_linked == &value[1]
+                {
+                    if manual_rm_links.contains(&value) {
+                        egui::Color32::GREEN
+                    } else {
+                        egui::Color32::RED
+                    }
+                } else {
+                    egui::Color32::GREEN
+                }
+            } else {
+                SEL_COLOR
+            };
+            let stroke = (2.0, col);
+            ui.painter().line_segment([p.pos, pos], stroke);
+        }
+    }
+    if let Some(_) = ui.ctx().viewport(|wp| wp.interact_widgets.drag_stopped)
+        && let Some(pl) = egui::DragAndDrop::take_payload::<LinkingPayload>(ui.ctx())
+    {
+        wasm_rs_dbg::dbg!(&pl);
+        if pl.already_linked.len() > 1 {
+            log::warn!("handle multiple already linked");
+            // TODO
+        }
+        if result.already_linked.is_none() {
+            result.already_linked = pl.already_linked.get(0).cloned();
+        }
+        if pl.right_side {
+            result.future = Some(pl.code.clone());
+        } else {
+            result.past = Some(pl.code.clone());
+        }
+        if DEBUG {
+            wasm_rs_dbg::dbg!(pp(&result.future.as_ref()));
+            wasm_rs_dbg::dbg!(pp(&result.past.as_ref()));
+            wasm_rs_dbg::dbg!(pp(&result.already_linked.as_ref()));
+        }
+        result
+    } else if let Some(_) = ui.ctx().viewport(|wp| wp.interact_widgets.drag_stopped)
+        && DEBUG
+    {
+        wasm_rs_dbg::dbg!(pp(&result.future.as_ref()));
+        wasm_rs_dbg::dbg!(pp(&result.past.as_ref()));
+        wasm_rs_dbg::dbg!(pp(&result.already_linked.as_ref()));
+        DetachedElementResp {
+            element: result.element,
+            ..Default::default()
+        }
+    } else {
+        DetachedElementResp {
+            element: result.element,
+            ..Default::default()
+        }
+    }
+}
+
+fn pp(x: &Option<&CodeRange>) -> String {
+    x.as_ref()
+        .map(|x| format!("{}{:?}", x.file.commit.id.prefix(6), x.path))
+        .unwrap_or_default()
 }
 
 fn interact_detached_element(
@@ -108,83 +229,72 @@ fn interact_detached_element(
     x: &mut CodeRange,
     id: egui::Id,
     resp: &egui::InnerResponse<DetachedElementResp>,
+    src: Option<&CodeRange>,
+    hovered_sink: &mut Option<egui::Pos2>,
 ) {
-    let line_id = D_LINE.into();
-    use egui::Color32;
-    const COL: Color32 = Color32::BLUE;
     result.element.insert(x.clone(), resp.inner.element.rect);
-    if resp.inner.future.is_some() {
-        result.future = Some(x.clone());
-    }
-    if resp.inner.past.is_some() {
-        result.past = Some(x.clone());
-    }
-    let past_interact = id.with("past_interact");
-    if let Some(past) = &resp.inner.past {
-        if past.double_clicked() {
-        } else if past.is_pointer_button_down_on() {
-            start_link_drag(ui, line_id, past_interact);
-        }
-    }
     let fut_interact = id.with("fut_interact");
-    if let Some(fut) = &resp.inner.future {
-        if fut.double_clicked() {
-        } else if fut.is_pointer_button_down_on() {
-            start_link_drag(ui, line_id, fut_interact);
-        }
-    }
-    if ui.ctx().is_being_dragged(line_id) {
-        link_dragged(ui, line_id, COL);
-    } else if ui.memory_mut(|mem| mem.data.get_temp(line_id) == Some(past_interact)) {
-        finish_link_drag(ui, line_id, COL);
+    let past_interact = id.with("past_interact");
+    if let Some(past) = &resp.inner.past
+        && past.drag_started()
+    {
+        past.dnd_set_drag_payload(LinkingPayload {
+            id: past_interact,
+            pos: past.rect.right_center(),
+            code: x.clone(),
+            right_side: false,
+            already_linked: vec![],
+        });
+    } else if let Some(fut) = &resp.inner.future
+        && fut.drag_started()
+    {
+        fut.dnd_set_drag_payload(LinkingPayload {
+            id: fut_interact,
+            pos: fut.rect.left_center(),
+            code: x.clone(),
+            right_side: true,
+            already_linked: src.into_iter().cloned().collect(),
+        });
+    } else if let Some(_past) = &resp.inner.past
+        && let Some(_) = ui.ctx().viewport(|wp|wp.interact_widgets.drag_stopped)// past.drag_stopped()
+        && let Some(pl) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx())
+        && pl.id != past_interact
+    {
         result.past = Some(x.clone());
-    } else if ui.memory_mut(|mem| mem.data.get_temp(line_id) == Some(fut_interact)) {
-        finish_link_drag(ui, line_id, COL);
+        #[cfg(debug_assertions)]
+        wasm_rs_dbg::dbg!(pp(&Some(&*x)));
+    } else if let Some(_fut) = &resp.inner.future
+        && let Some(_) = ui.ctx().viewport(|wp|wp.interact_widgets.drag_stopped) // fut.drag_stopped()
+        && let Some(pl) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx())
+        && pl.id != fut_interact
+    {
+        result.already_linked = src.into_iter().next().cloned();
         result.future = Some(x.clone());
-    }
-}
-
-fn start_link_drag(ui: &mut egui::Ui, line_id: egui::Id, interact_id: egui::Id) {
-    ui.memory_mut(|mem| {
-        if let Some(i) = mem.data.get_temp(line_id) {
-            if interact_id != i {
-                panic!();
-            }
-        } else {
-            mem.data.insert_temp(line_id, interact_id);
+        #[cfg(debug_assertions)]
+        wasm_rs_dbg::dbg!(pp(&Some(&*x)), pp(&src.into_iter().next()));
+    } else if let Some(past) = &resp.inner.past
+        && let Some(pl) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx())
+        && pl.id != past_interact
+    {
+        result.past = Some(x.clone());
+        if pl.right_side {
+            *hovered_sink = Some(past.rect.right_center());
         }
-    });
-    ui.ctx().set_dragged_id(line_id);
-}
-
-fn link_dragged(ui: &mut egui::Ui, line_id: egui::Id, col: egui::Color32) {
-    let state = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id));
-    let state = if let Some(mut p) = state {
-        if let Some(pos) = ui.ctx().pointer_latest_pos() {
-            p.1 = pos;
+    } else if let Some(fut) = &resp.inner.future
+        && let Some(pl) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx())
+        && pl.id != fut_interact
+    {
+        result.future = Some(x.clone());
+        result.already_linked = src.into_iter().next().cloned();
+        if !pl.right_side {
+            *hovered_sink = Some(fut.rect.left_center());
         }
-        Some(p)
-    } else {
-        ui.ctx().pointer_latest_pos().map(|x| (x, x))
-    };
-    if let Some(p) = state {
-        ui.painter().line_segment(p.into(), (2.0, col));
-        ui.memory_mut(|mem| mem.data.insert_temp::<(Pos2, Pos2)>(line_id, p));
     }
-}
-
-fn finish_link_drag(ui: &mut egui::Ui, line_id: egui::Id, col: egui::Color32) {
-    let Some(mut p) = ui.memory_mut(|mem| mem.data.get_temp::<(Pos2, Pos2)>(line_id)) else {
-        panic!()
-    };
-    if let Some(pos) = ui.ctx().pointer_latest_pos() {
-        p.1 = pos;
+    if let Some(payload) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx())
+        && DEBUG
+    {
+        ui.label(format!("{:?}", payload));
     }
-    ui.painter().line_segment(p.into(), (2.0, col));
-    ui.memory_mut(|mem| {
-        mem.data.remove::<(Pos2, Pos2)>(line_id);
-        mem.data.remove::<egui::Id>(line_id)
-    });
 }
 
 #[derive(Default)]
@@ -192,6 +302,7 @@ struct DetachedElementResp<R = egui::Response, T = R> {
     element: T,
     past: Option<R>,
     future: Option<R>,
+    already_linked: Option<R>,
 }
 
 fn show_detached_element<R>(
@@ -227,6 +338,41 @@ fn show_detached_element<R>(
     area
 }
 
+struct LinkingPayload {
+    id: egui::Id,
+    pos: egui::Pos2,
+    code: CodeRange,
+    right_side: bool,
+    /// list of already linked code ranges (those computed by the server)
+    already_linked: Vec<CodeRange>,
+}
+
+impl std::fmt::Debug for LinkingPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LinkingPayload")
+            .field("id", &self.id)
+            .field("pos", &self.pos)
+            .field(
+                "code",
+                &format_args!("{}", self.code.short_commit_and_path()),
+            )
+            .field("right_side", &self.right_side)
+            .field(
+                "already_linked",
+                &format_args!(
+                    "[{}]",
+                    &self
+                        .already_linked
+                        .iter()
+                        .map(|x| x.short_commit_and_path())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+            )
+            .finish()
+    }
+}
+
 fn show_element(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
@@ -260,7 +406,6 @@ fn show_element(
     let min = cui.min_rect().min;
     let size = cui.min_rect().size();
     let s = 25.0;
-    let other = egui::Color32::BLUE;
     let transp = egui::Color32::TRANSPARENT;
     DetachedElementResp {
         past: {
@@ -276,7 +421,7 @@ fn show_element(
                 (bot.x, bot.y),
                 (bot.x - s, bot.y + s),
             ];
-            link_side_hghlt(ui, past, col, other, id, rect, |col| {
+            link_side_hghlt(ui, past, col, SEL_COLOR, id, rect, |col| {
                 quad(col, transp, points)
             })
         },
@@ -294,11 +439,12 @@ fn show_element(
                 (bot.x + s, bot.y + s),
                 (bot.x, bot.y),
             ];
-            link_side_hghlt(ui, futur, col, other, id, rect, |col| {
+            link_side_hghlt(ui, futur, col, SEL_COLOR, id, rect, |col| {
                 quad(transp, col, points)
             })
         },
         element: prepared.end(ui),
+        already_linked: None,
     }
 }
 
@@ -323,15 +469,19 @@ fn link_side_hghlt(
     mesh: impl Fn(egui::Color32) -> egui::Mesh,
 ) -> Option<egui::Response> {
     if (ui.ctx().pointer_hover_pos()).map_or(false, |x| rect.contains(x)) {
-        let resp = ui.interact(rect, id, egui::Sense::click());
-        let col = if resp.clicked() {
-            other //.gamma_multiply(0.5)
+        let resp = ui.interact(rect, id, egui::Sense::drag());
+        let col = if resp.is_pointer_button_down_on() {
+            other
+        } else if egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx()).is_some() {
+            other
         } else {
             col.gamma_multiply(0.5)
         };
         ui.painter().set(shape_id, mesh(col));
         Some(resp)
-    } else if ui.memory_mut(|mem| mem.data.get_temp(D_LINE.into()) == Some(id)) {
+    } else if let Some(pl) = egui::DragAndDrop::payload::<LinkingPayload>(ui.ctx())
+        && pl.id == id
+    {
         ui.painter().set(shape_id, mesh(other));
         None
     } else {

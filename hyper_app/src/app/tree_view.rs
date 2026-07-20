@@ -12,9 +12,9 @@ mod cache;
 pub(crate) mod store;
 pub use store::{LabelIdentifier, NodeIdentifier};
 
-mod hyperast_layouter;
+pub(crate) mod hyperast_layouter;
 
-mod pp;
+pub(crate) mod pp;
 pub(crate) use pp::PPBuilder;
 
 mod ui_impl;

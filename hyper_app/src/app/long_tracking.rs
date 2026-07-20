@@ -38,8 +38,8 @@ pub(crate) struct LongTracking {
     pub(crate) flags: Flags,
     pub(crate) ser_view: bool,
     pub(crate) tree_view: bool,
-    pub(crate) detatched_view: bool,
-    pub(crate) detatched_view_link_config: LinkConfig,
+    pub(crate) detached_view: bool,
+    pub(crate) detached_view_link_config: LinkConfig,
     pub(crate) origins: Vec<CodeRange>,
     pub(crate) origin_index: usize,
     #[serde(skip)] // TODO remove that
@@ -64,8 +64,8 @@ impl Default for LongTracking {
             flags: Default::default(),
             ser_view: false,
             tree_view: true,
-            detatched_view: false,
-            detatched_view_link_config: Default::default(),
+            detached_view: false,
+            detached_view_link_config: Default::default(),
             origins: vec![Default::default()],
             origin_index: Default::default(),
             results: VecDeque::from(vec![Default::default()]),
@@ -140,16 +140,21 @@ pub(crate) fn show_config(
 
     ui.checkbox(&mut tracking.tree_view, "tree view");
     ui.checkbox(&mut tracking.ser_view, "serialized view");
-    ui.checkbox(&mut tracking.detatched_view, "detatched view");
-    if tracking.detatched_view {
+    ui.checkbox(&mut tracking.detached_view, "detached view");
+    if tracking.detached_view {
         ui.indent("detached_options", |ui| {
-            tracking.detatched_view_link_config.ui(ui);
+            tracking.detached_view_link_config.ui(ui);
         });
     }
     ui.add(egui::Label::new(
         egui::RichText::from("Triggers").font(egui::FontId::proportional(16.0)),
     ));
     tracking.flags.ui(ui);
+
+    if tracking.detached_view {
+        super::detached_view::show_detached_node_extra_config(ui);
+    }
+
     (resp_repo, resp_commit)
 }
 
@@ -1182,7 +1187,7 @@ pub(crate) fn show_results(
         ..
     } = res_impl;
 
-    if long_tracking.detatched_view {
+    if long_tracking.detached_view {
         let tracking_results = long_tracking.results.iter_mut().enumerate();
         let tracking_results = tracking_results.filter_map(|(col, (_, res))| {
             res.try_poll();
@@ -1194,7 +1199,7 @@ pub(crate) fn show_results(
             store,
             timeline_window,
             total_cols,
-            &long_tracking.detatched_view_link_config,
+            &long_tracking.detached_view_link_config,
             &mut long_tracking.manual_links,
             &mut long_tracking.manual_rm_links,
             tracking_results,
@@ -1423,7 +1428,6 @@ pub(crate) fn show_tree_view(
                     a => a,
                 }
             };
-            // let a = content.show(ui, aspects, focus, hightlights, "");
             for (k, blue_pos) in blue_pos {
                 if let Some(port) = ports.get_mut(col - min_col) {
                     let v = (ui.id().with("blue_highlight").with(k), blue_pos);

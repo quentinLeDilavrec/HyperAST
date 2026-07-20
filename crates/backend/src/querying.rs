@@ -1,5 +1,7 @@
 use axum::{Json, response::IntoResponse};
 use http::{HeaderMap, StatusCode};
+use hyperast::position::structural_pos::CursorHead;
+use hyperast_tsquery::CaptureId;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -155,6 +157,68 @@ impl ComputeResult {
 
 const INCREMENTAL_QUERIES: bool = true;
 
+#[derive(Debug, Serialize, Clone)]
+pub struct DetailedResult {
+    counts: Vec<usize>,
+    names: Vec<String>,
+    //
+    captures: Vec<u64>,
+    name_i: Vec<u16>,
+    pattern_i: Vec<u32>,
+}
+
+pub fn subtree(
+    query: Content,
+    state: SharedState,
+    id: u64,
+) -> Result<DetailedResult, QueryingError> {
+    let query = hyperast_tsquery::Query::new(
+        &query.query,
+        hyperast_vcs_git::resolve_language(&query.language).unwrap(),
+    )
+    .map_err(|e| QueryingError::ParsingError(e.to_string()))?;
+
+    if id == 0 {
+        return Err(QueryingError::ProcessingError("zeroed id".to_string()));
+    }
+    dbg!(&id);
+    let id: NodeIdentifier = unsafe { std::mem::transmute(id) };
+    dbg!(&id);
+
+    let repo = state.repositories.read().unwrap();
+    let stores = &repo.processor.main_stores;
+    let n = stores.resolve(&id);
+
+    let mut counts = vec![0; query.enabled_pattern_count()];
+    let names = (0..query.capture_count())
+        .map(|i| query.capture_name(CaptureId::from(i as u32)).to_string())
+        .collect::<Vec<_>>();
+    let mut captures = Vec::<u64>::new();
+    let mut name_i = vec![];
+    let mut pattern_i = vec![];
+
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(id);
+    let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(stores, pos);
+    let qcursor = query.matches(cursor);
+    for m in qcursor {
+        let i = m.pattern_index;
+        let i = query.enabled_pattern_index(i).unwrap();
+        counts[i as usize] += 1;
+        for capture in m.captures.iter() {
+            captures.push(unsafe { std::mem::transmute(capture.node.pos.node()) });
+            name_i.push(unsafe { std::mem::transmute::<_, u16>(capture.index) });
+            pattern_i.push(i as u32);
+        }
+    }
+
+    Ok(DetailedResult {
+        counts,
+        names,
+        captures,
+        name_i,
+        pattern_i,
+    })
+}
 pub fn simple(
     query: Content,
     state: SharedState,

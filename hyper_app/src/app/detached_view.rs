@@ -3,9 +3,12 @@ use std::sync::Arc;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
 
+use crate::app::querying::DetailedResult;
+
 use super::code_tracking::TrackingResult;
 use super::tree_view::store::FetchedHyperAST;
 use super::types::CodeRange;
+use super::utils_egui::MyUiExt as _;
 
 const DEBUG: bool = false;
 
@@ -385,24 +388,24 @@ fn show_element(
     let futur = ui.painter().add(egui::Shape::Noop);
     let mut prepared = egui::Frame::window(&ui.style()).begin(ui);
     let cui = &mut prepared.content_ui;
-    cui.disable();
     if options.commit {
-        cui.label(x.file.commit.id.prefix(6).to_string());
+        let prefix = x.file.commit.id.prefix(6).to_string();
+        cui.disabled_label(prefix);
     }
     if options.file {
-        if let Some(range) = &x.range {
-            cui.label(format!("{}:{:?}", x.file.file_path, range));
+        let x = if let Some(range) = &x.range {
+            format!("{}:{:?}", x.file.file_path, range)
         } else {
-            cui.label(x.file.file_path.to_string());
-        }
+            x.file.file_path.to_string()
+        };
+        cui.disabled_label(x);
     }
     if options.path {
-        cui.label(format!("{:?}", x.path));
+        cui.disabled_label(format!("{:?}", x.path));
     }
     if let Some(id) = x.path_ids.first() {
         show_element_content(store, options, cui, id);
     }
-    cui.min_rect();
     let min = cui.min_rect().min;
     let size = cui.min_rect().size();
     let s = 25.0;
@@ -498,7 +501,7 @@ fn show_element_content(
     use hyperast::types::WithChildren as _;
     use hyperast::types::{AnyType, Labeled as _, WithStats};
     if options.id {
-        ui.label(format!("{:?}", id));
+        ui.disabled_label(format!("{:?}", id));
     }
     let node_store = store.node_store.read().unwrap();
     let Some(r) = node_store.try_resolve::<AnyType>(*id) else {
@@ -507,23 +510,26 @@ fn show_element_content(
     };
     if options.kind {
         let kind = store.resolve_type(id);
-        ui.label(format!("{}", kind));
+        ui.disabled_label(format!("{}", kind));
     }
     if options.label {
         if let Some(l) = r.try_get_label().copied() {
             if let Some(l) = store.label_store.read().unwrap().try_resolve(&l) {
-                ui.label(format!("{:?}", l));
+                ui.disabled_label(format!("{:?}", l));
             }
         }
     }
     if options.size {
         let size = r.size();
-        ui.label(format!("size: {}", size));
+        ui.disabled_label(format!("size: {}", size));
     }
 
     if !options.extra {
         return;
     }
+    ui.visuals_mut().widgets.noninteractive.bg_stroke =
+        egui::Stroke::new(1.0, egui::Color32::BLACK);
+    ui.add(egui::Separator::default().spacing(3.0));
     let mut q = VecDeque::<NodeIdentifier>::default();
     if let Some(cs) = r.children() {
         cs.0.iter().for_each(|x| q.push_back(*x));
@@ -533,12 +539,188 @@ fn show_element_content(
     while let Some(r_id) = q.pop_front() {
         retrieve_extra(store, &mut q, &mut value, &mut name, r_id)
     }
+    let loading = name.is_none() && value.is_none();
     if let Some(l) = name {
-        ui.label(format!("name: {}", l));
+        ui.disabled_label(format!("name: {}", l));
     }
     if let Some(l) = value {
-        ui.label(format!("value: {}", l));
+        ui.disabled_label(format!("value: {}", l));
     }
+    if loading {
+        ui.disabled_label("inferring extras...");
+    } else {
+        query_enabled_extras(ui, store, id);
+    }
+}
+
+static DETACHED_NODE_QUERY: &str = "detached_node_query";
+
+pub(crate) fn show_detached_node_extra_config(ui: &mut egui::Ui) -> egui::Response {
+    let mut text = ui.data_mut(|d| {
+        d.get_persisted_mut_or_default::<String>(DETACHED_NODE_QUERY.into())
+            .to_owned()
+    });
+    ui.label("query for detached nodes extras");
+    let resp = ui.text_edit_multiline(&mut text);
+    ui.data_mut(|d| d.insert_persisted(DETACHED_NODE_QUERY.into(), text));
+
+    #[allow(static_mut_refs)]
+    if let Some(v) = unsafe { STORAGE.get_mut() }
+        && resp.lost_focus()
+    {
+        v.clear();
+    }
+    resp
+}
+
+type ExtraQueryResult = Result<
+    crate::utils_poll::Resource<Result<DetailedResult, crate::app::querying::QueryingError>>,
+    String,
+>;
+
+/// Do something safer
+static mut STORAGE: std::sync::OnceLock<
+    HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
+> = std::sync::OnceLock::new();
+
+fn query_enabled_extras(ui: &mut egui::Ui, store: &Arc<FetchedHyperAST>, id: &NodeIdentifier) {
+    let mut refresh = false;
+
+    #[allow(static_mut_refs)]
+    if let Some(v) = unsafe { STORAGE.get_mut() }
+        && let Some(prom) = v.get_mut(id)
+    {
+        match prom.ready_mut() {
+            Some(Ok(v)) => match &mut v.content {
+                Some(Ok(v)) => {
+                    query_enabled_extras_aux(ui, store, v);
+                }
+                Some(Err(e)) => {
+                    ui.label(format!("error: {:?}", e));
+                }
+                None => {
+                    ui.label("nothing");
+                }
+            },
+            Some(Err(e)) => {
+                ui.label(format!("error: {}", e));
+            }
+            None => {
+                ui.label("computing");
+            }
+        }
+    } else if let Some(text) =
+        ui.data_mut(|d| d.get_persisted::<String>(DETACHED_NODE_QUERY.into()))
+        && !text.trim().is_empty()
+    {
+        refresh |= true;
+    };
+
+    if let Some(text) = ui.data_mut(|d| {
+        d.get_persisted::<String>(DETACHED_NODE_QUERY.into())
+            .to_owned()
+    }) && refresh
+    {
+        #[allow(static_mut_refs)]
+        unsafe {
+            STORAGE.get_or_init(|| Default::default())
+        };
+        use super::querying::remote_compute_query_subtree as search_query;
+        let api_addr = "127.0.0.1:8888"; // TODO use the value given in settings
+        let script = crate::app::querying::QueryContent {
+            language: "Cpp".to_string(),
+            query: text.clone(),
+            precomp: None, // TODO get this from the server
+            commits: 1,
+            max_matches: 500, // more is a wast and difficult to interpret anyway
+            timeout: 2000,    // 2 seconds seems reasonable in most cases
+        };
+        let prom = search_query(ui.ctx(), api_addr, id, script);
+        #[allow(static_mut_refs)]
+        let _ = unsafe { STORAGE.get_mut().unwrap().insert(*id, prom) };
+    }
+}
+
+fn query_enabled_extras_aux(
+    ui: &mut egui::Ui,
+    store: &Arc<FetchedHyperAST>,
+    v: &mut DetailedResult,
+) {
+    ui.label(format!("matches: {:?}", v.counts()));
+    for (name, _, captures) in v.captures() {
+        if captures.len() == 1 {
+            let id = captures[0];
+            ui.label(format!("{}: {:?}", name, id));
+            let nid = id;
+            let layout_job = pp_subtree(ui.ctx(), store, nid);
+
+            if layout_job.text.len() < 30 && !layout_job.text.contains('\n') {
+                let galley = ui.fonts(|f| f.layout_job(layout_job));
+                let size = galley.size();
+                let min = ui.available_rect_before_wrap().min;
+                let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
+                ui.painter_at(rect.expand(1.0))
+                    .galley(min, galley, egui::Color32::RED);
+            } else {
+                let galley = ui.fonts(|f| f.layout_job(layout_job));
+                let size = galley.size();
+                egui::ScrollArea::new([size.x > 100.0, size.y > 20.0]).show(ui, |ui| {
+                    let min = ui.available_rect_before_wrap().min;
+                    let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
+                    ui.painter_at(rect.expand(1.0))
+                        .galley(min, galley, egui::Color32::RED);
+                });
+            }
+        } else {
+            let resp = ui.label(format!("{}: {:?} captures", name, captures.len()));
+            resp.on_hover_ui(|ui| {
+                hovered_many_captures(store, captures, ui);
+            });
+        }
+    }
+}
+
+fn hovered_many_captures(
+    store: &Arc<FetchedHyperAST>,
+    captures: &[NodeIdentifier],
+    ui: &mut egui::Ui,
+) {
+    #[derive(Copy, Clone, Default, serde::Serialize, serde::Deserialize)]
+    struct Cursor(u16);
+    let mut cursor = ui.data_mut(|d| *d.get_persisted_mut_or_default::<Cursor>(ui.id()));
+    ui.add(
+        egui::Label::new(format!("< {}/{} >", cursor.0 + 1, captures.len()))
+            .wrap_mode(egui::TextWrapMode::Extend),
+    );
+    ui.input_mut(|i| {
+        if i.consume_key(Default::default(), egui::Key::ArrowRight) {
+            if (cursor.0 as usize + 1) < captures.len() {
+                cursor.0 += 1;
+            }
+        } else if i.consume_key(Default::default(), egui::Key::ArrowLeft) {
+            cursor.0 = cursor.0.saturating_sub(1);
+        }
+    });
+    let layout_job = pp_subtree(ui.ctx(), store, captures[cursor.0 as usize]);
+    let galley = ui.fonts(|f| f.layout_job(layout_job));
+    let size = galley.size();
+    let min = ui.available_rect_before_wrap().min;
+    let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
+    ui.painter_at(rect.expand(1.0))
+        .galley(min, galley, egui::Color32::RED);
+    ui.data_mut(|d| d.insert_persisted::<Cursor>(ui.id(), cursor));
+}
+
+fn pp_subtree(
+    ctx: &egui::Context,
+    store: &Arc<FetchedHyperAST>,
+    nid: NodeIdentifier,
+) -> egui::text::LayoutJob {
+    let theme = egui_addon::syntax_highlighting::simple::CodeTheme::from_memory(ctx);
+    // TODO fetch entire subtree, line breaks would also be useful
+    let adv_theme = super::tree_view::hyperast_layouter::AdvTheme::from(theme);
+    let ppbuilder = super::tree_view::pp::PPBuilder::new(store.clone(), nid).theme(adv_theme);
+    ppbuilder.compute_incr(ctx)
 }
 
 fn retrieve_extra(

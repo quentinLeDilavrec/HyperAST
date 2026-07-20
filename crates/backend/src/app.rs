@@ -153,6 +153,24 @@ async fn querying(
     }
 }
 
+async fn querying_subtree(
+    headers: http::HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<u64>,
+    axum::extract::State(state): axum::extract::State<SharedState>,
+    axum::extract::Json(script): axum::extract::Json<querying::Content>,
+) -> axum::response::Response {
+    let accept = headers
+        .get(http::header::ACCEPT)
+        .map_or("", |x| x.to_str().unwrap_or_default());
+
+    let r = querying::subtree(script, state, id);
+    if accept.contains("csv") {
+        todo!()
+    } else {
+        Json(r).into_response()
+    }
+}
+
 #[axum_macros::debug_handler]
 async fn querying_streamed(
     axum::extract::Path(path): axum::extract::Path<querying::Param>,
@@ -186,25 +204,26 @@ pub fn querying_app(_st: SharedState) -> Router<SharedState> {
     let router = Router::new()
         .route(
             "/query/github/:user/:name/*commit",
-            post(querying).layer(querying_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
+            post(querying).layer(querying_service_config.clone()),
         )
         .route(
             "/query-st/github/:user/:name/*commit",
-            post(querying_streamed).layer(querying_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
+            post(querying_streamed).layer(querying_service_config.clone()),
         )
         .route(
             "/query-differential/github/:user/:name/:commit/:baseline",
-            post(querying_differential).layer(querying_service_config.clone()), // .with_state(Arc::clone(&shared_state)),
+            post(querying_differential).layer(querying_service_config.clone()),
+        )
+        .route(
+            "/query-subtree/github/:id",
+            post(querying_subtree).layer(querying_service_config.clone()),
         );
     #[cfg(feature = "collab")]
     let router = router
-        .route(
-            "/sharing-queries/shared-db",
-            get(crate::ws::connect_db), // .with_state(Arc::clone(&shared_state)),
-        )
+        .route("/sharing-queries/shared-db", get(crate::ws::connect_db))
         .route(
             "/sharing-queries/shared/:session",
-            get(crate::ws::connect_doc), // .with_state(Arc::clone(&shared_state)),
+            get(crate::ws::connect_doc),
         );
     router
 }

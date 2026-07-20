@@ -1,3 +1,4 @@
+use hyperast::store::nodes::fetched::NodeIdentifier;
 use poll_promise::Promise;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
@@ -357,6 +358,32 @@ pub(crate) fn remote_compute_query_aux_old(
     promise
 }
 
+pub(crate) fn remote_compute_query_subtree(
+    ctx: &egui::Context,
+    api_addr: &str,
+    id: &NodeIdentifier,
+    script: QueryContent,
+) -> Promise<Result<Resource<Result<DetailedResult, QueryingError>>, String>> {
+    let ctx = ctx.clone();
+    let (sender, promise) = Promise::new();
+    let url = format!("http://{}/query-subtree/github/{}", api_addr, id,);
+
+    let mut request = ehttp::Request::post(&url, serde_json::to_vec(&script).unwrap());
+    request.headers.insert(
+        "Content-Type".to_string(),
+        "application/json; charset=utf-8".to_string(),
+    );
+
+    ehttp::fetch(request, move |response| {
+        ctx.request_repaint(); // wake up UI thread
+        let resource = response.and_then(|response| {
+            Resource::<Result<DetailedResult, QueryingError>>::from_response(&ctx, response)
+        });
+        sender.send(resource);
+    });
+    promise
+}
+
 pub(crate) fn remote_compute_query_differential(
     ctx: &egui::Context,
     api_addr: &str,
@@ -663,6 +690,97 @@ impl Resource<Result<ComputeResults, QueryingError>> {
     }
 }
 
+#[derive(Debug, serde::Deserialize, Clone)]
+pub struct DetailedResult {
+    counts: Vec<usize>,
+    names: Vec<String>,
+    //
+    captures: Vec<NodeIdentifier>,
+    name_i: Vec<u16>,
+    pattern_i: Vec<PatternId>,
+    // capture by name, easy to only show the ones with exactly one occurrence
+    cached: Option<Vec<(Vec<PatternId>, Vec<NodeIdentifier>)>>,
+}
+
+pub type PatternId = u32;
+
+impl DetailedResult {
+    pub(crate) fn counts(&self) -> &[usize] {
+        &self.counts
+    }
+    pub(crate) fn captures(
+        &mut self,
+    ) -> impl Iterator<Item = (&str, &[PatternId], &[NodeIdentifier])> {
+        if self.cached.is_none() {
+            let mut cached = vec![(vec![], vec![]); self.names.len()];
+            for (i, x) in self
+                .name_i
+                .iter()
+                .zip(self.pattern_i.iter().zip(self.captures.iter()))
+            {
+                cached[*i as usize].0.push(*x.0);
+                cached[*i as usize].1.push(*x.1);
+            }
+            self.cached = Some(cached);
+        }
+        (self.cached.as_ref().unwrap().iter())
+            .enumerate()
+            .filter_map(|(i, c)| {
+                if !c.0.is_empty() {
+                    Some((self.names[i].as_str(), c.0.as_slice(), c.1.as_slice()))
+                } else {
+                    None
+                }
+            })
+    }
+}
+
+impl Resource<Result<DetailedResult, QueryingError>> {
+    pub(super) fn from_response(
+        _ctx: &egui::Context,
+        response: ehttp::Response,
+    ) -> Result<Self, String> {
+        let content_type = response.content_type().unwrap_or_default();
+        if !content_type.starts_with("application/json") {
+            return Err(format!("Wrong content type: {}", content_type));
+        }
+        if response.status != 200 {
+            let Some(text) = response.text() else {
+                wasm_rs_dbg::dbg!();
+                return Err("".to_string());
+            };
+            let json = match serde_json::from_str::<QueryingError>(text) {
+                Ok(json) => json,
+                Err(err) => {
+                    log::error!("error converting QueryError: {}", err);
+                    return Err(text.to_string());
+                }
+            };
+            return Ok(Self {
+                response,
+                content: Some(Err(json)),
+            });
+        }
+
+        let text = response.text();
+        wasm_rs_dbg::dbg!(&text);
+        // let colored_text = text.and_then(|text| syntax_highlighting(ctx, &response, text));
+        let content = if let Some(text) = text {
+            Some(
+                serde_json::from_str(text)
+                    .inspect_err(|err| {
+                        wasm_rs_dbg::dbg!(&err);
+                    })
+                    .map_err(|e| e.to_string())?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Self { response, content })
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct DetailsResults {
     pub prepare_time: f64,
@@ -670,9 +788,7 @@ pub struct DetailsResults {
 }
 
 impl DetailsResults {
-    pub(crate) fn iter_nodes_ids(
-        &self,
-    ) -> impl Iterator<Item = hyperast::store::nodes::fetched::NodeIdentifier> {
+    pub(crate) fn iter_nodes_ids(&self) -> impl Iterator<Item = NodeIdentifier> {
         self.results
             .iter()
             .flat_map(|x| x.0.path_ids.iter().chain(x.1.path_ids.iter()))

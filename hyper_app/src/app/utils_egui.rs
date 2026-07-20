@@ -13,6 +13,11 @@ type ShowRes<T> = (
 
 #[allow(unused)] // TODO move to egui_addon
 pub trait MyUiExt: UiExt {
+    fn disabled_label(&mut self, text: impl Into<String>) -> egui::Response {
+        let widget = egui::Label::new(text.into());
+        self.ui_mut().add_enabled(false, widget)
+    }
+
     fn radio_collapsing<R, S: PartialEq + Clone>(
         &mut self,
         id: egui::Id,

@@ -648,34 +648,37 @@ fn query_enabled_extras_aux(
 ) {
     ui.label(format!("matches: {:?}", v.counts()));
     for (name, _, captures) in v.captures() {
-        if captures.len() == 1 {
-            let id = captures[0];
-            ui.label(format!("{}: {:?}", name, id));
-            let nid = id;
-            let layout_job = pp_subtree(ui.ctx(), store, nid);
-
-            if layout_job.text.len() < 30 && !layout_job.text.contains('\n') {
-                let galley = ui.fonts(|f| f.layout_job(layout_job));
-                let size = galley.size();
-                let min = ui.available_rect_before_wrap().min;
-                let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
-                ui.painter_at(rect.expand(1.0))
-                    .galley(min, galley, egui::Color32::RED);
-            } else {
-                let galley = ui.fonts(|f| f.layout_job(layout_job));
-                let size = galley.size();
-                egui::ScrollArea::new([size.x > 100.0, size.y > 20.0]).show(ui, |ui| {
-                    let min = ui.available_rect_before_wrap().min;
-                    let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
-                    ui.painter_at(rect.expand(1.0))
-                        .galley(min, galley, egui::Color32::RED);
-                });
-            }
-        } else {
+        if captures.len() != 1 {
             let resp = ui.label(format!("{}: {:?} captures", name, captures.len()));
             resp.on_hover_ui(|ui| {
                 hovered_many_captures(store, captures, ui);
             });
+            continue;
+        }
+        ui.label(format!("{}:", name));
+        let nid = captures[0];
+        let layout_job = pp_subtree(ui.ctx(), store, nid);
+        let col = egui::Color32::RED;
+        if layout_job.text.len() < 30 && !layout_job.text.contains('\n') {
+            // small piece of code
+            let galley = ui.fonts(|f| f.layout_job(layout_job));
+            let size = galley.size();
+            let min = ui.available_rect_before_wrap().min;
+            let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
+            ui.painter_at(rect.expand(1.0)).galley(min, galley, col);
+        } else {
+            // need scroll area for large text
+            let galley = ui.fonts(|f| f.layout_job(layout_job));
+            let size = galley.size();
+            egui::ScrollArea::new([size.x > 200.0, size.y > 100.0])
+                .max_width(200.0)
+                .max_height(100.0)
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                .show(ui, |ui| {
+                    let min = ui.available_rect_before_wrap().min;
+                    let (rect, _resp) = ui.allocate_exact_size(size, egui::Sense::hover());
+                    ui.painter_at(rect.expand(1.0)).galley(min, galley, col);
+                });
         }
     }
 }

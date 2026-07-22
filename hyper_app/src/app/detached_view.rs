@@ -58,22 +58,20 @@ pub(crate) fn ui_detached<'a>(
         } else if let Some(already_linked) = already_linked
             && already_linked == value[1]
         {
-            if manual_rm_links.contains(&value) {
-                log::info!(
-                    "show link {} -> {}",
-                    value[0].short_commit_and_path(),
-                    value[1].short_commit_and_path(),
-                );
+            let other = [value[1].clone(), value[0].clone()];
+            let contains = manual_rm_links.contains(&value);
+            log::info!(
+                "{} link {} -> {}",
+                if contains { "show" } else { "hide" },
+                value[0].short_commit_and_path(),
+                value[1].short_commit_and_path(),
+            );
+            if contains {
                 manual_rm_links.remove(&value);
-                manual_rm_links.remove(&[value[1].clone(), value[0].clone()]);
+                manual_rm_links.remove(&other);
             } else {
-                log::info!(
-                    "hide link {} -> {}",
-                    value[0].short_commit_and_path(),
-                    value[1].short_commit_and_path(),
-                );
                 manual_rm_links.insert(value.clone());
-                manual_rm_links.insert([value[1].clone(), value[0].clone()]);
+                manual_rm_links.insert(other);
             }
         } else {
             log::info!(

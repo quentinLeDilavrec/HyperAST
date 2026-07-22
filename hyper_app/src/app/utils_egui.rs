@@ -18,6 +18,32 @@ pub trait MyUiExt: UiExt {
         self.ui_mut().add_enabled(false, widget)
     }
 
+    fn show_named_value(
+        &mut self,
+        name: Option<&str>,
+        value: impl Into<String>,
+        annot: impl egui::Widget,
+    ) -> egui::Response {
+        let text = if let Some(name) = name {
+            format!("{}: {}", name, value.into())
+        } else {
+            value.into()
+        };
+        let widget = egui::Label::new(text).wrap_mode(egui::TextWrapMode::Extend);
+        let resp = self.ui_mut().add_enabled(false, widget);
+
+        let mut tooltip = egui::Tooltip::for_widget(&resp);
+        let dragged = self.ui().ctx().viewport(|v| v.interact_widgets.dragged);
+        tooltip.popup = (tooltip.popup)
+            .open(resp.contains_pointer() && dragged.is_none())
+            .align(egui::RectAlign::LEFT)
+            .align_alternatives(&[egui::RectAlign::RIGHT]);
+        tooltip.show(|ui| {
+            ui.add(annot);
+        });
+        resp
+    }
+
     fn radio_collapsing<R, S: PartialEq + Clone>(
         &mut self,
         id: egui::Id,

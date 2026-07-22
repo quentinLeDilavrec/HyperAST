@@ -107,7 +107,7 @@ fn ui_detached_nodes<'a>(
     let mut result = DetachedElementResp::default();
     let tracking_results = it.flat_map(|(d, x)| x.iter_mut().enumerate().map(move |y| (d, y)));
     for (default_x, (i, r)) in tracking_results {
-        let show = |ui: &mut _, x: &_, id, o: &_| show_element(ui, &store, options, x, id, o);
+        let show = |ui: &mut _, x: &_, id, o: &mut _| show_element(ui, &store, options, x, id, o);
         let src = &mut r.src;
         let id = ui.id().with(&src);
         let default_pos = (default_x + col_width / 2.0, i as f32 * 100.0);
@@ -313,17 +313,18 @@ fn show_detached_element<R>(
     x: &CodeRange,
     id: egui::Id,
     default_pos: (f32, f32),
-    show: impl FnOnce(&mut egui::Ui, &CodeRange, egui::Id, &O) -> R,
+    show: impl FnOnce(&mut egui::Ui, &CodeRange, egui::Id, &mut O) -> R,
 ) -> egui::InnerResponse<R> {
     let p = ui.available_rect_before_wrap().left_bottom();
     let options = ui
         .memory_mut(|mem| mem.data.get_temp::<O>(id))
         .unwrap_or_default();
+    let mut opt = options.clone();
     let area = egui::Area::new(id)
         .default_pos(default_pos)
-        .show(ui.ctx(), |ui| show(ui, x, id, &options));
+        .show(ui.ctx(), |ui| show(ui, x, id, &mut opt));
     if area.response.hovered() {
-        options.on_input(ui.ctx(), id);
+        opt.on_input(ui.ctx(), id);
         egui::Area::new("full".into())
             .default_size(ui.ctx().screen_rect().size() * 0.1)
             .fixed_pos(p)
@@ -337,6 +338,8 @@ fn show_detached_element<R>(
                 };
                 ui.label(egui::RichText::new(text).background_color(egui::Color32::GRAY))
             });
+    } else if opt.0 != options.0 {
+        ui.memory_mut(|mem| mem.data.insert_temp::<O>(id, opt));
     }
     area
 }
@@ -382,32 +385,46 @@ fn show_element(
     _global_opt: &LinkConfig,
     x: &CodeRange,
     id: egui::Id,
-    options: &O,
+    options: &mut O,
 ) -> DetachedElementResp {
     let past = ui.painter().add(egui::Shape::Noop);
     let futur = ui.painter().add(egui::Shape::Noop);
     let mut prepared = egui::Frame::window(&ui.style()).begin(ui);
     let cui = &mut prepared.content_ui;
-    if options.commit {
+    if options.0.contains(Opt::Commit) {
         let prefix = x.file.commit.id.prefix(6).to_string();
-        cui.disabled_label(prefix);
+        cui.show_named_value(None, prefix, Opt::Commit.menu_button(ui.ctx(), false));
     }
-    if options.file {
+    if options.0.contains(Opt::File) {
         let x = if let Some(range) = &x.range {
             format!("{}:{:?}", x.file.file_path, range)
         } else {
             x.file.file_path.to_string()
         };
-        cui.disabled_label(x);
+        cui.show_named_value(None, x, Opt::File.menu_button(ui.ctx(), false));
     }
-    if options.path {
-        cui.disabled_label(format!("{:?}", x.path));
+    if options.0.contains(Opt::Path) {
+        cui.show_named_value(
+            None,
+            format!("{:?}", x.path),
+            Opt::Path.menu_button(ui.ctx(), false),
+        );
     }
     if let Some(id) = x.path_ids.first() {
         show_element_content(store, options, cui, id);
     }
     let min = cui.min_rect().min;
     let size = cui.min_rect().size();
+    let element = prepared.end(ui);
+    if !options.0.is_empty() && !element.dragged() {
+        let mut tooltip = egui::Tooltip::for_widget(&element);
+        tooltip.popup = tooltip.popup.open(
+            ui.ctx().viewport(|v| v.interact_widgets.dragged.is_none())
+                && egui::Tooltip::should_show_tooltip(&element),
+        );
+        tooltip.show(|ui| options.show(ui));
+    }
+
     let s = 25.0;
     let transp = egui::Color32::TRANSPARENT;
     DetachedElementResp {
@@ -446,7 +463,7 @@ fn show_element(
                 quad(transp, col, points)
             })
         },
-        element: prepared.end(ui),
+        element,
         already_linked: None,
     }
 }
@@ -500,56 +517,71 @@ fn show_element_content(
 ) {
     use hyperast::types::WithChildren as _;
     use hyperast::types::{AnyType, Labeled as _, WithStats};
-    if options.id {
-        ui.disabled_label(format!("{:?}", id));
+    if options.0.contains(Opt::Id) {
+        ui.show_named_value(
+            None,
+            format!("{:?}", id),
+            Opt::Id.menu_button(ui.ctx(), false),
+        );
     }
     let node_store = store.node_store.read().unwrap();
     let Some(r) = node_store.try_resolve::<AnyType>(*id) else {
         store.demand_node(*id);
         return;
     };
-    if options.kind {
+    if options.0.contains(Opt::Kind) {
         let kind = store.resolve_type(id);
-        ui.disabled_label(format!("{}", kind));
+        ui.show_named_value(
+            None,
+            kind.as_static_str(),
+            Opt::Kind.menu_button(ui.ctx(), false),
+        );
     }
-    if options.label {
+    if options.0.contains(Opt::Label) {
         if let Some(l) = r.try_get_label().copied() {
             if let Some(l) = store.label_store.read().unwrap().try_resolve(&l) {
-                ui.disabled_label(format!("{:?}", l));
+                ui.show_named_value(None, l, Opt::Label.menu_button(ui.ctx(), false));
             }
         }
     }
-    if options.size {
+    if options.0.contains(Opt::Size) {
         let size = r.size();
-        ui.disabled_label(format!("size: {}", size));
+        ui.show_named_value(
+            Some("size"),
+            format!("{}", size),
+            Opt::Size.menu_button(ui.ctx(), false),
+        );
     }
 
-    if !options.extra {
-        return;
+    if options.0.contains(Opt::OldExtra) {
+        ui.visuals_mut().widgets.noninteractive.bg_stroke =
+            egui::Stroke::new(1.0, egui::Color32::BLACK);
+        ui.add(egui::Separator::default().spacing(3.0));
+        let mut q = VecDeque::<NodeIdentifier>::default();
+        if let Some(cs) = r.children() {
+            cs.0.iter().for_each(|x| q.push_back(*x));
+        }
+        let mut value = None;
+        let mut name = None;
+        while let Some(r_id) = q.pop_front() {
+            retrieve_extra(store, &mut q, &mut value, &mut name, r_id)
+        }
+        let loading = name.is_none() && value.is_none();
+        if let Some(l) = name {
+            ui.disabled_label(format!("name: {}", l));
+        }
+        if let Some(l) = value {
+            ui.disabled_label(format!("value: {}", l));
+        }
+        if loading {
+            ui.disabled_label("inferring extras...");
+        }
     }
-    ui.visuals_mut().widgets.noninteractive.bg_stroke =
-        egui::Stroke::new(1.0, egui::Color32::BLACK);
-    ui.add(egui::Separator::default().spacing(3.0));
-    let mut q = VecDeque::<NodeIdentifier>::default();
-    if let Some(cs) = r.children() {
-        cs.0.iter().for_each(|x| q.push_back(*x));
-    }
-    let mut value = None;
-    let mut name = None;
-    while let Some(r_id) = q.pop_front() {
-        retrieve_extra(store, &mut q, &mut value, &mut name, r_id)
-    }
-    let loading = name.is_none() && value.is_none();
-    if let Some(l) = name {
-        ui.disabled_label(format!("name: {}", l));
-    }
-    if let Some(l) = value {
-        ui.disabled_label(format!("value: {}", l));
-    }
-    if loading {
-        ui.disabled_label("inferring extras...");
-    } else {
-        query_enabled_extras(ui, store, id);
+    if options.0.contains(Opt::Extra) {
+        ui.visuals_mut().widgets.noninteractive.bg_stroke =
+            egui::Stroke::new(1.0, egui::Color32::BLACK);
+        ui.add(egui::Separator::default().spacing(3.0));
+        query_enabled_extras(ui, store, id, options);
     }
 }
 
@@ -583,7 +615,12 @@ static mut STORAGE: std::sync::OnceLock<
     HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
 > = std::sync::OnceLock::new();
 
-fn query_enabled_extras(ui: &mut egui::Ui, store: &Arc<FetchedHyperAST>, id: &NodeIdentifier) {
+fn query_enabled_extras(
+    ui: &mut egui::Ui,
+    store: &Arc<FetchedHyperAST>,
+    id: &NodeIdentifier,
+    options: &O,
+) {
     let mut refresh = false;
 
     #[allow(static_mut_refs)]
@@ -593,6 +630,9 @@ fn query_enabled_extras(ui: &mut egui::Ui, store: &Arc<FetchedHyperAST>, id: &No
         match prom.ready_mut() {
             Some(Ok(v)) => match &mut v.content {
                 Some(Ok(v)) => {
+                    if options.0.contains(Opt::Matches) {
+                        ui.label(format!("matches: {:?}", v.counts()));
+                    }
                     query_enabled_extras_aux(ui, store, v);
                 }
                 Some(Err(e)) => {
@@ -646,13 +686,18 @@ fn query_enabled_extras_aux(
     store: &Arc<FetchedHyperAST>,
     v: &mut DetailedResult,
 ) {
-    ui.label(format!("matches: {:?}", v.counts()));
     for (name, _, captures) in v.captures() {
         if captures.len() != 1 {
-            let resp = ui.label(format!("{}: {:?} captures", name, captures.len()));
-            resp.on_hover_ui(|ui| {
-                hovered_many_captures(store, captures, ui);
-            });
+            let resp = ui.add(
+                egui::Label::new(format!("{}: {:?} captures", name, captures.len()))
+                    .wrap_mode(egui::TextWrapMode::Extend),
+            );
+            egui::Popup::from_response(&resp)
+                .open(resp.hovered())
+                .align(egui::RectAlign::RIGHT_START)
+                .show(|ui| {
+                    hovered_many_captures(store, captures, ui);
+                });
             continue;
         }
         ui.label(format!("{}:", name));
@@ -671,6 +716,7 @@ fn query_enabled_extras_aux(
             let galley = ui.fonts(|f| f.layout_job(layout_job));
             let size = galley.size();
             egui::ScrollArea::new([size.x > 200.0, size.y > 100.0])
+                .id_salt(name)
                 .max_width(200.0)
                 .max_height(100.0)
                 .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
@@ -769,50 +815,129 @@ fn retrieve_extra(
     }
 }
 
-#[derive(Clone)]
-struct O {
-    commit: bool,
-    file: bool,
-    path: bool,
-    id: bool,
-    kind: bool,
-    label: bool,
-    size: bool,
-    /// search number literal
-    extra: bool,
+#[derive(enumset::EnumSetType, Debug)]
+enum Opt {
+    Commit,
+    File,
+    Path,
+    Id,
+    Kind,
+    Label,
+    Size,
+    Extra,
+    Matches,
+    OldExtra,
 }
+
+impl Opt {
+    fn icon(self) -> Option<&'static re_ui::Icon> {
+        None
+    }
+
+    fn enable_text(self) -> &'static str {
+        match self {
+            Opt::Commit => "show commit id",
+            Opt::File => "show file and byte range",
+            Opt::Path => "show offset path",
+            Opt::Id => "show id of subtree in HyperAST",
+            Opt::Kind => "show type of syntax node",
+            Opt::Label => "show label attached to syntax node",
+            Opt::Size => "show size of subtree",
+            Opt::Extra => "show extra info captured with the query",
+            Opt::Matches => "show number of matches with the query",
+            Opt::OldExtra => "show inferred info about the node",
+        }
+    }
+
+    fn disable_text(self) -> &'static str {
+        match self {
+            Opt::Commit => "hide commit id",
+            Opt::File => "hide file and byte range",
+            Opt::Path => "hide offset path",
+            Opt::Id => "hide id of subtree in HyperAST",
+            Opt::Kind => "hide type of syntax node",
+            Opt::Label => "hide label attached to syntax node",
+            Opt::Size => "hide size of subtree",
+            Opt::Extra => "hide extra info captured with the query",
+            Opt::Matches => "hide number of matches with the query",
+            Opt::OldExtra => "hide inferred info about the node",
+        }
+    }
+
+    fn kb_shortcut(self) -> Option<egui::KeyboardShortcut> {
+        Some(egui::KeyboardShortcut::new(
+            egui::Modifiers::default(),
+            match self {
+                Opt::Commit => egui::Key::C,
+                Opt::File => egui::Key::F,
+                Opt::Path => egui::Key::P,
+                Opt::Id => egui::Key::I,
+                Opt::Kind => egui::Key::K,
+                Opt::Label => egui::Key::L,
+                Opt::Size => egui::Key::S,
+                Opt::Extra => egui::Key::E,
+                Opt::Matches => egui::Key::M,
+                Opt::OldExtra => egui::Key::Y,
+            },
+        ))
+    }
+
+    pub fn menu_button(self, ctx: &egui::Context, enable: bool) -> egui::Button<'static> {
+        let text = if enable {
+            self.enable_text()
+        } else {
+            self.disable_text()
+        };
+        let mut button = if let Some(icon) = self.icon() {
+            egui::Button::image_and_text(
+                icon.as_image()
+                    .fit_to_exact_size(re_ui::design_tokens_of(egui::Theme::Dark).small_icon_size),
+                text,
+            )
+            .wrap_mode(egui::TextWrapMode::Extend)
+        } else {
+            egui::Button::new(text).wrap_mode(egui::TextWrapMode::Extend)
+        };
+
+        if let Some(shortcut) = self.kb_shortcut() {
+            button = button.shortcut_text(ctx.format_shortcut(&shortcut));
+        }
+
+        button
+    }
+}
+
+#[derive(Clone)]
+struct O(enumset::EnumSet<Opt>);
+
 impl O {
-    fn on_input(self, ctx: &egui::Context, id: egui::Id) {
-        const NONE: egui::Modifiers = egui::Modifiers::NONE;
-        macro_rules! keys { ($($id:ident: $key:ident,)*) => {{
-            let o = ctx.input_mut(|inp|{ O {$(
-                $id: self.$id ^ inp.consume_key(NONE, egui::Key::$key)
-            ),*}});
-            ctx.memory_mut(|mem| mem.data.insert_temp::<O>(id, o));
-        }}}
-        keys!(
-            id: I,
-            commit: C,
-            file: F,
-            path: P,
-            kind: K,
-            label: L,
-            size: S,
-            extra: Y,
-        )
+    fn on_input(mut self, ctx: &egui::Context, id: egui::Id) {
+        let all = enumset::EnumSet::<Opt>::default().complement();
+        for x in all {
+            let Some(shortcut) = x.kb_shortcut() else {
+                continue;
+            };
+            if ctx.input_mut(|inp| inp.consume_shortcut(&shortcut)) {
+                self.0 ^= x;
+            }
+        }
+        ctx.memory_mut(|mem| mem.data.insert_temp::<O>(id, self));
     }
 }
 impl Default for O {
     fn default() -> Self {
-        Self {
-            commit: true,
-            file: true,
-            path: true,
-            id: true,
-            kind: true,
-            label: true,
-            size: true,
-            extra: false,
+        Self(Opt::Commit | Opt::File | Opt::Kind | Opt::Label)
+    }
+}
+
+impl O {
+    fn show(&mut self, ui: &mut egui::Ui) {
+        for x in enumset::EnumSet::<Opt>::default().complement() {
+            if !self.0.contains(x) {
+                if ui.add(x.menu_button(ui.ctx(), true)).clicked() {
+                    self.0 ^= x;
+                }
+            }
         }
     }
 }

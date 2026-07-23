@@ -1667,3 +1667,83 @@ pub(super) fn track_at_path_with_changes(
     });
     promise
 }
+
+pub(crate) fn prepare_export(
+    ui: &mut egui::Ui,
+    long_tracking: &mut super::long_tracking::LongTracking,
+    fetched_hyper_ast: Arc<FetchedHyperAST>,
+) -> impl serde::Serialize {
+    let tracking_results = long_tracking.results.iter_mut().enumerate();
+    let tracking_results = tracking_results.filter_map(|(col, (_, res))| {
+        res.try_poll();
+        res.get_mut()
+            .map(|res| (col, res.content.track.results.as_mut_slice()))
+    });
+    let manual_rm_links = &mut long_tracking.manual_rm_links;
+    let manual_links = &mut long_tracking.manual_links;
+    use crate::app::code_tracking::TrackingResult;
+    use crate::app::detached_view::get_query_enabled_extras;
+    use crate::app::types::CodeRange;
+    #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+    struct Res {
+        code_ranges: Vec<CodeRange>,
+        extras: Vec<crate::app::querying::DetailedResult>,
+        pp: HashMap<u32, String>,
+        tracking_results: Vec<Vec<TrackingResult<usize>>>,
+        manual_rm_links: Vec<[usize; 2]>,
+        manual_links: Vec<[usize; 2]>,
+    }
+    let mut code_ranges: Vec<CodeRange> = vec![];
+    let mut extras: Vec<crate::app::querying::DetailedResult> = vec![];
+    let mut pp: HashMap<u32, String> = HashMap::new();
+    let mut find_or_insert = |x: &_| {
+        code_ranges.iter().position(|y| y == x).unwrap_or_else(|| {
+            let e = get_query_enabled_extras(x.path_ids.first().unwrap());
+            if let Some(mut e) = e {
+                e.cached = None;
+                for c in &e.captures {
+                    let key = (fetched_hyper_ast.as_ref(), *c);
+                    let code = ui.memory_mut(|mem| {
+                        use crate::app::tree_view::pp::PPCache;
+                        mem.caches.cache::<PPCache>().get(key)
+                    });
+                    pp.insert(c.to_u32(), code);
+                }
+                extras.push(e);
+            }
+            code_ranges.push(x.clone());
+            code_ranges.len() - 1
+        })
+    };
+    let mut tr = |x: &mut TrackingResult| TrackingResult {
+        compute_time: x.compute_time,
+        commits_processed: x.commits_processed,
+        src: find_or_insert(&x.src),
+        intermediary: x.intermediary.as_ref().map(&mut find_or_insert),
+        fallback: x.fallback.as_ref().map(&mut find_or_insert),
+        matched: x
+            .matched
+            .iter()
+            .map(&mut find_or_insert)
+            .collect::<Vec<_>>(),
+    };
+    let tracking_results = tracking_results
+        .map(|x| x.1.into_iter().map(&mut tr).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+
+    let res = Res {
+        tracking_results,
+        manual_rm_links: manual_rm_links
+            .iter()
+            .map(|[a, b]| [find_or_insert(a), find_or_insert(b)])
+            .collect::<Vec<_>>(),
+        manual_links: manual_links
+            .iter()
+            .map(|[a, b]| [find_or_insert(a), find_or_insert(b)])
+            .collect::<Vec<_>>(),
+        code_ranges,
+        extras,
+        pp,
+    };
+    res
+}

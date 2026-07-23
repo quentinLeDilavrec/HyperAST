@@ -108,7 +108,7 @@ fn ui_detached_nodes<'a>(
         let show = |ui: &mut _, x: &_, id, o: &mut _| show_element(ui, &store, options, x, id, o);
         let src = &mut r.src;
         let id = ui.id().with(&src);
-        let default_pos = (default_x + col_width / 2.0, i as f32 * 100.0);
+        let default_pos = (default_x + col_width / 2.0, i as f32 * 150.0);
         let resp = show_detached_element(ui, src, id, default_pos, show);
         if DEBUG {
             ui.painter().debug_rect(
@@ -612,6 +612,25 @@ type ExtraQueryResult = Result<
 static mut STORAGE: std::sync::OnceLock<
     HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
 > = std::sync::OnceLock::new();
+
+pub(crate) fn get_query_enabled_extras(id: &NodeIdentifier) -> Option<DetailedResult> {
+    #[allow(static_mut_refs)]
+    let Some(v) = (unsafe { STORAGE.get() }) else {
+        return None;
+    };
+    if let Some(prom) = v.get(id) {
+        match prom.ready() {
+            Some(Ok(v)) => match &v.content {
+                Some(Ok(v)) => {
+                    return Some(v.clone());
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+    None
+}
 
 fn query_enabled_extras(
     ui: &mut egui::Ui,

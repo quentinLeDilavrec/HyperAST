@@ -690,16 +690,16 @@ impl Resource<Result<ComputeResults, QueryingError>> {
     }
 }
 
-#[derive(Debug, serde::Deserialize, Clone)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct DetailedResult {
     counts: Vec<usize>,
     names: Vec<String>,
     //
-    captures: Vec<NodeIdentifier>,
+    pub(crate) captures: Vec<NodeIdentifier>,
     name_i: Vec<u16>,
     pattern_i: Vec<PatternId>,
     // capture by name, easy to only show the ones with exactly one occurrence
-    cached: Option<Vec<(Vec<PatternId>, Vec<NodeIdentifier>)>>,
+    pub(crate) cached: Option<Vec<(Vec<PatternId>, Vec<NodeIdentifier>)>>,
 }
 
 pub type PatternId = u32;

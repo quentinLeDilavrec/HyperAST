@@ -1647,6 +1647,11 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             ui.markdown_ui(&help_markdown);
         });
 
+        fn export_button(ui: &mut egui::Ui) -> egui::Response {
+            ui.small_icon_button(&re_ui::icons::EXTERNAL_LINK, "Export data as json")
+                .on_hover_text("Export data as json")
+        }
+
         if let Tab::QueryResults { id, .. } = space_view {
             let Some(QueryResults { content: res, .. }) = self.data.queries_results.get_mut(*id)
             else {
@@ -1654,16 +1659,104 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 return Default::default();
             };
             if let Some(Ok(res)) = res.get() {
-                if ui
-                    .small_icon_button(&re_ui::icons::EXTERNAL_LINK, "Export data as json")
-                    .on_hover_text("Export data as json")
-                    .clicked()
-                {
+                if export_button(ui).clicked() {
                     if let Ok(text) = serde_json::to_string_pretty(res) {
                         utils::file_save("data", ".json", &text);
                     }
                 }
             };
+        } else if let Tab::LongTracking = space_view {
+            if !self.data.long_tracking.detached_view {
+                return;
+            }
+            if export_button(ui).clicked() {
+                let long_tracking = &mut self.data.long_tracking;
+                let tracking_results = long_tracking.results.iter_mut().enumerate();
+                let tracking_results = tracking_results.filter_map(|(col, (_, res))| {
+                    res.try_poll();
+                    res.get_mut()
+                        .map(|res| (col, res.content.track.results.as_mut_slice()))
+                });
+                let manual_rm_links = &mut long_tracking.manual_rm_links;
+                let manual_links = &mut long_tracking.manual_links;
+                use code_tracking::TrackingResult;
+                #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+                struct Res {
+                    code_ranges: Vec<types::CodeRange>,
+                    extras: Vec<querying::DetailedResult>,
+                    pp: HashMap<u32, String>,
+                    tracking_results: Vec<Vec<TrackingResult<usize>>>,
+                    manual_rm_links: Vec<[usize; 2]>,
+                    manual_links: Vec<[usize; 2]>,
+                }
+                let mut code_ranges: Vec<types::CodeRange> = vec![];
+                let mut extras: Vec<querying::DetailedResult> = vec![];
+                let mut pp: HashMap<u32, String> = HashMap::new();
+                let mut find_or_insert = |x: &_| {
+                    code_ranges.iter().position(|y| y == x).unwrap_or_else(|| {
+                        let e =
+                            detached_view::get_query_enabled_extras(x.path_ids.first().unwrap());
+                        if let Some(mut e) = e {
+                            e.cached = None;
+                            for c in &e.captures {
+                                let key = (self.data.store.as_ref(), *c);
+                                let code = ui.memory_mut(|mem| {
+                                    mem.caches.cache::<tree_view::pp::PPCache>().get(key)
+                                });
+                                pp.insert(c.to_u32(), code);
+                            }
+                            extras.push(e);
+                        }
+                        code_ranges.push(x.clone());
+                        code_ranges.len() - 1
+                    })
+                };
+                let mut tr = |x: &mut TrackingResult| TrackingResult {
+                    compute_time: x.compute_time,
+                    commits_processed: x.commits_processed,
+                    src: find_or_insert(&x.src),
+                    intermediary: x.intermediary.as_ref().map(&mut find_or_insert),
+                    fallback: x.fallback.as_ref().map(&mut find_or_insert),
+                    matched: x
+                        .matched
+                        .iter()
+                        .map(&mut find_or_insert)
+                        .collect::<Vec<_>>(),
+                };
+                let tracking_results = tracking_results
+                    .map(|x| x.1.into_iter().map(&mut tr).collect::<Vec<_>>())
+                    .collect::<Vec<_>>();
+
+                let res = Res {
+                    tracking_results,
+                    manual_rm_links: manual_rm_links
+                        .iter()
+                        .map(|[a, b]| [find_or_insert(a), find_or_insert(b)])
+                        .collect::<Vec<_>>(),
+                    manual_links: manual_links
+                        .iter()
+                        .map(|[a, b]| [find_or_insert(a), find_or_insert(b)])
+                        .collect::<Vec<_>>(),
+                    code_ranges,
+                    extras,
+                    pp,
+                };
+
+                match serde_json::to_string_pretty(&res) {
+                    Ok(text) => {
+                        utils::file_save("detached_nodes", ".json", &text);
+                    }
+                    Err(e) => log::warn!("failed to serialize: {e}"),
+                }
+                // long_tracking::show_results(
+                //     ui,
+                //     &self.data.api_addr,
+                //     &mut self.data.aspects,
+                //     self.data.store.clone(),
+                //     &mut self.data.long_tracking,
+                //     &mut self.data.fetched_files,
+                // );
+            }
         }
     }
 
@@ -1726,6 +1819,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
         }
     }
 }
+
 type ComputeRes = Result<utils_results_batched::ComputeResultIdentified, querying::MatchingError>;
 type StreamedComputeTable = querying::StreamedDataTable<Vec<String>, ComputeRes>;
 fn extract_qres<'a>(

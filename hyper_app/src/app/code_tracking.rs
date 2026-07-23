@@ -103,13 +103,13 @@ pub(super) fn remote_fetch_file(
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct TrackingResult {
+pub struct TrackingResult<C = CodeRange> {
     pub compute_time: f64,
     pub commits_processed: usize,
-    pub src: CodeRange,
-    pub intermediary: Option<CodeRange>,
-    pub fallback: Option<CodeRange>,
-    pub matched: Vec<CodeRange>,
+    pub src: C,
+    pub intermediary: Option<C>,
+    pub fallback: Option<C>,
+    pub matched: Vec<C>,
 }
 
 impl PartialEq for TrackingResult {

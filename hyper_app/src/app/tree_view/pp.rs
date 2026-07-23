@@ -34,14 +34,14 @@ fn subtree_to_string(store: &FetchedHyperAST, nid: NodeIdentifier) -> String {
 }
 
 #[derive(Default)]
-struct PrettyPrinter;
+pub(crate) struct PrettyPrinter;
 
 impl cache::ComputerMut<(&FetchedHyperAST, NodeIdentifier), String> for PrettyPrinter {
     fn compute(&mut self, (store, id): (&FetchedHyperAST, NodeIdentifier)) -> String {
         subtree_to_string(store, id)
     }
 }
-type PPCache = cache::FrameCache<String, PrettyPrinter>;
+pub(crate) type PPCache = cache::FrameCache<String, PrettyPrinter>;
 
 #[derive(Copy, Clone, Hash)]
 pub(crate) struct PPBuilder<Thm, HAST = ArcFetchedHAST, L = usize> {

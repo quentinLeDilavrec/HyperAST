@@ -48,7 +48,12 @@ pub(crate) struct LongTracking {
     pub(crate) tree_viewer: BufferedPerCommit<Result<Resource<FetchedView>, String>>,
     #[serde(skip)]
     pub(crate) manual_links: Vec<[CodeRange; 2]>,
+    #[serde(skip)]
     pub(crate) manual_rm_links: HashSet<[CodeRange; 2]>,
+    pub(crate) detached_node_query: String,
+    #[serde(skip)]
+    pub(crate) query_enabled_results:
+        HashMap<NodeIdentifier, poll_promise::Promise<crate::app::detached_view::ExtraQueryResult>>,
 }
 
 impl LongTracking {
@@ -72,6 +77,8 @@ impl Default for LongTracking {
             tree_viewer: Default::default(),
             manual_links: Default::default(),
             manual_rm_links: Default::default(),
+            detached_node_query: Default::default(),
+            query_enabled_results: Default::default(),
         }
     }
 }
@@ -152,7 +159,11 @@ pub(crate) fn show_config(
     tracking.flags.ui(ui);
 
     if tracking.detached_view {
-        super::detached_view::show_detached_node_extra_config(ui);
+        super::detached_view::show_detached_node_extra_config(
+            ui,
+            &mut tracking.detached_node_query,
+            &mut tracking.query_enabled_results,
+        );
     }
 
     (resp_repo, resp_commit)
@@ -1203,6 +1214,8 @@ pub(crate) fn show_results(
             &mut long_tracking.manual_links,
             &mut long_tracking.manual_rm_links,
             tracking_results,
+            &long_tracking.detached_node_query,
+            &mut long_tracking.query_enabled_results,
         );
     }
 }
@@ -1697,7 +1710,10 @@ pub(crate) fn prepare_export(
     let mut pp_map: HashMap<u32, String> = HashMap::new();
     let mut find_or_insert = |x: &_| {
         code_ranges.iter().position(|y| y == x).unwrap_or_else(|| {
-            let e = get_query_enabled_extras(x.path_ids.first().unwrap());
+            let e = get_query_enabled_extras(
+                &long_tracking.query_enabled_results,
+                x.path_ids.first().unwrap(),
+            );
             if let Some(mut e) = e {
                 e.cached = None;
                 for c in &e.captures {
@@ -1836,7 +1852,7 @@ fn compute_event_log(
             AttributeValue::Int(tr.src.path_ids.first().unwrap().to_u32() as i64),
         ));
 
-        let Some(mut e) = get_query_enabled_extras(id) else {
+        let Some(mut e) = get_query_enabled_extras(&long_tracking.query_enabled_results, id) else {
             continue;
         };
         let mut attributes = vec![];

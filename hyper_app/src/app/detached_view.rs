@@ -23,11 +23,9 @@ pub(crate) fn ui_detached<'a>(
     timeline_window: egui::Rect,
     total_cols: usize,
     link_config: &LinkConfig,
-    manual_links: &mut Vec<[CodeRange; 2]>,
-    manual_rm_links: &mut ahash::HashSet<[CodeRange; 2]>,
     it: impl Iterator<Item = (usize, &'a mut [TrackingResult])>,
-    query: &str,
-    results: &mut HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
+    manual_links: &mut super::long_tracking::ManualLinks,
+    query_enabled_results: &mut super::long_tracking::QueryEnabledExtras,
 ) {
     let col_width = timeline_window.width() / total_cols as f32;
     let it = it.map(|(col, res)| {
@@ -45,25 +43,23 @@ pub(crate) fn ui_detached<'a>(
         link_config,
         col_width,
         it,
-        manual_rm_links,
         manual_links,
-        query,
-        results,
+        query_enabled_results,
     );
     if let (Some(fut), Some(past)) = (future, past) {
         let value = [fut, past];
-        if let Some(index) = manual_links.iter().position(|v| v == &value) {
+        if let Some(index) = manual_links.links.iter().position(|v| v == &value) {
             log::info!(
                 "manual unlink {} -> {}",
                 value[0].short_commit_and_path(),
                 value[1].short_commit_and_path(),
             );
-            manual_links.remove(index);
+            manual_links.links.remove(index);
         } else if let Some(already_linked) = already_linked
             && already_linked == value[1]
         {
             let other = [value[1].clone(), value[0].clone()];
-            let contains = manual_rm_links.contains(&value);
+            let contains = manual_links.rm_links.contains(&value);
             log::info!(
                 "{} link {} -> {}",
                 if contains { "show" } else { "hide" },
@@ -71,11 +67,11 @@ pub(crate) fn ui_detached<'a>(
                 value[1].short_commit_and_path(),
             );
             if contains {
-                manual_rm_links.remove(&value);
-                manual_rm_links.remove(&other);
+                manual_links.rm_links.remove(&value);
+                manual_links.rm_links.remove(&other);
             } else {
-                manual_rm_links.insert(value.clone());
-                manual_rm_links.insert(other);
+                manual_links.rm_links.insert(value.clone());
+                manual_links.rm_links.insert(other);
             }
         } else {
             log::info!(
@@ -83,10 +79,10 @@ pub(crate) fn ui_detached<'a>(
                 value[0].short_commit_and_path(),
                 value[1].short_commit_and_path(),
             );
-            manual_links.push(value);
+            manual_links.links.push(value);
         }
     }
-    for [m, src] in manual_links {
+    for [m, src] in &manual_links.links {
         let m_rect = *rendered.get(m).unwrap();
         let src_rect = *rendered.get(src).unwrap();
         link_config
@@ -102,17 +98,15 @@ fn ui_detached_nodes<'a>(
     options: &LinkConfig,
     col_width: f32,
     it: impl Iterator<Item = (f32, &'a mut [TrackingResult])>,
-    manual_rm_links: &mut ahash::HashSet<[CodeRange; 2]>,
-    manual_links: &mut Vec<[CodeRange; 2]>,
-    extra_query: &str,
-    extra_results: &mut HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
+    manual_links: &mut super::long_tracking::ManualLinks,
+    query_enabled_results: &mut super::long_tracking::QueryEnabledExtras,
 ) -> DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>> {
     let mut hovered_sink = None;
     let mut result = DetachedElementResp::default();
     let tracking_results = it.flat_map(|(d, x)| x.iter_mut().enumerate().map(move |y| (d, y)));
     for (default_x, (i, r)) in tracking_results {
         let show = |ui: &mut _, x: &_, id, o: &mut _| {
-            show_element(ui, &store, options, x, id, o, extra_query, extra_results)
+            show_element(ui, &store, options, x, id, o, query_enabled_results)
         };
         let src = &mut r.src;
         let id = ui.id().with(&src);
@@ -130,10 +124,10 @@ fn ui_detached_nodes<'a>(
         let src_rect = resp.rect;
         for x in &mut r.matched {
             let show = |ui: &mut _, x: &_, id, o: &mut _| {
-                show_element(ui, &store, options, x, id, o, extra_query, extra_results)
+                show_element(ui, &store, options, x, id, o, query_enabled_results)
             };
             if let Some(m_pos) = result.element.get(&x) {
-                if !manual_rm_links.contains(&[src.clone(), x.clone()]) {
+                if !manual_links.rm_links.contains(&[src.clone(), x.clone()]) {
                     options.source(src_rect).sink(*m_pos).paint(ui.painter());
                 }
                 continue;
@@ -156,7 +150,7 @@ fn ui_detached_nodes<'a>(
             interact_detached_element(ui, &mut result, x, id, &resp, Some(&src), &mut hovered_sink);
 
             let m_rect = resp.inner.element.rect;
-            if !manual_rm_links.contains(&[src.clone(), x.clone()]) {
+            if !manual_links.rm_links.contains(&[src.clone(), x.clone()]) {
                 options.source(src_rect).sink(m_rect).paint(ui.painter());
             }
         }
@@ -169,12 +163,12 @@ fn ui_detached_nodes<'a>(
                 } else {
                     [result.future.clone().unwrap(), p.code.clone()]
                 };
-                if let Some(_) = manual_links.iter().position(|v| v == &value) {
+                if let Some(_) = manual_links.links.iter().position(|v| v == &value) {
                     egui::Color32::RED
                 } else if let Some(already_linked) = p.already_linked.first()
                     && already_linked == &value[1]
                 {
-                    if manual_rm_links.contains(&value) {
+                    if manual_links.rm_links.contains(&value) {
                         egui::Color32::GREEN
                     } else {
                         egui::Color32::RED
@@ -395,8 +389,7 @@ fn show_element(
     x: &CodeRange,
     id: egui::Id,
     options: &mut O,
-    extra_query: &str,
-    extra_results: &mut HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
+    query_enabled_results: &mut super::long_tracking::QueryEnabledExtras,
 ) -> DetachedElementResp {
     let past = ui.painter().add(egui::Shape::Noop);
     let futur = ui.painter().add(egui::Shape::Noop);
@@ -422,7 +415,7 @@ fn show_element(
         );
     }
     if let Some(id) = x.path_ids.first() {
-        show_element_content(cui, store, id, options, extra_query, extra_results);
+        show_element_content(cui, store, id, options, query_enabled_results);
     }
     let min = cui.min_rect().min;
     let size = cui.min_rect().size();
@@ -525,8 +518,7 @@ fn show_element_content(
     store: &Arc<FetchedHyperAST>,
     id: &NodeIdentifier,
     options: &O,
-    extra_query: &str,
-    extra_results: &mut HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
+    query_enabled_results: &mut super::long_tracking::QueryEnabledExtras,
 ) {
     use hyperast::types::WithChildren as _;
     use hyperast::types::{AnyType, Labeled as _, WithStats};
@@ -594,23 +586,8 @@ fn show_element_content(
         ui.visuals_mut().widgets.noninteractive.bg_stroke =
             egui::Stroke::new(1.0, egui::Color32::BLACK);
         ui.add(egui::Separator::default().spacing(3.0));
-        query_enabled_extras(ui, store, id, options, extra_query, extra_results);
+        query_enabled_extras(ui, store, id, options, query_enabled_results);
     }
-}
-
-pub(crate) fn show_detached_node_extra_config<T>(
-    ui: &mut egui::Ui,
-    text: &mut String,
-    extra_results: &mut HashMap<NodeIdentifier, T>,
-) -> egui::Response {
-    ui.label("query for detached nodes extras");
-    let resp = ui.text_edit_multiline(text);
-
-    #[allow(static_mut_refs)]
-    if resp.lost_focus() {
-        extra_results.clear();
-    }
-    resp
 }
 
 pub(crate) type ExtraQueryResult = Result<
@@ -618,36 +595,16 @@ pub(crate) type ExtraQueryResult = Result<
     String,
 >;
 
-pub(crate) fn get_query_enabled_extras(
-    results: &HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
-    id: &NodeIdentifier,
-) -> Option<DetailedResult> {
-    if let Some(prom) = results.get(id) {
-        match prom.ready() {
-            Some(Ok(v)) => match &v.content {
-                Some(Ok(v)) => {
-                    return Some(v.clone());
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
-    None
-}
-
 fn query_enabled_extras(
     ui: &mut egui::Ui,
     store: &Arc<FetchedHyperAST>,
     id: &NodeIdentifier,
     options: &O,
-    extra_query: &str,
-    extra_results: &mut HashMap<NodeIdentifier, poll_promise::Promise<ExtraQueryResult>>,
+    query_enabled_results: &mut super::long_tracking::QueryEnabledExtras,
 ) {
     let mut refresh = false;
-
     #[allow(static_mut_refs)]
-    if let Some(prom) = extra_results.get_mut(id) {
+    if let Some(prom) = query_enabled_results.results.get_mut(id) {
         match prom.ready_mut() {
             Some(Ok(v)) => match &mut v.content {
                 Some(Ok(v)) => {
@@ -670,23 +627,23 @@ fn query_enabled_extras(
                 ui.label("computing");
             }
         }
-    } else if !extra_query.trim().is_empty() {
+    } else if !query_enabled_results.query.trim().is_empty() {
         refresh |= true;
     };
 
-    if !extra_query.trim().is_empty() && refresh {
+    if !query_enabled_results.query.trim().is_empty() && refresh {
         use super::querying::remote_compute_query_subtree as search_query;
         let api_addr = "127.0.0.1:8888"; // TODO use the value given in settings
         let script = crate::app::querying::QueryContent {
             language: "Cpp".to_string(),
-            query: extra_query.to_owned(),
+            query: query_enabled_results.query.to_owned(),
             precomp: None, // TODO get this from the server
             commits: 1,
-            max_matches: 500, // more is a wast and difficult to interpret anyway
+            max_matches: 500, // more is a waste and difficult to interpret anyway
             timeout: 2000,    // 2 seconds seems reasonable in most cases
         };
         let prom = search_query(ui.ctx(), api_addr, id, script);
-        extra_results.insert(*id, prom);
+        query_enabled_results.results.insert(*id, prom);
     }
 }
 

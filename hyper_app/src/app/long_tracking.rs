@@ -46,14 +46,34 @@ pub(crate) struct LongTracking {
     pub(crate) results: LongTrackingResults,
     #[serde(skip)]
     pub(crate) tree_viewer: BufferedPerCommit<Result<Resource<FetchedView>, String>>,
+    pub(crate) manual_links: ManualLinks,
+    pub(crate) query_enabled_extras: QueryEnabledExtras,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+pub(crate) struct ManualLinks {
+    pub(crate) links: Vec<[CodeRange; 2]>,
+    pub(crate) rm_links: HashSet<[CodeRange; 2]>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+pub(crate) struct QueryEnabledExtras {
+    pub(crate) query: String,
     #[serde(skip)]
-    pub(crate) manual_links: Vec<[CodeRange; 2]>,
-    #[serde(skip)]
-    pub(crate) manual_rm_links: HashSet<[CodeRange; 2]>,
-    pub(crate) detached_node_query: String,
-    #[serde(skip)]
-    pub(crate) query_enabled_results:
+    pub(crate) results:
         HashMap<NodeIdentifier, poll_promise::Promise<crate::app::detached_view::ExtraQueryResult>>,
+}
+
+impl QueryEnabledExtras {
+    pub(crate) fn result(&self, id: &NodeIdentifier) -> Option<super::querying::DetailedResult> {
+        let prom = self.results.get(id)?;
+        if let Some(Ok(v)) = prom.ready()
+            && let Some(Ok(v)) = &v.content
+        {
+            return Some(v.clone());
+        }
+        None
+    }
 }
 
 impl LongTracking {
@@ -76,9 +96,7 @@ impl Default for LongTracking {
             results: VecDeque::from(vec![Default::default()]),
             tree_viewer: Default::default(),
             manual_links: Default::default(),
-            manual_rm_links: Default::default(),
-            detached_node_query: Default::default(),
-            query_enabled_results: Default::default(),
+            query_enabled_extras: Default::default(),
         }
     }
 }
@@ -158,12 +176,13 @@ pub(crate) fn show_config(
     ));
     tracking.flags.ui(ui);
 
+    // TODO make it more general and use it to choose how to pp/hide
     if tracking.detached_view {
-        super::detached_view::show_detached_node_extra_config(
-            ui,
-            &mut tracking.detached_node_query,
-            &mut tracking.query_enabled_results,
-        );
+        ui.label("query for detached nodes extras");
+        let resp = ui.text_edit_multiline(&mut tracking.query_enabled_extras.query);
+        if resp.lost_focus() {
+            tracking.query_enabled_extras.results.clear();
+        }
     }
 
     (resp_repo, resp_commit)
@@ -1211,11 +1230,9 @@ pub(crate) fn show_results(
             timeline_window,
             total_cols,
             &long_tracking.detached_view_link_config,
-            &mut long_tracking.manual_links,
-            &mut long_tracking.manual_rm_links,
             tracking_results,
-            &long_tracking.detached_node_query,
-            &mut long_tracking.query_enabled_results,
+            &mut long_tracking.manual_links,
+            &mut long_tracking.query_enabled_extras,
         );
     }
 }
@@ -1691,10 +1708,10 @@ pub(crate) fn prepare_export(
         res.get_mut()
             .map(|res| (col, res.content.track.results.as_mut_slice()))
     });
-    let manual_rm_links = &mut long_tracking.manual_rm_links;
     let manual_links = &mut long_tracking.manual_links;
+    let manual_rm_links = &mut manual_links.rm_links;
+    let manual_links = &mut manual_links.links;
     use crate::app::code_tracking::TrackingResult;
-    use crate::app::detached_view::get_query_enabled_extras;
     use crate::app::types::CodeRange;
     #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
     struct Res {
@@ -1710,10 +1727,9 @@ pub(crate) fn prepare_export(
     let mut pp_map: HashMap<u32, String> = HashMap::new();
     let mut find_or_insert = |x: &_| {
         code_ranges.iter().position(|y| y == x).unwrap_or_else(|| {
-            let e = get_query_enabled_extras(
-                &long_tracking.query_enabled_results,
-                x.path_ids.first().unwrap(),
-            );
+            let e = long_tracking
+                .query_enabled_extras
+                .result(x.path_ids.first().unwrap());
             if let Some(mut e) = e {
                 e.cached = None;
                 for c in &e.captures {
@@ -1807,7 +1823,6 @@ fn compute_event_log(
     ));
     trace.events.push(event);
 
-    use crate::app::detached_view::get_query_enabled_extras;
     let mut trace = Trace::default();
     trace.attributes.push(Attribute::new(
         "concept:name".to_string(),
@@ -1852,7 +1867,7 @@ fn compute_event_log(
             AttributeValue::Int(tr.src.path_ids.first().unwrap().to_u32() as i64),
         ));
 
-        let Some(mut e) = get_query_enabled_extras(&long_tracking.query_enabled_results, id) else {
+        let Some(mut e) = long_tracking.query_enabled_extras.result(id) else {
             continue;
         };
         let mut attributes = vec![];

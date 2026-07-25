@@ -94,6 +94,10 @@ strum = "0.24"
 strum_macros = "0.24"   # issue on later version with serialization of curly braces
 sublime_fuzzy = "0.7.0"
 
+process_mining = { version = "0.6.0", default-features = false, optional = true }
+flate2 = { version = "1.1.1", default-features = false, optional = true }
+
+
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 poll-promise = { version = "0.3", default-features = false }
@@ -130,7 +134,7 @@ objc2-app-kit = { version = "0.2.2", features = [
 ] }
 
 [features]
-default = ["serde", "force_layout", "collab"]
+default = ["serde", "force_layout", "collab"] #, "process_mining"
 
 serde = ["egui/serde", "dep:serde"]
 syntect = []
@@ -142,6 +146,8 @@ ts_highlight = [
 force_layout = ["egui_addon/force_layout"]
 
 collab = ["dep:autosurgeon", "dep:automerge", "dep:tokio-tungstenite-wasm"]
+
+process_mining = ["dep:process_mining", "dep:flate2"]
 
 # [patch.crates-io]
 

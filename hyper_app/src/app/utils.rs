@@ -29,6 +29,27 @@ pub(crate) fn file_save(_name: &str, _ext: &str, _content: &str) -> bool {
     false
 }
 
+#[cfg(all(target_arch = "wasm32", feature = "process_mining"))]
+pub(crate) fn file_save_bin(name: &str, ext: &str, content: &[u8]) -> bool {
+    use wasm_bindgen::prelude::wasm_bindgen;
+
+    #[wasm_bindgen]
+    extern "C" {
+        fn download_bin(data: js_sys::Uint8Array, filename: &str, ext: &str, r#type: &str);
+    }
+    let bytes = js_sys::Uint8Array::from(content);
+    download_bin(bytes, name, ext, "application/gzip");
+
+    true
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "process_mining"))]
+pub(crate) fn file_save_bin(_name: &str, _ext: &str, _content: &[u8]) -> bool {
+    // TODO
+    println!("TODO save file");
+    false
+}
+
 pub fn join<Item: ToString>(mut it: impl Iterator<Item = Item>, sep: &str) -> impl ToString {
     let mut res = String::default();
     if let Some(e) = it.next() {

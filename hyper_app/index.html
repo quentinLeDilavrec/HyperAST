@@ -21,12 +21,18 @@
     <script>
         // Function to download data to a file
         function download(data, name, ext, type) {
+          download0(data, name, ext, type, "Save as plain text")
+        }
+        function download_bin(data, name, ext, type) {
+          download0(data, name, ext, type, "Save as binary")
+        }
+        function download0(data, name, ext, type, description) {
             async function getNewFileHandle() {
                 const opts = {
                     suggestedName: name,
                     types: [
                         {
-                            description: "Save as plain text",
+                            description: description,
                             accept: { [type]: [ext] },
                         },
                     ],
@@ -35,12 +41,13 @@
                 return await window.showSaveFilePicker(opts);
             }
             async function writeFile(fileHandle, contents) {
-                // TODO change content formating depending on file extension
+                // TODO change content formatting depending on file extension
                 console.log(fileHandle);
 
                 // Create a FileSystemWritableFileStream to write to.
                 const writable = await fileHandle.createWritable();
 
+                console.log(contents);
                 // Write the contents of the file to the stream.
                 await writable.write(contents);
 

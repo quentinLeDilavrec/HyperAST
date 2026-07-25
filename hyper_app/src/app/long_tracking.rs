@@ -10,7 +10,7 @@ use egui_addon::code_editor::generic_text_buffer::byte_index_from_char_index;
 use egui_addon::egui_utils::highlight_byte_range;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
-use hyperast::types::{AnyType, HyperType, Labeled, TypeStore};
+use hyperast::types::{AnyType, HyperType, Labeled, NodeStore, TypeStore};
 
 use super::code_aspects::remote_fetch_node_old;
 use super::code_aspects::{FetchedView, Focus, HighLightHandle};
@@ -1669,9 +1669,8 @@ pub(super) fn track_at_path_with_changes(
 }
 
 pub(crate) fn prepare_export(
-    ui: &mut egui::Ui,
-    long_tracking: &mut super::long_tracking::LongTracking,
-    fetched_hyper_ast: Arc<FetchedHyperAST>,
+    long_tracking: &mut LongTracking,
+    mut pp: impl FnMut(NodeIdentifier) -> String,
 ) -> impl serde::Serialize {
     let tracking_results = long_tracking.results.iter_mut().enumerate();
     let tracking_results = tracking_results.filter_map(|(col, (_, res))| {
@@ -1695,19 +1694,15 @@ pub(crate) fn prepare_export(
     }
     let mut code_ranges: Vec<CodeRange> = vec![];
     let mut extras: Vec<crate::app::querying::DetailedResult> = vec![];
-    let mut pp: HashMap<u32, String> = HashMap::new();
+    let mut pp_map: HashMap<u32, String> = HashMap::new();
     let mut find_or_insert = |x: &_| {
         code_ranges.iter().position(|y| y == x).unwrap_or_else(|| {
             let e = get_query_enabled_extras(x.path_ids.first().unwrap());
             if let Some(mut e) = e {
                 e.cached = None;
                 for c in &e.captures {
-                    let key = (fetched_hyper_ast.as_ref(), *c);
-                    let code = ui.memory_mut(|mem| {
-                        use crate::app::tree_view::pp::PPCache;
-                        mem.caches.cache::<PPCache>().get(key)
-                    });
-                    pp.insert(c.to_u32(), code);
+                    let code = pp(*c);
+                    pp_map.insert(c.to_u32(), code);
                 }
                 extras.push(e);
             }
@@ -1743,7 +1738,238 @@ pub(crate) fn prepare_export(
             .collect::<Vec<_>>(),
         code_ranges,
         extras,
-        pp,
+        pp: pp_map,
     };
     res
+}
+
+#[cfg(feature = "process_mining")]
+fn compute_event_log(
+    long_tracking: &mut LongTracking,
+    stores: &FetchedHyperAST,
+    pp: impl Fn(NodeIdentifier) -> String,
+) -> process_mining::EventLog {
+    let tracking_results = long_tracking.results.iter_mut().enumerate();
+    let tracking_results = tracking_results.filter_map(|(col, (_, res))| {
+        res.try_poll();
+        res.get_mut()
+            .map(|res| (col, res.content.track.results.as_mut_slice()))
+    });
+
+    let mut event_log = empty_event_log();
+    event_log.traces.push(example_trace());
+
+    use process_mining::core::event_data::case_centric::Attribute;
+    use process_mining::core::event_data::case_centric::AttributeValue;
+    use process_mining::core::event_data::case_centric::Event;
+    use process_mining::core::event_data::case_centric::EventLogExtension;
+    use process_mining::core::event_data::case_centric::Trace;
+
+    macro_rules! str_attr {
+        ($key:expr, $value:expr) => {
+            Attribute::new($key.to_string(), AttributeValue::String($value.to_string()))
+        };
+    }
+    macro_rules! attr {
+        ("concept:name", $name:expr) => {
+            str_attr!("concept:name", $name)
+        };
+    }
+
+    let mut trace = Trace::default();
+    trace
+        .attributes
+        .push(attr!("concept:name", "hand made example"));
+    let mut event = Event::new("Modify".to_string());
+    event.attributes.push(str_attr!("instance:kind", "method"));
+    event.attributes.push(str_attr!("instance:name", "main"));
+    event.attributes.push(Attribute::new(
+        "time:timestamp".to_string(),
+        AttributeValue::Date(
+            chrono::DateTime::from_timestamp_nanos(1662921288_000_000_000).fixed_offset(),
+        ),
+    ));
+    trace.events.push(event);
+
+    use crate::app::detached_view::get_query_enabled_extras;
+    let mut trace = Trace::default();
+    trace.attributes.push(Attribute::new(
+        "concept:name".to_string(),
+        AttributeValue::String("actual trace".to_string()),
+    ));
+    for tr in tracking_results.flat_map(|x| x.1.into_iter()) {
+        let mut event = if tr.matched.is_empty() {
+            Event::new("Insert".to_string())
+        } else if tr
+            .matched
+            .iter()
+            .any(|x| tr.src.path_ids.first() == x.path_ids.first())
+        {
+            Event::new("Not Modified".to_string())
+        } else {
+            Event::new("Modified".to_string())
+        };
+        let src = &tr.src;
+        let Some(id) = src.path_ids.first() else {
+            continue;
+        };
+
+        let node_store = stores.node_store.read().unwrap();
+        let Some(r) = node_store.try_resolve::<AnyType>(*id) else {
+            stores.demand_node(*id);
+            continue;
+        };
+        let kind = stores.resolve_type(&id);
+        event.attributes.push(str_attr!("instance:kind", kind));
+
+        let p = if let Some(r) = &tr.src.range {
+            format!("{}:{}..{}", tr.src.file.file_path, r.start, r.end)
+        } else {
+            tr.src.file.file_path.clone()
+        };
+        event.attributes.push(Attribute::new(
+            "instance:position".to_string(),
+            AttributeValue::String(p),
+        ));
+        event.attributes.push(Attribute::new(
+            "instance:id".to_string(),
+            AttributeValue::Int(tr.src.path_ids.first().unwrap().to_u32() as i64),
+        ));
+
+        let Some(mut e) = get_query_enabled_extras(id) else {
+            continue;
+        };
+        let mut attributes = vec![];
+
+        e.cached = None;
+        for (c_n, _, cs) in e.captures() {
+            for c in cs {
+                let code = pp(*c);
+                attributes.push(str_attr!(format!("capture:{}", c_n), code));
+            }
+        }
+        event.attributes.push(Attribute::new(
+            "instance:more".to_string(),
+            AttributeValue::Container(attributes),
+        ));
+        trace.events.push(event);
+    }
+
+    event_log.traces.push(trace);
+
+    event_log
+}
+
+#[cfg(feature = "process_mining")]
+fn empty_event_log() -> process_mining::EventLog {
+    use process_mining::core::event_data::case_centric::Attribute;
+    use process_mining::core::event_data::case_centric::AttributeValue;
+    use process_mining::core::event_data::case_centric::Event;
+    use process_mining::core::event_data::case_centric::EventLogExtension;
+    use process_mining::core::event_data::case_centric::Trace;
+    let mut event_log = process_mining::core::EventLog::default();
+
+    let extensions = event_log.extensions.get_or_insert_default();
+    extensions.push(EventLogExtension {
+        name: "Concept".to_string(),
+        prefix: "concept".to_string(),
+        uri: "http://www.xes-standard.org/concept.xesext".to_string(),
+    });
+    extensions.push(EventLogExtension {
+        name: "Time".to_string(),
+        prefix: "time".to_string(),
+        uri: "http://www.xes-standard.org/time.xesext".to_string(),
+    });
+    event_log
+        .global_trace_attrs
+        .get_or_insert_default()
+        .push(Attribute::new(
+            "concept:name".to_string(),
+            AttributeValue::String("trace".to_string()),
+        ));
+    event_log
+        .global_event_attrs
+        .get_or_insert_default()
+        .push(Attribute::new(
+            "concept:name".to_string(),
+            AttributeValue::String("event".to_string()),
+        ));
+    event_log
+}
+
+#[cfg(feature = "process_mining")]
+fn example_trace() -> process_mining::core::event_data::case_centric::Trace {
+    use process_mining::core::event_data::case_centric::Attribute;
+    use process_mining::core::event_data::case_centric::AttributeValue;
+    use process_mining::core::event_data::case_centric::Event;
+    use process_mining::core::event_data::case_centric::EventLogExtension;
+    use process_mining::core::event_data::case_centric::Trace;
+    let mut trace = Trace::default();
+    trace.attributes.push(Attribute::new(
+        "concept:name".to_string(),
+        AttributeValue::String("example_trace".to_string()),
+    ));
+    let mut event = Event::new("Insert".to_string());
+    event.attributes.push(Attribute::new(
+        "time:timestamp".to_string(),
+        AttributeValue::Date(
+            chrono::DateTime::from_timestamp_nanos(1662921288_000_000_000).fixed_offset(),
+        ),
+    ));
+    trace.events.push(event);
+    let mut event = Event::new("Delete".to_string());
+    event.attributes.push(Attribute::new(
+        "time:timestamp".to_string(),
+        AttributeValue::Date(
+            chrono::DateTime::from_timestamp_nanos(1662931288_000_000_000).fixed_offset(),
+        ),
+    ));
+    trace.events.push(event);
+    trace
+}
+
+#[cfg(feature = "process_mining")]
+pub(crate) fn compute_compressed_xes(
+    long_tracking: &mut LongTracking,
+    stores: &FetchedHyperAST,
+    pp: impl Fn(hyperast::store::nodes::fetched::NodeIdentifier) -> String,
+) -> Result<Result<Vec<u8>, std::io::Error>, impl std::error::Error + 'static> {
+    let event_log = compute_event_log(long_tracking, stores, pp);
+
+    let buffer = Vec::new();
+    let mut writer = flate2::write::GzEncoder::new(buffer, flate2::Compression::default());
+
+    let res = process_mining::core::event_data::case_centric::xes::export_xes_event_log(
+        &mut writer,
+        &event_log,
+    )
+    .map(|_| writer.finish());
+    res
+}
+
+#[cfg(feature = "process_mining")]
+pub(crate) fn compute_xes(
+    long_tracking: &mut LongTracking,
+    stores: &FetchedHyperAST,
+    pp: impl Fn(hyperast::store::nodes::fetched::NodeIdentifier) -> String,
+) -> Result<String, impl std::error::Error + 'static> {
+    let event_log = compute_event_log(long_tracking, stores, pp);
+
+    struct StringBuffer(String);
+    impl std::io::Write for StringBuffer {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.push_str(&String::from_utf8_lossy(buf));
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut buffer = StringBuffer(String::new());
+    process_mining::core::event_data::case_centric::xes::export_xes_event_log(
+        &mut buffer,
+        &event_log,
+    )
+    .map(|_| buffer.0)
 }

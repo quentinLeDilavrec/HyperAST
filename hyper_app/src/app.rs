@@ -1669,13 +1669,67 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             if !self.data.long_tracking.detached_view {
                 return;
             }
+            #[cfg(feature = "process_mining")]
+            if ui
+                .small_icon_button(
+                    &re_ui::icons::EXTERNAL_LINK,
+                    "Export data as compressed xes",
+                )
+                .on_hover_text("Export data as compressed xes")
+                .clicked()
+            {
+                let stores = self.data.store.as_ref();
+                let long_tracking = &mut self.data.long_tracking;
+                let res = long_tracking::compute_compressed_xes(long_tracking, stores, |c| {
+                    ui.memory_mut(|mem| {
+                        use crate::app::tree_view::pp::PPCache;
+                        mem.caches.cache::<PPCache>().get((stores, c))
+                    })
+                });
+
+                match res {
+                    Ok(Ok(bin)) => {
+                        if bin[..2] != [0x1f, 0x8b] {
+                            log::warn!("invalid gzip header: {:02x?}", &bin[..2]);
+                            let mut gz = flate2::read::GzDecoder::new(&bin[..]);
+                            let mut s = String::new();
+                            use std::io::Read;
+                            gz.read_to_string(&mut s).unwrap();
+                            wasm_rs_dbg::dbg!(&s);
+                        }
+                        utils::file_save_bin("event_log.xes", ".gz", &bin);
+                    }
+                    Ok(Err(e)) => log::warn!("failed to serialize: {e}"),
+                    Err(e) => log::warn!("failed to serialize: {e}"),
+                }
+                // TODO enable choosing between compressed and uncompressed export
+                if false {
+                    let long_tracking = &mut self.data.long_tracking;
+                    let res = long_tracking::compute_xes(long_tracking, stores, |c| {
+                        ui.memory_mut(|mem| {
+                            let key = (self.data.store.as_ref(), c);
+                            use crate::app::tree_view::pp::PPCache;
+                            mem.caches.cache::<PPCache>().get(key)
+                        })
+                    });
+                    match res {
+                        Ok(s) => {
+                            wasm_rs_dbg::dbg!(&s);
+                            utils::file_save("event_log", ".xes", &s);
+                        }
+                        Err(e) => log::warn!("failed to serialize: {e}"),
+                    }
+                }
+            }
 
             if export_button(ui).clicked() {
-                let res = long_tracking::prepare_export(
-                    ui,
-                    &mut self.data.long_tracking,
-                    self.data.store.clone(),
-                );
+                let res = long_tracking::prepare_export(&mut self.data.long_tracking, |c| {
+                    ui.memory_mut(|mem| {
+                        let key = (self.data.store.as_ref(), c);
+                        use crate::app::tree_view::pp::PPCache;
+                        mem.caches.cache::<PPCache>().get(key)
+                    })
+                });
 
                 match serde_json::to_string_pretty(&res) {
                     Ok(text) => {

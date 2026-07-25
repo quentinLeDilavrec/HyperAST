@@ -5,7 +5,7 @@ use egui_addon::syntax_highlighting as syntax_highlighter;
 
 use crate::app::code_aspects::Focus;
 use crate::app::code_aspects::HighLightHandle;
-use crate::app::long_tracking::TARGET_COLOR;
+use crate::app::tracking::long_tracking::TARGET_COLOR;
 
 use super::{Action, FetchedViewImpl, PrefillCache};
 use super::{CLIP_LEN, DEBUG_LAYOUT};

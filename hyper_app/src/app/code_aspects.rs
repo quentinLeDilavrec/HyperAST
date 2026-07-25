@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+use super::store::{FetchedHyperAST, LabelIdentifier, NodeIdentifier};
 use super::tree_view::FetchedViewImpl;
-use super::tree_view::store::FetchedHyperAST;
-use super::tree_view::{Action, LabelIdentifier, NodeIdentifier, PrefillCache, SimplePacked};
+use super::tree_view::{Action, PrefillCache, SimplePacked};
 use super::types::{Commit, ComputeConfigAspectViews, Repo, SelectedConfig};
 use super::utils_egui::MyUiExt as _;
 use crate::utils_poll::Resource;

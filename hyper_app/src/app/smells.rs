@@ -41,8 +41,8 @@ use wasm_rs_dbg::dbg;
 use egui_addon::InteractiveSplitter;
 use egui_addon::MultiSplitter;
 
-use super::code_tracking::FetchedFiles;
-use super::code_tracking::try_fetch_remote_file;
+use super::tracking::FetchedFiles;
+use super::tracking::try_fetch_remote_file;
 use super::types::{CodeRange, Commit, CommitId, SelectedConfig};
 use super::utils_edition::MakeHighlights;
 use crate::app::utils_egui::MyUiExt as _;
@@ -2240,7 +2240,7 @@ fn show_either_side<MH: MakeHighlights>(
     });
     if r.is_none() {
         if let std::collections::hash_map::Entry::Vacant(_) = file_result {
-            file_result.insert_entry(super::code_tracking::remote_fetch_file(
+            file_result.insert_entry(super::tracking::remote_fetch_file(
                 ui.ctx(),
                 &api_addr,
                 &code.file.commit,

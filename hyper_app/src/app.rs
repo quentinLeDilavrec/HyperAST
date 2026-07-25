@@ -12,7 +12,7 @@ use commit::{CommitSlice, SelectedProjects};
 use egui_addon::{code_editor, egui_utils::radio_collapsing};
 use querying::DetailsResults;
 use single_repo::ComputeConfigSingle;
-use tree_view::store::FetchedHyperAST;
+use store::FetchedHyperAST;
 use types::{Commit, Repo, SelectedConfig};
 use utils_results_batched::ComputeResultsProm;
 
@@ -27,17 +27,14 @@ mod app_components;
 mod code_aspects;
 #[cfg(feature = "collab")]
 mod code_editor_automerge;
-mod code_tracking;
 pub mod commit;
 #[cfg(feature = "collab")]
 pub(crate) mod crdt_over_ws;
-mod detached_view;
-#[allow(unused)]
-mod long_tracking;
 mod querying;
 mod re_ui_collapse;
 mod single_repo;
 mod smells;
+pub(crate) mod store;
 mod tree_view;
 mod tsg;
 pub(crate) mod types;
@@ -48,6 +45,7 @@ mod utils_egui;
 mod utils_results_batched;
 pub(crate) use app_components::show_repo_menu;
 mod commit_graph;
+mod tracking;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Deserialize, Serialize)]
@@ -470,7 +468,7 @@ pub(crate) struct AppData {
     smells_diffs_result: Option<smells::RemoteResultDiffs>,
 
     #[serde(skip)]
-    fetched_files: code_tracking::FetchedFiles,
+    fetched_files: tracking::FetchedFiles,
     #[serde(skip)]
     fetched_files2: HashMap<
         types::FileIdentifier,
@@ -482,13 +480,13 @@ pub(crate) struct AppData {
     // TODO just use the oid as key...
     fetched_commit_metadata: CommitMdStore,
     #[serde(skip)]
-    tracking_result: crate::utils_poll::Buffered<code_tracking::RemoteResult>,
+    tracking_result: crate::utils_poll::Buffered<tracking::code_tracking::RemoteResult>,
     #[serde(skip)]
     aspects_result: Option<code_aspects::RemoteView>,
     #[serde(skip)]
     store: Arc<FetchedHyperAST>,
 
-    long_tracking: long_tracking::LongTracking,
+    long_tracking: tracking::long_tracking::LongTracking,
 
     selected_code_data: SelectedProjects,
 
@@ -1339,7 +1337,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     let commit = selected_commit;
 
                     let left_side = true;
-                    let mut curr_view = long_tracking::ColView::default();
+                    let mut curr_view = tracking::long_tracking::ColView::default();
                     (curr_view.matcheds).extend(
                         x.results
                             .iter_mut()
@@ -1362,7 +1360,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         ui.separator();
                     });
                     let left_side = false;
-                    let mut curr_view = long_tracking::ColView::default();
+                    let mut curr_view = tracking::long_tracking::ColView::default();
                     (curr_view.matcheds).extend(
                         x.results
                             .iter_mut()
@@ -1506,7 +1504,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 Default::default()
             }
             Tab::LongTracking => {
-                long_tracking::show_results(
+                tracking::long_tracking::show_results(
                     ui,
                     &self.data.api_addr,
                     &mut self.data.aspects,
@@ -1680,12 +1678,13 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             {
                 let stores = self.data.store.as_ref();
                 let long_tracking = &mut self.data.long_tracking;
-                let res = long_tracking::compute_compressed_xes(long_tracking, stores, |c| {
-                    ui.memory_mut(|mem| {
-                        use crate::app::tree_view::pp::PPCache;
-                        mem.caches.cache::<PPCache>().get((stores, c))
-                    })
-                });
+                let res =
+                    tracking::long_tracking::compute_compressed_xes(long_tracking, stores, |c| {
+                        ui.memory_mut(|mem| {
+                            use crate::app::tree_view::pp::PPCache;
+                            mem.caches.cache::<PPCache>().get((stores, c))
+                        })
+                    });
 
                 match res {
                     Ok(Ok(bin)) => {
@@ -1705,7 +1704,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                 // TODO enable choosing between compressed and uncompressed export
                 if false {
                     let long_tracking = &mut self.data.long_tracking;
-                    let res = long_tracking::compute_xes(long_tracking, stores, |c| {
+                    let res = tracking::long_tracking::compute_xes(long_tracking, stores, |c| {
                         ui.memory_mut(|mem| {
                             let key = (self.data.store.as_ref(), c);
                             use crate::app::tree_view::pp::PPCache;
@@ -1723,13 +1722,14 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
             }
 
             if export_button(ui).clicked() {
-                let res = long_tracking::prepare_export(&mut self.data.long_tracking, |c| {
-                    ui.memory_mut(|mem| {
-                        let key = (self.data.store.as_ref(), c);
-                        use crate::app::tree_view::pp::PPCache;
-                        mem.caches.cache::<PPCache>().get(key)
-                    })
-                });
+                let res =
+                    tracking::long_tracking::prepare_export(&mut self.data.long_tracking, |c| {
+                        ui.memory_mut(|mem| {
+                            let key = (self.data.store.as_ref(), c);
+                            use crate::app::tree_view::pp::PPCache;
+                            mem.caches.cache::<PPCache>().get(key)
+                        })
+                    });
 
                 match serde_json::to_string_pretty(&res) {
                     Ok(text) => {
@@ -1883,11 +1883,11 @@ fn show_tree_view(
     ui: &mut egui::Ui,
     aspects: &mut types::ComputeConfigAspectViews,
     selected_projects: &mut SelectedProjects,
-    long_tacking: &mut long_tracking::LongTracking,
+    long_tacking: &mut tracking::long_tracking::LongTracking,
     store: Arc<FetchedHyperAST>,
     commit: &(ProjectId, CommitId),
     api_addr: &String,
-    curr_view: &mut long_tracking::ColView<'_>,
+    curr_view: &mut tracking::long_tracking::ColView<'_>,
 ) {
     let (repo, _c) = selected_projects.get_mut(commit.0).unwrap();
 
@@ -1917,9 +1917,9 @@ fn show_tree_view(
     };
     let col = 0;
     let min_col = 0;
-    let mut attacheds: long_tracking::Attacheds = vec![];
+    let mut attacheds: tracking::long_tracking::Attacheds = vec![];
     let mut defered_focus_scroll = None;
-    long_tracking::show_tree_view(
+    tracking::long_tracking::show_tree_view(
         ui,
         min_col,
         api_addr,
@@ -1951,7 +1951,7 @@ fn show_tree_view(
 
 fn show_hunks(
     ui: &mut egui::Ui,
-    fetched_files: &mut code_tracking::FetchedFiles,
+    fetched_files: &mut tracking::FetchedFiles,
     api_addr: &String,
     x: &DetailsResults,
     selected_commit: &(ProjectId, CommitId),

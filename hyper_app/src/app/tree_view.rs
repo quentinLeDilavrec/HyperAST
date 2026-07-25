@@ -2,15 +2,15 @@ use std::fmt::Debug;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use super::code_aspects::{HighLightHandle, remote_fetch_labels, remote_fetch_nodes_by_ids};
+use super::code_aspects::HighLightHandle;
+use super::code_aspects::{remote_fetch_labels, remote_fetch_nodes_by_ids};
+use super::store;
+use super::store::{LabelIdentifier, NodeIdentifier};
 
 pub use hyperast::store::nodes::fetched::SimplePacked;
 use hyperast::types::{AnyType, Labeled, WithChildren, WithStats};
 
 mod cache;
-
-pub(crate) mod store;
-pub use store::{LabelIdentifier, NodeIdentifier};
 
 pub(crate) mod hyperast_layouter;
 

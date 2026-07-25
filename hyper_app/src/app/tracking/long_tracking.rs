@@ -1,8 +1,7 @@
-use epaint::{Pos2, ahash::HashSet};
+use epaint::ahash::HashSet;
 use poll_promise::Promise;
-use re_ui::UiExt as _;
 use std::collections::{HashMap, VecDeque};
-use std::ops::{ControlFlow, Range};
+use std::ops::Range;
 use std::sync::Arc;
 
 use egui_addon::MultiSplitter;
@@ -10,17 +9,18 @@ use egui_addon::code_editor::generic_text_buffer::byte_index_from_char_index;
 use egui_addon::egui_utils::highlight_byte_range;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
-use hyperast::types::{AnyType, HyperType, Labeled, NodeStore, TypeStore};
 
-use super::code_aspects::remote_fetch_node_old;
-use super::code_aspects::{FetchedView, Focus, HighLightHandle};
-use super::code_tracking::{FetchedFiles, RemoteFile};
+use super::FetchedFiles;
 use super::code_tracking::{TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges};
-use super::commit::{CommitMetadata, fetch_commit0};
-use super::tree_view::{Action, store::FetchedHyperAST};
-use super::types::{CodeRange, ComputeConfigAspectViews, FileIdentifier, SelectedConfig};
-use super::types::{Commit, CommitId};
-use super::utils_egui::MyUiExt as _;
+
+use crate::app::code_aspects::remote_fetch_node_old;
+use crate::app::code_aspects::{FetchedView, Focus, HighLightHandle};
+use crate::app::commit::{CommitMetadata, fetch_commit0};
+use crate::app::store::FetchedHyperAST;
+use crate::app::tree_view::Action;
+use crate::app::types::{CodeRange, ComputeConfigAspectViews, SelectedConfig};
+use crate::app::types::{Commit, CommitId};
+use crate::app::utils_egui::MyUiExt as _;
 use crate::utils_poll::{AccumulableResult, Buffered, MultiBuffered, Resource};
 
 use super::detached_view::LinkConfig;
@@ -61,11 +61,14 @@ pub(crate) struct QueryEnabledExtras {
     pub(crate) query: String,
     #[serde(skip)]
     pub(crate) results:
-        HashMap<NodeIdentifier, poll_promise::Promise<crate::app::detached_view::ExtraQueryResult>>,
+        HashMap<NodeIdentifier, poll_promise::Promise<super::detached_view::ExtraQueryResult>>,
 }
 
 impl QueryEnabledExtras {
-    pub(crate) fn result(&self, id: &NodeIdentifier) -> Option<super::querying::DetailedResult> {
+    pub(crate) fn result(
+        &self,
+        id: &NodeIdentifier,
+    ) -> Option<crate::app::querying::DetailedResult> {
         let prom = self.results.get(id)?;
         if let Some(Ok(v)) = prom.ready()
             && let Some(Ok(v)) = &v.content
@@ -77,7 +80,7 @@ impl QueryEnabledExtras {
 }
 
 impl LongTracking {
-    pub(crate) fn repo(&self) -> &super::Repo {
+    pub(crate) fn repo(&self) -> &crate::app::Repo {
         let code = self.origins.get(0).unwrap();
         &code.file.commit.repo
     }
@@ -189,13 +192,13 @@ pub(crate) fn show_config(
 }
 
 pub(crate) fn project_modal_handler(
-    data: &mut super::AppData,
-    pid: super::ProjectId,
-) -> super::ProjectId {
+    data: &mut crate::app::AppData,
+    pid: crate::app::ProjectId,
+) -> crate::app::ProjectId {
     let projects = &mut data.selected_code_data;
     let commit = data.long_tracking.origins.get(0);
     let commit = commit.map(|x| &x.file.commit);
-    use super::utils_commit::project_modal_handler;
+    use crate::app::utils_commit::project_modal_handler;
     let (repo, mut commits) = match project_modal_handler(pid, projects, commit) {
         Ok(value) => value,
         Err(value) => return value,
@@ -205,10 +208,13 @@ pub(crate) fn project_modal_handler(
     let commit = &mut code.file.commit;
     commit.repo = repo.clone();
     commit.id = *commits.iter_mut().next().unwrap();
-    super::ProjectId::INVALID
+    crate::app::ProjectId::INVALID
 }
 
-pub(crate) fn commit_modal_handler(data: &mut super::AppData, cid: super::types::CommitId) {
+pub(crate) fn commit_modal_handler(
+    data: &mut crate::app::AppData,
+    cid: crate::app::types::CommitId,
+) {
     let code = data.long_tracking.origins.get_mut(0).unwrap();
     let mut commit = code.file.commit.clone();
     commit.id = cid;
@@ -263,13 +269,7 @@ struct LongTrackingResultsImpl<'a> {
 }
 
 impl<'a> LongTrackingResultsImpl<'a> {
-    fn new(
-        ui: &mut egui::Ui,
-        api_addr: &'a str,
-        aspects: &mut ComputeConfigAspectViews,
-        long_tracking: &mut LongTracking,
-        fetched_files: &mut FetchedFiles,
-    ) -> Self {
+    fn new(ui: &mut egui::Ui, api_addr: &'a str, long_tracking: &mut LongTracking) -> Self {
         let w_id = ui.id().with("Tracking Timeline");
         let timeline_window = ui.available_rect_before_wrap();
         let spacing: egui::Vec2 = (0.0, 0.0).into();
@@ -292,7 +292,7 @@ impl<'a> LongTrackingResultsImpl<'a> {
         let viewport_left = timeline_window.left() - w_state.map_or(0.0, |x| x.offset);
         let viewport_x = egui::Rangef::new(viewport_left, viewport_left + viewport_width);
 
-        let mut min_col = (viewport_x.min / col_width_with_spacing).floor() as usize;
+        // let min_col = (viewport_x.min / col_width_with_spacing).floor() as usize;
         let offset = w_state.map_or(0.0, |x| x.offset);
         let mut min_col = (offset / col_width_with_spacing).floor() as usize;
         let offset = offset + timeline_window.width();
@@ -323,17 +323,11 @@ impl<'a> LongTrackingResultsImpl<'a> {
     }
 
     fn make_main_ui(&self, ui: &mut egui::Ui) -> egui::Ui {
-        let LongTrackingResultsImpl {
-            viewport_x,
-            timeline_window,
-            ..
-        } = *self;
-        use egui::NumExt;
         let viewport =
-            egui::Rect::from_x_y_ranges(viewport_x, ui.available_rect_before_wrap().y_range());
+            egui::Rect::from_x_y_ranges(self.viewport_x, ui.available_rect_before_wrap().y_range());
         let layout = egui::Layout::left_to_right(egui::Align::BOTTOM);
         let mut ui = ui.new_child(egui::UiBuilder::new().layout(layout).max_rect(viewport));
-        ui.set_clip_rect(timeline_window);
+        ui.set_clip_rect(self.timeline_window);
         ui
     }
 
@@ -345,7 +339,7 @@ impl<'a> LongTrackingResultsImpl<'a> {
             col_width,
             ..
         } = *self;
-        let scale = |x| ui.max_rect().left() + min_col as f32 * (col_width + spacing.x);
+        let scale = |_x| ui.max_rect().left() + min_col as f32 * (col_width + spacing.x);
         let [x_min, x_max] = [min_col, max_col].map(scale);
         let x_min = x_min + spacing.x / 3.0;
         let x_max = x_max - spacing.x * 2.0 / 3.0;
@@ -358,10 +352,7 @@ impl<'a> LongTrackingResultsImpl<'a> {
 fn show_commit(
     ui: &mut egui::Ui,
     col: usize,
-    store: &Arc<FetchedHyperAST>,
-    aspects: &mut ComputeConfigAspectViews,
     long_tracking: &mut LongTracking,
-    fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
     let mut tracking_result = (Buffered::Empty, MultiBuffered::default());
@@ -450,26 +441,12 @@ fn show_commit(
 }
 fn show_timeline(
     ui: &mut egui::Ui,
-    api_addr: &str,
-    aspects: &mut ComputeConfigAspectViews,
-    store: &Arc<FetchedHyperAST>,
     long_tracking: &mut LongTracking,
-    fetched_files: &mut FetchedFiles,
     res_impl: &LongTrackingResultsImpl<'_>,
 ) {
     ui.set_clip_rect(ui.max_rect().expand2((1.0, 0.0).into()));
 
-    let mut show_c = |ui: &mut _, col| {
-        show_commit(
-            ui,
-            col,
-            store,
-            aspects,
-            long_tracking,
-            fetched_files,
-            res_impl,
-        )
-    };
+    let mut show_c = |ui: &mut _, col| show_commit(ui, col, long_tracking, res_impl);
     if res_impl.total_cols == 0 {
         ui.spinner();
     } else if res_impl.total_cols == 1 {
@@ -546,7 +523,6 @@ fn timeline_drag_box_vertical_handle(
     let LongTrackingResultsImpl {
         timeline_window,
         total_cols,
-        viewport_width,
         spacing,
         ..
     } = *res_impl;
@@ -651,7 +627,6 @@ fn timeline_drag_box(
 
 fn show_trackings(
     ui: &mut egui::Ui,
-    api_addr: &str,
     aspects: &mut ComputeConfigAspectViews,
     store: &Arc<FetchedHyperAST>,
     long_tracking: &mut LongTracking,
@@ -665,21 +640,19 @@ fn show_trackings(
 
     let LongTrackingResultsImpl {
         timeline_window,
-        total_cols,
-        w_id,
         spacing,
         col_width,
         ..
     } = *res_impl;
 
     // handle the scrolling
-    if let Some((o, i, mut scroll)) = attached.differed_focus_scroll {
+    if let Some((o, _i, mut scroll)) = attached.differed_focus_scroll {
         let o: f32 = o;
-        let g_o = (attached.attacheds.get(i))
-            .and_then(|a| a.0.get(&0))
-            .and_then(|x| x.1)
-            .map(|p| p.min.y)
-            .unwrap_or(timeline_window.height() / 2000.0);
+        // let g_o = (attached.attacheds.get(i))
+        //     .and_then(|a| a.0.get(&0))
+        //     .and_then(|x| x.1)
+        //     .map(|p| p.min.y)
+        //     .unwrap_or(timeline_window.height() / 2000.0);
         let g_o: f32 = 50.0;
         scroll.state.offset = (0.0, (o - g_o).max(0.0)).into();
         scroll.state.store(ui.ctx(), scroll.id);
@@ -705,12 +678,12 @@ fn show_trackings(
         let (left, right) = attached.attacheds.split_at(i + 1);
         let (greens, blues) = (&left.last().unwrap().1, &right.first().unwrap().0);
         let mut done = HashSet::default();
-        let cable = false;
-        let mut min_right_x = 0.0;
-        let mut min_left_x = 0.0;
+        // let cable = false;
+        // let mut min_right_x = 0.0;
+        // let mut min_left_x = 0.0;
         let l_bound = res_impl.viewport_x.min + (i + 1) as f32 * (col_width + spacing.x) - 15.0;
         let r_bound = l_bound + 25.0;
-        let mut render = |&(green, g_rect), &(blue, b_rect)| {
+        let render = |&(_green, g_rect), &(_blue, b_rect)| {
             let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) else {
                 return;
             };
@@ -781,7 +754,6 @@ impl<'a> AttachedImpl<'a> {
             let ui = &mut self.prep_ui(ui, col);
 
             let mut curr_view = match init_col_view(
-                ui,
                 self,
                 col,
                 &mut long_tracking.results,
@@ -862,7 +834,6 @@ impl<'a> AttachedImpl<'a> {
 }
 
 fn init_col_view<'a>(
-    ui: &mut egui::Ui,
     attached: &AttachedImpl<'_>,
     col: usize,
     tracking_results: &'a mut LongTrackingResults,
@@ -1179,37 +1150,18 @@ pub(crate) fn show_results(
     long_tracking: &mut LongTracking,
     fetched_files: &mut FetchedFiles,
 ) {
-    let mut res_impl =
-        LongTrackingResultsImpl::new(ui, api_addr, aspects, long_tracking, fetched_files);
+    let res_impl = LongTrackingResultsImpl::new(ui, api_addr, long_tracking);
 
     egui::panel::TopBottomPanel::bottom("Timeline Map")
         .frame(egui::Frame::side_top_panel(ui.style()).inner_margin(0.0))
         .height_range(0.0..=ui.available_height() / 3.0)
         .default_height(ui.available_height() / 5.0)
         .resizable(true)
-        .show_inside(ui, |ui| {
-            show_timeline(
-                ui,
-                api_addr,
-                aspects,
-                &store,
-                long_tracking,
-                fetched_files,
-                &res_impl,
-            )
-        });
+        .show_inside(ui, |ui| show_timeline(ui, long_tracking, &res_impl));
 
-    let mut ui = &mut res_impl.make_main_ui(ui);
+    let ui = &mut res_impl.make_main_ui(ui);
 
-    show_trackings(
-        ui,
-        api_addr,
-        aspects,
-        &store,
-        long_tracking,
-        fetched_files,
-        &res_impl,
-    );
+    show_trackings(ui, aspects, &store, long_tracking, fetched_files, &res_impl);
 
     let LongTrackingResultsImpl {
         timeline_window,
@@ -1224,7 +1176,7 @@ pub(crate) fn show_results(
             res.get_mut()
                 .map(|res| (col, res.content.track.results.as_mut()))
         });
-        crate::app::detached_view::ui_detached(
+        super::detached_view::ui_detached(
             ui,
             store,
             timeline_window,
@@ -1306,7 +1258,7 @@ fn show_code_view(
     Some(te)
 }
 
-type ClickedNode = egui::scroll_area::ScrollAreaOutput<Option<super::tree_view::Offsets>>;
+type ClickedNode = egui::scroll_area::ScrollAreaOutput<Option<crate::app::tree_view::Offsets>>;
 type DeferedFocusScroll = (f32, usize, ClickedNode);
 
 pub(crate) fn show_tree_view(
@@ -1320,17 +1272,17 @@ pub(crate) fn show_tree_view(
     aspects: &mut ComputeConfigAspectViews,
     ports: &mut Attacheds,
     defered_focus_scroll: &mut Option<DeferedFocusScroll>,
-) -> Option<super::tree_view::Offsets> {
+) -> Option<crate::app::tree_view::Offsets> {
     use egui::scroll_area::ScrollBarVisibility as Vis;
     let mut scroll_focus = None;
-    let mut scroll = egui::ScrollArea::both()
+    let scroll = egui::ScrollArea::both()
         .auto_shrink([false, false])
         .scroll_bar_visibility(if ui.max_rect().width() < 500. {
             Vis::AlwaysHidden
         } else {
             Vis::VisibleWhenNeeded
         })
-        .show_viewport(ui, |ui, viewport| {
+        .show_viewport(ui, |ui, _viewport| {
             ui.set_height(3_000.0);
             ui.set_max_width(500.);
             ui.set_min_width(200.);
@@ -1587,7 +1539,7 @@ pub(super) fn track(
         )
     };
 
-    let mut request = ehttp::Request::get(&url);
+    let request = ehttp::Request::get(&url);
     // request
     //     .headers
     //     .insert("Content-Type".to_string(), "text".to_string());
@@ -1637,10 +1589,7 @@ pub(super) fn track_at_path(
         )
     };
 
-    let mut request = ehttp::Request::get(&url);
-    // request
-    //     .headers
-    //     .insert("Content-Type".to_string(), "text".to_string());
+    let request = ehttp::Request::get(&url);
 
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // wake up UI thread
@@ -1681,10 +1630,7 @@ pub(super) fn track_at_path_with_changes(
         )
     };
 
-    let mut request = ehttp::Request::get(&url);
-    // request
-    //     .headers
-    //     .insert("Content-Type".to_string(), "text".to_string());
+    let request = ehttp::Request::get(&url);
 
     ehttp::fetch(request, move |response| {
         ctx.request_repaint(); // wake up UI thread
@@ -1711,7 +1657,7 @@ pub(crate) fn prepare_export(
     let manual_links = &mut long_tracking.manual_links;
     let manual_rm_links = &mut manual_links.rm_links;
     let manual_links = &mut manual_links.links;
-    use crate::app::code_tracking::TrackingResult;
+    use super::code_tracking::TrackingResult;
     use crate::app::types::CodeRange;
     #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
     struct Res {
@@ -1794,7 +1740,6 @@ fn compute_event_log(
     use process_mining::core::event_data::case_centric::Attribute;
     use process_mining::core::event_data::case_centric::AttributeValue;
     use process_mining::core::event_data::case_centric::Event;
-    use process_mining::core::event_data::case_centric::EventLogExtension;
     use process_mining::core::event_data::case_centric::Trace;
 
     macro_rules! str_attr {
@@ -1846,12 +1791,14 @@ fn compute_event_log(
         };
 
         let node_store = stores.node_store.read().unwrap();
-        let Some(r) = node_store.try_resolve::<AnyType>(*id) else {
+        let Some(r) = node_store.try_resolve::<hyperast::types::AnyType>(*id) else {
             stores.demand_node(*id);
             continue;
         };
         let kind = stores.resolve_type(&id);
         event.attributes.push(str_attr!("instance:kind", kind));
+        use hyperast::types::WithStats;
+        event.attributes.push(str_attr!("instance:size", r.size()));
 
         let p = if let Some(r) = &tr.src.range {
             format!("{}:{}..{}", tr.src.file.file_path, r.start, r.end)
@@ -1895,9 +1842,7 @@ fn compute_event_log(
 fn empty_event_log() -> process_mining::EventLog {
     use process_mining::core::event_data::case_centric::Attribute;
     use process_mining::core::event_data::case_centric::AttributeValue;
-    use process_mining::core::event_data::case_centric::Event;
     use process_mining::core::event_data::case_centric::EventLogExtension;
-    use process_mining::core::event_data::case_centric::Trace;
     let mut event_log = process_mining::core::EventLog::default();
 
     let extensions = event_log.extensions.get_or_insert_default();
@@ -1933,7 +1878,6 @@ fn example_trace() -> process_mining::core::event_data::case_centric::Trace {
     use process_mining::core::event_data::case_centric::Attribute;
     use process_mining::core::event_data::case_centric::AttributeValue;
     use process_mining::core::event_data::case_centric::Event;
-    use process_mining::core::event_data::case_centric::EventLogExtension;
     use process_mining::core::event_data::case_centric::Trace;
     let mut trace = Trace::default();
     trace.attributes.push(Attribute::new(

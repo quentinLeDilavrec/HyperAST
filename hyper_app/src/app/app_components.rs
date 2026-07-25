@@ -1,3 +1,4 @@
+use crate::app::tracking::*;
 use crate::app::*;
 use commit::CommitSlice;
 use re_ui::list_item;
@@ -561,7 +562,7 @@ impl super::HyperApp {
                 egui::CentralPanel::default()
                     .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(2.0))
                     .show(ctx, |ui| {
-                        long_tracking::show_results(
+                        tracking::long_tracking::show_results(
                             ui,
                             &api_addr,
                             aspects,

@@ -6,9 +6,9 @@ use hyperast::store::nodes::fetched::NodeIdentifier;
 use crate::app::querying::DetailedResult;
 
 use super::code_tracking::TrackingResult;
-use super::tree_view::store::FetchedHyperAST;
-use super::types::CodeRange;
-use super::utils_egui::MyUiExt as _;
+use crate::app::store::FetchedHyperAST;
+use crate::app::types::CodeRange;
+use crate::app::utils_egui::MyUiExt as _;
 
 const DEBUG: bool = false;
 
@@ -632,7 +632,7 @@ fn query_enabled_extras(
     };
 
     if !query_enabled_results.query.trim().is_empty() && refresh {
-        use super::querying::remote_compute_query_subtree as search_query;
+        use crate::app::querying::remote_compute_query_subtree as search_query;
         let api_addr = "127.0.0.1:8888"; // TODO use the value given in settings
         let script = crate::app::querying::QueryContent {
             language: "Cpp".to_string(),
@@ -733,8 +733,9 @@ fn pp_subtree(
 ) -> egui::text::LayoutJob {
     let theme = egui_addon::syntax_highlighting::simple::CodeTheme::from_memory(ctx);
     // TODO fetch entire subtree, line breaks would also be useful
-    let adv_theme = super::tree_view::hyperast_layouter::AdvTheme::from(theme);
-    let ppbuilder = super::tree_view::pp::PPBuilder::new(store.clone(), nid).theme(adv_theme);
+    use crate::app::tree_view;
+    let adv_theme = tree_view::hyperast_layouter::AdvTheme::from(theme);
+    let ppbuilder = tree_view::pp::PPBuilder::new(store.clone(), nid).theme(adv_theme);
     ppbuilder.compute_incr(ctx)
 }
 

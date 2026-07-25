@@ -107,7 +107,7 @@ impl crate::HyperApp {
                             gid,
                         );
                     } else if let super::Tab::LongTracking = self.tabs[pane] {
-                        use crate::app::long_tracking;
+                        use crate::app::tracking::long_tracking;
                         let (proj_resp, commit_resp) =
                             long_tracking::show_config(ui, &mut self.data.long_tracking);
                         if proj_resp.clicked() {

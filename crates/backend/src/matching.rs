@@ -7,14 +7,14 @@ use hyperast::types::{WithHashs, WithStats};
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
 use hyper_diff::decompressed_tree_store::hidding_wrapper;
 use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
+use hyper_diff::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use hyper_diff::matchers::heuristic::gt::lazy_greedy_bottom_up_matcher::LazyGreedyBottomUpMatcher;
 use hyper_diff::matchers::heuristic::gt::lazy_hybrid_bottom_up_matcher::LazyHybridBottomUpMatcher;
-use hyper_diff::mappings::{DefaultMultiMappingStore, MappingStore, VecStore};
 use hyper_diff::matchers::{Decompressible, Mapper};
 
 pub use hyper_diff::matchers::heuristic::gt::lazy_greedy_subtree_matcher::LazyGreedySubtreeMatcher;
 
-use crate::utils::IdD;
+use crate::IdD;
 
 #[allow(type_alias_bounds)]
 type LazyVecMapper<'a, HAST: HyperASTShared> = Mapper<

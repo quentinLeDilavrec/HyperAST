@@ -19,6 +19,7 @@ pub mod examples;
 mod fetch;
 mod file;
 mod matching;
+mod piece_of_code;
 mod pull_requests;
 mod querying;
 mod scriptingv1;
@@ -32,6 +33,10 @@ mod view;
 mod ws;
 #[cfg(feature = "collab")]
 pub use ws::ws_handler;
+
+pub(crate) type IdN = hyperast::store::defaults::NodeIdentifier;
+pub(crate) type Idx = u16;
+pub(crate) type IdD = u32;
 
 #[cfg(feature = "collab")]
 type DocState = (

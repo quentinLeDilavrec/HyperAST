@@ -15,8 +15,8 @@ use hyperast_vcs_git::processing::ConfiguredRepo2 as ConfiguredRepo;
 use hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
 use crate::changes::{DstChanges, SrcChanges, added_deleted};
-use crate::utils::PieceOfCode;
-use crate::utils::{LocalPieceOfCode, string_to_oid};
+use crate::piece_of_code::{LocalPieceOfCode, PieceOfCode};
+use crate::utils::string_to_oid;
 use crate::{SharedState, track};
 
 mod compute;
@@ -236,7 +236,7 @@ pub fn track_code(
     let mut repository = repo_handle.fetch();
     log::debug!("done cloning {}", repository.spec);
 
-    let mut tracking = TrackingImpl::new(&state, now, query, path);
+    let mut tracking = Tracker::new(&state, now, query, path);
     while tracking.node_processed < MAX_NODES {
         tracking.commits_processed += 1;
         let commits = (state.repositories.write().unwrap())
@@ -276,7 +276,7 @@ pub(crate) fn track_code_at_path(
         .ok_or_else(|| repo_config_error(now))?;
     let mut repository = repository.fetch();
     log::debug!("done cloning {}", repository.spec);
-    let mut tracking = TrackingImpl::at_path(&state, now, query, path);
+    let mut tracking = Tracker::at_path(&state, now, query, path);
     let mut ori_oid = None;
     while tracking.node_processed < MAX_NODES {
         let commit = &tracking.commit;
@@ -317,7 +317,7 @@ pub(crate) fn track_code_at_path_with_changes(
         .ok_or_else(|| repo_config_error(now))?;
     let mut repository = repo_handle.fetch();
     log::debug!("done cloning {}", repository.spec);
-    let mut tracking = TrackingImpl::at_path(&state, now, query, path);
+    let mut tracking = Tracker::at_path(&state, now, query, path);
     let mut ori_oid = None;
 
     while tracking.node_processed < MAX_NODES {
@@ -359,7 +359,7 @@ pub(crate) fn track_code_at_path_with_changes(
     Err(tracking.max_diffed_error())
 }
 
-struct TrackingImpl {
+struct Tracker {
     state: SharedState,
     now: Instant,
     commit: Oid,
@@ -371,14 +371,14 @@ struct TrackingImpl {
     source: Option<PieceOfCode<IdN, Idx>>,
 }
 
-impl TrackingImpl {
+impl Tracker {
     fn new(
         state: &std::sync::Arc<crate::AppState>,
         now: Instant,
         query: TrackingQuery,
         path: TrackingParam,
     ) -> Self {
-        TrackingImpl {
+        Tracker {
             state: state.clone(),
             now,
             commit: path.commit,
@@ -397,7 +397,7 @@ impl TrackingImpl {
         path: TrackingAtPathParam,
     ) -> Self {
         let (path, commit) = (path.path(), path.commit);
-        TrackingImpl {
+        Tracker {
             state: state.clone(),
             now,
             commit,
@@ -428,7 +428,7 @@ impl TrackingImpl {
 }
 
 fn handle_tracked(
-    tracking: &mut TrackingImpl,
+    tracking: &mut Tracker,
     repo: &Repo,
     commits: &[Oid],
     track_res: MappingResult<IdN, Idx>,
@@ -551,7 +551,7 @@ impl<IdN, Idx, T> From<Result<MappingResult<IdN, Idx, T>, String>> for MappingRe
 type RepoConfig = hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
 fn track_aux(
-    tracking: &mut TrackingImpl,
+    tracking: &mut Tracker,
     repo_handle: &ConfiguredRepo,
     src_oid: Oid,
     dst_oid: Oid,
@@ -563,9 +563,6 @@ fn track_aux(
     let target = tracking.make_target(src_tr)?;
     let repositories = tracking.state.repositories.read().unwrap();
     let dst_tr = get_commit_root(&repositories, &repo_handle.config, dst_oid)?;
-    let postprocess_matching =
-        |p: LocalPieceOfCode<IdN, Idx>| p.globalize(&repo_handle.spec, dst_oid);
-
     do_tracking(
         &repositories,
         &tracking.state.partial_decomps,
@@ -573,12 +570,12 @@ fn track_aux(
         &tracking.query.flags,
         &target,
         dst_tr,
-        &postprocess_matching,
+        &|p| p.globalize(&repo_handle.spec, dst_oid),
     )
     .into()
 }
 
-impl TrackingImpl {
+impl Tracker {
     fn make_target(&mut self, src_tr: IdN) -> Result<TargetCodeElement<IdN, Idx>, String> {
         let start = self.query.start;
         let end = self.query.end;
@@ -642,7 +639,7 @@ fn get_commit_root(
 }
 
 fn track_at_path_aux(
-    tracking: &mut TrackingImpl,
+    tracking: &mut Tracker,
     repo_handle: &ConfiguredRepo,
     src_oid: Oid,
     dst_oid: Oid,
@@ -656,8 +653,6 @@ fn track_at_path_aux(
 
     let target = target_code_elem(stores, src_tr, path);
 
-    let postprocess_matching =
-        |p: LocalPieceOfCode<IdN, Idx>| p.globalize(&repo_handle.spec, dst_oid);
     let dst_tr = get_commit_root(&repositories, &repo_handle.config, dst_oid)?;
     do_tracking(
         &repositories,
@@ -666,7 +661,11 @@ fn track_at_path_aux(
         flags,
         &target,
         dst_tr,
-        &postprocess_matching,
+        &|mut p| {
+            // assert_eq!(p.path_ids.last(), Some(&dst_tr));
+            // p.path_ids.push(dst_tr);
+            p.globalize(&repo_handle.spec, dst_oid)
+        },
     )
     .into()
 }

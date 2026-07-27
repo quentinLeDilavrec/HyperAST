@@ -169,7 +169,7 @@ where
         ));
 
         let src = compute_local2(target, with_spaces_stores);
-        dbg!(target.root(), &src.path_ids);
+        dbg!(target.root(), &src.path_ids, &mapped);
         return if should_continue {
             let other_tr = mapper.dst_arena.original(&mapper.dst_arena.root());
             let nodes = MappingTracker::new(mapper.hyperast).size(&other_tr, &target.root());
@@ -199,8 +199,8 @@ where
         );
         // assert_eq!(Some(&mapped_node), path_ids.last().or(Some(&other_tr)), "{:?} {:?} {:?} {:?}", mapped_node, other_tr, path, path_ids); // if it holds then ok to take the ids from the nospace repr.
         // TODO WARN there is an issue there. Entity(2148976) Entity(2149024) [0, 38, 2] [Entity(2148976), Entity(2148992), Entity(2149008)]
-        // the list of ids is I believe sorted in reverse compered to the list of offsets,
-        // but as you can see the mapped node is the same (but at the begining of the array) so it should be correct to  use the path from the nospace repr.
+        // the list of ids is I believe sorted in reverse compared to the list of offsets,
+        // but as you can see the mapped node is the same (but at the beginning of the array) so it should be correct to  use the path from the nospace repr.
         let src = compute_local2(target, with_spaces_stores);
         // TODO add fallback_src
         return MappingResult::Missing { src, fallback };
@@ -312,6 +312,7 @@ where
     // TODO add flags for similarity comps
     (flagged && !triggered, mapped)
 }
+
 fn trig_upd(
     flags: &Flags,
     target_node: IdN,
@@ -436,6 +437,7 @@ where
     let current_tr = target.root();
     let other_tr = dst_tree.original(&dst_tree.root());
     assert_eq!(current_tr, src_tree.original(&src_tree.root()));
+    assert_eq!(other_tr, dst_tree.original(&dst_tree.root()));
     let node_store = &stores.node_store;
     let tracker_nospace = MappingTracker {
         stores: &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores),
@@ -586,14 +588,18 @@ where
     let next = mappeds
         .iter()
         .map(|x| {
+            assert_eq!(dst_tree.original(&dst_tree.root()), other_tr);
             let mut path_dst = dst_tree.path_rooted(x);
+            panic!("{path_dst:?} {path:?} {other_tr:?}");
             path_dst.extend(path); // WARN with similarity it might not be possible to simply concat path...
             let (path_dst, _) =
                 path_with_spaces(other_tr, &mut path_dst.iter().copied(), with_spaces_stores);
             postprocess_matching(compute_local(other_tr, &path_dst, with_spaces_stores))
         })
         .collect();
+    assert_eq!(target.root(), current_tr);
     let src = compute_local2(target, with_spaces_stores);
+    // assert_eq!(src.path_ids, current_tr);
     MappingResult::Skipped { nodes, src, next }
 }
 

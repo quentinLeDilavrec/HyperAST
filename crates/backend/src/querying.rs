@@ -23,8 +23,10 @@ use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{HyperAST, HyperType, WithStats};
 use hyperast_vcs_git::TStore;
 
-use crate::SharedState;
-use crate::utils::{Arena, IdD, IdN, LocalPieceOfCode, NoS, PieceOfCode, Position, remap};
+use crate::piece_of_code::{LocalPieceOfCode, PieceOfCode, Position};
+use crate::utils::{Arena, NoS, remap};
+use crate::{IdD, SharedState};
+use crate::{IdN, Idx};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Param {

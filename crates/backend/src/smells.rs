@@ -12,8 +12,9 @@ use hyperast::position::position_accessors::{RootedPosition, WithPreOrderOffsets
 use hyperast::types::{Children, LabelStore, WithStats};
 use hyperast_gen_ts_tsquery::code2query::QueryLattice;
 
+use crate::IdN;
 use crate::SharedState;
-use crate::utils::{IdN, LocalPieceOfCode, PieceOfCode};
+use crate::piece_of_code::{LocalPieceOfCode, PieceOfCode};
 
 pub(crate) mod matching;
 
@@ -860,7 +861,7 @@ mod graph_compression {
         println!("Csr EF: {}", serde_json::to_string(&webg).unwrap().len());
     }
 
-    pub fn compress(g: petgraph::Graph<crate::utils::IdN, ()>) {
+    pub fn compress(g: petgraph::Graph<crate::IdN, ()>) {
         let csr = graph_to_csr(&g);
 
         let seq =
@@ -963,6 +964,7 @@ mod test_gen {
     use hyperast_gen_ts_tsquery::code2query::QueryLattice;
 
     use crate::AppState;
+    use crate::IdN;
     use crate::smells;
     use crate::smells::ExMap;
     use crate::smells::SearchResult;
@@ -972,7 +974,6 @@ mod test_gen {
     use crate::smells::matching;
     use crate::smells::poset_exploration;
     use crate::smells::{Examples, More, Path};
-    use crate::utils::IdN;
 
     #[test]
     fn test_meta_simp_last_child() -> Result<(), Box<dyn std::error::Error>> {

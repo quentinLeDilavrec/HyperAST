@@ -1,7 +1,7 @@
 // #![feature(array_chunks)]
 // #![feature(map_many_mut)]
 // #![feature(iter_collect_into)]
-// #![allow(unused)]
+#![allow(unused)]
 use axum::body::Bytes;
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
@@ -52,7 +52,7 @@ pub struct AppState {
     pub db: DashMap<String, Bytes>,
     pub repositories: RwLock<PreProcessedRepositories>,
     /// configs: RwLock<RepoConfigs>,
-    mappings: MappingCache,
+    // mappings: MappingCache,
     mappings_alone: MappingAloneCache,
     partial_decomps: PartialDecompCache,
     /// Single shared doc
@@ -69,7 +69,7 @@ impl Default for AppState {
         Self {
             db: Default::default(),
             repositories: Default::default(),
-            mappings: Default::default(),
+            // mappings: Default::default(),
             mappings_alone: Default::default(),
             partial_decomps: Default::default(),
             #[cfg(feature = "collab")]
@@ -96,7 +96,7 @@ pub(crate) type MappingAloneCacheRef<'a, IdN = NodeIdentifier, M = VecStore<u32>
 pub(crate) enum MappingStage {
     Subtree,
     Bottomup,
-    Decls,
+    // Decls,
 }
 
 type DS<T> = hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder<T, u32>;
@@ -165,7 +165,7 @@ fn run_scripting(
     repo_spec: hyperast_vcs_git::git::Repo,
     config: hyperast_vcs_git::processing::RepoConfig,
     commit: &str,
-    language: &str,
+    _language: &str,
     prepro: &str,
     show: &str,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -288,7 +288,7 @@ fn run_tsg(
     repo_spec: hyperast_vcs_git::git::Repo,
     config: hyperast_vcs_git::processing::RepoConfig,
     commit: &str,
-    language: &str,
+    _language: &str,
     tsg: &str,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let state = crate::AppState::default();
@@ -305,7 +305,7 @@ fn run_tsg(
         .ok_or_else(|| "missing config for repository".to_string())?;
     let mut repository = repo.fetch();
     log::debug!("done cloning {}", repository.spec);
-    let commits = state.repositories.write().unwrap().pre_process_with_limit(
+    let _commits = state.repositories.write().unwrap().pre_process_with_limit(
         &mut repository,
         "",
         commit,

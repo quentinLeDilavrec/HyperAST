@@ -16,12 +16,10 @@ use hyper_diff::matchers::{Decompressible, Mapper};
 use hyperast::position::position_accessors;
 use hyperast::position::{compute_position, compute_position_and_nodes, path_with_spaces};
 
-use hyperast_vcs_git::processing::ConfiguredRepoTrait;
 use hyperast_vcs_git::{TStore, multi_preprocessed};
 
-use crate::MappingAloneCacheRef;
-use crate::changes::{DstChanges, NoSpaceStore, SrcChanges};
-use crate::{MappingAloneCache, PartialDecompCache, SharedState, matching, no_space};
+use crate::changes::NoSpaceStore;
+use crate::{MappingAloneCache, PartialDecompCache, matching, no_space};
 
 use super::more::WithPreOrderOffsetsNoSpaces;
 use super::{Flags, FlagsE, Idx, LocalPieceOfCode, MappingResult};
@@ -404,7 +402,7 @@ where
     assert_eq!(path_no_spaces.len(), path_ids.len());
     let (path, _) = path_with_spaces(tr, &mut path_no_spaces.iter().copied(), with_spaces_stores);
     let offsets = &mut path.iter().copied();
-    let (pos, mapped_node) = compute_position(tr, offsets, with_spaces_stores);
+    let (pos, _mapped_node) = compute_position(tr, offsets, with_spaces_stores);
     LocalPieceOfCode::from_position(&pos, path.clone(), path_ids.clone())
 }
 
@@ -438,7 +436,6 @@ where
     let other_tr = dst_tree.original(&dst_tree.root());
     assert_eq!(current_tr, src_tree.original(&src_tree.root()));
     assert_eq!(other_tr, dst_tree.original(&dst_tree.root()));
-    let node_store = &stores.node_store;
     let tracker_nospace = MappingTracker {
         stores: &hyperast_vcs_git::no_space::as_nospaces(with_spaces_stores),
     };
@@ -567,7 +564,7 @@ where
 
 fn track_greedy_aux_aux<'s, C, P>(
     with_spaces_stores: &'s SimpleStores<TStore>,
-    flags: EnumSet<FlagsE>,
+    _flags: EnumSet<FlagsE>,
     target: &P,
     dst_tree: &Decompressible<&NoSpaceStore<'_, '_>, &mut DecompressedTree>,
     current_tr: IdN,

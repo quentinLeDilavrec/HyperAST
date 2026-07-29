@@ -1,5 +1,6 @@
-use hyperast::store::nodes::fetched::{self, NodeIdentifier};
-use hyperast::store::nodes::{self};
+use hyperast::store::nodes;
+use hyperast::store::nodes::fetched;
+use hyperast::store::nodes::fetched::NodeIdentifier;
 use hyperast::store::{defaults, labels::label_id_from_usize};
 use hyperast::types::{Childrn, WithChildren, WithSerialization, WithStats};
 use hyperast_vcs_git::TStore;
@@ -43,8 +44,7 @@ pub struct FetchedNodes {
     node_store: fetched::SimplePacked<&'static str>,
 }
 
-pub fn fetch(mut state: SharedState, path: Parameters) -> Result<FetchedNodes, String> {
-    let now = Instant::now();
+pub fn fetch(state: SharedState, path: Parameters) -> Result<FetchedNodes, String> {
     let Parameters {
         user,
         name,
@@ -208,7 +208,7 @@ fn resolve_in_file(
         }
         return Err(d);
     }
-    let Some(col) = col else {
+    let Some(_col) = col else {
         return Ok(d);
     };
     // TODO also use the col
@@ -231,7 +231,7 @@ pub fn fetch_with_node_ids<'a>(
             id
         })
         .collect();
-    let mut get_mut = state;
+    let get_mut = state;
     let repositories = get_mut.repositories.read().unwrap();
 
     let node_store = extract_nodes(
@@ -260,9 +260,9 @@ pub fn fetch_labels<'a>(
 
         label_id_from_usize(id).unwrap()
     });
-    let mut get_mut = state;
+    let get_mut = state;
     let repositories = get_mut.repositories.read().unwrap();
-    let node_store = &repositories.processor.main_stores.node_store;
+    // let node_store = &repositories.processor.main_stores.node_store;
     let label_store = &repositories.processor.main_stores.label_store;
     use hyperast::types::LabelStore;
     let (label_ids, labels) = ids
@@ -282,7 +282,7 @@ pub fn fetch_labels<'a>(
 fn resolve_path<'a>(
     node_store: &hyperast::store::nodes::legion::NodeStore,
     root: defaults::NodeIdentifier,
-    mut path: impl Iterator<Item = &'a str>,
+    path: impl Iterator<Item = &'a str>,
 ) -> Result<defaults::NodeIdentifier, defaults::NodeIdentifier> {
     let mut curr = root;
     for i in path {

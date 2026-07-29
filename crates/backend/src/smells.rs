@@ -1,4 +1,3 @@
-use axum::Json;
 use hashbrown::HashSet;
 use hyperast::nodes::TextSerializer;
 use serde::{Deserialize, Serialize};
@@ -9,7 +8,7 @@ use hyper_diff::actions::Actions;
 use hyperast::position::TreePathMut;
 use hyperast::position::position_accessors::SolvedPosition;
 use hyperast::position::position_accessors::{RootedPosition, WithPreOrderOffsets};
-use hyperast::types::{Children, LabelStore, WithStats};
+use hyperast::types::Children;
 use hyperast_gen_ts_tsquery::code2query::QueryLattice;
 
 use crate::IdN;
@@ -187,8 +186,8 @@ pub fn smells(
 
     let More {
         timeout,
-        size_threshold,
-        shrink_threshold_factor,
+        size_threshold: _,
+        shrink_threshold_factor: _,
     } = more;
 
     let repo_handle = (state.repositories.read().unwrap())
@@ -281,7 +280,7 @@ pub fn smells(
 
         let size_threshold: usize = 400;
         let shrink_threshold_factor: usize = 75; // in percent
-        let mut size_threshold = |s| size_threshold.max(s * shrink_threshold_factor / 100);
+        let size_threshold = |s| size_threshold.max(s * shrink_threshold_factor / 100);
         poset_exploration::semi_interactive_poset_build(
             &mut b,
             &meta_simp,
@@ -305,14 +304,14 @@ pub fn smells(
     };
 
     // naive filtering
-    let bad: Vec<_> = query_lattice
+    let _bad: Vec<_> = query_lattice
         .iter_pretty()
         .filter(|x| 5 < x.1.len() && x.1.len() * 2 < ex_map.len())
         .map(|(s, x)| (s, std::borrow::Cow::Borrowed(x))) // enable additional selections
         .take(10000)
         .collect();
 
-    let mut graphs = {
+    let graphs = {
         let g = lattice::Prep::extract_and_group(&query_lattice);
         g.describe();
         let f = |x: &IdN| TextSerializer::new(sss, *x).to_string();
@@ -630,7 +629,7 @@ mod tests {
             size_threshold: 400,
             shrink_threshold_factor: 75,
         };
-        let res = smells(examples, state, param, more)?;
+        let _res = smells(examples, state, param, more)?;
         // for x in res.bad {
         //     eprintln!();
         //     eprintln!("{}", x.query);
@@ -653,11 +652,9 @@ pub const META_GEN: &str = r#"[
 /// experimenting with webgraph and graph compression
 mod graph_compression {
     use num::ToPrimitive;
-    use petgraph::graph::{Graph, NodeIndex};
-    use petgraph::visit::{EdgeCount, EdgeRef, NodeIndexable};
+    use petgraph::graph::Graph;
+    use petgraph::visit::EdgeRef;
 
-    // use webgraph::graphs::ImmutableGraph;
-    use webgraph::graphs::arc_list_graph::ArcListGraph;
     use webgraph::graphs::vec_graph::{LabeledVecGraph, VecGraph}; // VecGraph is an in-memory implementation
 
     pub fn petgraph_to_webgraph(g: &Graph<(), ()>) -> VecGraph {
@@ -705,17 +702,14 @@ mod graph_compression {
         println!("Webgraph has {} nodes", webg.num_nodes());
     }
 
+    use petgraph::Directed;
     use petgraph::csr::Csr;
-    use petgraph::{Directed, EdgeType};
-    use webgraph::graphs::csr_graph::{CompressedCsrGraph, CsrGraph};
-    use webgraph::labels::{Left, LeftIterator};
-    use webgraph::traits::{
-        NodeLabelsLender, RandomAccessLabeling, SequentialGraph, SequentialLabeling,
-        SortedIterator, UnitLabelGraph,
-    };
+    use webgraph::graphs::csr_graph::CompressedCsrGraph;
+    use webgraph::labels::Left;
+    use webgraph::traits::RandomAccessLabeling;
 
     pub fn graph_to_csr<N: Clone, E: Clone>(g: &Graph<N, E, Directed>) -> Csr<N, E, Directed> {
-        let node_count = g.node_count();
+        let _node_count = g.node_count();
         // let mut csr: Csr<(), _, Directed> = Csr::with_nodes(node_count);
         let mut csr: Csr<_, _, Directed> = Csr::new();
         g.node_weights().for_each(|n| {
@@ -770,8 +764,6 @@ mod graph_compression {
 
         let seq =
             LabeledVecGraph::from_arcs((0..csr.node_count().to_u32().unwrap()).flat_map(|u| {
-                use petgraph::adj::IndexType;
-                use petgraph::visit::IntoNeighbors;
                 csr.edges(u).map(|e| {
                     (
                         (e.source().to_usize().unwrap(), e.target() as usize),
@@ -802,8 +794,6 @@ mod graph_compression {
             serde_json::to_string(
                 &(0..csr.node_count().to_u32().unwrap())
                     .map(|u| {
-                        use petgraph::adj::IndexType;
-                        use petgraph::visit::IntoNeighbors;
                         csr.edges(u)
                             .map(|e| (e.target(), *e.weight() as i8))
                             .collect::<Vec<_>>()
@@ -817,11 +807,7 @@ mod graph_compression {
             "csr edges labels: {}",
             serde_json::to_string(
                 &(0..csr.node_count().to_u32().unwrap())
-                    .map(|u| {
-                        use petgraph::adj::IndexType;
-                        use petgraph::visit::IntoNeighbors;
-                        csr.edges(u).map(|e| *e.weight() as i8).collect::<Vec<_>>()
-                    })
+                    .map(|u| { csr.edges(u).map(|e| *e.weight() as i8).collect::<Vec<_>>() })
                     .collect::<Vec<_>>()
             )
             .unwrap()
@@ -831,19 +817,15 @@ mod graph_compression {
             "csr edges no lab: {}",
             serde_json::to_string(
                 &(0..csr.node_count().to_u32().unwrap())
-                    .map(|u| {
-                        use petgraph::adj::IndexType;
-                        use petgraph::visit::IntoNeighbors;
-                        csr.edges(u).map(|e| e.target()).collect::<Vec<_>>()
-                    })
+                    .map(|u| { csr.edges(u).map(|e| e.target()).collect::<Vec<_>>() })
                     .collect::<Vec<_>>()
             )
             .unwrap()
             .len()
         );
-        use lender::{IntoLender, Lender};
+        use lender::IntoLender;
         let seq = Left(seq);
-        let mut lender = seq.into_lender();
+        let lender = seq.into_lender();
         // while let Some((x, i)) = lender.next() {
         //     let s = i.into_iter().collect::<Vec<_>>();
         //     println!("{:?} {:?}", x, s);
@@ -866,8 +848,6 @@ mod graph_compression {
 
         let seq =
             LabeledVecGraph::from_arcs((0..csr.node_count().to_u32().unwrap()).flat_map(|u| {
-                use petgraph::adj::IndexType;
-                use petgraph::visit::IntoNeighbors;
                 csr.edges(u)
                     .map(|e| ((e.source().to_usize().unwrap(), e.target() as usize), ()))
             }));
@@ -897,11 +877,7 @@ mod graph_compression {
             "csr edges: {}",
             serde_json::to_string(
                 &(0..csr.node_count().to_u32().unwrap())
-                    .map(|u| {
-                        use petgraph::adj::IndexType;
-                        use petgraph::visit::IntoNeighbors;
-                        csr.edges(u).map(|e| (e.target(), ())).collect::<Vec<_>>()
-                    })
+                    .map(|u| { csr.edges(u).map(|e| (e.target(), ())).collect::<Vec<_>>() })
                     .collect::<Vec<_>>()
             )
             .unwrap()
@@ -911,11 +887,7 @@ mod graph_compression {
             "csr edges labels: {}",
             serde_json::to_string(
                 &(0..csr.node_count().to_u32().unwrap())
-                    .map(|u| {
-                        use petgraph::adj::IndexType;
-                        use petgraph::visit::IntoNeighbors;
-                        csr.edges(u).map(|e| ()).collect::<Vec<_>>()
-                    })
+                    .map(|u| { csr.edges(u).map(|e| ()).collect::<Vec<_>>() })
                     .collect::<Vec<_>>()
             )
             .unwrap()
@@ -925,19 +897,15 @@ mod graph_compression {
             "csr edges no lab: {}",
             serde_json::to_string(
                 &(0..csr.node_count().to_u32().unwrap())
-                    .map(|u| {
-                        use petgraph::adj::IndexType;
-                        use petgraph::visit::IntoNeighbors;
-                        csr.edges(u).map(|e| e.target()).collect::<Vec<_>>()
-                    })
+                    .map(|u| { csr.edges(u).map(|e| e.target()).collect::<Vec<_>>() })
                     .collect::<Vec<_>>()
             )
             .unwrap()
             .len()
         );
-        use lender::{IntoLender, Lender};
+        use lender::IntoLender;
         let seq = Left(seq);
-        let mut lender = seq.into_lender();
+        let _lender = seq.into_lender();
         // while let Some((x, i)) = lender.next() {
         //     let s = i.into_iter().collect::<Vec<_>>();
         //     println!("{:?} {:?}", x, s);
@@ -967,11 +935,7 @@ mod test_gen {
     use crate::IdN;
     use crate::smells;
     use crate::smells::ExMap;
-    use crate::smells::SearchResult;
-    use crate::smells::SearchResults;
-    use crate::smells::examples4idqs;
     use crate::smells::lattice;
-    use crate::smells::matching;
     use crate::smells::poset_exploration;
     use crate::smells::{Examples, More, Path};
 
@@ -1112,7 +1076,7 @@ mod test_gen {
         let state = state.clone();
         let path = path.clone();
         let more = more.clone();
-        let now = Instant::now();
+        // let now = Instant::now();
         let repo_spec = path.repo();
         let Path { commit, len, .. } = path;
         log::warn!("use len value={len}");
@@ -1123,7 +1087,7 @@ mod test_gen {
             simple_matching,
             prepro_matching,
         } = examples;
-        let prepro_matching = if simple_matching {
+        let _prepro_matching = if simple_matching {
             prepro_matching
         } else if prepro_matching {
             prepro_matching
@@ -1133,8 +1097,8 @@ mod test_gen {
 
         let More {
             timeout,
-            size_threshold,
-            shrink_threshold_factor,
+            size_threshold: _,
+            shrink_threshold_factor: _,
         } = more;
 
         let repo_handle = (state.repositories.read().unwrap())
@@ -1149,8 +1113,8 @@ mod test_gen {
             "done construction of {commits:?} commits in {}",
             repository.spec.user()
         );
-        let prepare_time = now.elapsed().as_secs_f64();
-        let now = Instant::now();
+        // let prepare_time = now.elapsed().as_secs_f64();
+        // let now = Instant::now();
         let src_oid = commits[0];
         let dst_oid = commits[1];
         use hyperast_vcs_git::processing::ConfiguredRepoTrait;
@@ -1213,8 +1177,8 @@ mod test_gen {
 
             if let Some(cid) = meta_simp.capture_index_for_name("uniq") {
                 dbg!();
-                let mut active_size = b.dedup.len() - 1;
-                let mut active: Vec<_> = b.actives(active_size);
+                let active_size = b.dedup.len() - 1;
+                let active: Vec<_> = b.actives(active_size);
                 let query_store = &b.lattice.query_store;
                 dbg!(active.len());
                 active.iter().for_each(|query| {
@@ -1230,15 +1194,15 @@ mod test_gen {
             }
             if let Some(cid) = meta_simp.capture_index_for_name("rm.all.full") {
                 dbg!();
-                let mut active_size = b.dedup.len() - 1;
-                let mut active: Vec<_> = b.actives(active_size);
+                let active_size = b.dedup.len() - 1;
+                let active: Vec<_> = b.actives(active_size);
                 let query_store = &b.lattice.query_store;
                 dbg!(active.len());
-                let mut res = active
+                let res = active
                     .iter()
                     .map(|query| {
                         let mut res = vec![];
-                        let mut pos =
+                        let pos =
                             hyperast::position::structural_pos::CursorWithPersistence::new(*query);
                         let cursor =
                             hyperast_tsquery::hyperast_opt::TreeCursor::new(query_store, pos);
@@ -1292,8 +1256,8 @@ mod test_gen {
             }
             if let Some(cid) = meta_simp.capture_index_for_name("rm") {
                 dbg!();
-                let mut active_size = b.dedup.len() - 1;
-                let mut active: Vec<_> = b.actives(active_size);
+                let active_size = b.dedup.len() - 1;
+                let active: Vec<_> = b.actives(active_size);
                 let query_store = &b.lattice.query_store;
                 dbg!(active.len());
                 let m = active
@@ -1311,8 +1275,8 @@ mod test_gen {
                 assert_eq!(m, vec![8, 8]);
             }
             {
-                let mut active_size = b.dedup.len() - 1;
-                let mut active: Vec<_> = b.actives(active_size);
+                let active_size = b.dedup.len() - 1;
+                let active: Vec<_> = b.actives(active_size);
                 let query_store = &b.lattice.query_store;
                 dbg!(active.len());
                 let m = active
@@ -1355,7 +1319,7 @@ mod test_gen {
 
             let size_threshold: usize = 400;
             let shrink_threshold_factor: usize = 75; // in percent
-            let mut size_threshold = |s| size_threshold.max(s * shrink_threshold_factor / 100);
+            let size_threshold = |s| size_threshold.max(s * shrink_threshold_factor / 100);
             poset_exploration::semi_interactive_poset_build(
                 &mut b,
                 &meta_simp,
@@ -1378,7 +1342,7 @@ mod test_gen {
             b.build()
         };
 
-        let mut graphs = {
+        let graphs = {
             let g = lattice::Prep::extract_and_group(&query_lattice);
             g.describe();
             let f = |x: &IdN| TextSerializer::new(sss, *x).to_string();

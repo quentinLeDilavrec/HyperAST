@@ -1,16 +1,13 @@
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, hash::Hash, ops::Deref, time::Instant};
+use std::{fmt::Debug, hash::Hash, time::Instant};
 
 use hyperast::position::structural_pos::PersistedNode;
-use hyperast::store::nodes::legion::NodeStoreInner;
-use hyperast::types::{HyperAST, HyperASTShared, LendT, NodeId, RoleStore};
+use hyperast::types::{HyperAST, LendT, NodeId, RoleStore};
 use hyperast::types::{WithPrecompQueries, WithRoles, WithSerialization, WithStats};
 use hyperast_vcs_git::{SimpleStores, preprocessed::child_at_path};
 
-use tree_sitter_graph::execution::lazy::execute_stmt_lazy;
-use tree_sitter_graph::graph::{NodeLending, NodesLending, QMatch, SyntaxNode, WithSynNodes};
-use tree_sitter_graph::{GenQuery, MatchLending, MatchesLending, MyQueryMatch};
+use tree_sitter_graph::graph::{NodeLending, SyntaxNode, WithSynNodes};
 
 use crate::SharedState;
 
@@ -154,9 +151,8 @@ pub fn simple(
     }))
 }
 
-use hyperast_tsquery::CaptureId;
+use hyperast_tsquery::hyperast_opt::tsg_impl::Node;
 use hyperast_tsquery::hyperast_opt::tsg_impl::QueryMatcher;
-use hyperast_tsquery::{Cursor, hyperast_opt::tsg_impl::Node};
 use tree_sitter_graph::Variables as Globals; // I prefer to avoid the aliasing done at the root of tsg
 use tree_sitter_graph::functions::Functions;
 
@@ -175,7 +171,6 @@ fn simple_aux(
     use hyperast::position::structural_pos::CursorWithPersistence as Pos;
     use hyperast_tsquery::hyperast_opt::TreeCursorNoRef as Cursor;
     use hyperast_tsquery::hyperast_opt::tsg_impl::MyQMatch as QMatch;
-    use tree_sitter_graph::graph;
 
     let now = Instant::now();
     let mut globals = Globals::new();
@@ -190,10 +185,10 @@ fn simple_aux(
 
     init_globals(&mut globals, &mut graph);
 
-    let mut functions = Functions::stdlib();
+    let functions = Functions::stdlib();
     // TODO add it back, or put it behind a feature
     // tree_sitter_stack_graphs::functions::add_path_functions(&mut functions);
-    let mut config = configure(&globals, &functions);
+    let config = configure(&globals, &functions);
 
     let cursor = Cursor::new(stores, Pos::new(code));
 
@@ -296,7 +291,6 @@ fn configure<'a, 'b, 'g, SNode, HAST>(
     globals: &'b Globals<'g>,
     functions: &'a Functions<Graph<SNode, HAST>>,
 ) -> tree_sitter_graph::ExecutionConfig<'a, 'g, 'b, Graph<SNode, HAST>> {
-    
     tree_sitter_graph::ExecutionConfig::new(functions, globals)
         .lazy(true)
         .debug_attributes(

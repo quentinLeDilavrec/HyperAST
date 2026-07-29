@@ -6,11 +6,9 @@ use hyperast::position::position_accessors;
 use hyperast::store::SimpleStores;
 use hyperast::types::PrimInt;
 use hyperast::types::UniformNodeId;
-use hyperast::types::{HyperAST, LendT, TypeStore};
+use hyperast::types::{HyperAST, LendT};
 use hyperast::types::{WithSerialization, WithStats};
-use hyperast_vcs_git::TStore;
 use hyperast_vcs_git::git::Oid;
-use hyperast_vcs_git::git::Repo;
 
 use crate::IdD;
 use crate::IdN;

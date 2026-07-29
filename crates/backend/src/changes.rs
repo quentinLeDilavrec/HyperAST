@@ -326,7 +326,6 @@ where
     HAST::IdN: std::hash::Hash + Debug,
 {
     use dashmap::mapref::entry::Entry;
-    use hyper_diff::matchers::heuristic::gt as matching;
     match mappings_alone.entry((
         mapper.src_arena.original(&mapper.src_arena.root()),
         mapper.dst_arena.original(&mapper.dst_arena.root()),
@@ -349,8 +348,6 @@ where
             };
 
             let now = std::time::Instant::now();
-
-            // matching::bottom_up_hiding(hyperast, &mm, mapper);
 
             use hyper_diff::matchers::heuristic::gt;
 
@@ -382,8 +379,6 @@ where
             };
 
             let now = std::time::Instant::now();
-
-            // matching::bottom_up_hiding(hyperast, &mm, mapper);
 
             use hyper_diff::matchers::heuristic::gt;
 

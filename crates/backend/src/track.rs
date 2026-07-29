@@ -1,9 +1,8 @@
 use axum::{Json, response::IntoResponse};
 use serde_aux::prelude::deserialize_bool_from_anything;
-use std::{fmt::Debug, thread::sleep, time::Duration};
+use std::fmt::Debug;
 use tokio::time::Instant;
 
-use hyperast::position::position_accessors;
 use hyperast::position::{compute_position_with_no_spaces, compute_range, resolve_range};
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
@@ -14,10 +13,10 @@ use hyperast_vcs_git::preprocessed::child_at_path_tracked;
 use hyperast_vcs_git::processing::ConfiguredRepo2 as ConfiguredRepo;
 use hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
+use crate::SharedState;
 use crate::changes::{DstChanges, SrcChanges, added_deleted};
 use crate::piece_of_code::{LocalPieceOfCode, PieceOfCode};
 use crate::utils::string_to_oid;
-use crate::{SharedState, track};
 
 mod compute;
 use compute::do_tracking;
@@ -279,7 +278,7 @@ pub(crate) fn track_code_at_path(
     let mut tracking = Tracker::at_path(&state, now, query, path);
     let mut ori_oid = None;
     while tracking.node_processed < MAX_NODES {
-        let commit = &tracking.commit;
+        let _commit = &tracking.commit;
         tracking.commits_processed += 1;
         let commits = (state.repositories.write().unwrap())
             .pre_process_with_limit(&mut repository, "", &tracking.commit.to_string(), 4)
@@ -321,7 +320,7 @@ pub(crate) fn track_code_at_path_with_changes(
     let mut ori_oid = None;
 
     while tracking.node_processed < MAX_NODES {
-        let commit = &tracking.commit;
+        let _commit = &tracking.commit;
         tracking.commits_processed += 1;
         let commits = (state.repositories.write().unwrap())
             .pre_process_with_limit(&mut repository, "", &tracking.commit.to_string(), 4)
@@ -472,6 +471,7 @@ fn handle_tracked(
         }
         MappingResult::Error(err) => Err(tracking.error(err))?,
         MappingResult::Skipped { nodes, src, next } => {
+            let _ = nodes;
             dbg!(&src);
             dbg!(&next);
             (src, Ok(next))
@@ -548,7 +548,7 @@ impl<IdN, Idx, T> From<Result<MappingResult<IdN, Idx, T>, String>> for MappingRe
     }
 }
 
-type RepoConfig = hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
+// type RepoConfig = hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle;
 
 fn track_aux(
     tracking: &mut Tracker,
@@ -589,7 +589,7 @@ impl Tracker {
             return Err("not found".into());
         };
         let mut path_to_target = vec![];
-        let (node, offsets_in_file) = resolve_range(file_node, start.unwrap_or(0), end, stores);
+        let (_node, offsets_in_file) = resolve_range(file_node, start.unwrap_or(0), end, stores);
         path_to_target.extend(offsets_to_file.iter().map(|x| *x as Idx));
         path_to_target.extend(offsets_in_file.iter().map(|x| *x as Idx));
         let computed_range = compute_range(file_node, &mut offsets_in_file.into_iter(), stores);
@@ -661,7 +661,7 @@ fn track_at_path_aux(
         flags,
         &target,
         dst_tr,
-        &|mut p| {
+        &|p| {
             // assert_eq!(p.path_ids.last(), Some(&dst_tr));
             // p.path_ids.push(dst_tr);
             p.globalize(&repo_handle.spec, dst_oid)

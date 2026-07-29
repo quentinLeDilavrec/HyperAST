@@ -1,6 +1,5 @@
 use hyperast_vcs_git::preprocessed::child_at_path;
 use serde::Deserialize;
-use tokio::time::Instant;
 
 use crate::{SharedState, utils};
 
@@ -13,7 +12,6 @@ pub struct FetchFileParam {
 }
 
 pub fn from_hyperast(state: SharedState, path: FetchFileParam) -> Result<String, String> {
-    let now = Instant::now();
     let FetchFileParam {
         user,
         name,

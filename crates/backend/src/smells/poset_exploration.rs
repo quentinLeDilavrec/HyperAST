@@ -3,7 +3,6 @@ use hyperast::position::position_accessors::SolvedPosition;
 use crate::smells::IdNQ;
 
 use super::IdN;
-use super::Idx;
 
 pub fn semi_interactive_poset_build<P>(
     b: &mut hyperast_gen_ts_tsquery::code2query::Builder<'_, P>,
@@ -23,10 +22,10 @@ pub fn semi_interactive_poset_build<P>(
         Removes2,
     }
 
-    type BySize<T> = Vec<T>;
-    type SimpEqResult = IdN;
-    type SimpEqSource = IdN;
-    type SimpEqedSet = Vec<(SimpEqResult, Vec<SimpEqSource>)>;
+    // type BySize<T> = Vec<T>;
+    // type SimpEqResult = IdN;
+    // type SimpEqSource = IdN;
+    // type SimpEqedSet = Vec<(SimpEqResult, Vec<SimpEqSource>)>;
     // let mut simp_eq_valid_by_construction: BySize<SimpEqedSet> = vec![];
 
     let mut too_slow = hyperast_gen_ts_tsquery::code2query::DedupBySize2::<
@@ -543,7 +542,7 @@ fn test_match_for_removes_not_matching() {
     let cid = meta_simp.capture_index_for_name("rm").unwrap();
     let full_node = tree_gen.generate_file(b"", text, tree.walk());
     let query = full_node.local.compressed_node;
-    let mut pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
+    let pos = hyperast::position::structural_pos::CursorWithPersistence::new(query);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(&query_store, pos);
     let mut matches = meta_simp.matches(cursor);
     loop {
@@ -552,7 +551,7 @@ fn test_match_for_removes_not_matching() {
         };
         dbg!(m.pattern_index);
         log::info!("found match {}", m.pattern_index.to_usize());
-        if let Some(p) = m.nodes_for_capture_index(cid).next() {
+        if let Some(_p) = m.nodes_for_capture_index(cid).next() {
             dbg!();
             return;
         }

@@ -75,7 +75,7 @@ pub struct ViewBoth {
 }
 
 pub fn view(state: SharedState, path: Parameters) -> Result<Json<ViewRes>, String> {
-    let now = Instant::now();
+    // let now = Instant::now();
     let Parameters {
         user,
         name,
@@ -104,10 +104,10 @@ pub fn view(state: SharedState, path: Parameters) -> Result<Json<ViewRes>, Strin
     let src_tr = commit_src.ast_root;
     dbg!(src_tr);
     let node_store = &repositories.processor.main_stores.node_store;
-    let label_store = &repositories.processor.main_stores.label_store;
+    // let label_store = &repositories.processor.main_stores.label_store;
 
     log::info!("searching for {path:?}");
-    let curr = resolve_path(src_tr, path, node_store);
+    // let curr = resolve_path(src_tr, path, node_store);
     todo!(
         "should deprecate or accomodate changes in type repr ie. lang + type btw. could allow paking as u16 like before"
     );
@@ -119,17 +119,16 @@ pub fn view(state: SharedState, path: Parameters) -> Result<Json<ViewRes>, Strin
 }
 
 pub fn view_with_node_id(state: SharedState, id: u64) -> Result<Json<ViewRes>, String> {
-    let now = Instant::now();
+    // let now = Instant::now();
     if id == 0 {
         return Err("wrong node id".into());
     }
     dbg!(&id);
     let id: NodeIdentifier = unsafe { std::mem::transmute(id) };
     dbg!(&id);
-    let mut get_mut = state;
-    let repositories = get_mut.repositories.read().unwrap();
-    let node_store = &repositories.processor.main_stores.node_store;
-    let label_store = &repositories.processor.main_stores.label_store;
+    let repositories = state.repositories.read().unwrap();
+    // let node_store = &repositories.processor.main_stores.node_store;
+    // let label_store = &repositories.processor.main_stores.label_store;
 
     todo!(
         "should deprecate or accomodate changes in type repr ie. lang + type btw. could allow paking as u16 like before"

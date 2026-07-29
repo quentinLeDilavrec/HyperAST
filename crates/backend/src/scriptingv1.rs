@@ -67,7 +67,7 @@ pub struct ComputeResultIdentified {
 }
 
 impl Display for ComputeResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -79,7 +79,7 @@ pub struct ComputeResults {
 }
 
 impl Display for ComputeResults {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -254,7 +254,7 @@ fn simple_aux(
     let repositories = state.repositories.read().unwrap();
     let commit_src = repositories.get_commit(&repo.config, commit_oid).unwrap();
     let src_tr = commit_src.ast_root;
-    let node_store = &repositories.processor.main_stores.node_store;
+    // let node_store = &repositories.processor.main_stores.node_store;
     // let size = node_store.resolve(src_tr).size();
     drop(repositories);
     macro_rules! ns {

@@ -5,82 +5,13 @@ use super::*;
 use hyper_diff::actions::action_tree::ActionsTree;
 use hyper_diff::actions::action_vec::ActionsVec;
 use hyper_diff::actions::script_generator2::Act;
-use hyper_diff::actions::script_generator2::ScriptGenerator;
 use hyper_diff::actions::script_generator2::SimpleAction;
-use hyper_diff::algorithms::DiffResult;
-use hyper_diff::decompressed_tree_store::bfs_wrapper::SimpleBfsMapper;
-use hyper_diff::decompressed_tree_store::complete_post_order_ref;
-use hyper_diff::matchers::Decompressible;
 use hyper_diff::tree::tree_path::CompressedTreePath;
 use hyperast::store::defaults::LabelIdentifier;
 use hyperast::store::defaults::NodeIdentifier;
 use hyperast::store::labels::LabelStore;
 use hyperast::types::HyperAST;
 use hyperast_vcs_git::no_space::NoSpaceWrapper;
-
-pub(crate) struct T;
-
-impl hyperast::types::Node for T {}
-
-impl hyperast::types::Stored for T {
-    type TreeId = NodeIdentifier;
-}
-
-impl<'a> hyperast::types::CLending<'a, u16, NodeIdentifier> for T {
-    type Children = hyperast::types::ChildrenSlice<'a, NodeIdentifier>;
-}
-
-impl hyperast::types::WithChildren for T {
-    type ChildIdx = u16;
-
-    // type Children<'a>
-    //     = hyperast::types::MySlice<NodeIdentifier>
-    // where
-    //     Self: 'a;
-
-    fn child_count(&self) -> Self::ChildIdx {
-        todo!()
-    }
-
-    fn child(
-        &self,
-        idx: &Self::ChildIdx,
-    ) -> Option<<Self::TreeId as hyperast::types::NodeId>::IdN> {
-        todo!()
-    }
-
-    fn child_rev(
-        &self,
-        idx: &Self::ChildIdx,
-    ) -> Option<<Self::TreeId as hyperast::types::NodeId>::IdN> {
-        todo!()
-    }
-
-    fn children(
-        &self,
-    ) -> Option<
-        hyperast::types::LendC<
-            '_,
-            Self,
-            Self::ChildIdx,
-            <Self::TreeId as hyperast::types::NodeId>::IdN,
-        >,
-    > {
-        todo!()
-    }
-}
-
-impl hyperast::types::Labeled for T {
-    type Label = LabelIdentifier;
-
-    fn get_label_unchecked(&self) -> &Self::Label {
-        todo!()
-    }
-
-    fn try_get_label(&self) -> Option<&Self::Label> {
-        todo!()
-    }
-}
 
 pub(crate) fn diff(
     state: std::sync::Arc<crate::AppState>,
@@ -120,6 +51,7 @@ pub(crate) fn diff(
     let actions = diff.actions.unwrap();
     dbg!(&actions.len());
 
+    #[allow(unused)]
     enum Choice {
         Del,
         Mov,
@@ -346,7 +278,7 @@ pub(crate) fn extract_updates<'a>(
         stores,
         &a_tree.atomics,
         hyperast::position::StructuralPosition::new(dst_tr),
-        &mut |p, nn, n, id| {
+        &mut |p, _nn, _n, id| {
             let t = stores.resolve_type(&id);
             dbg!(t.as_static_str(), p);
             result.push(p.clone());
@@ -375,6 +307,7 @@ pub(crate) fn extract_updates<'a>(
         })
         .map(|x| (x.clone(), x))
 }
+
 pub(crate) fn extract_updates2<'a>(
     with_spaces_stores: &'a hyperast::store::SimpleStores<hyperast_vcs_git::TStore>,
     stores: &'a Stores,
@@ -450,12 +383,11 @@ pub(crate) fn extract_inserts<'a>(
             a_tree.merge_ori(a);
         }
     }
-    use hyperast::types::HyperType;
     go_to_files(
         stores,
         &a_tree.atomics,
         hyperast::position::StructuralPosition::new(dst_tr),
-        &mut |p, nn, n, id| {
+        &mut |p, _nn, _n, _id| {
             result.push(p.clone());
             false
         },
@@ -512,7 +444,7 @@ pub(crate) fn extract_deletes<'a>(
         stores,
         &a_tree.atomics, // , &mapping
         hyperast::position::StructuralPosition::new(src_tr),
-        &mut |p, nn, n, id| {
+        &mut |p, _nn, _n, id| {
             let t = stores.resolve_type(&id);
             if t.is_syntax() {
                 return false;
@@ -576,7 +508,7 @@ pub(crate) fn extract_focuses<'a>(
             stores,
             &atomic,
             &hyperast::position::StructuralPosition::new(src_tr),
-            &mut |p, nn, n, id| {
+            &mut |p, _nn, n, id| {
                 if let Act::Delete { .. } = n.action.action {
                     if with_spaces_stores.resolve_type(&id).is_syntax() {
                         return false;
@@ -600,7 +532,7 @@ pub(crate) fn extract_focuses<'a>(
         let mut first_path = None;
         for m in moves {
             let a = &composed[m as usize];
-            let (to_path, x) = hyperast::position::path_with_spaces(
+            let (to_path, _x) = hyperast::position::path_with_spaces(
                 dst_tr,
                 &mut a.path.ori.iter(),
                 with_spaces_stores,
@@ -698,7 +630,6 @@ where
         };
         let id = path.node();
         let nn = stores.node_store.resolve(id);
-        use hyperast::types::TypeStore;
         let t = stores.resolve_type(&id);
         use hyperast::types::HyperType;
         // dbg!(t.as_static_str());
@@ -762,7 +693,6 @@ pub(crate) fn got_through<F>(
 
 #[cfg(test)]
 mod tests {
-    use hyperast::types::{HyperType, WithChildren};
     use hyperast_vcs_git::preprocessed::child_by_name_with_idx;
 
     use super::*;
@@ -776,7 +706,6 @@ mod tests {
         let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
         let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
         let commit = "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde";
-        let language = "Java";
 
         let state = crate::AppState::default();
         state
@@ -801,7 +730,6 @@ mod tests {
             .unwrap()
             .pre_process_with_limit(&mut repository, "", &commit, 4)
             .map_err(|e| e.to_string())?;
-        let now = Instant::now();
         log::warn!(
             "done construction of {commits:?} in {}",
             repository.spec.user()
@@ -912,7 +840,7 @@ mod tests {
         // let stores = stores.change_type_store::<hyperast_gen_ts_java::types::TStore>();
         let stores = &hyperast_vcs_git::no_space::as_nospaces(&stores);
 
-        let mut diff = hyper_diff::algorithms::gumtree_stable_hybrid_lazy::diff(
+        let diff = hyper_diff::algorithms::gumtree_stable_hybrid_lazy::diff(
             // hyper_diff::algorithms::gumtree_stable_lazy::diff(
             stores, &src_tr, &dst_tr,
         );
@@ -929,8 +857,8 @@ mod tests {
                     .compute_pos_pre_order::<_, Pos2<IdN, Idx>>();
                 eprintln!("{}", TextSerializer::new(stores, p.node()));
             }
-            Act::MovUpd { from, new } => eprint!("mup "),
-            Act::Insert { sub } => eprint!("ins "),
+            Act::MovUpd { from: _, new: _ } => eprint!("mup "),
+            Act::Insert { sub: _ } => eprint!("ins "),
         });
         eprintln!();
 

@@ -184,7 +184,6 @@ pub fn subtree(
 
     let repo = state.repositories.read().unwrap();
     let stores = &repo.processor.main_stores;
-    let n = stores.resolve(&id);
 
     let mut counts = vec![0; query.enabled_pattern_count()];
     let names = (0..query.capture_count())
@@ -339,7 +338,7 @@ pub fn streamed(mut state: SharedState, path: Param, content: Content) -> axum::
 
     let mut headers = HeaderMap::new();
 
-    let language: tree_sitter::Language =
+    let _language: tree_sitter::Language =
         match hyperast_vcs_git::resolve_language(&content.language) {
             Some(x) => x,
             None => {
@@ -522,9 +521,13 @@ fn pre_query(
     content: &Content,
     repo_config: hyperast_vcs_git::processing::erased::ParametrizedCommitProcessorHandle,
 ) -> Result<hyperast_tsquery::Query, QueryingError> {
-    let Param { user, name, commit } = path.clone();
+    let Param {
+        user: _,
+        name: _,
+        commit,
+    } = path.clone();
     let mut additional = commit.split("/");
-    let commit = additional.next().unwrap();
+    let _commit = additional.next().unwrap();
     let Content {
         language,
         query,
@@ -533,7 +536,7 @@ fn pre_query(
         max_matches: _,
         timeout: _,
     } = &content;
-    let config = if language == "Java" {
+    let _config = if language == "Java" {
         hyperast_vcs_git::processing::RepoConfig::JavaMaven
     } else if language == "Cpp" {
         hyperast_vcs_git::processing::RepoConfig::CppMake
@@ -1123,7 +1126,7 @@ fn differential_filter(
     current_tr: IdN,
     other_tr: IdN,
     stores: &SimpleStores<TStore>,
-    hyperast: &NoS,
+    _hyperast: &NoS,
     baseline_results: Vec<Position>,
     other_results: Vec<Position>,
     subtree_mappings: MultiVecStore<IdD>,
@@ -1242,7 +1245,7 @@ fn differential_aux(
     let pos = StructuralPosition::new(code);
     let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(stores, pos);
     let qcursor = query.matches(cursor);
-    let now = Instant::now();
+    // let now = Instant::now();
     let mut results = vec![];
     let mut result_names = vec![];
     let mut err_flags = DifferentialErrorFlags {
@@ -1258,7 +1261,7 @@ fn differential_aux(
         return (results, result_names, err_flags);
     };
     let name_cid = query.capture_index_for_name("name");
-    let mut missing_root_flagged = false;
+    // let mut missing_root_flagged = false;
     for m in qcursor {
         let i = m.pattern_index;
         let i = query.enabled_pattern_index(i).unwrap();
@@ -1279,8 +1282,8 @@ fn differential_aux(
             .collect::<Vec<_>>();
         results.push(pos);
         result_names.push(names);
-        let compute_time = now.elapsed();
+        // let compute_time = now.elapsed();
     }
-    let compute_time = now.elapsed().as_secs_f64();
+    // let compute_time = now.elapsed().as_secs_f64();
     (results, result_names, err_flags)
 }

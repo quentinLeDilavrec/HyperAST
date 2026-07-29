@@ -1,9 +1,7 @@
 use num::ToPrimitive;
-use petgraph::data::FromElements;
 use petgraph::visit::NodeCount;
 use serde::Serialize;
 
-use hyperast::position::StructuralPosition;
 use hyperast::types::WithStats;
 use hyperast_gen_ts_tsquery::code2query::QueryLattice;
 use hyperast_vcs_git::TStore;
@@ -406,7 +404,7 @@ fn _compress<F: Fn(&IdNQ) -> String>(
     // }
 }
 
-fn _uncompress(mut g: &_G) -> petgraph::Graph<IdN, ()> {
+fn _uncompress(g: &_G) -> petgraph::Graph<IdN, ()> {
     use num::Zero as _;
     let mut r = petgraph::Graph::<IdN, ()>::with_capacity(
         g.queries.len(),
@@ -671,7 +669,7 @@ fn print_topo_numbers<P, Bitset>(
         }
     }
     snd_lvl.sort_by_key(|x| (x.1, x.2));
-    let inits = dense_inits_counts.len();
+    let _inits = dense_inits_counts.len();
     for (qid, c, s) in snd_lvl {
         println!("---snd-----inits:{c}/{ex}-----size:{s}------",);
         if c > 1 {
@@ -1058,7 +1056,7 @@ impl<'g, N: Clone, E: Clone + 'static, G: Default> ToDag<'g, N, E, G> {
     fn new(graph: &'g petgraph::Graph<N, E>, g: G) -> Self {
         use petgraph::prelude::*;
         let toposort = petgraph::algo::toposort(&graph, None).expect("acyclic");
-        let (intermediate, revmap) =
+        let (intermediate, _revmap) =
             petgraph::algo::tred::dag_to_toposorted_adjacency_list(&graph, &toposort);
         let (reduction, _closure) =
             petgraph::algo::tred::dag_transitive_reduction_closure::<_, NodeIndex>(&intermediate);
@@ -1149,8 +1147,8 @@ fn to_dag<N: Clone, E: Clone + 'static>(graph: &petgraph::Graph<N, E>) -> petgra
         graph,
         petgraph::Graph::<N, E>::with_capacity(graph.node_count(), graph.edge_count()),
     );
-    while let Some(x) = td.advance_node(|w| w) {}
-    while let Some(x) = td.advance_edge(|w| w) {}
+    while let Some(_x) = td.advance_node(|w| w) {}
+    while let Some(_x) = td.advance_edge(|w| w) {}
     td.new_graph
     // dbg!();
     // use petgraph::prelude::*;
@@ -1252,6 +1250,7 @@ fn compress_webgraphs(g: Vec<petgraph::Graph<IdN, ()>>) -> Vec<_G> {
     }
     vec![]
 }
+
 fn compress_webgraph(g: petgraph::Graph<IdN, ()>) {
     super::graph_compression::compress(g);
 }
@@ -1263,6 +1262,7 @@ struct ExIt<'g> {
     ex_pretty: u32,
     it: std::ops::Range<usize>,
 }
+
 #[derive(Clone, Copy)]
 struct ExSet(u64);
 impl ExSet {
@@ -1270,6 +1270,7 @@ impl ExSet {
         self.0.count_ones()
     }
 }
+
 impl<'a> ExIt<'a> {
     fn new(content: &'a _G) -> Self {
         Self {
@@ -1281,6 +1282,7 @@ impl<'a> ExIt<'a> {
         }
     }
 }
+
 impl Iterator for ExIt<'_> {
     type Item = ExSet;
     fn next(&mut self) -> Option<Self::Item> {

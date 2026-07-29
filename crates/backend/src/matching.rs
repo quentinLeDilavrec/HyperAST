@@ -52,7 +52,7 @@ where
     mm
 }
 
-pub fn full<HAST: HyperAST + Copy>(hyperast: HAST, mapper: &mut LazyVecMapper<'_, HAST>)
+pub fn full<HAST: HyperAST + Copy>(_hyperast: HAST, mapper: &mut LazyVecMapper<'_, HAST>)
 where
     HAST::IdN: Clone + Debug + Eq,
     HAST::Label: Copy + Eq + Debug,
@@ -67,7 +67,6 @@ where
 }
 
 pub fn bottom_up_hiding<'a, 'b, 's: 'a, HAST: 's + HyperAST + Copy>(
-    hyperast: HAST,
     mm: &hyper_diff::mappings::MultiVecStore<IdD>,
     mapper: &'b mut LazyVecMapper<'a, HAST>,
 ) where
@@ -119,7 +118,6 @@ pub fn bottom_up_hiding<'a, 'b, 's: 'a, HAST: 's + HyperAST + Copy>(
 }
 
 pub fn bottom_up<'store, 'a, 'b, HAST: HyperAST + Copy>(
-    hyperast: HAST,
     mm: &hyper_diff::mappings::MultiVecStore<IdD>,
     mapper: &'b mut LazyVecMapper<'a, HAST>,
 ) where
@@ -135,7 +133,6 @@ pub fn bottom_up<'store, 'a, 'b, HAST: HyperAST + Copy>(
 }
 
 pub fn leveraging_method_headers<'store, 'a, 'b, HAST: HyperAST + Copy>(
-    hyperast: HAST,
     mapper: &'b mut LazyVecMapper<'a, HAST>,
 ) where
     HAST::IdN: Clone + Debug + Eq,
@@ -167,7 +164,7 @@ where
     let compute_multimapping_t = now.elapsed().as_secs_f64();
     dbg!(compute_multimapping_t);
     let now = std::time::Instant::now();
-    bottom_up_hiding(mapper.hyperast, &mm, mapper);
+    bottom_up_hiding(&mm, mapper);
     let bottom_up_hiding_t = now.elapsed().as_secs_f64();
     dbg!(bottom_up_hiding_t);
 }
@@ -226,7 +223,7 @@ pub fn full3<'store, 'a, 'b, HAST: HyperAST + Copy>(
     let compute_multimapping_t = now.elapsed().as_secs_f64();
     dbg!(compute_multimapping_t);
     let now = std::time::Instant::now();
-    bottom_up(hyperast, &mm, mapper);
+    bottom_up(&mm, mapper);
     let bottom_up_t = now.elapsed().as_secs_f64();
     dbg!(bottom_up_t);
 }

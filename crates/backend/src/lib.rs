@@ -1,10 +1,9 @@
 // #![feature(array_chunks)]
 // #![feature(map_many_mut)]
 // #![feature(iter_collect_into)]
-#![allow(unused)]
+// #![allow(unused)]
 use axum::body::Bytes;
 use dashmap::DashMap;
-use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
 use hyper_diff::mappings::VecStore;

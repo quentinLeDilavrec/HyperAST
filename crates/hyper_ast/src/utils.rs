@@ -277,3 +277,41 @@ impl std::fmt::Display for Url {
         write!(f, "{}://{}/{}", self.protocol, self.domain, self.path)
     }
 }
+
+pub(crate) struct ComposedIter<A, B>(Option<A>, Option<B>);
+impl<A, B> ComposedIter<A, B> {
+    pub fn new(a: A, b: B) -> Self {
+        ComposedIter(Some(a), Some(b))
+    }
+}
+impl<A: Iterator, B: Iterator<Item = A::Item>> Iterator for ComposedIter<A, B> {
+    type Item = A::Item;
+    fn next(&mut self) -> Option<Self::Item> {
+        and_then_or_clear(&mut self.0, Iterator::next).or_else(|| self.1.as_mut()?.next())
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let x = self.0.as_ref().map_or((0, Some(0)), Iterator::size_hint);
+        let y = self.1.as_ref().map_or((0, Some(0)), Iterator::size_hint);
+        (x.0 + y.0, Some(x.1.unwrap() + y.1.unwrap()))
+    }
+}
+impl<A: DoubleEndedIterator, B: DoubleEndedIterator<Item = A::Item>> DoubleEndedIterator
+    for ComposedIter<A, B>
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        and_then_or_clear(&mut self.1, DoubleEndedIterator::next_back)
+            .or_else(|| self.0.as_mut()?.next_back())
+    }
+}
+impl<A: ExactSizeIterator, B: ExactSizeIterator<Item = A::Item>> ExactSizeIterator
+    for ComposedIter<A, B>
+{
+}
+
+fn and_then_or_clear<T, U>(opt: &mut Option<T>, f: impl FnOnce(&mut T) -> Option<U>) -> Option<U> {
+    let x = f(opt.as_mut()?);
+    if x.is_none() {
+        *opt = None;
+    }
+    x
+}

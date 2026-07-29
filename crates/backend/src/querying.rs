@@ -1,4 +1,4 @@
-use axum::{Json, response::IntoResponse};
+use axum::response::IntoResponse;
 use http::{HeaderMap, StatusCode};
 use hyperast::position::structural_pos::CursorHead;
 use hyperast_tsquery::CaptureId;
@@ -8,16 +8,12 @@ use std::time::Instant;
 use hyperast_vcs_git::git::Oid;
 
 use hyper_diff::decompressed_tree_store::ShallowDecompressedTreeStore;
-use hyper_diff::decompressed_tree_store::lazy_post_order::LazyPostOrder;
-use hyper_diff::mappings::mapping_store::MultiMappingStore;
 use hyper_diff::mappings::{MappingStore, MultiVecStore, VecStore};
 use hyper_diff::matchers::{Decompressible, Mapper, Mapping};
 use hyper_diff::similarity_metrics::SimilarityMeasure;
 use hyperast::nodes::TextSerializer;
-use hyperast::position::position_accessors::{
-    SolvedPosition, WithFullPostOrderPath, WithPreOrderOffsets,
-};
-use hyperast::position::{StructuralPosition, compute_position_and_nodes};
+use hyperast::position::StructuralPosition;
+use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types::{HyperAST, HyperType, WithStats};
@@ -25,8 +21,7 @@ use hyperast_vcs_git::TStore;
 
 use crate::piece_of_code::{LocalPieceOfCode, PieceOfCode, Position};
 use crate::utils::{Arena, NoS, remap};
-use crate::{IdD, SharedState};
-use crate::{IdN, Idx};
+use crate::{IdD, IdN, SharedState};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Param {
@@ -645,7 +640,6 @@ fn aux_opt128<T>(
     mut ex: impl FnMut(usize) -> Option<T>,
 ) -> Option<T> {
     let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
-    use hyperast_opt::opt9_parent_types::PersistCursor;
     use hyperast_tsquery::hyperast_opt;
     let cursor = hyperast_opt::TreeCursor::new(stores, pos);
     let qcursor = query.matches(cursor);
@@ -985,7 +979,7 @@ pub fn differential(
             .map(|a| remap(stores, a, &mut mapper.src_arena, current_tr))
             .collect::<Vec<_>>();
         baseline_candidates.sort();
-        let mut other_candidates = (other_results.iter())
+        let other_candidates = (other_results.iter())
             .map(|a| remap(stores, a, &mut mapper.dst_arena, other_tr))
             .collect::<hashbrown::HashSet<_>>();
         for a in &baseline_candidates {
@@ -1025,7 +1019,7 @@ pub fn differential(
                 mapper.mappings.link(a, best);
             }
         }
-        diferential_filter(
+        differential_filter(
             &repo,
             baseline,
             commit,
@@ -1058,7 +1052,7 @@ pub fn differential(
             mapper.mappings.len(),
         );
 
-        diferential_filter(
+        differential_filter(
             &repo,
             baseline,
             commit,
@@ -1122,7 +1116,7 @@ pub fn differential(
     Ok(result)
 }
 
-fn diferential_filter(
+fn differential_filter(
     repo: &hyperast_vcs_git::processing::ConfiguredRepo2,
     baseline: Oid,
     commit: Oid,

@@ -219,6 +219,7 @@ pub mod bottom_up {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CompoundPositionPreparer<A, B>(pub A, pub B);
 
 mod impl_c_p_p_receivers2 {

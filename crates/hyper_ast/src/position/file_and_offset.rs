@@ -23,6 +23,9 @@ impl<F, T: PrimInt> Position<F, T> {
     pub fn range(&self) -> std::ops::Range<T> {
         self.offset..(self.offset + self.len)
     }
+    pub fn with_root<IdN>(self, root: IdN) -> super::rooted_wrapper::RootedWrapper<IdN, Self> {
+        super::rooted_wrapper::RootedWrapper::new(root, self)
+    }
 }
 impl<F: Eq, T: PrimInt> Position<F, T> {
     pub fn try_merge(&mut self, other: Position<F, T>) {

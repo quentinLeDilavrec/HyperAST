@@ -24,7 +24,7 @@ macro_rules! show {
         match $val {
             tmp => {
                 eprintln!(
-                    "{:>22} = {:#?}",
+                    "{:>22} = {:?}",
                     format!("{} {}", stringify!($f), stringify!($val)),
                     &&tmp as &dyn std::fmt::Debug,
                 );

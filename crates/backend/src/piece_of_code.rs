@@ -1,14 +1,7 @@
-use dashmap::SharedValue;
-use num::ToPrimitive;
-
-use hyper_diff::decompressed_tree_store::{Shallow, lazy_post_order};
 use hyperast::position::position_accessors;
-use hyperast::store::{SimpleStores, defaults::NodeIdentifier};
+use hyperast::store::SimpleStores;
 use hyperast::types::PrimInt;
-use hyperast::types::UniformNodeId;
-use hyperast::types::{HyperAST, LendT, TypeStore};
-use hyperast::types::{WithSerialization, WithStats};
-use hyperast_vcs_git::TStore;
+use hyperast::types::TypeStore;
 use hyperast_vcs_git::git::Oid;
 use hyperast_vcs_git::git::Repo;
 
@@ -48,14 +41,6 @@ pub struct LocalPieceOfCode<IdN, Idx> {
     pub path_ids: Vec<IdN>,
 }
 
-impl<'a, S, IdN: Clone, Idx: Clone> From<(&S, &'a LocalPieceOfCode<IdN, Idx>)>
-    for LocalPieceOfCode<IdN, Idx>
-{
-    fn from((_, p): (&S, &'a LocalPieceOfCode<IdN, Idx>)) -> Self {
-        p.clone()
-    }
-}
-
 impl<Idx> LocalPieceOfCode<IdN, Idx> {
     pub(crate) fn from_root_and_offsets<TS: TypeStore>(
         stores: &SimpleStores<TS>,
@@ -67,10 +52,48 @@ impl<Idx> LocalPieceOfCode<IdN, Idx> {
     {
         use hyperast::position::compute_position_and_nodes;
         let (pos, path_ids) = compute_position_and_nodes(root, &mut path.iter().copied(), stores);
+        let _rooted_offsets =
+            hyperast::position::Offsets::from_iterator(path.iter().copied().map(|x| x.cast()))
+                .with_root(root);
         let offsets = path.into_iter().map(|x| x.cast()).collect();
+        let _compound = _rooted_offsets
+            .with_store(stores)
+            .compute_pos_pre_order::<_, hyperast::position::CompoundPositionPreparer<
+            hyperast::position::Position,
+            hyperast::position::offsets_and_nodes::StructuralPosition<_, _>,
+        >>();
+
+        let _pos = _compound.0;
+        assert_eq!(_pos, pos);
+        let _path_ids = _compound.1;
+        assert_eq!(
+            _path_ids.iter_nodes().skip(1).rev().collect::<Vec<_>>(),
+            path_ids
+        );
+
+        if cfg!(debug_assertion) {
+            let from_offsets_and_nodes = pos
+                .clone()
+                .with_root(root)
+                .with_store(stores)
+                .compute_pos_file_and_offset::<_, hyperast::position::CompoundPositionPreparer<
+                hyperast::position::Position,
+                hyperast::position::offsets_and_nodes::StructuralPosition<_, _>,
+            >>();
+            assert_eq!(pos, from_offsets_and_nodes.0);
+            assert_eq!(
+                path_ids,
+                (from_offsets_and_nodes.1.iter_nodes())
+                    .skip(1)
+                    .rev()
+                    .collect::<Vec<_>>()
+            );
+        }
+
         Self::from_position(&pos, offsets, path_ids)
     }
 }
+
 impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
     pub(crate) fn from_position(
         pos: &hyperast::position::Position,
@@ -97,6 +120,7 @@ impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
             path_ids,
         }
     }
+    #[allow(unused)]
     pub(crate) fn from_pos<P>(pos: &P) -> Self
     where
         P: position_accessors::WithOffsets<Idx = Idx>
@@ -123,6 +147,7 @@ impl<IdN, Idx> LocalPieceOfCode<IdN, Idx> {
             end: self.end,
         }
     }
+    #[allow(unused)]
     fn map_path<Idx2, F: Fn(Idx) -> Idx2>(self, f: F) -> LocalPieceOfCode<IdN, Idx2> {
         let path = self.path.into_iter().map(f).collect();
         LocalPieceOfCode {

@@ -1,13 +1,16 @@
 use std::fmt::Debug;
 
-use super::{TreePath, TreePathMut, position_accessors, tags};
 use crate::PrimInt;
-use crate::types::{HyperAST, NodeId, NodeStore as _, Tree as _, WithChildren as _};
+use crate::types::{HyperAST, NodeId};
+use crate::types::{NodeStore as _, Tree as _, WithChildren as _};
+
+use super::{TreePath, TreePathMut, position_accessors, tags};
 
 /// BottomUp content
 #[derive(Clone)]
 pub struct StructuralPosition<IdN, Idx, Config = tags::TopDownFull> {
     pub(super) parents: Vec<IdN>, //parents? // most likely parents
+    // zeros are used as a marker
     pub(super) offsets: Vec<Idx>,
     _phantom: std::marker::PhantomData<Config>,
 }
@@ -277,7 +280,7 @@ impl<IdN: Copy, Idx: PrimInt> TreePathMut<IdN, Idx> for StructuralPosition<IdN, 
         use num::one;
         self.parents.push(node);
         // self.offsets.push(i);
-        // TODO remove or justify usage right here
+        // the zero is used as a marker elsewhere
         self.offsets.push(i + one());
     }
 
@@ -391,11 +394,7 @@ impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets
     for SolvedStructuralPosition<IdN, Idx>
 {
     fn iter(&self) -> impl Iterator<Item = Self::Idx> {
-        self.offsets[1..]
-            .iter()
-            .rev()
-            .cloned()
-            .map(|o| o - num::one())
+        self.offsets.iter().rev().cloned().map(|o| o - num::one())
     }
 }
 
@@ -403,8 +402,13 @@ impl<IdN: Copy, Idx: PrimInt> position_accessors::WithPostOrderPath<IdN>
     for SolvedStructuralPosition<IdN, Idx>
 {
     fn iter_offsets_and_parents(&self) -> impl Iterator<Item = (Self::Idx, IdN)> {
-        position_accessors::WithPostOrderOffsets::iter(self)
-            .zip(self.parents.iter().rev().skip(1).cloned())
+        position_accessors::WithPostOrderOffsets::iter(self).zip(self.parents.iter().rev().cloned())
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> SolvedStructuralPosition<IdN, Idx> {
+    pub fn iter_nodes(&self) -> impl DoubleEndedIterator<Item = IdN> + ExactSizeIterator {
+        crate::utils::ComposedIter::new(self.parents.iter().map(|x| *x), [self.node].into_iter())
     }
 }
 
@@ -463,7 +467,7 @@ mod impl_c_p_p_receivers {
     use building::bottom_up;
     use building::top_down;
 
-    impl<IdN, Idx: PrimInt, C> top_down::CreateBuilder<IdN> for StructuralPosition<IdN, Idx, C> {
+    impl<IdN, Idx, C> top_down::CreateBuilder<IdN> for StructuralPosition<IdN, Idx, C> {
         fn create(_root: IdN) -> Self {
             Self {
                 offsets: vec![],
@@ -480,18 +484,20 @@ mod impl_c_p_p_receivers {
         }
     }
 
-    impl<IdN, Idx> top_down::ReceiveIdx<Idx, Self> for StructuralPosition<IdN, Idx, tags::TopDownFull> {
+    impl<IdN, Idx: PrimInt> top_down::ReceiveIdx<Idx, Self>
+        for StructuralPosition<IdN, Idx, tags::TopDownFull>
+    {
         fn push(mut self, idx: Idx) -> Self {
-            self.offsets.push(idx);
+            self.offsets.push(idx + num::one());
             self
         }
     }
 
-    impl<IdN, Idx> top_down::ReceiveIdx<Idx, Self>
+    impl<IdN, Idx: PrimInt> top_down::ReceiveIdx<Idx, Self>
         for StructuralPosition<IdN, Idx, tags::BottomUpFull>
     {
         fn push(mut self, idx: Idx) -> Self {
-            self.offsets.insert(0, idx);
+            self.offsets.insert(0, idx + num::one());
             self
         }
     }
@@ -512,11 +518,11 @@ mod impl_c_p_p_receivers {
         }
     }
 
-    impl<IdN, Idx> top_down::ReceiveIdxNoSpace<Idx, Self>
+    impl<IdN, Idx: PrimInt> top_down::ReceiveIdxNoSpace<Idx, Self>
         for StructuralPosition<IdN, Idx, tags::TopDownNoSpace>
     {
         fn push(mut self, idx: Idx) -> Self {
-            self.offsets.push(idx);
+            self.offsets.push(idx + num::one());
             self
         }
     }
@@ -528,6 +534,7 @@ mod impl_c_p_p_receivers {
     //         self.solved(node)
     //     }
     // }
+
     impl<IdN, Idx: PrimInt, C> top_down::SetNode<IdN, SolvedStructuralPosition<IdN, Idx, C>>
         for StructuralPosition<IdN, Idx, C>
     {

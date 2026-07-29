@@ -162,9 +162,9 @@ where
             };
             let n = stores.resolve(&x);
             let cs = n.children().unwrap();
-            let c = cs
-                .get(o)
-                .unwrap_or_else(|| panic!("{}", stores.resolve_type(&x).as_static_str()));
+            let Some(c) = cs.get(o) else {
+                panic!("{}", stores.resolve_type(&x).as_static_str());
+            };
             let parent = x;
             x = *c;
             let idx = o;
@@ -237,7 +237,7 @@ where
         let file = file.as_ref();
         let start = self.src.inner().range().start;
         let end = Some(self.src.inner().range().end);
-        let mut file = file.split("/");
+        let mut it = file.split("/");
 
         let mut builder: B = top_down::CreateBuilder::create(root);
 
@@ -246,15 +246,20 @@ where
         use top_down::ReceiveIdx;
         use top_down::ReceiveParent;
 
-        // use crate::position::computing_path::child_at_path_with_offsets;
-        // let (file_node, path) = child_at_path_with_offsets(stores, root, file).unwrap();
+        // # child_at_path_with_offsets(stores, root, file).unwrap();
         let mut x = root;
-        loop {
-            if stores.resolve_type(&x).is_file() {
-                break;
+        let mut builder = loop {
+            let ty = stores.resolve_type(&x);
+            if ty.is_file() {
+                let n = stores.resolve(&x);
+                let file_name = stores.label_store().resolve(n.get_label_unchecked());
+                break builder.set_file_name(file_name);
             }
-            let Some(name) = file.next() else {
-                return builder.set_node(x);
+            let Some(name) = it.next() else {
+                if ty.is_directory() {
+                    return builder.set_node(x);
+                }
+                break builder.transit();
             };
             if name.trim().is_empty() {
                 continue;
@@ -264,20 +269,19 @@ where
             let idx = num::cast(cbn.1).unwrap();
             let parent = x;
             x = cbn.0;
+            if stores.resolve_type(&x).is_file() {
+                let file_name = dir_name;
+                break builder.set_file_name(file_name);
+            }
             builder = builder.push(parent).push(idx).push(dir_name);
-        }
+        };
 
-        let n = stores.resolve(&x);
-        let file_name = stores.label_store().resolve(n.get_label_unchecked());
-        let mut builder = builder.set_file_name(file_name);
-
-        // let (node, offsets_in_file) = crate::position::resolve_range(file_node, start, end, stores);
+        // # crate::position::resolve_range(file_node, start, end, stores);
         let start = start;
         let mut offset = 0;
         let mut x = x; // node
-        // let mut offsets = vec![]; // offsets_in_file
-        'main: loop {
-            dbg!();
+        // go down
+        'down: loop {
             let mut no_s_idx = zero();
             let mut bytes = zero();
             let mut idx1 = zero();
@@ -285,57 +289,79 @@ where
             let parent = x;
             let b = stores.resolve(&x);
             let Some(cs) = b.children() else {
+                dbg!();
                 break;
             };
             use crate::types::Childrn;
             if cs.is_empty() {
+                dbg!();
                 break;
             };
             let mut cs = cs.enumerate();
-            loop {
+            // go right
+            'right: loop {
                 let Some((y, child_id)) = cs.next() else {
                     break;
                 };
                 idx1 = num::cast(y).unwrap();
-                if !stores.resolve_type(&child_id).is_spaces() {
+                let ty = stores.resolve_type(&child_id);
+                if !ty.is_spaces() {
                     no_s_idx += one();
                 }
                 let b = stores.resolve(&child_id);
                 let line_count = b.line_count();
                 let len = b.try_bytes_len().unwrap_or(0);
                 rows += line_count;
-                bytes += len;
                 // dbg!(offset, len, start, idx1);
-                if offset < start {
-                    // not yet reached something
+                if let Some(end) = end
+                    && offset < start
+                    && end <= offset + len
+                {
+                    // inside
+                    dbg!(offset, len, start, end);
+                    x = child_id;
+                    break 'right;
+                } else if offset < start {
+                    // not yet reached far enough sibling
+                    dbg!(offset, len, start, end);
                 } else if let Some(end) = end
-                    && offset + len <= end
+                    && offset + len < end
+                {
+                    // inside
+                    dbg!(offset, len, start, end);
+                    x = child_id;
+                    break 'right;
+                } else if let Some(end) = end
+                    && offset + len == end
+                    && !(ty.is_supertype() || ty.is_hidden())
                 {
                     // found
-                    dbg!();
+                    dbg!(ty, offset, len, start, end);
                     builder = builder
                         .push(parent)
                         .push(idx1)
                         .push(bytes)
                         .push(no_s_idx)
                         .push(rows);
-                    break 'main;
+                    x = child_id;
+                    break 'down;
                 } else if end.is_none() {
                     // cannot do better
                     // offsets.push(y);
-                    dbg!();
+                    dbg!(offset, len, start, end);
                     builder = builder
                         .push(parent)
                         .push(idx1)
                         .push(bytes)
                         .push(no_s_idx)
                         .push(rows);
-                    break 'main;
+                    break 'down;
                 } else {
-                    // offsets.push(y);
+                    dbg!(offset, len, start, end);
                     x = child_id;
-                    break;
+                    break 'right;
                 }
+                bytes += len;
                 offset += len;
             }
             use building::ReceiveRows;

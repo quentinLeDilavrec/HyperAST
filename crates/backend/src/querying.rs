@@ -1144,7 +1144,7 @@ fn differential_filter(
                 |node| mapper.mapping.mappings.is_src(&node),
                 |pos| {
                     let offsets = pos.1.clone();
-                    let pos = LocalPieceOfCode::from_root_and_offsets(stores, current_tr, offsets);
+                    let pos = LocalPieceOfCode::from_root_and_offsets(stores, current_tr, &offsets);
                     // let offsets = pos.1.iter().map(|x| *x as usize).collect();
                     // let (pos, path_ids) =
                     //     compute_position_and_nodes(current_tr, &mut pos.1.iter().copied(), stores);

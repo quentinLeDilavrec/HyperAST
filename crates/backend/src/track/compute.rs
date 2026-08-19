@@ -14,7 +14,7 @@ use hyper_diff::mappings::{MappingStore, MonoMappingStore, MultiMappingStore};
 use hyper_diff::matchers::{Decompressible, Mapper};
 
 use hyperast::position::position_accessors;
-use hyperast::position::{compute_position, compute_position_and_nodes, path_with_spaces};
+use hyperast::position::{compute_position, path_with_spaces};
 
 use hyperast_vcs_git::{TStore, multi_preprocessed};
 
@@ -208,12 +208,12 @@ where
     // RATIONAL: For now I consider that mapping roots is part of the hypothesis when tracking a value between a tree pair,
     //           it is not necessary for all mapping algorithms,
     //           but providing a fallback is still useful,
-    //           so that the user can descide if the element is really not there.
-    //           The disaperance of an element should probably be descibed using a window of versions.
+    //           so that the user can decide how to proceed when the element is really not there.
+    //           The disappearance of an element should probably be described using a window of versions.
     //           Actually, relaxing the mapping process could always find a match for a given code element.
     //           Moreover, a mapping algorithm does not give an absolute result (would not mean much),
     //           it is just a process that minimizes the number of actions to go from one version to the other.
-    //           In this context falling back to a clone detection approach seem more adapted.
+    //           In this context falling back to a clone detection approach seem more appropriate.
 
     // let path = path_to_target.clone();
     // let (target_pos, target_path_ids) = compute_position_and_nodes(
@@ -260,8 +260,7 @@ where
     dbg!(&path_ids);
     let path = path_with_spaces(other_tr, &mut path.iter().copied(), with_spaces_stores).0;
 
-    let (pos, _) = compute_position(other_tr, &mut path.iter().copied(), with_spaces_stores);
-    let fallback = LocalPieceOfCode::from_position(&pos, path, path_ids);
+    let fallback = LocalPieceOfCode::from_root_and_offsets(with_spaces_stores, other_tr, &path);
 
     postprocess_matching(fallback)
 }
@@ -399,11 +398,12 @@ where
     path_ids.extend(dst_tree.parents(mapped).map(|i| dst_tree.original(&i)));
     path_ids.pop();
 
-    assert_eq!(path_no_spaces.len(), path_ids.len());
+    debug_assert_eq!(path_no_spaces.len(), path_ids.len());
     let (path, _) = path_with_spaces(tr, &mut path_no_spaces.iter().copied(), with_spaces_stores);
     let offsets = &mut path.iter().copied();
-    let (pos, _mapped_node) = compute_position(tr, offsets, with_spaces_stores);
-    LocalPieceOfCode::from_position(&pos, path.clone(), path_ids.clone())
+    let r = LocalPieceOfCode::from_root_and_offsets(with_spaces_stores, tr, &path);
+    debug_assert_eq!(path_ids, r.path_ids);
+    r
 }
 
 const CONST_NODE_COUNTING: Option<usize> = Some(500_000);
@@ -587,7 +587,7 @@ where
         .map(|x| {
             assert_eq!(dst_tree.original(&dst_tree.root()), other_tr);
             let mut path_dst = dst_tree.path_rooted(x);
-            panic!("{path_dst:?} {path:?} {other_tr:?}");
+            // panic!("{path_dst:?} {path:?} {other_tr:?}");
             path_dst.extend(path); // WARN with similarity it might not be possible to simply concat path...
             let (path_dst, _) =
                 path_with_spaces(other_tr, &mut path_dst.iter().copied(), with_spaces_stores);
@@ -600,24 +600,28 @@ where
     MappingResult::Skipped { nodes, src, next }
 }
 
+/// with spaces
 fn compute_local(
     tr: IdN,
     path: &[super::Idx],
-    with_spaces_stores: &SimpleStores<TStore>,
+    store: &SimpleStores<TStore>,
 ) -> LocalPieceOfCode<IdN, super::Idx> {
-    let (pos, path_ids) =
-        compute_position_and_nodes(tr, &mut path.iter().copied(), with_spaces_stores);
-    let path = path.to_vec();
-    LocalPieceOfCode::from_position(&pos, path, path_ids)
+    // let (pos, path_ids) =
+    //     compute_position_and_nodes(tr, &mut path.iter().copied(), with_spaces_stores);
+    // let path = path.to_vec();
+    // LocalPieceOfCode::from_position(&pos, path, path_ids)
+    LocalPieceOfCode::from_root_and_offsets(store, tr, path)
 }
 
+/// with spaces
 fn compute_local2<P>(path: &P, store: &SimpleStores<TStore>) -> LocalPieceOfCode<IdN, super::Idx>
 where
     P: position_accessors::WithPreOrderOffsets<Idx = super::Idx>
         + position_accessors::RootedPosition<IdN>,
 {
     let tr = path.root();
-    let (pos, path_ids) = compute_position_and_nodes(tr, &mut path.iter_offsets(), store);
-    let path = path.iter_offsets().collect();
-    LocalPieceOfCode::from_position(&pos, path, path_ids)
+    // let (pos, path_ids) = compute_position_and_nodes(tr, &mut path.iter_offsets(), store);
+    let path: Vec<_> = path.iter_offsets().collect();
+    // LocalPieceOfCode::from_position(&pos, path, path_ids)
+    LocalPieceOfCode::from_root_and_offsets(store, tr, &path)
 }

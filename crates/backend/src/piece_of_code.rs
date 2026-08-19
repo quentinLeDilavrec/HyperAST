@@ -45,7 +45,7 @@ impl<Idx> LocalPieceOfCode<IdN, Idx> {
     pub(crate) fn from_root_and_offsets<TS: TypeStore>(
         stores: &SimpleStores<TS>,
         root: IdN,
-        path: Vec<impl PrimInt>,
+        path: &[impl PrimInt],
     ) -> Self
     where
         Idx: PrimInt,

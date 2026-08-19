@@ -276,7 +276,7 @@ fn make(acc: CppAcc, stores: &mut SimpleStores, cpp_proc: &mut CppProc) -> super
         .primary
         .map_metrics(|m| m.finalize(&interned_kind, &label_id));
     let hashable = primary.metrics.hashs.most_discriminating();
-    let eq = eq_node(&kind, Some(&label_id), &primary.children);
+    let eq = eq_node(&interned_kind, Some(&label_id), &primary.children);
     // let md_cache = &mut cpp_proc.cache.md_cache;
     let dedup = &mut cpp_proc.cache.dedup.0;
     let insertion = node_store.inner.prepare_insertion(dedup, &hashable, eq);

@@ -268,7 +268,7 @@ fn make(acc: RustAcc, stores: &mut SimpleStores, proc: &mut RustProc) -> super::
         .primary
         .map_metrics(|m| m.finalize(&interned_kind, &label_id));
     let hashable = primary.metrics.hashs.most_discriminating();
-    let eq = eq_node(&Type::Directory, Some(&label_id), &primary.children);
+    let eq = eq_node(&interned_kind, Some(&label_id), &primary.children);
     let md_cache = &mut proc.cache.md_cache;
     let dedup_cache = &mut proc.cache.dedup.0;
     let insertion = node_store

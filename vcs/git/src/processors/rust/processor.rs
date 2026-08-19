@@ -84,7 +84,10 @@ impl<'repo, 'b, 'd, 'c> Processor<RustAcc> for RustProcessor<'repo, 'b, 'd, 'c, 
         let holder = processor_map.commit_proc_mut::<RustProcessorHolder>();
         let proc = holder.with_parameters_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), proc);
-        proc.cache.object_map.insert(key, full_node.clone());
+        let old = proc.cache.object_map.insert(key, full_node.clone());
+        if let Some(old) = old {
+            debug_assert_eq!(full_node.id, old.id,);
+        }
         if self.stack.is_empty() {
             return Some(full_node);
         }

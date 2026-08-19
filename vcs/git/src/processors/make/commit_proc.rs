@@ -39,7 +39,10 @@ impl<'repo> crate::processing::erased::PreparedCommitProc for PreparedMakeCommit
         let handle = self.handle.try_into().unwrap();
         let oid = self.commit_builder.commit_oid();
         let commit = self.commit_builder.finish(root_full_node.id);
-        h.with_parameters_mut(handle).commits.insert(oid, commit);
+        let prev = h.with_parameters_mut(handle).commits.insert(oid, commit);
+        if let Some(prev) = prev {
+            assert_eq!(root_full_node.id, prev.ast_root,);
+        }
         root_full_node.id
     }
 }

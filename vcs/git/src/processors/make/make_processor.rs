@@ -101,16 +101,22 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MakeModuleAcc>
             log::debug!("not cpp source file {:?}", name.try_str());
         }
     }
+
     fn post(&mut self, oid: Oid, acc: MakeModuleAcc) -> Option<FullNode> {
         let name = acc.primary.name.clone();
         let full_node = Self::make(acc, self.prepro.main_stores_mut().mut_with_ts());
-        self.prepro
+        let old = self
+            .prepro
             .processing_systems
             .commit_proc_mut::<MakeProcessorHolder>()
             .with_parameters_mut(self.handle)
             .get_caches_mut()
             .object_map
             .insert(oid, full_node.clone());
+
+        if let Some(old) = old {
+            debug_assert_eq!(full_node.id, old.id,);
+        }
 
         let name = self.prepro.main_stores.label_store.get_or_insert(name);
         if self.stack.is_empty() {

@@ -107,7 +107,10 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
             .commit_proc_mut::<JavaProcessorHolder>();
         let java_proc = holder.with_parameters_mut(self.handle);
         let full_node = make(acc, self.prepro.main_stores.mut_with_ts(), java_proc);
-        java_proc.cache.object_map.insert(key, full_node.clone());
+        let old = java_proc.cache.object_map.insert(key, full_node.clone());
+        if let Some(old) = old {
+            debug_assert_eq!(full_node.id, old.id,);
+        }
         if self.stack.is_empty() {
             return Some(full_node);
         }

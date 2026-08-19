@@ -9,7 +9,7 @@ use crate::processors::file_sys::{FileSysAcc, FileSysProc};
 
 type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
 
-struct PreparedMakeCommitProc<'repo> {
+struct PreparedFileSysCommitProc<'repo> {
     repository: &'repo git2::Repository,
     commit_builder: CommitBuilder,
     dir_path: std::path::PathBuf,
@@ -17,9 +17,9 @@ struct PreparedMakeCommitProc<'repo> {
     pub(crate) handles: super::Parameter,
 }
 
-impl<'repo> PreparedCommitProc for PreparedMakeCommitProc<'repo> {
+impl<'repo> PreparedCommitProc for PreparedFileSysCommitProc<'repo> {
     fn process(
-        self: Box<PreparedMakeCommitProc<'repo>>,
+        self: Box<PreparedFileSysCommitProc<'repo>>,
         prepro: &mut RepositoryProcessor,
     ) -> hyperast::store::defaults::NodeIdentifier {
         let mut dir_path = self.dir_path.components().peekable();
@@ -62,7 +62,7 @@ impl crate::processing::erased::CommitProc for FileSysProc {
             unreachable!("caller of prepare_processing should properly dispatch")
         });
         let handles = self.parameter.clone();
-        Box::new(PreparedMakeCommitProc {
+        Box::new(PreparedFileSysCommitProc {
             repository,
             commit_builder,
             dir_path: path,

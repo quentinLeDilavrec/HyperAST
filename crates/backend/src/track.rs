@@ -42,24 +42,32 @@ impl TrackingParam {
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
-pub struct TrackingAtPathParam {
-    user: String,
-    name: String,
+pub struct TrackingAtPathParam<P = Vec<Idx>> {
+    pub user: String,
+    pub name: String,
     #[serde(deserialize_with = "string_to_oid")]
     #[serde(serialize_with = "oid_to_string")]
-    commit: Oid,
-    path: Option<String>,
+    pub commit: Oid,
+    pub path: P,
 }
 
 impl TrackingAtPathParam {
     pub fn repo(&self) -> Repo {
         hyperast_vcs_git::git::Forge::Github.repo(&self.user, &self.name)
     }
-    pub fn path<T: std::str::FromStr>(&self) -> Vec<T> {
-        (self.path.as_deref().unwrap_or_default())
-            .split("/")
-            .filter_map(|x| T::from_str(x).ok())
-            .collect()
+}
+
+impl<P> TrackingAtPathParam<P> {
+    pub fn map_path<P2, E>(
+        self,
+        f: impl FnOnce(P) -> Result<P2, E>,
+    ) -> Result<TrackingAtPathParam<P2>, E> {
+        Ok(TrackingAtPathParam {
+            user: self.user,
+            name: self.name,
+            commit: self.commit,
+            path: f(self.path)?,
+        })
     }
 }
 
@@ -395,7 +403,7 @@ impl Tracker {
         query: TrackingQuery,
         path: TrackingAtPathParam,
     ) -> Self {
-        let (path, commit) = (path.path(), path.commit);
+        let (path, commit) = (path.path, path.commit);
         Tracker {
             state: state.clone(),
             now,

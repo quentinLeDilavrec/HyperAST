@@ -380,23 +380,46 @@ async fn track_code(
     dbg!(&query);
     track::track_code(state, path, query)
 }
+
 async fn track_code_at_path(
-    axum::extract::Path(path): axum::extract::Path<track::TrackingAtPathParam>,
+    axum::extract::Path(path): axum::extract::Path<track::TrackingAtPathParam<String>>,
     axum::extract::State(state): axum::extract::State<SharedState>,
     axum::extract::Query(query): axum::extract::Query<track::TrackingQuery>,
-) -> impl IntoResponse {
+) -> Response {
     dbg!(&path);
     dbg!(&query);
-    track::track_code_at_path(state, path, query)
+    let path = path.map_path(|s| {
+        s.split("/")
+            .map(|x| x.parse::<u16>())
+            .collect::<Result<Vec<_>, _>>()
+    });
+    let path = match path {
+        Ok(path) => path,
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, e.to_string()).into_response();
+        }
+    };
+    track::track_code_at_path(state, path, query).into_response()
 }
 async fn track_code_at_path_with_changes(
-    axum::extract::Path(path): axum::extract::Path<track::TrackingAtPathParam>,
+    axum::extract::Path(path): axum::extract::Path<track::TrackingAtPathParam<String>>,
     axum::extract::State(state): axum::extract::State<SharedState>,
     axum::extract::Query(query): axum::extract::Query<track::TrackingQuery>,
-) -> impl IntoResponse {
+) -> Response {
     dbg!(&path);
     dbg!(&query);
-    track::track_code_at_path_with_changes(state, path, query)
+    let path = path.map_path(|s| {
+        s.split("/")
+            .map(|x| x.parse::<u16>())
+            .collect::<Result<Vec<_>, _>>()
+    });
+    let path = match path {
+        Ok(path) => path,
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, e.to_string()).into_response();
+        }
+    };
+    track::track_code_at_path_with_changes(state, path, query).into_response()
 }
 
 pub fn view_code_route(_st: SharedState) -> Router<SharedState> {

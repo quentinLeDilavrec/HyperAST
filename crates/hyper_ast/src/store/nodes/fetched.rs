@@ -392,7 +392,8 @@ where
 }
 
 macro_rules! variant_store {
-    ($id:ty, $rev:ty ; $($( #[$doc:meta] )* $c:ident => { $($d:ident : $e:ty),* $(,)?}),* $(,)?) => {
+    ($id:ty, $rev:ty ;
+     $($( #[$doc:meta] )* $c:ident => { $($d:ident : $e:ty),* $(,)?}[$($f:ident),* $(,)?]),* $(,)?) => {
         mod variants {
             use super::*;
 
@@ -405,6 +406,7 @@ macro_rules! variant_store {
                 pub(super) lang: StaticStr,
                 pub(super) rev: Vec<$rev>,
                 $(pub(super) $d: Vec<$e>,)*
+                $(pub(super) $f: bitvec::vec::BitVec<u32>,)*
             }
             impl $c{
                 pub(super) fn lang(lang: &'static str) -> Self {
@@ -412,7 +414,7 @@ macro_rules! variant_store {
                         lang,
                         rev: Default::default(),
                         $($d: Default::default(),)*
-
+                        $($f: Default::default(),)*
                     }
                 }
                 pub fn remove_if(&mut self, predicate: impl Fn(&$rev) -> bool) {
@@ -536,6 +538,32 @@ macro_rules! variant_store {
                     _=> unreachable!()
                 }
             }
+
+            fn clear_flags(&mut self) {
+                match self {$(
+                    Variant::$c{ entities: variants::$c{hidden, skipped, serialized, ..}, ..} => {
+                        *hidden = bitvec::vec::BitVec::EMPTY;
+                        *skipped = bitvec::vec::BitVec::EMPTY;
+                        *serialized = bitvec::vec::BitVec::EMPTY;
+                    },
+                )*}
+            }
+
+            pub fn set_hidden(&mut self, index: u32) {
+                match self {$(
+                    Variant::$c{entities: variants::$c{hidden, ..}, ..} => hidden.set(index as usize, true),
+                )*}
+            }
+            pub fn set_skipped(&mut self, index: u32) {
+                match self {$(
+                    Variant::$c{entities: variants::$c{skipped, ..}, ..} => skipped.set(index as usize, true),
+                )*}
+            }
+            pub fn set_serialized(&mut self, index: u32) {
+                match self {$(
+                    Variant::$c{entities: variants::$c{serialized, ..}, ..} => serialized.set(index as usize, true),
+                )*}
+            }
         }
         impl RawVariant {
             pub fn remove_if(&mut self, predicate: impl Fn(&$rev) -> bool) {
@@ -584,6 +612,27 @@ macro_rules! variant_store {
                     },
                 )*}
             }
+            pub fn is_hidden(&self) -> bool {
+                match self.s_ref {$(
+                    VariantRef::$c{ entities: variants::$c{hidden,..}, ..} => {
+                        hidden[self.index as usize]
+                    },
+                )*}
+            }
+            pub fn is_skipped(&self) -> bool {
+                match self.s_ref {$(
+                    VariantRef::$c{ entities: variants::$c{skipped,..}, ..} => {
+                        skipped[self.index as usize]
+                    },
+                )*}
+            }
+            pub fn is_serialized(&self) -> bool {
+                match self.s_ref {$(
+                    VariantRef::$c{ entities: variants::$c{serialized,..}, ..} => {
+                        serialized[self.index as usize]
+                    },
+                )*}
+            }
         }
         impl<'a,T> crate::types::WithStats for HashedNodeRef<'a,T> {
             fn size(&self) -> usize {
@@ -611,29 +660,28 @@ macro_rules! variant_store {
         }
     };
 }
-
 variant_store!(NodeIdentifier, NodeIdentifier;
     /// Just a leaf with a type
     Typed => {
         kind: u16,
         size: usize,
-    },
+    }[hidden, skipped, serialized],
     Labeled => {
         kind: u16,
         label: LabelIdentifier,
         size: usize,
-    },
+    }[hidden, skipped, serialized],
     Children => {
         kind: u16,
         children: Vec<NodeIdentifier>,
         size: usize,
-    },
+    }[hidden, skipped, serialized],
     Both => {
         kind: u16,
         children: Vec<NodeIdentifier>,
         label: LabelIdentifier,
         size: usize,
-    },
+    }[hidden, skipped, serialized],
 );
 
 // #[derive(Default)]
@@ -806,6 +854,23 @@ impl NodeStore {
             phantom: PhantomData,
         }
     }
+    pub fn clear_flags(&mut self) {
+        for v in &mut self.variants {
+            v.clear_flags()
+        }
+    }
+    pub fn set_hidden(&mut self, id: NodeIdentifier) {
+        let (variant, offset) = self.index.get(&id).unwrap();
+        self.variants[*variant as usize].set_hidden(*offset);
+    }
+    pub fn set_skipped(&mut self, id: NodeIdentifier) {
+        let (variant, offset) = self.index.get(&id).unwrap();
+        self.variants[*variant as usize].set_skipped(*offset);
+    }
+    pub fn set_serialized(&mut self, id: NodeIdentifier) {
+        let (variant, offset) = self.index.get(&id).unwrap();
+        self.variants[*variant as usize].set_serialized(*offset);
+    }
 }
 
 const UNAVAILABLE_NODE: &'static variants::Typed = &variants::Typed {
@@ -813,6 +878,9 @@ const UNAVAILABLE_NODE: &'static variants::Typed = &variants::Typed {
     rev: vec![],
     kind: vec![],
     size: vec![],
+    hidden: bitvec::vec::BitVec::EMPTY,
+    skipped: bitvec::vec::BitVec::EMPTY,
+    serialized: bitvec::vec::BitVec::EMPTY,
 };
 
 impl NodeStore {

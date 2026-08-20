@@ -350,16 +350,16 @@ impl<'a, T> crate::types::Labeled for HashedNodeRef<'a, T> {
 #[derive(Default, Debug)]
 pub struct NodeStore {
     // #[cfg(not(feature = "fetched_par"))]
-    // stockages: HashMap<u32, Variant>,
+    // storages: HashMap<u32, Variant>,
     index: HashMap<NodeIdentifier, (u32, u32)>,
     vindex: HashMap<Arch<String>, u32>,
     variants: Vec<Variant>,
     // #[cfg(feature = "fetched_par")]
-    // stockages: dashmap::DashMap<u32, Variant>,
+    // storages: dashmap::DashMap<u32, Variant>,
 }
 impl Hash for NodeStore {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // for r in &self.stockages {
+        // for r in &self.storages {
         //     r.0.hash(state);
         //     r.1.rev().len().hash(state);
         // }
@@ -688,7 +688,7 @@ variant_store!(NodeIdentifier, NodeIdentifier;
 #[derive(Default)]
 pub struct SimplePackedBuilder {
     // // label_ids: Vec<LabelIdentifier>,
-    stockages: HashMap<Arch<&'static str>, RawVariant>,
+    inner: HashMap<Arch<&'static str>, RawVariant>,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -724,92 +724,45 @@ impl SimplePackedBuilder {
         use crate::types::Tree;
         use crate::types::WithChildren;
         use crate::types::WithStats;
+        macro_rules! insert { ($i:ident $a:ident => $e:expr) => {
+            match self.inner
+                .entry(Arch(lang_name, RawVariantDiscriminants::$i))
+                .or_insert_with(|| RawVariant::$i { entities: <variants::$i>::lang(lang_name), }) {
+                RawVariant::$i { entities: $a @ variants::$i { .. },} => {
+                    $a.rev.push(id);
+                    $a.kind.push(type_id);
+                    $a.size.push(node.size());
+                    $e
+                },
+                _ => unreachable!(concat!("SimplePackedBuilder::add variant ", stringify!($i))),
+            }
+        };}
         if let Some(children) = node.children() {
             let children = children.map(|x| x.into()).collect();
             if node.has_label() {
-                match self
-                    .stockages
-                    .entry(Arch(lang_name, RawVariantDiscriminants::Both))
-                    .or_insert_with(|| RawVariant::Both {
-                        entities: variants::Both::lang(lang_name),
-                    }) {
-                    RawVariant::Both {
-                        entities: a @ variants::Both { .. },
-                    } => {
-                        a.rev.push(id);
-                        a.kind.push(type_id);
-
-                        a.children.push(children);
-                        a.label.push((node.get_label_unchecked().clone()).into());
-
-                        a.size.push(node.size());
-                    }
-                    _ => unreachable!("SimplePackedBuilder::add variant Both"),
-                }
+                insert!(Both a => {
+                    a.children.push(children);
+                    a.label.push((node.get_label_unchecked().clone()).into());
+                })
             } else {
-                match self
-                    .stockages
-                    .entry(Arch(lang_name, RawVariantDiscriminants::Children))
-                    .or_insert_with(|| RawVariant::Children {
-                        entities: variants::Children::lang(lang_name),
-                    }) {
-                    RawVariant::Children {
-                        entities: a @ variants::Children { .. },
-                    } => {
-                        a.rev.push(id);
-                        a.kind.push(type_id);
-
-                        a.children.push(children);
-
-                        a.size.push(node.size());
-                    }
-                    _ => unreachable!("SimplePackedBuilder::add variant Children"),
-                }
+                insert!(Children a => {
+                    a.children.push(children);
+                })
             }
         } else if node.has_label() {
-            match self
-                .stockages
-                .entry(Arch(lang_name, RawVariantDiscriminants::Labeled))
-                .or_insert_with(|| RawVariant::Labeled {
-                    entities: variants::Labeled::lang(lang_name),
-                }) {
-                RawVariant::Labeled {
-                    entities: a @ variants::Labeled { .. },
-                } => {
-                    a.rev.push(id);
-                    a.kind.push(type_id);
-
-                    a.label.push((node.get_label_unchecked().clone()).into());
-
-                    a.size.push(node.size());
-                }
-                _ => unreachable!("SimplePackedBuilder::add variant Labeled"),
-            }
+            insert!(Labeled a => {
+                a.label.push((node.get_label_unchecked().clone()).into());
+            })
         } else {
-            match self
-                .stockages
-                .entry(Arch(lang_name, RawVariantDiscriminants::Typed))
-                .or_insert_with(|| RawVariant::Typed {
-                    entities: variants::Typed::lang(lang_name),
-                }) {
-                RawVariant::Typed {
-                    entities: a @ variants::Typed { .. },
-                } => {
-                    a.rev.push(id);
-                    a.kind.push(type_id);
-
-                    a.size.push(node.size());
-                }
-                _ => unreachable!("SimplePackedBuilder::add variant Typed"),
-            }
+            insert!(Typed a => {})
         };
     }
 
     pub fn build(self) -> SimplePacked<&'static str> {
         let mut res = SimplePacked::default();
-        res.storages_arch.reserve_exact(self.stockages.len());
-        res.storages_variants.reserve_exact(self.stockages.len());
-        for (arch, variant) in self.stockages {
+        res.storages_arch.reserve_exact(self.inner.len());
+        res.storages_variants.reserve_exact(self.inner.len());
+        for (arch, variant) in self.inner {
             res.storages_arch.push(arch);
             res.storages_variants.push(variant);
         }

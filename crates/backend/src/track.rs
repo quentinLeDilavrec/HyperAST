@@ -147,15 +147,15 @@ decl_flags!(
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct TrackingResult<IdN, Idx> {
     pub compute_time: f64,
-    commits_processed: usize,
+    pub commits_processed: usize,
     #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>, Idx: serde::Serialize"))]
-    src: PieceOfCode<IdN, Idx>,
+    pub src: PieceOfCode<IdN, Idx>,
     #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>, Idx: serde::Serialize"))]
-    intermediary: Option<PieceOfCode<IdN, Idx>>,
+    pub intermediary: Option<PieceOfCode<IdN, Idx>>,
     #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>, Idx: serde::Serialize"))]
-    fallback: Option<PieceOfCode<IdN, Idx>>,
+    pub fallback: Option<PieceOfCode<IdN, Idx>>,
     #[serde(bound(serialize = "IdN: Clone + Into<self::IdN>, Idx: serde::Serialize"))]
-    matched: Vec<PieceOfCode<IdN, Idx>>,
+    pub matched: Vec<PieceOfCode<IdN, Idx>>,
 }
 
 // set the type of offset used to index in children list
@@ -272,7 +272,7 @@ pub fn track_code(
     Err(tracking.max_diffed_error())
 }
 
-pub(crate) fn track_code_at_path(
+pub fn track_code_at_path(
     state: SharedState,
     path: TrackingAtPathParam,
     query: TrackingQuery,
@@ -344,9 +344,6 @@ pub(crate) fn track_code_at_path_with_changes(
         let Some(&dst_oid) = commits.get(1) else {
             return Err(tracking.error("this commit has no parent"));
         };
-        dbg!(dst_oid);
-        dbg!(src_oid);
-        dbg!(ori_oid);
         let track_res = track_at_path_aux(&mut tracking, &repository, src_oid, dst_oid).into();
         let repo = &repository.spec;
         if let Some(res) = handle_tracked(&mut tracking, repo, &commits, track_res, dst_oid)? {
@@ -442,20 +439,14 @@ fn handle_tracked(
     dst_oid: Oid,
 ) -> Result<Option<TrackingResult<IdN, Idx>>, TrackingError> {
     let commit = &tracking.commit;
-    dbg!(&tracking.query.before);
-    dbg!(tracking.query.before.as_ref() == Some(&dst_oid.to_string()));
-    dbg!(commits.len() <= 3);
-    dbg!(tracking.node_processed > MAX_NODES);
     let can_skip =
         tracking.query.before.as_ref() != Some(&dst_oid.to_string()) && commits.len() > 3;
-    dbg!(can_skip);
     let (src, next) = match track_res {
         MappingResult::Skipped { nodes, src, next }
             if can_skip && tracking.node_processed + nodes < MAX_NODES =>
         {
-            dbg!(nodes);
             tracking.node_processed += nodes;
-            // TODO fix issue of not stoping when failling to match accurately,
+            // TODO fix issue of not stopping when failing to match accurately,
             // most likely related to miss use of fallback value ?
             if tracking.source.is_none() {
                 tracking.source = Some(src.globalize(repo, *commit));
@@ -480,26 +471,18 @@ fn handle_tracked(
         MappingResult::Error(err) => Err(tracking.error(err))?,
         MappingResult::Skipped { nodes, src, next } => {
             let _ = nodes;
-            dbg!(&src);
-            dbg!(&next);
             (src, Ok(next))
         }
         MappingResult::Direct { src, matches } => {
-            dbg!(&src);
-            dbg!(&matches);
             (src, Ok(matches))
         }
         MappingResult::Missing { src, fallback } => {
-            dbg!();
             (src, Err(fallback))
         }
     };
     let (src, intermediary) = shift_piece(*commit, tracking.source.take(), src, repo);
     let compute_time = tracking.now.elapsed().as_secs_f64();
     let commits_processed = tracking.commits_processed;
-    dbg!(&src);
-    dbg!(&next);
-    dbg!(next.is_ok());
     Ok(Some(match next {
         Ok(matched) => TrackingResult {
             compute_time,
@@ -620,7 +603,6 @@ fn target_code_elem(
     path: &Vec<Idx>,
 ) -> TargetCodeElement<IdN, Idx> {
     let path_to_target: Vec<_> = path.to_vec();
-    dbg!(&path_to_target);
     let (pos, target_node, no_spaces_path_to_target) =
         compute_position_with_no_spaces(src_tr, &mut path_to_target.iter().copied(), stores);
     let range = pos.range();
@@ -634,7 +616,7 @@ fn target_code_elem(
     }
 }
 
-fn get_commit_root(
+pub fn get_commit_root(
     repositories: &std::sync::RwLockReadGuard<'_, multi_preprocessed::PreProcessedRepositories>,
     repo_handle: &ParametrizedCommitProcessorHandle,
     src_oid: Oid,
@@ -657,11 +639,11 @@ fn track_at_path_aux(
     let state = &tracking.state;
     let repositories = state.repositories.read().unwrap();
     let src_tr = get_commit_root(&repositories, &repo_handle.config, src_oid)?;
-    let stores = &repositories.processor.main_stores;
+    let dst_tr = get_commit_root(&repositories, &repo_handle.config, dst_oid)?;
 
+    let stores = &repositories.processor.main_stores;
     let target = target_code_elem(stores, src_tr, path);
 
-    let dst_tr = get_commit_root(&repositories, &repo_handle.config, dst_oid)?;
     do_tracking(
         &repositories,
         &state.partial_decomps,

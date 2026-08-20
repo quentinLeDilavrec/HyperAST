@@ -18,7 +18,7 @@ pub mod examples;
 mod fetch;
 mod file;
 mod matching;
-mod piece_of_code;
+pub mod piece_of_code;
 mod pull_requests;
 mod querying;
 mod scriptingv1;

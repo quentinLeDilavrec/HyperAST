@@ -10,7 +10,7 @@ use crate::Idx;
 
 pub type Position = hyperast::position::StructuralPosition<IdN, Idx>;
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct PieceOfCode<IdN = crate::IdN, Idx = usize> {
     pub user: String,
     pub name: String,
@@ -42,7 +42,7 @@ pub struct LocalPieceOfCode<IdN, Idx> {
 }
 
 impl<Idx> LocalPieceOfCode<IdN, Idx> {
-    pub(crate) fn from_root_and_offsets<TS: TypeStore>(
+    pub fn from_root_and_offsets<TS: TypeStore>(
         stores: &SimpleStores<TS>,
         root: IdN,
         path: &[impl PrimInt],

@@ -189,7 +189,7 @@ where
         .map(|(i, x)| (x, i))
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TargetCodeElement<IdN, Idx> {
     pub start: usize,
     pub end: usize,

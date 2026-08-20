@@ -106,7 +106,6 @@ where
             &mut mapper.mapping.src_arena,
             &mut mapper.mapping.dst_arena,
         );
-        dbg!();
         // let mut mapper = mapper.mirror();
         if let Some(value) = track_greedy(
             with_spaces_stores,
@@ -157,7 +156,6 @@ where
     // let mut mapper = mapper.mirror();
     if let Some(mapped) = fuller_mappings.get_dst(&mapping_target) {
         // TODO consider multimappings
-        dbg!();
         let (should_continue, mapped) =
             track_with_mappings(&mut mapper, flags, target, mapping_target, mapped);
         let mapped = postprocess_matching(reconstruct_mapped(
@@ -167,7 +165,6 @@ where
         ));
 
         let src = compute_local2(target, with_spaces_stores);
-        dbg!(target.root(), &src.path_ids, &mapped);
         return if should_continue {
             let other_tr = mapper.dst_arena.original(&mapper.dst_arena.root());
             let nodes = MappingTracker::new(mapper.hyperast).size(&other_tr, &target.root());
@@ -257,7 +254,6 @@ where
     );
     path_ids.pop();
     assert_eq!(path.len(), path_ids.len());
-    dbg!(&path_ids);
     let path = path_with_spaces(other_tr, &mut path.iter().copied(), with_spaces_stores).0;
 
     let fallback = LocalPieceOfCode::from_root_and_offsets(with_spaces_stores, other_tr, &path);
@@ -287,22 +283,18 @@ where
     let mut triggered = false;
     if flags.exact_child {
         flagged = true;
-        dbg!();
         triggered |= trig_exact_child(flags, target_node, mapped_node, mapper.hyperast);
     }
     if flags.child || flags.sim_child {
         flagged = true;
-        dbg!();
         triggered |= trig_child(flags, target_node, mapped_node, mapper.hyperast);
     }
     if flags.upd {
         flagged = true;
-        dbg!();
         triggered |= trig_upd(flags, target_node, mapped_node, mapper.hyperast);
     }
     if flags.parent {
         flagged = true;
-        dbg!();
         triggered |= trig_parent(mapper, flags, mapping_target, mapped);
     }
     // TODO add flags for artefacts (tests, prod code, build, lang, misc)
@@ -388,13 +380,7 @@ where
     let dst_tree = &arena;
     let path_no_spaces = dst_tree.path_rooted(&mapped);
 
-    dbg!(dst_tree.original(&mapped));
     let mut path_ids = vec![dst_tree.original(&mapped)];
-    dbg!(
-        &(dst_tree.parents(mapped))
-            .map(|i| dst_tree.original(&i))
-            .collect::<Vec<_>>()
-    );
     path_ids.extend(dst_tree.parents(mapped).map(|i| dst_tree.original(&i)));
     path_ids.pop();
 
@@ -444,7 +430,6 @@ where
     let mut path = &path[..];
     let flags: EnumSet<_> = flags.into();
     loop {
-        // dbg!(path);
         let dsts = subtree_mappings.get_dsts(&curr);
         if let Some(value) = track_greedy_aux(
             with_spaces_stores,

@@ -102,54 +102,74 @@ fn ui_detached_nodes<'a>(
     query_enabled_results: &mut super::long_tracking::QueryEnabledExtras,
 ) -> DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>> {
     let mut hovered_sink = None;
-    let mut result = DetachedElementResp::default();
+    let mut result: DetachedElementResp<CodeRange, HashMap<CodeRange, egui::Rect>> =
+        Default::default();
     let tracking_results = it.flat_map(|(d, x)| x.iter_mut().enumerate().map(move |y| (d, y)));
     for (default_x, (i, r)) in tracking_results {
         let show = |ui: &mut _, x: &_, id, o: &mut _| {
             show_element(ui, &store, options, x, id, o, query_enabled_results)
         };
         let src = &mut r.src;
-        let id = ui.id().with(&src);
-        let default_pos = (default_x + col_width / 2.0, i as f32 * 150.0);
-        let resp = show_detached_element(ui, src, id, default_pos, show);
-        if DEBUG {
-            ui.painter().debug_rect(
-                resp.response.rect.expand(20.0),
-                egui::Color32::RED,
-                format!("{default_x} {i} {:?}", src.path_ids),
-            );
-        }
-        interact_detached_element(ui, &mut result, src, id, &resp, None, &mut hovered_sink);
-        let resp = resp.inner.element;
-        let src_rect = resp.rect;
+        let src_rect = if let Some(rect) = result.element.get(src) {
+            rect.clone()
+        } else {
+            let id = ui.id().with(&src);
+            let default_pos = (default_x + col_width / 2.0, i as f32 * 150.0);
+            let resp = show_detached_element(ui, src, id, default_pos, show);
+            if DEBUG {
+                ui.painter().debug_rect(
+                    resp.response.rect.expand(20.0),
+                    egui::Color32::RED,
+                    format!(
+                        "{default_x} {i} {:?}\n\n\n\n{}",
+                        pp(&Some(&*src)),
+                        result.element.len()
+                    ),
+                );
+            }
+            interact_detached_element(ui, &mut result, src, id, &resp, None, &mut hovered_sink);
+            resp.inner.element.rect
+        };
         for x in &mut r.matched {
-            let show = |ui: &mut _, x: &_, id, o: &mut _| {
-                show_element(ui, &store, options, x, id, o, query_enabled_results)
-            };
             if let Some(m_pos) = result.element.get(&x) {
                 if !manual_links.rm_links.contains(&[src.clone(), x.clone()]) {
                     options.source(src_rect).sink(*m_pos).paint(ui.painter());
                 }
                 continue;
             }
-            let id = ui.id().with(&x);
-            let default_pos = (default_x, i as f32 * 50.0);
-            let resp = show_detached_element(ui, x, id, default_pos, show);
-            if DEBUG {
-                ui.painter().debug_rect(
-                    resp.response.rect.expand(20.0),
-                    egui::Color32::BLUE,
-                    format!(
-                        "{default_x} {i} {:?}\n{:?}\n{}",
-                        x.file,
-                        x.path_ids,
-                        all(&result, x)
-                    ),
+            let show = |ui: &mut _, x: &_, id, o: &mut _| {
+                show_element(ui, &store, options, x, id, o, query_enabled_results)
+            };
+            let m_rect = if let Some(m_pos) = result.element.get(&x) {
+                *m_pos
+            } else {
+                let id = ui.id().with(&x);
+                let default_pos = (default_x, i as f32 * 50.0);
+                let resp = show_detached_element(ui, x, id, default_pos, show);
+                if DEBUG {
+                    ui.painter().debug_rect(
+                        resp.response.rect.expand(20.0),
+                        egui::Color32::BLUE,
+                        format!(
+                            "{default_x} {i} \n{} {:?}\n{}",
+                            pp(&Some(&*x)),
+                            x.path_ids,
+                            all(&result, x)
+                        ),
+                    );
+                }
+                interact_detached_element(
+                    ui,
+                    &mut result,
+                    x,
+                    id,
+                    &resp,
+                    Some(&src),
+                    &mut hovered_sink,
                 );
-            }
-            interact_detached_element(ui, &mut result, x, id, &resp, Some(&src), &mut hovered_sink);
 
-            let m_rect = resp.inner.element.rect;
+                resp.inner.element.rect
+            };
             if !manual_links.rm_links.contains(&[src.clone(), x.clone()]) {
                 options.source(src_rect).sink(m_rect).paint(ui.painter());
             }
@@ -914,17 +934,17 @@ fn all(
     x: &CodeRange,
 ) -> String {
     (result.element.iter())
-            .map(|y| format!(
-                "                           {} {} {} {} {} {:?} {:?}\n                           {:?} {:?}\n",
+        .map(|y| {
+            format!(
+                "                           {} {} {} {} {} {} {:?}\n",
                 x.file.commit == y.0.file.commit,
                 x.file == y.0.file,
                 x.path == y.0.path,
                 x.range == y.0.range,
                 x.path_ids == y.0.path_ids,
-                y.0.path,
+                pp(&Some(&*y.0)),
                 y.0.path_ids,
-                y.0.file.commit.id,
-                y.0.file.file_path,
-            ))
-            .collect::<String>()
+            )
+        })
+        .collect::<String>()
 }

@@ -615,21 +615,24 @@ macro_rules! variant_store {
             pub fn is_hidden(&self) -> bool {
                 match self.s_ref {$(
                     VariantRef::$c{ entities: variants::$c{hidden,..}, ..} => {
-                        hidden[self.index as usize]
+                        hidden.as_bitslice().get(self.index as usize)
+                        .as_deref().cloned().unwrap_or_default()
                     },
                 )*}
             }
             pub fn is_skipped(&self) -> bool {
                 match self.s_ref {$(
                     VariantRef::$c{ entities: variants::$c{skipped,..}, ..} => {
-                        skipped[self.index as usize]
+                        skipped.as_bitslice().get(self.index as usize)
+                        .as_deref().cloned().unwrap_or_default()
                     },
                 )*}
             }
             pub fn is_serialized(&self) -> bool {
                 match self.s_ref {$(
                     VariantRef::$c{ entities: variants::$c{serialized,..}, ..} => {
-                        serialized[self.index as usize]
+                        serialized.as_bitslice().get(self.index as usize)
+                        .as_deref().cloned().unwrap_or_default()
                     },
                 )*}
             }

@@ -963,6 +963,8 @@ impl<'a> FetchedViewImpl<'a> {
         let ret = if let Some(r) =
             (self.store.node_store.read().unwrap()).try_resolve::<NodeIdentifier>(*c)
         {
+            let hidden = r.is_hidden(); // TODO
+            let serialized = r.is_serialized(); // TODO
             let kind = self.store.resolve_type(c); //r.get_type();
             let l = r.try_get_label().copied();
             let cs = r.children();
@@ -974,7 +976,12 @@ impl<'a> FetchedViewImpl<'a> {
             _size = Some(size as u32);
             imp.global_pos = *global_pos;
 
-            if let Some(cs) = cs {
+            if hidden {
+                imp.prefill_cache.get_or_insert_default();
+                Action::Keep
+            } else if serialized {
+                imp.show_pp(ui, *c, size as u32)
+            } else if let Some(cs) = cs {
                 if let Some(label) = l {
                     imp.ui_both_impl(ui, kind, size as u32, *c, label, cs.0.to_vec().as_ref())
                 } else {
@@ -983,6 +990,9 @@ impl<'a> FetchedViewImpl<'a> {
             } else if let Some(label) = l {
                 imp.ui_labeled_impl2(ui, kind, size as u32, *c, label)
             } else {
+                if imp.is_hidden(kind) {
+                    imp.prefill_cache.get_or_insert_default();
+                }
                 imp.ui_typed_impl2(ui, kind, size as u32)
             }
         // let ret = if let Some(c) = self.store.both.ids.iter().position(|x| x == c) {

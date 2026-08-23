@@ -32,6 +32,8 @@ type LongTrackingResults = VecDeque<(
 )>;
 type BufferedPerCommit<T> = HashMap<Commit, Buffered<T>>;
 
+const DEBUG: bool = false;
+
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub(crate) struct LongTracking {
@@ -395,6 +397,29 @@ fn show_commit(
                 dst_changes: tracking_result.content.dst_changes.clone(),
             });
             let track = &mut tracking_result.content.track.results;
+            if let Some(track) = track.get(0)
+                && DEBUG
+            {
+                let fallback = track.fallback.as_ref().map(|x| x.file.commit.id.prefix(6));
+                let _src = track.src.file.commit.id.prefix(6);
+                let _1trm = track
+                    .intermediary
+                    .as_ref()
+                    .map(|x| x.file.commit.id.prefix(6));
+                let _mtch = track
+                    .matched
+                    .iter()
+                    .map(|x| x.file.commit.id.prefix(6))
+                    .collect::<Vec<_>>();
+                ui.painter().debug_rect(
+                    ui.available_rect_before_wrap(),
+                    egui::Color32::RED,
+                    format!(
+                        "{:?}\nsrc:{:?}\n1trm:{:?}\nmtch:{:?}",
+                        fallback, _src, _1trm, _mtch
+                    ),
+                );
+            }
             let track = track.iter_mut().map(|track| {
                 ((track.matched).get_mut(0)).unwrap_or_else(|| track.fallback.as_mut().unwrap())
             });
@@ -411,6 +436,7 @@ fn show_commit(
             let track = &tracking_result.content.track.results[0];
             let api_addr = res_impl.api_addr;
             if let Some(code_range) = &track.intermediary {
+                // TODO check
                 md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
             } else if let Some(code_range) = track.matched.get(0) {
                 md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
@@ -939,8 +965,11 @@ fn init_col_view<'a>(
             curr_view.deletions = Some(&mut x.deletions);
         }
         for (i, result) in result.content.track.results.iter_mut().enumerate() {
-            let result = result.matched.get_mut(0).or(result.fallback.as_mut());
-            curr_view.matcheds.push((result.unwrap(), i));
+            let res = result.matched.get_mut(0).or(result.fallback.as_mut());
+            curr_view.matcheds.push((res.unwrap(), i));
+            if let Some(result) = &mut result.intermediary {
+                curr_view.effective_targets.push((result, i));
+            }
         }
     }
     Ok(curr_view)
@@ -989,6 +1018,31 @@ fn show_tree_view_of_tracking(
     }) else {
         return;
     };
+
+    if DEBUG {
+        let _past_commit = curr_view.left_commit.as_ref();
+        let _ori = (curr_view.original_targets.iter())
+            .map(|x| x.0.file.commit.id.as_str())
+            .collect::<Vec<_>>();
+        let _eff = (curr_view.effective_targets.iter())
+            .map(|x| x.0.file.commit.id.as_str())
+            .collect::<Vec<_>>();
+        let _mtch = (curr_view.matcheds.iter())
+            .map(|x| x.0.file.commit.id.as_str())
+            .collect::<Vec<_>>();
+        ui.painter().debug_rect(
+            ui.available_rect_before_wrap(),
+            egui::Color32::RED,
+            format!(
+                "{:?}\nori:{:?}\neff:{:?}\nmtch:{:?}",
+                _past_commit.map(|x| x.id.as_str()),
+                _ori,
+                _eff,
+                _mtch
+            ),
+        );
+    }
+
     let Some(p) = show_tree_view(
         ui,
         res_impl.min_col,
@@ -1031,6 +1085,13 @@ fn show_tree_view_of_tracking(
                 path_ids: vec![],
             });
             let past_commit = curr_view.left_commit.as_ref().unwrap();
+            if DEBUG {
+                ui.painter().debug_rect(
+                    ui.available_rect_before_wrap(),
+                    egui::Color32::RED,
+                    past_commit.id.as_str(),
+                );
+            }
             assert_ne!(&curr.file.commit, *past_commit);
             let track_at_path = track_at_path(
                 ui.ctx(),

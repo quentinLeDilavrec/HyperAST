@@ -50,6 +50,19 @@ pub(crate) enum Action {
     Clicked(Offsets),
 }
 
+impl std::ops::AddAssign for Action {
+    fn add_assign(&mut self, other: Self) {
+        match (self, other) {
+            (_, Action::Keep) => {}
+            (slf@Action::Keep, other) => { *slf = other;}
+            (Action::Clicked(_), Action::Clicked(_)) => { unreachable!() }
+            (slf, other) => {
+                dbg!(slf, other);
+            }
+        };
+    }
+}
+
 pub(crate) type Offsets = Vec<usize>;
 
 pub(crate) struct FetchedViewImpl<'a> {

@@ -1113,8 +1113,7 @@ fn show_tree_view_of_tracking(
                 flags,
             );
             attached.waiting.push((col, track_at_path));
-        } else {
-            let past_commit = curr_view.left_commit.as_ref().unwrap();
+        } else if let Some(past_commit) = curr_view.left_commit.as_ref() {
             let present_commit = &curr.file.commit;
             // TODO allow to reset tracking
             assert_ne!(&present_commit, past_commit);
@@ -1127,6 +1126,9 @@ fn show_tree_view_of_tracking(
                 &Default::default(),
             );
             attached.waiting.push((col, track_at_path));
+        } else {
+            // TODO handle case of multiple concurrent tracking requests
+            log::info!("attempt tracking while still waiting for previous tracking request");
         }
     }
 }

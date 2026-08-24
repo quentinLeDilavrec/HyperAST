@@ -1069,16 +1069,7 @@ impl<'a> FetchedViewImpl<'a> {
                 Action::PartialFocused(ui.available_rect_before_wrap().min.y)
             }
         };
-        match ret {
-            Action::Clicked(_)
-            | Action::Focused(_)
-            | Action::PartialFocused(_)
-            | Action::SerializeKind(_)
-            | Action::HideKind(_) => {
-                *action = ret;
-            }
-            _ => (),
-        };
+        *action += ret;
         let c_cache = imp.prefill_cache.unwrap_or_default();
         let h = c_cache.height();
 

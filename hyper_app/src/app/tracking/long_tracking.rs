@@ -1,8 +1,9 @@
 use epaint::ahash::HashSet;
 use poll_promise::Promise;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::ops::Range;
 use std::sync::Arc;
+use std::usize;
 
 use egui_addon::MultiSplitter;
 use egui_addon::code_editor::generic_text_buffer::byte_index_from_char_index;
@@ -251,10 +252,19 @@ impl State {
 }
 type PortId = egui::Id;
 
-pub(crate) type Attacheds = Vec<(
-    HashMap<usize, (PortId, Option<egui::Rect>)>,
-    HashMap<usize, (PortId, Option<egui::Rect>)>,
-)>;
+pub(crate) type Attacheds = Vec<Attached>;
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Attached {
+    pub left: BTreeMap<usize, AttachedVals>,
+    pub right: BTreeMap<usize, AttachedVals>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AttachedVals {
+    pub id: PortId,
+    pub rect: Vec<egui::Rect>,
+}
 
 struct LongTrackingResultsImpl<'a> {
     viewport_x: egui::Rangef,
@@ -435,13 +445,13 @@ fn show_commit(
         } else if !md.is_waiting() {
             let track = &tracking_result.content.track.results[0];
             let api_addr = res_impl.api_addr;
-            if let Some(code_range) = &track.intermediary {
-                // TODO check
-                md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
-            } else if let Some(code_range) = track.matched.get(0) {
+            if let Some(code_range) = track.matched.get(0) {
                 md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
             } else if let Some(code_range) = &track.fallback {
                 md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
+            // } else if let Some(code_range) = &track.intermediary {
+            //     // TODO check
+            //     md.buffer(fetch_commit0(ui.ctx(), api_addr, &code_range.file.commit));
             } else {
                 unreachable!("should have been matched or been given a fallback")
             }
@@ -700,21 +710,33 @@ fn show_trackings(
 
     // render the attached color boxes
     ui.set_clip_rect(timeline_window);
+    if DEBUG {
+        ui.painter().debug_rect(
+            ui.available_rect_before_wrap(),
+            egui::Color32::ORANGE,
+            format!(
+                "{:?} {:?}",
+                attached.attacheds.len(),
+                attached
+                    .attacheds
+                    .iter()
+                    .map(|x| (x.left.len(), x.right.len()))
+                    .collect::<Vec<_>>()
+            ),
+        );
+    }
     for i in 0..attached.attacheds.len() - 1 {
         let (left, right) = attached.attacheds.split_at(i + 1);
-        let (greens, blues) = (&left.last().unwrap().1, &right.first().unwrap().0);
+        let (greens, blues) = (&left.last().unwrap().right, &right.first().unwrap().left);
         let mut done = HashSet::default();
         // let cable = false;
         // let mut min_right_x = 0.0;
         // let mut min_left_x = 0.0;
         let l_bound = res_impl.viewport_x.min + (i + 1) as f32 * (col_width + spacing.x) - 15.0;
         let r_bound = l_bound + 25.0;
-        let render = |&(_green, g_rect), &(_blue, b_rect)| {
-            let (Some(m_rect), Some(src_rect)) = (g_rect, b_rect) else {
-                return;
-            };
-            let m_rect: egui::Rect = m_rect;
-            let src_rect: egui::Rect = src_rect;
+        let render = |g_rect, b_rect| {
+            let m_rect: &egui::Rect = g_rect;
+            let src_rect: &egui::Rect = b_rect;
             let mut m_pos = m_rect.right_center();
             let mut src_pos = src_rect.left_center();
             let mut ctrl = (m_pos, src_pos);
@@ -730,7 +752,11 @@ fn show_trackings(
         for (k, g) in greens {
             done.insert(k);
             if let Some(b) = blues.get(&k) {
-                render(g, b)
+                for g in &g.rect {
+                    for b in &b.rect {
+                        render(g, b)
+                    }
+                }
             }
         }
         for (k, b) in blues {
@@ -738,7 +764,11 @@ fn show_trackings(
                 continue;
             }
             if let Some(g) = greens.get(&k) {
-                render(g, b)
+                for g in &g.rect {
+                    for b in &b.rect {
+                        render(g, b)
+                    }
+                }
             }
         }
     }
@@ -870,92 +900,83 @@ fn init_col_view<'a>(
     if attached.is_origin(col) {
         match (attached.has_past(col), attached.has_future(col)) {
             (true, true) => {
-                let result = tracking_results
-                    .get_mut(col - 1)
-                    .and_then(|x| x.1.get_mut());
-                let Some(result) = result else {
-                    original_targets.push((&mut tracking_origins[0], 0));
-                    return Ok(curr_view);
-                };
-                if let Some(x) = &mut result.content.dst_changes {
-                    curr_view.additions = Some(&mut x.additions);
-                }
-                if let Some(x) = &mut result.content.src_changes {
-                    assert_ne!(tracking_origins[0].file.commit, x.commit);
-                    curr_view.left_commit = Some(&mut x.commit);
-                }
-                let mut origins = tracking_origins.iter_mut();
-                for (i, result) in result.content.track.results.iter_mut().enumerate() {
-                    curr_view.effective_targets.push((&mut result.src, i));
-                    (curr_view.effective_targets).push((origins.next().unwrap(), i));
-                }
+                todo!();
             }
             (true, false) => {
-                let result = tracking_results
+                let past = tracking_results
                     .get_mut(col - 1)
                     .and_then(|x| x.1.get_mut());
-                let Some(result) = result else {
-                    original_targets.push((&mut tracking_origins[0], 0));
+                let Some(past) = past else {
+                    original_targets.push(PlacedCode::new(&mut tracking_origins[0], 0));
                     return Ok(curr_view);
                 };
-                if let Some(changes) = &mut result.content.dst_changes {
+                if let Some(changes) = &mut past.content.dst_changes {
                     curr_view.additions = Some(&mut changes.additions);
                 }
-                if let Some(changes) = &mut result.content.src_changes {
+                if let Some(changes) = &mut past.content.src_changes {
                     assert_ne!(tracking_origins[0].file.commit, changes.commit);
                     curr_view.left_commit = Some(&mut changes.commit);
                 }
                 let mut origins = tracking_origins.iter_mut();
-                for (i, result) in result.content.track.results.iter_mut().enumerate() {
-                    curr_view.effective_targets.push((&mut result.src, i));
+                for (i, result) in past.content.track.results.iter_mut().enumerate() {
+                    curr_view
+                        .effective_targets
+                        .push(PlacedCode::new(&mut result.src, i));
                     if let Some(origins) = origins.next() {
-                        curr_view.original_targets.push((origins, i));
+                        original_targets.push(PlacedCode::new(origins, i));
                     }
                 }
             }
             (false, true) => todo!(),
             (false, false) => {
                 // nothing to do
-                original_targets.push((&mut tracking_origins[0], 0));
+                original_targets.push(PlacedCode::new(&mut tracking_origins[0], 0));
             }
         }
     } else if attached.has_past(col) {
         let mut it = tracking_results.range_mut(col - 1..=col);
         let past = it.next();
 
-        if let Some(result) = past.and_then(|x| x.1.get_mut()) {
-            if let Some(changes) = &mut result.content.dst_changes {
+        if let Some(past) = past.and_then(|x| x.1.get_mut()) {
+            if let Some(changes) = &mut past.content.dst_changes {
                 curr_view.additions = Some(&mut changes.additions);
             }
-            if let Some(changes) = &mut result.content.src_changes {
+            if let Some(changes) = &mut past.content.src_changes {
                 curr_view.left_commit = Some(&mut changes.commit);
             }
-            for (i, result) in result.content.track.results.iter_mut().enumerate() {
+            for (i, result) in past.content.track.results.iter_mut().enumerate() {
                 assert_ne!(
                     result.src.file.commit,
                     **curr_view.left_commit.as_ref().unwrap()
                 );
-                curr_view.effective_targets.push((&mut result.src, i));
+                curr_view
+                    .effective_targets
+                    .push(PlacedCode::new(&mut result.src, i));
             }
         }
         let curr = it.next();
-        if let Some(result) = curr.and_then(|x| x.1.get_mut()) {
-            for (i, result) in result.content.track.results.iter_mut().enumerate() {
-                let result = result.matched.get_mut(0).or(result.fallback.as_mut());
-                (curr_view.matcheds).push((result.unwrap(), i));
+        if let Some(curr) = curr.and_then(|x| x.1.get_mut()) {
+            for (i, result) in curr.content.track.results.iter_mut().enumerate() {
+                if result.matched.is_empty() {
+                    let res = result.fallback.as_mut();
+                    curr_view.matcheds.push(PlacedCode::new(res.unwrap(), i));
+                }
+                for res in &mut result.matched {
+                    curr_view.matcheds.push(PlacedCode::new(res, i));
+                }
             }
-            if let Some(changes) = &mut result.content.src_changes {
+            if let Some(changes) = &mut curr.content.src_changes {
                 curr_view.deletions = Some(&mut changes.deletions);
             }
         }
         if original_targets.is_empty() {
-            original_targets.push((&mut tracking_origins[0], 0));
+            original_targets.push(PlacedCode::new(&mut tracking_origins[0], 0));
         }
         assert!(it.next().is_none());
     } else {
         let result = tracking_results.get_mut(col).and_then(|x| x.1.get_mut());
         let Some(result) = result else {
-            original_targets.push((&mut tracking_origins[0], 0));
+            original_targets.push(PlacedCode::new(&mut tracking_origins[0], 0));
             return Ok(curr_view);
         };
         if result.content.track.results.is_empty() {
@@ -965,10 +986,15 @@ fn init_col_view<'a>(
             curr_view.deletions = Some(&mut x.deletions);
         }
         for (i, result) in result.content.track.results.iter_mut().enumerate() {
-            let res = result.matched.get_mut(0).or(result.fallback.as_mut());
-            curr_view.matcheds.push((res.unwrap(), i));
+            if result.matched.is_empty() {
+                let res = result.fallback.as_mut();
+                curr_view.matcheds.push(PlacedCode::new(res.unwrap(), i));
+            }
+            for res in &mut result.matched {
+                curr_view.matcheds.push(PlacedCode::new(res, i));
+            }
             if let Some(result) = &mut result.intermediary {
-                curr_view.effective_targets.push((result, i));
+                curr_view.effective_targets.push(PlacedCode::new(result, i));
             }
         }
     }
@@ -992,10 +1018,8 @@ fn show_tree_view_of_tracking(
         } else {
             curr_view.original_targets.get_mut(0)
         };
-        let Some((curr, _)) = curr else {
-            return;
-        };
-        &curr.file.commit
+        let Some(curr) = curr else { return };
+        &curr.code.file.commit
     };
     let tree_viewer = tree_viewer.entry(curr_commit.clone());
     let tree_viewer = tree_viewer.or_default();
@@ -1022,13 +1046,13 @@ fn show_tree_view_of_tracking(
     if DEBUG {
         let _past_commit = curr_view.left_commit.as_ref();
         let _ori = (curr_view.original_targets.iter())
-            .map(|x| x.0.file.commit.id.as_str())
+            .map(|x| x.code.file.commit.id.as_str())
             .collect::<Vec<_>>();
         let _eff = (curr_view.effective_targets.iter())
-            .map(|x| x.0.file.commit.id.as_str())
+            .map(|x| x.code.file.commit.id.as_str())
             .collect::<Vec<_>>();
         let _mtch = (curr_view.matcheds.iter())
-            .map(|x| x.0.file.commit.id.as_str())
+            .map(|x| x.code.file.commit.id.as_str())
             .collect::<Vec<_>>();
         ui.painter().debug_rect(
             ui.available_rect_before_wrap(),
@@ -1063,11 +1087,17 @@ fn show_tree_view_of_tracking(
     } else {
         curr_view.original_targets.get_mut(0)
     };
-    let Some((curr, _)) = curr else { return };
+    let Some(curr) = curr else { return };
+    let curr = &mut *curr.code;
     if attached.is_origin(col) {
         curr.path = p;
         if col == 0 {
             // TODO only request changes when we have none
+            log::info!(
+                "track_at_path_with_changes {col} {:?} {}",
+                curr.path,
+                curr.file.commit.id.prefix(6)
+            );
             let track_at_path = track_at_path_with_changes(
                 ui.ctx(),
                 res_impl.api_addr,
@@ -1076,7 +1106,7 @@ fn show_tree_view_of_tracking(
                 flags,
             );
             attached.waiting.push((col, track_at_path));
-        } else {
+        } else if let Some(past_commit) = &curr_view.left_commit {
             // TODO allow to reset tracking
             attached.new_origins.push(CodeRange {
                 file: curr.file.clone(),
@@ -1084,7 +1114,6 @@ fn show_tree_view_of_tracking(
                 path: curr.path.clone(),
                 path_ids: vec![],
             });
-            let past_commit = curr_view.left_commit.as_ref().unwrap();
             if DEBUG {
                 ui.painter().debug_rect(
                     ui.available_rect_before_wrap(),
@@ -1093,18 +1122,31 @@ fn show_tree_view_of_tracking(
                 );
             }
             assert_ne!(&curr.file.commit, *past_commit);
+            log::info!(
+                "track_at_path {col} {:?} {} {}",
+                curr.path,
+                curr.file.commit.id.prefix(6),
+                past_commit.id.prefix(6)
+            );
             let track_at_path = track_at_path(
                 ui.ctx(),
                 res_impl.api_addr,
                 &curr.file.commit,
                 Some(past_commit),
                 &curr.path,
-                &Default::default(),
+                &flags,
             );
             attached.waiting.push((col, track_at_path));
+        } else {
+            todo!("{:?} {}", curr.path, curr.file.commit.id.prefix(6));
         }
     } else {
         if col == 0 {
+            log::info!(
+                "track_at_path_with_changes {col} {:?} {}",
+                curr.path,
+                curr.file.commit.id.prefix(6),
+            );
             let track_at_path = track_at_path_with_changes(
                 ui.ctx(),
                 res_impl.api_addr,
@@ -1117,13 +1159,19 @@ fn show_tree_view_of_tracking(
             let present_commit = &curr.file.commit;
             // TODO allow to reset tracking
             assert_ne!(&present_commit, past_commit);
+            log::info!(
+                "track_at_path {col} {:?} {} {}",
+                curr.path,
+                curr.file.commit.id.prefix(6),
+                past_commit.id.prefix(6)
+            );
             let track_at_path = track_at_path(
                 ui.ctx(),
                 res_impl.api_addr,
                 &present_commit,
                 Some(past_commit),
                 &p,
-                &Default::default(),
+                flags,
             );
             attached.waiting.push((col, track_at_path));
         } else {
@@ -1167,9 +1215,8 @@ fn show_ser_view_of_tracking(
     } else {
         curr_view.original_targets.get_mut(0)
     };
-    let Some((curr, _)) = curr else {
-        return;
-    };
+    let Some(curr) = curr else { return };
+    let curr = &mut *curr.code;
 
     if curr.range == Some(r.clone()) {
         return;
@@ -1178,6 +1225,11 @@ fn show_ser_view_of_tracking(
         curr.range = Some(r.clone());
     }
     if col == 0 {
+        log::info!(
+            "track {col} {:?} {}",
+            curr.path,
+            curr.file.commit.id.prefix(6),
+        );
         attached.waiting.push((
             col,
             track(
@@ -1186,22 +1238,33 @@ fn show_ser_view_of_tracking(
                 &curr.file.commit,
                 &curr.file.file_path,
                 &Some(r),
+                None,
+                flags,
+            ),
+        ));
+    } else if let Some(left_commit) = &curr_view.left_commit {
+        // TODO allow to reset tracking
+        log::info!(
+            "track {col} {:?} {} {}",
+            curr.path,
+            curr.file.commit.id.prefix(6),
+            left_commit.id.prefix(6)
+        );
+        attached.waiting.push((
+            col,
+            track(
+                ui.ctx(),
+                api_addr,
+                &curr.file.commit,
+                &curr.file.file_path,
+                &Some(r),
+                Some(*left_commit),
                 flags,
             ),
         ));
     } else {
         // TODO allow to reset tracking
-        attached.waiting.push((
-            col,
-            track(
-                ui.ctx(),
-                api_addr,
-                &curr.file.commit,
-                &curr.file.file_path,
-                &Some(r),
-                flags,
-            ),
-        ));
+        todo!("check behavior");
     }
 }
 
@@ -1255,11 +1318,23 @@ pub(crate) fn show_results(
 #[derive(Default, Debug)]
 pub(crate) struct ColView<'a> {
     pub left_commit: Option<&'a mut Commit>,
-    pub effective_targets: Vec<(&'a mut CodeRange, usize)>,
-    pub original_targets: Vec<(&'a mut CodeRange, usize)>,
-    pub matcheds: Vec<(&'a mut CodeRange, usize)>,
+    pub effective_targets: Vec<PlacedCode<'a>>,
+    pub original_targets: Vec<PlacedCode<'a>>,
+    pub matcheds: Vec<PlacedCode<'a>>,
     pub additions: Option<&'a [u32]>,
     pub deletions: Option<&'a [u32]>,
+}
+
+#[derive(Debug)]
+pub(crate) struct PlacedCode<'a> {
+    pub code: &'a mut CodeRange,
+    pub id: usize,
+}
+
+impl<'a> PlacedCode<'a> {
+    pub fn new(code: &'a mut CodeRange, id: usize) -> Self {
+        Self { code, id }
+    }
 }
 
 #[allow(unused)]
@@ -1275,7 +1350,7 @@ fn show_code_view(
         } else {
             curr_view.original_targets.get_mut(0)
         };
-        &mut curr?.0.file
+        &mut curr?.code.file
     };
 
     let file_result = fetched_files.entry(curr_file.clone());
@@ -1296,7 +1371,7 @@ fn show_code_view(
         return None;
     };
     let first_ori = curr_view.original_targets.get(0);
-    if let Some(range) = first_ori.as_ref().and_then(|(x, _)| x.range.as_ref()) {
+    if let Some(range) = first_ori.as_ref().and_then(|x| x.code.range.as_ref()) {
         let te = &aa.inner;
         let color = egui::Color32::RED.linear_multiply(0.1);
         let rect = highlight_byte_range(ui, te, &range, color);
@@ -1310,7 +1385,7 @@ fn show_code_view(
     //     let rect = highlight_byte_range(ui, te, &range, color);
     // }
     let first_match = curr_view.matcheds.get(0);
-    let first_match = first_match.and_then(|x| x.0.range.as_ref());
+    let first_match = first_match.and_then(|x| x.code.range.as_ref());
     if let Some(range) = first_match {
         let te = &aa.inner;
         let color = egui::Color32::GREEN.linear_multiply(0.1);
@@ -1334,7 +1409,7 @@ pub(crate) fn show_tree_view(
     curr_view: &mut ColView<'_>,
     aspects: &mut ComputeConfigAspectViews,
     ports: &mut Attacheds,
-    defered_focus_scroll: &mut Option<DeferedFocusScroll>,
+    deferred_focus_scroll: &mut Option<DeferedFocusScroll>,
 ) -> Option<crate::app::tree_view::Offsets> {
     use egui::scroll_area::ScrollBarVisibility as Vis;
     let mut scroll_focus = None;
@@ -1353,138 +1428,10 @@ pub(crate) fn show_tree_view(
             let Some(content) = &mut tree_viewer.content else {
                 return None;
             };
-            let mut hightlights = vec![];
-            let mut focus = None;
-            let mut blue_pos = HashMap::<usize, Option<egui::Rect>>::default();
-            let mut green_pos = HashMap::<usize, Option<egui::Rect>>::default();
-            for (_, i) in curr_view.effective_targets.iter() {
-                blue_pos.insert(*i, None);
-            }
-            for (i, b_p) in blue_pos.iter_mut() {
-                hightlights.push(HighLightHandle {
-                    path: &curr_view
-                        .effective_targets
-                        .iter()
-                        .find(|x| x.1 == *i)
-                        .unwrap()
-                        .0
-                        .path[..],
-                    color: &egui::Color32::BLUE,
-                    id: *i,
-                    screen_pos: b_p,
-                });
-            }
-            let a = if curr_view.matcheds.len() == 1 {
-                let Some((foc, i)) = curr_view.matcheds.get(0) else {
-                    unreachable!()
-                };
-                green_pos.insert(*i, None);
-                hightlights.push(HighLightHandle {
-                    path: &foc.path[..],
-                    color: &TARGET_COLOR,
-                    id: *i,
-                    screen_pos: green_pos.get_mut(i).unwrap(),
-                });
-                if trigger {
-                    let mut pi = foc.path_ids.clone();
-                    pi.reverse();
-                    focus = Some(Focus::new(&foc.path[..], &pi[..]));
-                    let id = ui.id();
-                    let a = content.show(
-                        ui,
-                        api_addr,
-                        aspects,
-                        focus,
-                        hightlights,
-                        curr_view.additions,
-                        curr_view.deletions,
-                        "",
-                    );
-                    let bool = match a {
-                        Action::Focused(_) => false,
-                        Action::PartialFocused(_) => true,
-                        Action::Keep => true,
-                        x => panic!("{:?}", x),
-                    };
-                    if bool {
-                        ui.ctx().memory_mut(|mem| {
-                            *mem.data.get_temp_mut_or_default::<bool>(id) = true;
-                        });
-                    }
-                    a
-                } else {
-                    let id = ui.id();
-                    let bool = ui
-                        .ctx()
-                        .memory_mut(|mem| mem.data.get_temp::<bool>(id).unwrap_or(false));
-                    let mut pi = foc.path_ids.clone();
-                    pi.reverse();
-                    if bool {
-                        focus = Some(Focus::new(&foc.path[..], &pi[..]));
-                    }
-                    let a = content.show(
-                        ui,
-                        api_addr,
-                        aspects,
-                        focus,
-                        hightlights,
-                        curr_view.additions,
-                        curr_view.deletions,
-                        "",
-                    );
-                    let bool = match a {
-                        Action::Focused(_) => false,
-                        Action::PartialFocused(_) => true,
-                        _ => false,
-                    };
-                    if !bool {
-                        ui.ctx().memory_mut(|mem| {
-                            mem.data.remove::<bool>(id);
-                        });
-                    }
-                    a
-                }
-            } else {
-                for (_, i) in curr_view.matcheds.iter() {
-                    green_pos.insert(*i, None);
-                }
-                for (i, g_p) in green_pos.iter_mut() {
-                    let matched = curr_view.matcheds.iter().find(|x| x.1 == *i).unwrap();
-                    hightlights.push(HighLightHandle {
-                        path: &matched.0.path[..],
-                        color: &TARGET_COLOR,
-                        id: *i,
-                        screen_pos: g_p,
-                    });
-                }
-                let a = content.show(
-                    ui,
-                    api_addr,
-                    aspects,
-                    focus,
-                    hightlights,
-                    curr_view.additions,
-                    curr_view.deletions,
-                    "",
-                );
-                match a {
-                    Action::PartialFocused(_) => Action::Keep,
-                    Action::Focused(_) => Action::Keep,
-                    a => a,
-                }
-            };
-            for (k, blue_pos) in blue_pos {
-                if let Some(port) = ports.get_mut(col - min_col) {
-                    let v = (ui.id().with("blue_highlight").with(k), blue_pos);
-                    port.0.insert(k, v);
-                }
-            }
-            for (k, green_pos) in green_pos {
-                if let Some(port) = ports.get_mut(col - min_col) {
-                    let v = (ui.id().with("green_highlight").with(k), green_pos);
-                    port.1.insert(k, v);
-                }
-            }
+
+            let a = show_tree_view_aux(
+                ui, min_col, api_addr, col, trigger, content, curr_view, aspects, ports,
+            );
             match a {
                 Action::Focused(p) => {
                     dbg!(p);
@@ -1499,11 +1446,164 @@ pub(crate) fn show_tree_view(
             }
         });
     if let Some(o) = scroll_focus {
-        *defered_focus_scroll = Some((o, col - min_col + 1, scroll));
+        *deferred_focus_scroll = Some((o, col - min_col + 1, scroll));
         None
     } else {
         scroll.inner
     }
+}
+
+fn show_tree_view_aux(
+    ui: &mut egui::Ui,
+    min_col: usize,
+    api_addr: &str,
+    col: usize,
+    trigger: bool,
+    content: &mut FetchedView,
+    curr_view: &mut ColView<'_>,
+    aspects: &mut ComputeConfigAspectViews,
+    ports: &mut Attacheds,
+) -> Action {
+    let action;
+    let mut hightlights = vec![];
+    let mut focus = vec![];
+    let mut blue_pos = Vec::<Option<egui::Rect>>::default();
+    let mut green_pos = Vec::<Option<egui::Rect>>::default();
+    for _ in curr_view.effective_targets.iter() {
+        blue_pos.push(None);
+    }
+    for (i, b_p) in blue_pos.iter_mut().enumerate() {
+        let x = &curr_view.effective_targets[i];
+        hightlights.push(HighLightHandle {
+            path: &x.code.path[..],
+            color: &egui::Color32::BLUE,
+            id: x.id,
+            screen_pos: b_p,
+        });
+    }
+    if curr_view.matcheds.len() == 1 {
+        let Some(x) = curr_view.matcheds.get(0) else {
+            unreachable!()
+        };
+        let foc = &*x.code;
+        green_pos.push(None);
+        hightlights.push(HighLightHandle {
+            path: &foc.path[..],
+            color: &TARGET_COLOR,
+            id: x.id,
+            screen_pos: green_pos.last_mut().unwrap(),
+        });
+        let mut pi = foc.path_ids.clone();
+        pi.reverse();
+        let id = ui.id();
+        let bool = ui
+            .ctx()
+            .memory_mut(|mem| mem.data.get_temp::<bool>(id).unwrap_or(trigger));
+        let bool = bool || trigger;
+        if bool {
+            focus.push(Focus::new(&foc.path[..], &pi[..]));
+        }
+        action = content.show(
+            ui,
+            api_addr,
+            aspects,
+            focus,
+            hightlights,
+            curr_view.additions,
+            curr_view.deletions,
+            "",
+            false,
+        );
+        let bool = match action {
+            Action::Focused(_) => false,
+            Action::PartialFocused(_) => trigger,
+            Action::Keep => trigger,
+            _ if trigger => panic!("{:?}", x),
+            _ => false,
+        };
+        if bool {
+            ui.ctx().memory_mut(|mem| {
+                *mem.data.get_temp_mut_or_default::<bool>(id) = true;
+            });
+        } else if !trigger {
+            ui.ctx().memory_mut(|mem| {
+                mem.data.remove_temp::<bool>(id);
+            });
+        }
+    } else {
+        for _ in curr_view.matcheds.iter() {
+            green_pos.push(None);
+        }
+        for (i, g_p) in green_pos.iter_mut().enumerate() {
+            let matched = &curr_view.matcheds[i];
+            hightlights.push(HighLightHandle {
+                path: &matched.code.path[..],
+                color: &TARGET_COLOR,
+                id: matched.id,
+                screen_pos: g_p,
+            });
+        }
+        if DEBUG {
+            ui.painter().debug_rect(
+                ui.clip_rect().shrink(10.0),
+                egui::Color32::GOLD,
+                format!(
+                    "{:?}",
+                    curr_view.matcheds.iter().map(|x| x.id).collect::<Vec<_>>()
+                ),
+            );
+        }
+        let a = content.show(
+            ui,
+            api_addr,
+            aspects,
+            focus,
+            hightlights,
+            curr_view.additions,
+            curr_view.deletions,
+            "",
+            false,
+        );
+        action = match a {
+            Action::PartialFocused(_) => Action::Keep,
+            Action::Focused(_) => Action::Keep,
+            x => x,
+        };
+    }
+    let Some(port) = ports.get_mut(col - min_col) else {
+        return action;
+    };
+    for (i, pos) in blue_pos.into_iter().enumerate() {
+        let Some(pos) = pos else {
+            continue;
+        };
+        let k = curr_view.effective_targets[i].id;
+        let id = ui.id().with("blue_highlight").with(k);
+        let x = port
+            .left
+            .entry(k)
+            .or_insert(AttachedVals { id, rect: vec![] });
+        assert_eq!(x.id, id);
+        x.rect.push(pos);
+    }
+    for (i, pos) in green_pos.into_iter().enumerate() {
+        let Some(pos) = pos else {
+            continue;
+        };
+        let k = curr_view.matcheds[i].id;
+        let id = ui.id().with("green_highlight").with(k);
+        let x = port
+            .right
+            .entry(k)
+            .or_insert(AttachedVals { id, rect: vec![] });
+        assert_eq!(x.id, id);
+        x.rect.push(pos);
+    }
+    if DEBUG {
+        ui.painter()
+            .debug_rect(ui.clip_rect(), egui::Color32::WHITE, format!("{:#?}", port));
+    }
+    action
 }
 
 const SC_COPY: egui::KeyboardShortcut =
@@ -1541,12 +1641,10 @@ fn show_commitid_info(
         f_commit(ui, id);
         return;
     };
-    if let Some(cr) = tracked
-        .track
-        .intermediary
-        .as_ref()
+    if let Some(cr) = None
         .or(tracked.track.matched.get(0).as_ref().copied())
         .or(tracked.track.fallback.as_ref())
+    // .or(tracked.track.intermediary.as_ref())
     {
         let id = &cr.file.commit.id;
         f_commit(ui, id);
@@ -1559,7 +1657,7 @@ fn show_commitid_info(
         ui.label(format!("skipped {} commits", commits_processed));
     }
 }
-pub(crate) const TARGET_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 100, 0);
+pub(crate) const TARGET_COLOR: egui::Color32 = egui::Color32::from_rgb(255, 165, 0);
 
 pub(super) fn track(
     ctx: &egui::Context,
@@ -1567,6 +1665,7 @@ pub(super) fn track(
     commit: &Commit,
     file_path: &String,
     range: &Option<Range<usize>>,
+    before: Option<&Commit>,
     flags: &Flags,
 ) -> Promise<ehttp::Result<TrackingResultWithChanges>> {
     let ctx = ctx.clone();
@@ -1579,6 +1678,11 @@ pub(super) fn track(
         } else {
             format!("&{}", flags)
         };
+        let rest = if let Some(before) = before {
+            format!("before={}&{}", before.id.prefix(6), flags)
+        } else {
+            flags
+        };
         format!(
             "http://{}/track/github/{}/{}/{}/{}?start={}&end={}{}",
             api_addr,
@@ -1588,7 +1692,7 @@ pub(super) fn track(
             &file_path,
             &range.start,
             &range.end,
-            flags
+            rest
         )
     } else {
         let flags = if flags.is_empty() {

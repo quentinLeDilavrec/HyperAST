@@ -1127,7 +1127,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                             &self.data.aspects,
                             code_view.prefill_cache.take(),
                             vec![],
-                            None,
+                            vec![],
                             path.iter().map(|x| *x as usize).collect(),
                             ui.id().with(&commit),
                             Some(&[100, 1000]),
@@ -1322,66 +1322,17 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     let store = &data.store;
                     store.demand_nodes(x.iter_nodes_ids());
                 }
-                let api_addr = &data.api_addr;
-
-                let aspects = &mut data.aspects;
-                let selected_projects = &mut data.selected_code_data;
-                let long_tacking = &mut data.long_tracking;
-                let store = data.store.clone();
-
-                let rect = ui.clip_rect();
-                use egui_addon::InteractiveSplitter;
-                InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
-                    ui1.set_clip_rect(ui1.max_rect().intersect(rect));
-                    ui2.set_clip_rect(ui2.max_rect().intersect(rect));
-                    let commit = selected_commit;
-
-                    let left_side = true;
-                    let mut curr_view = tracking::long_tracking::ColView::default();
-                    (curr_view.matcheds).extend(
-                        x.results
-                            .iter_mut()
-                            .enumerate()
-                            .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
-                    );
-
-                    let bl = &(selected_commit.0, *selected_baseline);
-                    ui2.push_id((commit, bl), |ui| {
-                        show_tree_view(
-                            ui,
-                            aspects,
-                            selected_projects,
-                            long_tacking,
-                            store,
-                            commit,
-                            api_addr,
-                            &mut curr_view,
-                        );
-                        ui.separator();
-                    });
-                    let left_side = false;
-                    let mut curr_view = tracking::long_tracking::ColView::default();
-                    (curr_view.matcheds).extend(
-                        x.results
-                            .iter_mut()
-                            .enumerate()
-                            .map(|(i, x)| (if left_side { &mut x.0 } else { &mut x.1 }, i)),
-                    );
-                    ui1.push_id((bl, commit), |ui| {
-                        let store = data.store.clone();
-                        show_tree_view(
-                            ui,
-                            aspects,
-                            selected_projects,
-                            long_tacking,
-                            store,
-                            bl,
-                            api_addr,
-                            &mut curr_view,
-                        );
-                        ui.separator();
-                    });
-                });
+                show_tree_view_pair(
+                    ui,
+                    selected_baseline,
+                    selected_commit,
+                    &data.api_addr,
+                    data.store.clone(),
+                    x,
+                    &mut data.aspects,
+                    &mut data.selected_code_data,
+                    &mut data.long_tracking,
+                );
                 Default::default()
             }
             Tab::ProjectSelection() => {
@@ -1917,8 +1868,8 @@ fn show_tree_view(
     };
     let col = 0;
     let min_col = 0;
-    let mut attacheds: tracking::long_tracking::Attacheds = vec![];
-    let mut defered_focus_scroll = None;
+    let mut attacheds = vec![];
+    let mut deferred_focus_scroll = None;
     tracking::long_tracking::show_tree_view(
         ui,
         min_col,
@@ -1929,10 +1880,10 @@ fn show_tree_view(
         curr_view,
         aspects,
         &mut attacheds,
-        &mut defered_focus_scroll,
+        &mut deferred_focus_scroll,
     );
 
-    if let Some((o, _i, mut scroll)) = defered_focus_scroll {
+    if let Some((o, _i, mut scroll)) = deferred_focus_scroll {
         let o: f32 = o;
         // let g_o = attacheds
         //     .get(i)
@@ -2105,6 +2056,55 @@ fn compute_queries_differential_results(
     data.queries_differential_results = Some((pid, qid, Default::default(), pane, hash));
     let res = data.queries_differential_results.as_mut().unwrap();
     res.2.buffer(prom);
+}
+
+pub(crate) fn show_tree_view_pair(
+    ui: &mut egui::Ui,
+    selected_baseline: &types::Oid,
+    selected_commit: &(ProjectId, types::Oid),
+    api_addr: &String,
+    store: Arc<store::FetchedHyperAST>,
+    x: &mut querying::DetailsResults,
+    aspects: &mut types::ComputeConfigAspectViews,
+    selected_projects: &mut commit::SelectedProjects,
+    long_tacking: &mut tracking::long_tracking::LongTracking,
+) {
+    use egui_addon::InteractiveSplitter;
+    use tracking::long_tracking::ColView;
+    use tracking::long_tracking::PlacedCode;
+
+    let commit = selected_commit;
+    let bl = &(selected_commit.0, *selected_baseline);
+
+    let mut f = |ui: &mut egui::Ui, id_salt: (&_, &_), left_side, commit: &_| {
+        let mut curr_view = ColView::default();
+        (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(|(i, x)| {
+            let code = if left_side { &mut x.0 } else { &mut x.1 };
+            PlacedCode::new(code, i)
+        }));
+
+        ui.push_id(id_salt, |ui| {
+            show_tree_view(
+                ui,
+                aspects,
+                selected_projects,
+                long_tacking,
+                store.clone(),
+                commit,
+                api_addr,
+                &mut curr_view,
+            );
+            ui.separator();
+        })
+    };
+
+    let rect = ui.clip_rect();
+    InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
+        ui1.set_clip_rect(ui1.max_rect().intersect(rect));
+        ui2.set_clip_rect(ui2.max_rect().intersect(rect));
+        f(ui2, (commit, bl), true, commit);
+        f(ui1, (bl, commit), false, bl);
+    });
 }
 
 impl MyTileTreeBehavior<'_> {

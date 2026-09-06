@@ -104,7 +104,7 @@ impl<'a> FetchedViewImpl<'a> {
         let no_change = self.additions.is_none() && self.deletions.is_none();
         let add = self.additions.unwrap_or_default();
         let del = self.deletions.unwrap_or_default();
-        if self.focus.is_some() {
+        if !self.focus.is_empty() {
             load_with_default_open.set_open(true)
         } else if self.open_changed
             && (!add.is_empty() || !del.is_empty() || !self.highlights.is_empty())
@@ -236,7 +236,7 @@ impl<'a> FetchedViewImpl<'a> {
         let no_change = self.additions.is_none() && self.deletions.is_none();
         let add = self.additions.unwrap_or_default();
         let del = self.deletions.unwrap_or_default();
-        if self.focus.is_some() {
+        if !self.focus.is_empty() {
             load_with_default_open.set_open(true)
         } else if self.open_changed
             && (!add.is_empty() || !del.is_empty() || !self.highlights.is_empty())
@@ -392,7 +392,7 @@ impl<'a> FetchedViewImpl<'a> {
         let id = ui.id().with(&self.path);
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
-        if self.focus.is_some() {
+        if !self.focus.is_empty() {
             load_with_default_open.set_open(true)
         }
         let show: FoldRet<_, _> = load_with_default_open
@@ -845,19 +845,20 @@ impl<'a> FetchedViewImpl<'a> {
         path: super::Offsets,
     ) -> ControlFlow<()> {
         let rect = ui.available_rect_before_wrap();
-        let focus = (self.focus.as_ref())
-            .filter(|x| x.offsets.get(0) == Some(&i))
-            .map(|x| {
-                let offsets = &x.offsets[1..];
-                let ids = x.ids.get(1..).unwrap_or(&[]);
-                Focus { offsets, ids }
-            });
-        if self.focus.is_none()
+        if self.focus.is_empty()
             && rect.min.y > 0.0
             && ui.ctx().screen_rect().height() - CLIP_LEN < rect.min.y
         {
             return ControlFlow::Break(());
         }
+        let focus = (self.focus.iter())
+            .filter(|x| x.offsets.get(0) == Some(&i))
+            .map(|x| {
+                let offsets = &x.offsets[1..];
+                let ids = x.ids.get(1..).unwrap_or(&[]);
+                Focus { offsets, ids }
+            })
+            .collect::<Vec<_>>();
         let highlights: Vec<_> =
             vec_extract_if_polyfill::MakeExtractIf::extract_if(&mut self.highlights, |handle| {
                 !handle.path.is_empty() && handle.path[0] == i
@@ -872,7 +873,7 @@ impl<'a> FetchedViewImpl<'a> {
         let mut imp = if let Some(child) = prefill_old.children.get(i) {
             let child_size = prefill_old.children_sizes.get(i).unwrap(); // children and children_sizes should be the same sizes
             let exact_max_y = rect.min.y + *child;
-            if focus.is_none() && exact_max_y < CLIP_LEN {
+            if focus.is_empty() && exact_max_y < CLIP_LEN {
                 prefill.children.push(*child);
                 prefill.children_sizes.push(*child_size);
                 if let (Some(child_size), Some(gp)) = (child_size, &mut global_pos) {
@@ -916,7 +917,7 @@ impl<'a> FetchedViewImpl<'a> {
                     additions,
                     deletions,
                     global_pos: None,
-                    open_changed: true,
+                    open_changed: self.open_changed,
                 }
             }
         } else if i == prefill_old.children.len() {
@@ -940,7 +941,7 @@ impl<'a> FetchedViewImpl<'a> {
                 additions,
                 deletions,
                 global_pos: None,
-                open_changed: true,
+                open_changed: self.open_changed,
             }
         } else {
             FetchedViewImpl {
@@ -956,7 +957,7 @@ impl<'a> FetchedViewImpl<'a> {
                 additions,
                 deletions,
                 global_pos: None,
-                open_changed: true,
+                open_changed: self.open_changed,
             }
         };
         let _size;
@@ -1012,9 +1013,9 @@ impl<'a> FetchedViewImpl<'a> {
             });
             _size = None;
             self.store.demand_node(*c);
-            if let Some(focus) = &imp.focus {
+            if let Some(focus) = &imp.focus.first() {
                 imp.draw_count += 1;
-                if let Some(x) = self.focus.as_ref().unwrap().ids.first() {
+                if let Some(x) = focus.ids.first() {
                     imp.additions = None;
                     imp.deletions = None;
                     let offset = focus.offsets.first().copied();
@@ -1139,19 +1140,25 @@ fn selection_highlight(
     if !clip.intersects(rect) {
         return;
     }
+
     // TODO: Implement proper highlighting logic
     // this is definitely brittle
     if color == egui::Color32::BLUE {
-        let _id = root_ui_id.with("blue_highlight").with(id);
-        let pos = egui::pos2(min.x - 15.0, min.y - 10.0);
+        // let _id = root_ui_id.with("blue_highlight").with(id).with(handle.path);
+        let pos = rect.center();
+        // let pos = egui::pos2(min.x - 15.0, min.y - 10.0);
         let pos = clip.clamp(pos);
         if ui.clip_rect().contains(pos) {
             // show_port(ui, id, pos);
             *ret_pos = Some(rect);
         }
     } else if color == TARGET_COLOR {
-        let _id = root_ui_id.with("green_highlight").with(id);
-        let pos = egui::pos2(rect.max.x - 10.0, rect.min.y - 10.0);
+        // let _id = root_ui_id
+        //     .with("green_highlight")
+        //     .with(id)
+        //     .with(handle.path);
+        let pos = rect.center();
+        // let pos = egui::pos2(rect.max.x - 10.0, rect.min.y - 10.0);
         let pos = clip.clamp(pos);
         if ui.clip_rect().contains(pos) {
             // show_port(ui, id, pos);

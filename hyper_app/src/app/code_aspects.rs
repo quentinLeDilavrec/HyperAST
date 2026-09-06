@@ -186,11 +186,12 @@ pub(crate) fn show(
             ui,
             api_addr,
             aspects,
-            None,
+            vec![],
             vec![], //(&hightlight, &egui::Color32::RED, &mut None)
             None,
             None,
             &aspects.path,
+            true,
         );
         aspects.on_action(action);
     };
@@ -277,11 +278,12 @@ impl FetchedView {
         ui: &mut egui::Ui,
         api_addr: &str,
         aspects: &ComputeConfigAspectViews,
-        focus: Option<Focus<'_>>,
+        focus: Vec<Focus<'_>>,
         hightlights: Vec<HighLightHandle<'_>>,
         additions: Option<&[u32]>,
         deletions: Option<&[u32]>,
         path: &str,
+        open_changed: bool,
     ) -> Action {
         let take = self.prefill_cache.take();
         // ui.allocate_space((h, ui.available_size().x).into());
@@ -297,6 +299,7 @@ impl FetchedView {
             additions,
             deletions,
         );
+        imp.open_changed = open_changed;
         let r = imp.show(ui, api_addr, &self.root);
         self.prefill_cache = imp.prefill_cache;
         r

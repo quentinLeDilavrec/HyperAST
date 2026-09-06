@@ -54,8 +54,12 @@ impl std::ops::AddAssign for Action {
     fn add_assign(&mut self, other: Self) {
         match (self, other) {
             (_, Action::Keep) => {}
-            (slf@Action::Keep, other) => { *slf = other;}
-            (Action::Clicked(_), Action::Clicked(_)) => { unreachable!() }
+            (slf @ Action::Keep, other) => {
+                *slf = other;
+            }
+            (Action::Clicked(_), Action::Clicked(_)) => {
+                unreachable!()
+            }
             (slf, other) => {
                 dbg!(slf, other);
             }
@@ -72,13 +76,13 @@ pub(crate) struct FetchedViewImpl<'a> {
     min_before_count: usize,
     draw_count: usize,
     highlights: Vec<HighLightHandle<'a>>,
-    focus: Option<super::code_aspects::Focus<'a>>,
+    focus: Vec<super::code_aspects::Focus<'a>>,
     path: Offsets,
     root_ui_id: egui::Id,
     additions: Option<&'a [u32]>,
     deletions: Option<&'a [u32]>,
     global_pos: Option<u32>,
-    open_changed: bool,
+    pub(super) open_changed: bool,
 }
 
 impl<'a> Debug for FetchedViewImpl<'a> {
@@ -97,7 +101,7 @@ impl<'a> FetchedViewImpl<'a> {
         aspects: &'a super::types::ComputeConfigAspectViews,
         take: Option<PrefillCache>,
         highlights: Vec<HighLightHandle<'a>>,
-        focus: Option<super::code_aspects::Focus<'a>>,
+        focus: Vec<super::code_aspects::Focus<'a>>,
         path: Offsets,
         root_ui_id: egui::Id,
         additions: Option<&'a [u32]>,
@@ -110,7 +114,7 @@ impl<'a> FetchedViewImpl<'a> {
             draw_count: 0,
             min_before_count: 0,
             highlights,
-            focus,
+            focus: focus.into_iter().collect(),
             path,
             root_ui_id,
             additions,

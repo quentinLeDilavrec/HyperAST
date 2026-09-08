@@ -238,7 +238,7 @@ pub(crate) struct HighLightHandle<'a> {
     /// primary key
     pub color: &'a egui::Color32,
     /// secondary key
-    pub id: usize,
+    pub interact: bool,
     /// return value by reference
     pub screen_pos: &'a mut Option<egui::Rect>,
 }

@@ -1477,7 +1477,7 @@ fn show_tree_view_aux(
         hightlights.push(HighLightHandle {
             path: &x.code.path[..],
             color: &egui::Color32::BLUE,
-            id: x.id,
+            interact: true,
             screen_pos: b_p,
         });
     }
@@ -1490,7 +1490,7 @@ fn show_tree_view_aux(
         hightlights.push(HighLightHandle {
             path: &foc.path[..],
             color: &TARGET_COLOR,
-            id: x.id,
+            interact: true,
             screen_pos: green_pos.last_mut().unwrap(),
         });
         let mut pi = foc.path_ids.clone();
@@ -1539,7 +1539,7 @@ fn show_tree_view_aux(
             hightlights.push(HighLightHandle {
                 path: &matched.code.path[..],
                 color: &TARGET_COLOR,
-                id: matched.id,
+                interact: true,
                 screen_pos: g_p,
             });
         }

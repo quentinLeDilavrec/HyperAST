@@ -867,7 +867,7 @@ impl<'a> FetchedViewImpl<'a> {
                 path: &handle.path[1..],
                 color: handle.color,
                 screen_pos: handle.screen_pos,
-                id: handle.id,
+                interact: handle.interact,
             })
             .collect();
         let mut imp = if let Some(child) = prefill_old.children.get(i) {
@@ -1114,58 +1114,36 @@ impl<'a> FetchedViewImpl<'a> {
 fn selection_highlight(
     ui: &mut egui::Ui,
     handle: &mut HighLightHandle<'_>,
-    min: epaint::Pos2,
+    _min: epaint::Pos2,
     rect: epaint::Rect,
-    root_ui_id: egui::Id,
+    _root_ui_id: egui::Id,
 ) {
     if !handle.path.is_empty() {
         return;
     }
-    let color = *handle.color;
-    let id = handle.id;
-    let ret_pos = &mut *handle.screen_pos;
     let clip = ui.clip_rect();
-    let min_elem = clip.size().min_elem();
-    if clip.intersects(rect) {
-        ui.painter().debug_rect(rect, color, "");
-    }
-    let clip = if min_elem < 1.0 {
-        clip
-    } else {
-        let mut clip = clip.shrink((min_elem / 2.0).min(4.0));
-        clip.set_width((clip.width() - 14.0).max(0.0));
-        clip
-    };
+    // let min_elem = clip.size().min_elem();
+    // let clip = if min_elem < 1.0 {
+    //     clip
+    // } else {
+    //     let mut clip = clip.shrink((min_elem / 2.0).min(4.0));
+    //     clip.set_width((clip.width() - 14.0).max(0.0));
+    //     clip
+    // };
 
     if !clip.intersects(rect) {
         return;
     }
 
-    // TODO: Implement proper highlighting logic
-    // this is definitely brittle
-    if color == egui::Color32::BLUE {
-        // let _id = root_ui_id.with("blue_highlight").with(id).with(handle.path);
+    ui.painter().debug_rect(rect, *handle.color, "");
+
+    if handle.interact {
         let pos = rect.center();
-        // let pos = egui::pos2(min.x - 15.0, min.y - 10.0);
         let pos = clip.clamp(pos);
-        if ui.clip_rect().contains(pos) {
-            // show_port(ui, id, pos);
-            *ret_pos = Some(rect);
-        }
-    } else if color == TARGET_COLOR {
-        // let _id = root_ui_id
-        //     .with("green_highlight")
-        //     .with(id)
-        //     .with(handle.path);
-        let pos = rect.center();
-        // let pos = egui::pos2(rect.max.x - 10.0, rect.min.y - 10.0);
-        let pos = clip.clamp(pos);
-        if ui.clip_rect().contains(pos) {
-            // show_port(ui, id, pos);
-            *ret_pos = Some(rect);
+        if clip.contains(pos) {
+            *handle.screen_pos = Some(rect);
         }
     }
-    ui.painter().debug_rect(rect, color, "");
 }
 
 fn show_node_menu(ui: &mut egui::Ui, interact: egui::Response, kind: AnyType) -> Option<Action> {

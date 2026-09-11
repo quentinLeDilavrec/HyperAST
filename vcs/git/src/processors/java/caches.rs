@@ -5,6 +5,7 @@ use crate::processing::{ObjectMapper, ObjectName};
 
 #[derive(Default)]
 pub struct JavaCaches {
+    pub(crate) _md_cache: Option<hyperast::tree_gen::extra_pattern_precomp::MDCache>,
     pub(crate) md_cache: hyperast_gen_ts_java::legion_with_refs::MDCache,
     /// Passed to subtree builder when deriving different data (assumed to be incompatible).
     pub(crate) dedup: DedupMap,

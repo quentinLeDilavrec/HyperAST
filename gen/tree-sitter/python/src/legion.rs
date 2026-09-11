@@ -34,7 +34,7 @@ fn medium_extra_pattern_precomp() {
     let (precomp, _q) = Query::with_precomputed(query, lang, precomp) //
         .unwrap_or_else(|e| panic!("\n{e}"));
     let more = PreparedQuerying::<_, TStore, Acc<Type>>::from(&precomp);
-    let mut extra = Precomp::<_, Acc<Type>, _>::from(more);
+    let mut extra = Precomp::<_, Acc<Type>, _>::with_cache(more, Default::default());
 
     let mut stores = Default::default();
     let mut r#gen = PythonTreeGen::new(&mut stores, &mut extra);

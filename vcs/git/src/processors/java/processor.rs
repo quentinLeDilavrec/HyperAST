@@ -472,13 +472,16 @@ impl RepositoryProcessor {
                     type Acc = hyperast::tree_gen::zipped_ts_extra::Acc<Type>;
                     let more = hyperast_tsquery::PreparedQuerying::<_, TStore, Acc>::from(more);
                     use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
-                    let mut extra = PatternPrecompExtra::<_, Acc, _>::from(more);
+                    let cache = java_proc.cache._md_cache.take().unwrap_or_default();
+                    let mut extra = PatternPrecompExtra::<_, Acc, _>::with_cache(more, cache);
 
                     let mut java_tree_gen =
                         hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen::new(stores, &mut extra)
                             .set_line_break(line_break);
-                    super::handle_java_file2(&mut java_tree_gen, n, t).map(|x| x.map(|x| x.into()))
-                    // .map(simp2full)
+                    let r = super::handle_java_file2(&mut java_tree_gen, n, t)
+                        .map(|x| x.map(|x| x.into()));
+                    java_proc.cache._md_cache = Some(extra.md_cache);
+                    r
                 } else {
                     use hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen;
                     let mut java_tree_gen = JavaTreeGen::bare(stores) //
@@ -491,11 +494,17 @@ impl RepositoryProcessor {
                 self.parsing_time += r.parsing_time;
                 self.processing_time += r.processing_time;
                 log::info!(
-                    "parsing, processing, n, f: {} {} {} {}",
+                    "parsing, processing, n, f: {} {} {} {} {}",
                     self.parsing_time.as_secs(),
                     self.processing_time.as_secs(),
                     java_proc.cache.md_cache.len(),
-                    java_proc.cache.object_map.len()
+                    java_proc.cache.object_map.len(),
+                    java_proc
+                        .cache
+                        ._md_cache
+                        .as_ref()
+                        .map(|c| c.len())
+                        .unwrap_or(0),
                 );
 
                 let r: super::FullNode = r.node;

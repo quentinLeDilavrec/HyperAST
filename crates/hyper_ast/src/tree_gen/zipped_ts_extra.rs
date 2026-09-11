@@ -165,7 +165,7 @@ impl<T, Acc> Default for NoOpExtra<T, Acc> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq, Debug)]
 pub struct EmptyExtra;
 
 impl std::ops::AddAssign for EmptyExtra {
@@ -595,8 +595,8 @@ where
         };
         // TODO test perf if lookup fail is costly for not caching spaces
         match res {
-            Ok((hashs, line_count)) => self.extra.from_cache(id, || node(hashs, line_count)),
-            Err(hashs) => self.extra.from_cache(id, || {
+            Ok((hashs, line_count)) => self.extra.from_cache0(id, || node(hashs, line_count)),
+            Err(hashs) => self.extra.from_cache0(id, || {
                 let line_count = spacing
                     .matches(std::str::from_utf8(line_break).expect("use a proper utf8 line break"))
                     .count();
@@ -722,6 +722,18 @@ where
         let insertion = node_store.inner.prepare_insertion(dedup, hashable, eq);
 
         if let Some(compressed_node) = insertion.occupied_id() {
+            if cfg!(debug_assertions) {
+                log::info!("occupied {} {:?}", kind, compressed_node);
+                let node_store = &self.stores.node_store.inner;
+                let stores = SimpleStores {
+                    type_store,
+                    label_store: &*label_store,
+                    node_store,
+                };
+                acc = self
+                    .extra
+                    .check_cache(stores, compressed_node, acc, label.as_deref())
+            }
             self.extra.from_cache(compressed_node, move || FullNode {
                 global: global.simple(),
                 local: Local {
@@ -778,6 +790,9 @@ where
 
             let id = vacant.insert_built(dyn_builder.build());
 
+            if cfg!(debug_assertions) {
+                log::info!("inserted {} {:?}", kind, id);
+            }
             self.extra.to_cache(
                 id,
                 FullNode {

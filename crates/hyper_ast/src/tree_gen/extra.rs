@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use super::*;
 
-impl<Acc, Extra> WithExtra for AccWithExtra<Acc, Extra> {
+impl<Acc, Extra: Debug + Eq> WithExtra for AccWithExtra<Acc, Extra> {
     type Extra = Extra;
 
     fn extra(&mut self) -> &mut Self::Extra {

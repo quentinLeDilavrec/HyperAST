@@ -17,7 +17,7 @@ impl<A, B> From<(A, B)> for ChainedExtra<A, B> {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct DerivedDataPair<A, B>(pub A, pub B);
 
 impl<A: Debug, B: Debug> Debug for DerivedDataPair<A, B> {
@@ -48,6 +48,8 @@ where
     <<B as Extra<HAST, Acc>>::Acc as WithExtra>::Extra: AddAssign + Default,
     //
     HAST::IdN: Copy,
+    <<A as Extra<HAST, Acc>>::Acc as WithExtra>::Extra: Eq + Debug,
+    <<B as Extra<HAST, Acc>>::Acc as WithExtra>::Extra: Eq + Debug,
 {
     type Acc = AccWithExtra<
         Acc,
@@ -66,7 +68,7 @@ where
         ))
     }
 
-    fn from_cache(
+    fn from_cache0(
         &mut self,
         id: HAST::IdN,
         or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
@@ -75,8 +77,48 @@ where
         // (or_else(), self._from_cache(id).unwrap_or_default()).into()
         // give to the second extra the opportunity to cache `Acc::Node`
         let a = self.0._from_cache(id).unwrap_or_default();
+        let (n, b) = self.1.from_cache0(id, or_else).into();
+        (n, DerivedDataPair(a, b)).into()
+    }
+
+    fn from_cache(
+        &mut self,
+        id: HAST::IdN,
+        or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
+    ) -> Self::Node {
+        // // use the _from_cache
+        // (or_else(), self._from_cache(id).unwrap_or_default()).into()
+        // give to the second extra the opportunity to cache `Acc::Node`
+        let a = self.0._from_cache(id).unwrap();
         let (n, b) = self.1.from_cache(id, or_else).into();
         (n, DerivedDataPair(a, b)).into()
+    }
+
+    fn check_cache(
+        &mut self,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
+        id: <HAST>::IdN,
+        acc: Self::Acc,
+        label: Option<&str>,
+    ) -> Self::Acc
+    where
+        <Self::Acc as WithExtra>::Extra: Eq + Debug,
+    {
+        let cached_a = self.0._from_cache(id).unwrap_or_default();
+        let cached_b = self.1._from_cache(id).unwrap_or_default();
+
+        let AccWithExtra(acc, DerivedDataPair(a, b)) = acc;
+        let acc = (acc, a).into();
+        let acc = Extra::<HAST, _>::check_cache(&mut self.0, stores, id, acc, label.clone());
+        let (acc, a) = acc.into();
+        let acc = (acc, b).into();
+        let acc = Extra::<HAST, _>::check_cache(&mut self.1, stores, id, acc, label.clone());
+        let (acc, b) = acc.into();
+
+        assert_eq!(cached_a, a);
+        assert_eq!(cached_b, b);
+
+        AccWithExtra(acc, DerivedDataPair(a, b))
     }
 
     fn extra(

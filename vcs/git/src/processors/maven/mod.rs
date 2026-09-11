@@ -43,6 +43,7 @@ pub struct MavenProc {
 pub struct FullNode {
     pub id: hyperast::store::defaults::NodeIdentifier,
     pub metrics: crate::DefaultMetrics,
+    // intentionally merges precomp queries from different languages (thus from different precomp queries) causing collisions. It has no impact on validity
     pub precomp_queries: super::PrecompQueries,
     pub(crate) status: EnumSet<SemFlag>,
     // TODO even if almost everyone is using the defaults, use it
@@ -154,6 +155,7 @@ impl MavenModuleAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries = full_node.precomp_queries;
     }
     pub(crate) fn push_source_directory(
         &mut self,
@@ -167,6 +169,7 @@ impl MavenModuleAcc {
             line_count: 0,
             ..full_node.metrics
         });
+        self.precomp_queries = full_node.precomp_queries;
         // TODO ana
         // full_node.2.acc(&Type::Directory, &mut self.ana);
     }
@@ -182,6 +185,7 @@ impl MavenModuleAcc {
             line_count: 0,
             ..full_node.metrics
         });
+        self.precomp_queries = full_node.precomp_queries;
         // TODO ana
         // full_node.2.acc(&Type::Directory, &mut self.ana);
     }
@@ -239,6 +243,7 @@ impl hyperast::tree_gen::Accumulator for MavenModuleAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries = full_node.precomp_queries;
     }
 }
 

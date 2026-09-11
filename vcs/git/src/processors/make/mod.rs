@@ -48,6 +48,7 @@ pub struct MakeModuleAcc {
     pub(crate) sub_modules: Option<Vec<PathBuf>>,
     pub(crate) main_dirs: Option<Vec<PathBuf>>,
     pub(crate) test_dirs: Option<Vec<PathBuf>>,
+    // intentionally merges precomp queries from different languages (thus from different precomp queries) causing collisions. It has no impact on validity
     pub(crate) precomp_queries: PrecompQueries,
 }
 
@@ -115,16 +116,19 @@ impl MakeModuleAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries = full_node.precomp_queries;
     }
     pub(crate) fn push_source_file(&mut self, name: LabelIdentifier, full_node: FullNode) {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries = full_node.precomp_queries;
     }
     pub(crate) fn push_source_directory(&mut self, name: LabelIdentifier, full_node: FullNode) {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries = full_node.precomp_queries;
     }
     pub(crate) fn push_test_source_directory(
         &mut self,
@@ -134,6 +138,7 @@ impl MakeModuleAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
+        self.precomp_queries = full_node.precomp_queries;
     }
 }
 

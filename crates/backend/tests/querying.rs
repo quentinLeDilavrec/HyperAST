@@ -1,14 +1,15 @@
 use backend::AppState;
+use hyperast::{position::position_accessors::WithPostOrderPath, types::HyperAST};
 
-#[ignore] // ignore (from normal cargo test) for now, later make a feature
+// #[ignore] // ignore (from normal cargo test) for now, later make a feature
 #[test_log::test]
 // slow test, more of an integration test, try using release
-fn test_querying() -> Result<(), Box<dyn std::error::Error>> {
+fn test_querying_graphhopper() -> Result<(), Box<dyn std::error::Error>> {
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo("graphhopper", "graphhopper");
     let commit = "f5f2b7765e6b392c5e8c7855986153af82cc1abe";
     let query = r#"(try_statement
     (block
-        (expression_statement 
+        (expression_statement
             (method_invocation
                 (identifier) (#EQ? "fail")
             )
@@ -17,7 +18,7 @@ fn test_querying() -> Result<(), Box<dyn std::error::Error>> {
     (catch_clause)
 ) @root
     "#;
-    compare_querying_with_and_without_skipping(repo_spec, commit, query)
+    compare_querying_with_and_without_skipping(repo_spec, commit, query, &["(try_statement)"])
 }
 
 /// use this in a test if you suspect a querying discrepancy on a commit due to the subtree skipping feature,
@@ -26,6 +27,7 @@ fn compare_querying_with_and_without_skipping(
     repo_spec: hyperast_vcs_git::git::Repo,
     commit: &str,
     query: &str,
+    pre: &[&str],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let lang = "Java";
     let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
@@ -35,7 +37,7 @@ fn compare_querying_with_and_without_skipping(
         .repositories
         .write()
         .unwrap()
-        .register_config_with_prequeries(repo_spec.clone(), config, &["(try_statement)"]);
+        .register_config_with_prequeries(repo_spec.clone(), config, pre);
     let repo = state
         .repositories
         .read()
@@ -98,6 +100,19 @@ fn compare_querying_with_and_without_skipping(
         log::info!("m: {:?}", m);
         log::info!("m: {:?}", m.make_file_line_range(stores));
         let m_incr = qcursor_incr.next();
+        if m_incr.is_none() {
+            for x in m.iter_offsets_and_parents() {
+                log::info!("offset: {:?}", x.0);
+                log::info!("parent: {:?}", stores.resolve_type(&x.1).as_static_str());
+                let resolve = stores.node_store.resolve(x.1);
+                let y = resolve.get_component::<hyperast::store::nodes::compo::Precomp<u16>>();
+                if let Ok(precomp) = y {
+                    log::info!("precomp: {:b}", precomp.0);
+                }
+            }
+
+            panic!("incremental match is missing results");
+        }
         let m_incr = &m_incr
             .as_ref()
             .unwrap()
@@ -107,6 +122,24 @@ fn compare_querying_with_and_without_skipping(
             .pos;
         log::info!("m_incr: {:?}", m_incr);
         log::info!("m_incr: {:?}", m_incr.make_file_line_range(stores));
+        if m.make_file_line_range(stores) != m_incr.make_file_line_range(stores) {
+            for x in m.iter_offsets_and_parents() {
+                log::info!("offset: {:?}", x.0);
+                log::info!("parent: {:?}", stores.resolve_type(&x.1).as_static_str());
+                let resolve = stores.node_store.resolve(x.1);
+                let y = resolve.get_component::<hyperast::store::nodes::compo::Precomp<u16>>();
+                if let Ok(precomp) = y {
+                    log::info!("precomp: {:b}", precomp.0);
+                } else {
+                    assert!(
+                        resolve
+                            .get_component::<hyperast::store::nodes::compo::PrecompFlag>()
+                            .is_ok(),
+                        "node was not processed with precomp feature"
+                    );
+                }
+            }
+        }
         assert_eq!(
             m.make_file_line_range(stores),
             m_incr.make_file_line_range(stores)

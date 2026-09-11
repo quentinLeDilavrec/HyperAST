@@ -11,6 +11,8 @@ use crate::compat::HashMap;
 use crate::store::nodes::GatherAttrErazed;
 use crate::types::StoreRefAssoc;
 
+pub type MDCache = hashbrown::HashMap<crate::store::defaults::NodeIdentifier, PrecompQueries>;
+
 /// Extra data for the pattern pre-computation step.
 ///
 /// More should be an instance of `hyperast_tsquery::PreparedQuerying<&Query, TS, Acc>,`
@@ -20,11 +22,11 @@ pub struct PatternPrecompExtra<IdN, Acc, More> {
     _phantom: PhantomData<Acc>,
 }
 
-impl<IdN, Acc, More> From<More> for PatternPrecompExtra<IdN, Acc, More> {
-    fn from(more: More) -> Self {
-        Self::with_cache(more, Default::default())
-    }
-}
+// impl<IdN, Acc, More> From<More> for PatternPrecompExtra<IdN, Acc, More> {
+//     fn from(more: More) -> Self {
+//         Self::with_cache(more, Default::default())
+//     }
+// }
 
 impl<IdN, Acc, More> PatternPrecompExtra<IdN, Acc, More> {
     pub fn with_cache(more: More, md_cache: HashMap<IdN, PrecompQueries>) -> Self {
@@ -36,7 +38,7 @@ impl<IdN, Acc, More> PatternPrecompExtra<IdN, Acc, More> {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct PrecompQueries(pub u16);
 
 impl Debug for PrecompQueries {
@@ -83,13 +85,40 @@ where
         self.md_cache.get(&id).cloned()
     }
 
-    fn from_cache(
+    fn from_cache0(
         &mut self,
         id: HAST::IdN,
         or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
     ) -> Self::Node {
         let precomp = self._from_cache(id).unwrap_or_default();
         (or_else(), precomp).into()
+    }
+
+    fn from_cache(
+        &mut self,
+        id: HAST::IdN,
+        or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
+    ) -> Self::Node {
+        let precomp = self._from_cache(id).unwrap();
+        (or_else(), precomp).into()
+    }
+
+    fn check_cache(
+        &mut self,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
+        id: HAST::IdN,
+        mut acc: Self::Acc,
+        label: Option<&str>,
+    ) -> Self::Acc
+    where
+        <Self::Acc as WithExtra>::Extra: Eq + Debug,
+    {
+        use super::More;
+        let cached = self._from_cache(id).unwrap();
+        acc.extra().0 |=
+            More::<HAST>::match_precomp_queries(&self.more, stores, &acc, label.as_deref());
+        assert_eq!(cached.0, acc.extra().0);
+        acc
     }
 
     fn extra(
@@ -121,6 +150,9 @@ where
         node: <Acc as Accumulator>::Node,
         acc: Self::Acc,
     ) -> Self::Node {
+        if cfg!(debug_assertions) {
+            log::info!("{:?}", acc.1);
+        }
         let (_acc, extra) = acc.into();
         let extra = self._to_cache(id, extra);
         (node, extra).into()

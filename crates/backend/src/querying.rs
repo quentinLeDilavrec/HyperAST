@@ -1234,6 +1234,7 @@ fn filtering_pred(
     log::debug!("mapped = {}", r);
     r
 }
+
 type Names = Vec<IdN>;
 fn differential_aux(
     stores: &SimpleStores<TStore>,

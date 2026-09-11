@@ -736,11 +736,33 @@ pub trait Extra<HAST: StoreRefAssoc, Acc: Accumulator> {
         None
     }
 
+    fn from_cache0(
+        &mut self,
+        id: HAST::IdN,
+        or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
+    ) -> Self::Node {
+        self.from_cache(id, or_else)
+    }
+
     fn from_cache(
         &mut self,
         id: HAST::IdN,
         or_else: impl FnOnce() -> <Acc as Accumulator>::Node,
     ) -> Self::Node;
+
+    fn check_cache(
+        &mut self,
+        stores: <HAST as StoreRefAssoc>::S<'_>,
+        id: HAST::IdN,
+        acc: Self::Acc,
+        label: Option<&str>,
+    ) -> Self::Acc
+    where
+        <Self::Acc as WithExtra>::Extra: Eq + Debug,
+    {
+        let _ = (stores, id, label);
+        acc
+    }
 
     fn extra(
         &mut self,
@@ -1032,7 +1054,7 @@ impl<T, Acc> Default for NoOpMore<T, Acc> {
 }
 
 pub trait WithExtra {
-    type Extra;
+    type Extra: Debug + Eq; // bounds used to check cache consistency
     fn extra(&mut self) -> &mut Self::Extra;
 }
 

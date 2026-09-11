@@ -75,7 +75,7 @@ fn medium_extra_pattern_precomp() {
     let (precomp, _q) = Query::with_precomputed(query, lang, precomp) //
         .unwrap_or_else(|e| panic!("\n{e}"));
     let more = PreparedQuerying::<_, TStore, Acc<Type>>::from(&precomp);
-    let mut extra = Precomp::<_, Acc<Type>, _>::from(more);
+    let mut extra = Precomp::<_, Acc<Type>, _>::with_cache(more, Default::default());
 
     let mut stores = Default::default();
     let mut r#gen = CppTreeGen::new(&mut stores, &mut extra);
@@ -131,9 +131,9 @@ fn medium_extra_double_pattern_precomp() {
     let (precomp, query) = Query::with_precomputed(query, lang, precomp) //
         .unwrap_or_else(|e| panic!("\n{e}"));
     let more = PreparedQuerying::<_, TStore, Acc<Type>>::from(&precomp);
-    let extra = Precomp::<_, Acc<Type>, _>::from(more);
+    let extra = Precomp::<_, Acc<Type>, _>::with_cache(more, Default::default());
     let more = PreparedQuerying::<_, TStore, Acc<Type>>::from(&precomp);
-    let extra2 = Precomp::<_, Acc<Type>, _>::from(more);
+    let extra2 = Precomp::<_, Acc<Type>, _>::with_cache(more, Default::default());
     let mut extra = ChainedExtra(extra, extra2);
 
     let mut stores = Default::default();

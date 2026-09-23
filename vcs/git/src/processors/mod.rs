@@ -62,6 +62,37 @@ impl From<FNode> for FullNode {
     }
 }
 
+pub struct ProcessorCache<MD = PrecompQueries, N = FullNode> {
+    pub(crate) md_cache:
+        hyperast::compat::HashMap<hyperast::store::nodes::legion::NodeIdentifier, MD>,
+    pub(crate) dedup: hyperast::store::nodes::legion::DedupMap,
+    pub object_map: crate::processing::caches::NamedMap<N>,
+}
+
+impl<MD, N> Default for ProcessorCache<MD, N> {
+    fn default() -> Self {
+        Self {
+            md_cache: Default::default(),
+            dedup: Default::default(),
+            object_map: Default::default(),
+        }
+    }
+}
+
+impl<MD, N> crate::processing::ObjectMapper for ProcessorCache<MD, N> {
+    type K = (git2::Oid, crate::processing::ObjectName);
+
+    type V = N;
+
+    fn get(&self, key: &Self::K) -> Option<&Self::V> {
+        self.object_map.get(key)
+    }
+
+    fn insert(&mut self, key: Self::K, value: Self::V) -> Option<Self::V> {
+        self.object_map.insert(key, value)
+    }
+}
+
 fn prepare_dir_exploration(tree: &git2::Tree) -> impl Iterator<Item = crate::git::BasicGitObject> {
     tree.iter()
         .rev()

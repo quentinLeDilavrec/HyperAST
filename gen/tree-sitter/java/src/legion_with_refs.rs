@@ -479,9 +479,7 @@ where
         acc: Self::Acc,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let label = if acc.labeled {
-            std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
-                .ok()
-                .map(|x| x.to_string())
+            std::str::from_utf8(&text[acc.start_byte..acc.end_byte]).ok()
         } else {
             None
         };
@@ -609,7 +607,7 @@ where
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
 
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(spacing).unwrap();
 
         let dedup = &mut self.stores.node_store.dedup;
         let dedup = self.dedup.as_mut().map_or(dedup, |x| &mut x.0);
@@ -632,7 +630,7 @@ where
             dedup,
             line_break,
             interned_kind,
-            &spacing,
+            spacing,
             more,
         );
         debug_assert!(
@@ -687,7 +685,7 @@ where
             }
         });
 
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
+        let label = Some(std::str::from_utf8(name).unwrap());
 
         use hyperast::types::HyperType;
         if !acc.simple.kind.is_file() {
@@ -745,7 +743,7 @@ where
         &mut self,
         global: &mut Self::Global,
         mut acc: Self::Acc,
-        label: Option<String>,
+        label: Option<&str>,
     ) -> <Self::Acc as Accumulator>::Node {
         let stores = &mut self.stores;
         let more = &mut self.more;
@@ -791,7 +789,7 @@ where
                 &insertion,
             );
             let mut metrics = metrics.map_hashs(|h| h.build());
-            let own_line_count = tree_gen::newline_count(&label);
+            let own_line_count = tree_gen::newline_count(&label.as_deref());
             metrics.line_count += own_line_count;
 
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();

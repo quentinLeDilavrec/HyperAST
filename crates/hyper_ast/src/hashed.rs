@@ -16,7 +16,7 @@ pub trait NodeHashs {
 }
 
 pub trait ComputableNodeHashs: NodeHashs {
-    fn prepare<T: ?Sized + Hash>(t: &T) -> Self::Hash;
+    fn prepare<T: Hash>(t: T) -> Self::Hash;
     fn compute(
         &self,
         kind: &Self::Kind,
@@ -35,7 +35,7 @@ pub struct SyntaxNodeHashs<T: PrimInt> {
 }
 
 pub trait IndexingHashBuilder<H> {
-    fn new<K: ?Sized + Hash, L: ?Sized + Hash>(hashs: H, k: &K, l: &L, size: impl PrimInt) -> Self;
+    fn new<K: Hash, L: Hash>(hashs: H, k: K, l: L, size: impl PrimInt) -> Self;
     fn most_discriminating(&self) -> impl Hash + Copy;
 }
 pub trait MetaDataHashsBuilder<H>: IndexingHashBuilder<H> {
@@ -55,7 +55,7 @@ where
     H::Hash: Hash + Copy,
 {
     /// use size ignoring spaces to stay consistent with other AST approaches, i.e. those not tracking spaces
-    fn new<K: ?Sized + Hash, L: ?Sized + Hash>(hashs: H, k: &K, l: &L, size: impl PrimInt) -> Self {
+    fn new<K: Hash, L: Hash>(hashs: H, k: K, l: L, size: impl PrimInt) -> Self {
         // TODO redo a better builder
         let k = H::prepare(k);
         let l = H::prepare(l);
@@ -145,9 +145,9 @@ impl<T: PrimInt + WrappingAdd + Hash> NodeHashs for SyntaxNodeHashs<T> {
 }
 
 impl ComputableNodeHashs for SyntaxNodeHashs<u32> {
-    fn prepare<U: ?Sized + Hash>(x: &U) -> u32 {
+    fn prepare<U: Hash>(x: U) -> u32 {
         use crate::utils::{self, clamp_u64_to_u32};
-        clamp_u64_to_u32(&utils::hash(x))
+        clamp_u64_to_u32(&utils::hash(&x))
     }
 
     fn compute(

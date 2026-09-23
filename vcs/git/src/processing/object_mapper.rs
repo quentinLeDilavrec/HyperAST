@@ -47,7 +47,7 @@ impl TryInto<String> for &ObjectName {
     type Error = std::str::Utf8Error;
 
     fn try_into(self) -> Result<String, Self::Error> {
-        std::str::from_utf8(&self.0).map(|x| x.to_string())
+        std::str::from_utf8(&self.0).map(|s| s.to_owned())
     }
 }
 
@@ -55,6 +55,6 @@ impl TryInto<String> for ObjectName {
     type Error = std::str::Utf8Error;
 
     fn try_into(self) -> Result<String, Self::Error> {
-        std::str::from_utf8(&self.0).map(|x| x.to_string())
+        String::from_utf8(self.0).map_err(|e| e.utf8_error())
     }
 }

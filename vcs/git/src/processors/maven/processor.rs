@@ -72,7 +72,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree, &mut dir_path);
-        let name = std::str::from_utf8(&name).unwrap().to_string();
+        let name = std::str::from_utf8(name).unwrap();
         let acc = MavenModuleAcc::new(name);
         let prep_scripting = prep_scripting(prepro, java_handle);
         let prep_scripting = prep_scripting.cloned().map(ScriptingPrepro::from);
@@ -180,7 +180,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
                 self.stack.last_mut().expect("never empty").cs.clear();
                 let tree = self.repository.find_tree(oid).unwrap();
                 let prepared = prepare_dir_exploration(tree, &mut self.dir_path);
-                let acc = MavenModuleAcc::new(name.try_into().unwrap());
+                let name: String = name.try_into().unwrap();
+                let acc = MavenModuleAcc::new(name);
                 let prep_scripting = prep_scripting(&self.prepro, self.java_handle);
                 let acc = acc.init_scripting(
                     prep_scripting

@@ -229,9 +229,7 @@ impl<'store, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdentifier>>>
         }
 
         let label = if acc.labeled {
-            std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
-                .ok()
-                .map(|x| x.to_string())
+            std::str::from_utf8(&text[acc.start_byte..acc.end_byte]).ok()
         } else {
             None
         };
@@ -258,7 +256,7 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
 
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(spacing).unwrap();
 
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
@@ -300,7 +298,7 @@ impl<'store, 'cache, TS: TsQueryEnabledTypeStore<HashedNodeRef<'store, NodeIdent
         let init = self.init_val(text, &TNode(cursor.node()));
         let xx = TTreeCursor(cursor);
         let acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
+        let label = Some(std::str::from_utf8(name).unwrap());
         self.make(&mut global, acc, label)
     }
 }
@@ -314,12 +312,12 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         &mut self,
         global: &mut Self::Global,
         acc: Self::Acc,
-        label: Option<String>,
+        label: Option<&str>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let node_store = &mut self.stores.node_store;
         let label_store = &mut self.stores.label_store;
         let interned_kind = TS::intern(acc.simple.kind);
-        let metrics = acc.metrics.finalize(&interned_kind, &label);
+        let metrics = acc.metrics.finalize(&interned_kind, &label.as_deref());
         let hashable = &metrics.hashs.most_discriminating();
 
         let label_id = label.as_deref().map(|l| label_store.get_or_insert(l));
@@ -336,7 +334,7 @@ impl<'stores, TS: TsQueryEnabledTypeStore<HashedNodeRef<'stores, NodeIdentifier>
         } else {
             use hyperast::store::nodes::compo;
             let mut metrics = metrics.map_hashs(|h| h.build());
-            let own_line_count = tree_gen::newline_count(&label);
+            let own_line_count = tree_gen::newline_count(&label.as_deref());
             metrics.line_count += own_line_count;
 
             let mut dyn_builder = subtree_builder::<TS>(interned_kind);

@@ -1,5 +1,4 @@
 use std::io::{Write, stdout};
-use std::str::from_utf8;
 
 use hyperast::tree_gen::utils_ts::tree_sitter_parse;
 
@@ -19,7 +18,7 @@ fn run(text: &[u8]) {
     let res = hyperast::nodes::TextSerializer::new(&stores, id).to_string();
     println!("{}", res);
 
-    assert_eq!(res, from_utf8(text).unwrap());
+    assert_eq!(res, std::str::from_utf8(text).unwrap());
 }
 
 fn prepare(text: &[u8]) -> (SimpleStores<TStore>, NodeIdentifier) {

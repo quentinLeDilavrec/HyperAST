@@ -422,9 +422,7 @@ where
             }
         }
         let label = if acc.labeled {
-            std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
-                .ok()
-                .map(|x| x.to_string())
+            std::str::from_utf8(&text[acc.start_byte..acc.end_byte]).ok()
         } else {
             None
         };
@@ -543,13 +541,13 @@ where
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
         let bytes_len = spacing.len();
-        let spacing = std::str::from_utf8(&spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(&spacing).unwrap();
         let line_count = spacing
             .matches("\n")
             .count()
             .to_u32()
             .expect("too many newlines");
-        let spacing_id = self.stores.label_store.get_or_insert(spacing.clone());
+        let spacing_id = self.stores.label_store.get_or_insert(spacing.to_owned());
         let hbuilder: hashed::HashesBuilder<SyntaxNodeHashs<u32>> =
             hashed::HashesBuilder::new(Default::default(), &interned_kind, &spacing, 1);
         let hsyntax = hbuilder.most_discriminating();
@@ -686,7 +684,7 @@ where
                 }
             }
         }
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
+        let label = Some(std::str::from_utf8(name).unwrap());
 
         use hyperast::types::HyperType;
         if !acc.simple.kind.is_file() {

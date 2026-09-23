@@ -1,5 +1,3 @@
-use std::str::from_utf8;
-
 use axum::response::IntoResponse;
 use http::header::{AUTHORIZATION, USER_AGENT};
 use hyper_rustls::ConfigBuilderExt;
@@ -168,7 +166,7 @@ async fn query_github(variables: repo_view::Variables) -> Result<repo_view::Resp
     use http_body_util::BodyExt;
     let body = body.collect().await.unwrap();
     let bytes = &body.to_bytes();
-    log::info!("{}", from_utf8(bytes).unwrap());
+    log::info!("{}", std::str::from_utf8(bytes).unwrap());
     #[derive(Deserialize)]
     struct AAA {
         data: repo_view::ResponseData,

@@ -534,7 +534,7 @@ where
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let label = if acc.labeled {
             let label = &text[acc.start_byte..acc.end_byte];
-            std::str::from_utf8(label).ok().map(|x| x.to_string())
+            std::str::from_utf8(label).ok()
         } else {
             None
         };
@@ -556,7 +556,7 @@ where
         let kind = TS::spaces();
         let interned_kind = TS::intern(kind);
 
-        let spacing = std::str::from_utf8(spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(spacing).unwrap();
 
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
@@ -575,7 +575,7 @@ where
             dedup,
             line_break,
             interned_kind,
-            &spacing,
+            spacing,
             f,
             |_| {},
         );
@@ -614,7 +614,7 @@ where
         let kind = TS::error();
         let interned_kind = TS::intern(kind);
         // debug_assert_eq!(kind, TS::resolve(interned_kind));
-        let text = std::str::from_utf8(text).unwrap().to_string();
+        let text = std::str::from_utf8(text).unwrap();
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
         let label_store = &mut self.stores.label_store;
@@ -625,7 +625,7 @@ where
             dedup,
             line_break,
             interned_kind,
-            &text,
+            text,
             |h| h.build(),
             |_| {},
         );
@@ -676,7 +676,7 @@ where
         if acc.simple.kind.is_error() {
             acc.simple.kind = TS::file();
         }
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
+        let label = Some(std::str::from_utf8(name).unwrap());
         // TODO what if making the file node was handled (at least in part) by the parent generator
         self.make(&mut global, acc, label)
     }
@@ -695,7 +695,7 @@ where
         &mut self,
         global: &mut Self::Global,
         mut acc: Self::Acc,
-        label: Option<String>,
+        label: Option<&str>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let type_store = self.stores.type_store;
         let label_store = &mut self.stores.label_store;
@@ -744,7 +744,7 @@ where
             })
         } else {
             let mut metrics = metrics.map_hashs(|h| h.build());
-            let own_line_count = super::newline_count(&label);
+            let own_line_count = super::newline_count(&label.as_deref());
             metrics.line_count += own_line_count;
 
             let byte_len = (acc.end_byte - acc.start_byte).try_into().unwrap();

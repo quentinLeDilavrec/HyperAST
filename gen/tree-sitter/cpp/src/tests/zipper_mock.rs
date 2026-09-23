@@ -129,7 +129,7 @@ impl hyperast::tree_gen::TreeGen for CppTreeGenMock {
         &mut self,
         _global: &mut Self::Global,
         _acc: <Self as hyperast::tree_gen::TreeGen>::Acc,
-        _label: Option<String>,
+        _label: Option<&str>,
     ) -> <<Self as hyperast::tree_gen::TreeGen>::Acc as hyperast::tree_gen::Accumulator>::Node {
         ()
     }

@@ -498,9 +498,7 @@ where
         acc: Self::Acc,
     ) -> <Self::Acc as Accumulator>::Node {
         let label = if acc.labeled {
-            std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
-                .ok()
-                .map(|x| x.to_string())
+            std::str::from_utf8(&text[acc.start_byte..acc.end_byte]).ok()
         } else {
             None
         };
@@ -617,7 +615,7 @@ where
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
 
-        let spacing = std::str::from_utf8(spacing).unwrap().to_string();
+        let spacing = std::str::from_utf8(spacing).unwrap().to_owned();
 
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
@@ -645,7 +643,7 @@ where
         let kind = Type::ERROR;
         let interned_kind = TS::intern(kind);
         debug_assert_eq!(kind, TS::resolve(interned_kind));
-        let text = std::str::from_utf8(text).unwrap().to_string();
+        let text = std::str::from_utf8(text).unwrap();
         let dedup = &mut self.stores.node_store.dedup;
         let node_store = &mut self.stores.node_store.inner;
         let label_store = &mut self.stores.label_store;
@@ -656,7 +654,7 @@ where
             dedup,
             line_break,
             interned_kind,
-            &text,
+            text,
             |h| h.build(),
             |_| {},
         );
@@ -712,7 +710,7 @@ where
             log::warn!("ignoring parsing error at the root of the file");
             acc.simple.kind = Type::TranslationUnit;
         }
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
+        let label = Some(std::str::from_utf8(name).unwrap());
         self.make(&mut global, acc, label)
     }
 }
@@ -730,7 +728,7 @@ where
         &mut self,
         global: &mut Self::Global,
         mut acc: Self::Acc,
-        label: Option<String>,
+        label: Option<&str>,
     ) -> <Self::Acc as Accumulator>::Node {
         let node_store = &mut self.stores.node_store;
         let kind = acc.simple.kind;

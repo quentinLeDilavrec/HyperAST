@@ -240,10 +240,10 @@ impl<U: crate::hashed::ComputableNodeHashs> SubTreeMetrics<U>
 where
     U::Hash: std::hash::Hash + Copy,
 {
-    pub fn finalize<K: ?Sized + std::hash::Hash, L: ?Sized + std::hash::Hash>(
+    pub fn finalize<K: std::hash::Hash, L: std::hash::Hash>(
         self,
-        k: &K,
-        l: &L,
+        k: K,
+        l: L,
     ) -> SubTreeMetrics<crate::hashed::HashesBuilder<U>> {
         let size_no_spaces = self.size_no_spaces + 1;
         use crate::hashed::IndexingHashBuilder;
@@ -490,7 +490,7 @@ pub trait TreeGen {
         &mut self,
         global: &mut Self::Global,
         acc: Self::Acc,
-        label: Option<String>,
+        label: Option<&str>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node;
 }
 

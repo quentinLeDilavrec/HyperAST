@@ -47,8 +47,8 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
     ) -> Self {
         let tree = repository.find_tree(oid).unwrap();
         let prepared = prepare_dir_exploration(tree, &mut dir_path);
-        let name = std::str::from_utf8(&name).unwrap().to_string();
-        let stack = vec![StackEle::new(oid, prepared, name.into())];
+        let name = std::str::from_utf8(name).unwrap();
+        let stack = vec![StackEle::new(oid, prepared, name.to_owned().into())];
         Self {
             stack,
             repository,

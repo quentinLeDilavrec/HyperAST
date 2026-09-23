@@ -299,9 +299,7 @@ where
             acc_node(self.make_space(global, &spacing));
         }
         let label = if acc.labeled {
-            std::str::from_utf8(&text[acc.start_byte..acc.end_byte])
-                .ok()
-                .map(|x| x.to_string())
+            std::str::from_utf8(&text[acc.start_byte..acc.end_byte]).ok()
         } else {
             None
         };
@@ -403,7 +401,7 @@ where
         let init = self.init_val(text, &TNode(cursor.node()));
         let xx = TTreeCursor(cursor);
         let acc = handle_file_bounds(self, text, xx, &mut global, init, Self::make_space);
-        let label = Some(std::str::from_utf8(name).unwrap().to_owned());
+        let label = Some(std::str::from_utf8(name).unwrap());
         let full_node = self.make(&mut global, acc, label);
         full_node
     }
@@ -422,11 +420,11 @@ where
         &mut self,
         global: &mut Self::Global,
         mut acc: Self::Acc,
-        label: Option<String>,
+        label: Option<&str>,
     ) -> <<Self as TreeGen>::Acc as Accumulator>::Node {
         let kind = acc.simple.kind;
         let interned_kind = TS::intern(kind);
-        let metrics = acc.metrics.finalize(&interned_kind, &label);
+        let metrics = acc.metrics.finalize(&interned_kind, &label.as_deref());
 
         let hashable = &metrics.hashs.most_discriminating();
 

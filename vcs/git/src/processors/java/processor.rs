@@ -379,10 +379,9 @@ impl RepositoryProcessor {
         let mut md_cache = Default::default();
         let stores = self.main_stores.mut_with_ts::<TStore>();
 
-        let mut java_tree_gen =
-            java_tree_gen::JavaTreeGen::<TStore, _, _>::new(stores, &mut md_cache)
-                .set_line_break(line_break);
-        super::handle_java_file1(&mut java_tree_gen, name, text)
+        let mut tree_gen = java_tree_gen::JavaTreeGen::<TStore, _, _>::new(stores, &mut md_cache)
+            .set_line_break(line_break);
+        super::handle_java_file1(&mut tree_gen, name, text)
             .map(|x| x.node)
             .map_err(|e| {
                 eprintln!(
@@ -447,24 +446,22 @@ impl RepositoryProcessor {
                             overlayer: spec,
                             functions,
                         };
-                        let mut java_tree_gen =
+                        let mut tree_gen =
                             java_tree_gen::JavaTreeGen::with_preprocessing_and_dedup(
                                 stores, dedup, md_cache, more,
                             )
                             .set_line_break(line_break);
-                        super::handle_java_file1(&mut java_tree_gen, n, t)
+                        super::handle_java_file1(&mut tree_gen, n, t)
                             .map(|x| x.map(|x| Into::<super::FullNode>::into(x.local)))
                     }
                 } else if let Some(precomp) = &java_proc.parameter.prepro {
                     let more = hyperast::scripting::Prepro::<_, _>::from_arc(precomp.clone());
                     // let mut java_tree_gen = java_tree_gen.with_more(more);
-                    let mut java_tree_gen =
-                        java_tree_gen::JavaTreeGen::with_preprocessing_and_dedup(
-                            stores, dedup, md_cache, more,
-                        )
-                        .set_line_break(line_break);
-                    super::handle_java_file1(&mut java_tree_gen, n, t)
-                        .map(|x| x.map(|x| x.local.into()))
+                    let mut tree_gen = java_tree_gen::JavaTreeGen::with_preprocessing_and_dedup(
+                        stores, dedup, md_cache, more,
+                    )
+                    .set_line_break(line_break);
+                    super::handle_java_file1(&mut tree_gen, n, t).map(|x| x.map(|x| x.local.into()))
                 } else if let Some(more) = &java_proc.query {
                     let more = &more.0;
                     // let more: hyperast_tsquery::PreparedQuerying<_, _, _> = more.into();
@@ -475,18 +472,19 @@ impl RepositoryProcessor {
                     let cache = java_proc.cache._md_cache.take().unwrap_or_default();
                     let mut extra = PatternPrecompExtra::<_, Acc, _>::with_cache(more, cache);
 
-                    let mut java_tree_gen =
+                    let mut tree_gen =
                         hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen::new(stores, &mut extra)
                             .set_line_break(line_break);
-                    let r = super::handle_java_file2(&mut java_tree_gen, n, t)
+                    let r = super::handle_java_file2(tree_gen.with_dedup(dedup), n, t)
                         .map(|x| x.map(|x| x.into()));
                     java_proc.cache._md_cache = Some(extra.md_cache);
                     r
                 } else {
                     use hyperast_gen_ts_java::legion_ts_simp::JavaTreeGen;
-                    let mut java_tree_gen = JavaTreeGen::bare(stores) //
+                    let mut tree_gen = JavaTreeGen::bare(stores) //
                         .set_line_break(line_break);
-                    super::handle_java_file2(&mut java_tree_gen, n, t).map(|x| x.map(|x| x.into()))
+                    super::handle_java_file2(tree_gen.with_dedup(dedup), n, t)
+                        .map(|x| x.map(|x| x.into()))
                     // .map(empty2full)
                 }
                 .map_err(|_| crate::ParseErr::IllFormed)?;

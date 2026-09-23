@@ -98,9 +98,9 @@ impl crate::processing::CachesHolding for MavenProc {
 }
 
 impl MavenModuleAcc {
-    pub(crate) fn new(name: String) -> Self {
+    pub(crate) fn new(name: impl Into<String>) -> Self {
         Self {
-            primary: BasicDirAcc::new(name),
+            primary: BasicDirAcc::new(name.into()),
             ana: MavenPartialAnalysis::new(),
             sub_modules: None,
             main_dirs: None,

@@ -12,13 +12,13 @@ use crate::{TStore, java::handle_java_file};
 fn run(text: &[u8]) {
     let mut stores = SimpleStores::<TStore>::default();
     let mut md_cache = Default::default();
-    let mut java_tree_gen = java_tree_gen::JavaTreeGen {
+    let mut tree_gen = java_tree_gen::JavaTreeGen {
         line_break: "\n".as_bytes().to_vec(),
         stores: stores.mut_with_ts(),
         md_cache: &mut md_cache,
         more: (),
     };
-    let a = handle_java_file(&mut java_tree_gen, &b"A.java".into(), text).unwrap();
+    let a = handle_java_file(&mut tree_gen, &b"A.java".into(), text).unwrap();
 
     let mut ana = PartialAnalysis::default(); //&mut commits[0].meta_data.0;
 

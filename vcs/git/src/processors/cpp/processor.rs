@@ -176,12 +176,14 @@ impl RepositoryProcessor {
                     stores, dedup, md_cache, more,
                 )
                 .set_line_break(line_break);
+
                 super::handle_cpp_file1::<_>(&mut cpp_tree_gen, n, t)
                     .map(|x| x.map(|x| x.local.into()))
             } else {
                 use hyperast_gen_ts_cpp::legion_ts_simp::CppTreeGen;
-                let mut cpp_tree_gen = CppTreeGen::bare(stores).set_line_break(line_break);
-                super::handle_cpp_file2(&mut cpp_tree_gen, n, t).map(|x| x.map(|x| x.into()))
+                let mut tree_gen = CppTreeGen::bare(stores).set_line_break(line_break);
+                super::handle_cpp_file2(tree_gen.with_dedup(dedup), n, t)
+                    .map(|x| x.map(|x| x.into()))
             }
             .map_err(|_| crate::ParseErr::IllFormed)?;
 

@@ -24,8 +24,8 @@ fn run(text: &[u8]) {
         node_store: NodeStore::new(),
     };
     let mut md_cache = Default::default();
-    let mut java_tree_gen = java_tree_gen::JavaTreeGen::new(&mut stores, &mut md_cache);
-    handle_java_file(&mut java_tree_gen, &b"A.java".into(), text).unwrap();
+    let mut tree_gen = java_tree_gen::JavaTreeGen::new(&mut stores, &mut md_cache);
+    handle_java_file(&mut tree_gen, &b"A.java".into(), text).unwrap();
 }
 
 fn run1(text: &[u8]) {

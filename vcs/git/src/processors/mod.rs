@@ -122,6 +122,31 @@ impl Query {
     }
 }
 
+pub(crate) fn handle_file_ts_simp<'a, TS, E>(
+    tree_gen: &mut hyperast::tree_gen::zipped_ts_extra::TsTreeGen<'a, 'a, TS, E, true>,
+    language: &tree_sitter::Language,
+    name: &crate::processing::ObjectName,
+    text: &'a [u8],
+) -> crate::utils::FileProcessingResult<<E::Acc as hyperast::tree_gen::Accumulator>::Node>
+where
+    E: hyperast::tree_gen::TsExtra<hyperast::store::SimpleStores<TS>>,
+    TS: hyperast::types::ETypeStore,
+    <TS as hyperast::types::ETypeStore>::Ty2: hyperast::tree_gen::TsType,
+    TS: hyperast::tree_gen::TsEnabledTS,
+{
+    let time = std::time::Instant::now();
+    let tree = hyperast::tree_gen::utils_ts::tree_sitter_parse(text, language);
+    let parsing_time = time.elapsed();
+    report_or_fail_on_errored_tree!(name, tree, parsing_time);
+    let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
+    let processing_time = time.elapsed() - parsing_time;
+    Ok(crate::utils::SuccessProcessing {
+        parsing_time,
+        processing_time,
+        node,
+    })
+}
+
 static VAR_NAME: &'static str = "CST contains parsing errors";
 macro_rules! report_or_fail_on_errored_tree {
     ($name:expr, $tree:expr, $parsing_time:expr) => {

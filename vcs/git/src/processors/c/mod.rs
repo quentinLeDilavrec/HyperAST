@@ -7,13 +7,10 @@ mod processor;
 pub mod selection;
 
 use hyperast::store::defaults::LabelIdentifier;
-use hyperast::tree_gen;
 
 use crate::Accumulator;
 use crate::DirPrimary;
-use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
-use crate::{FileProcessingResult, SuccessProcessing};
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_c::TStore>;
 
@@ -68,24 +65,4 @@ impl CProc {
     }
 }
 
-/// Processing a single C file with new `hyperast_gen_ts_c::legion_ts_simp::CTreeGen`
-pub(crate) fn handle_c_file<'a, E>(
-    tree_gen: &mut hyperast_gen_ts_c::legion_ts_simp::CTreeGen<'a, 'a, E>,
-    name: &ObjectName,
-    text: &'a [u8],
-) -> FileProcessingResult<<E::Acc as hyperast::tree_gen::Accumulator>::Node>
-where
-    E: hyperast::tree_gen::TsExtra<SimpleStores>,
-{
-    let time = std::time::Instant::now();
-    let tree = tree_gen::utils_ts::tree_sitter_parse(text, &hyperast_gen_ts_c::language());
-    let parsing_time = time.elapsed();
-    super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
-    let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
-    let processing_time = time.elapsed() - parsing_time;
-    Ok(SuccessProcessing {
-        parsing_time,
-        processing_time,
-        node,
-    })
-}
+use super::handle_file_ts_simp as handle_c_file;

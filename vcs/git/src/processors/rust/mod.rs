@@ -10,13 +10,10 @@ use hyperast::tree_gen;
 
 use crate::Accumulator;
 use crate::DirPrimary;
-use crate::processing::ObjectName;
 use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::caches::OidMap;
-use crate::{FileProcessingResult, SuccessProcessing};
 
 use hyperast_gen_ts_rust::TStore;
-use hyperast_gen_ts_rust::legion as rust_tree_gen;
 
 pub type SimpleStores = hyperast::store::SimpleStores<TStore>;
 type RustProcessorHolder = crate::processing::ProcessorHolder<RustProc>;
@@ -97,24 +94,4 @@ impl RustProc {
     }
 }
 
-pub(crate) fn handle_rust_file<'a, E>(
-    tree_gen: &mut rust_tree_gen::RustTreeGen<'a, 'a, E>,
-    name: &ObjectName,
-    text: &'a [u8],
-) -> FileProcessingResult<<E::Acc as tree_gen::Accumulator>::Node>
-where
-    E: tree_gen::TsExtra<SimpleStores>,
-{
-    let time = std::time::Instant::now();
-    let language = hyperast_gen_ts_rust::language();
-    let tree = tree_gen::utils_ts::tree_sitter_parse(text, &language);
-    let parsing_time = time.elapsed();
-    super::report_or_fail_on_errored_tree!(name, tree, parsing_time);
-    let node = tree_gen.generate_file(name.as_bytes(), text, tree.walk());
-    let processing_time = time.elapsed() - parsing_time;
-    Ok(SuccessProcessing {
-        parsing_time,
-        processing_time,
-        node,
-    })
-}
+use super::handle_file_ts_simp as handle_rust_file;

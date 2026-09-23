@@ -234,6 +234,7 @@ fn handle_typescript_blob_aux(
     proc: &mut TypescriptProc,
     stores: &mut SimpleStores,
 ) -> Result<crate::utils::SuccessProcessing<super::FullNode>, crate::utils::FailedParsing> {
+    let lang = &hyperast_gen_ts_typescript::language();
     let lb = _auto_configured_line_break(t);
     let dedup = &mut proc.cache.dedup;
     use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
@@ -245,13 +246,14 @@ fn handle_typescript_blob_aux(
         let more: hyperast_tsquery::PreparedQuerying<_, TStore, Acc> = more.into();
         let mut extra = PatternPrecompExtra::<_, Acc, _>::with_cache(more, md_cache);
         let mut tree_gen = TypeScriptTreeGen::new(stores, &mut extra).set_line_break(lb);
-        let r = super::handle_typescript_file(tree_gen.with_dedup(dedup), n, t)
+        let r = super::handle_typescript_file(tree_gen.with_dedup(dedup), lang, n, t)
             .map(|x| x.map(|x| x.into()));
         proc.cache.md_cache = extra.md_cache;
         r
     } else {
         let mut tree_gen = TypeScriptTreeGen::bare(stores).set_line_break(lb);
-        super::handle_typescript_file(tree_gen.with_dedup(dedup), n, t).map(|x| x.map(|x| x.into()))
+        super::handle_typescript_file(tree_gen.with_dedup(dedup), lang, n, t)
+            .map(|x| x.map(|x| x.into()))
     }
 }
 

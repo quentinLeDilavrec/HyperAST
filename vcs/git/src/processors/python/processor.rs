@@ -231,6 +231,7 @@ fn handle_python_blob_aux(
     proc: &mut PythonProc,
     stores: &mut SimpleStores,
 ) -> Result<crate::utils::SuccessProcessing<super::FullNode>, crate::utils::FailedParsing> {
+    let lang = &hyperast_gen_ts_python::language();
     let lb = _auto_configured_line_break(t);
     let dedup = &mut proc.cache.dedup;
     use hyperast::tree_gen::extra_pattern_precomp::PatternPrecompExtra;
@@ -242,13 +243,14 @@ fn handle_python_blob_aux(
         let more: hyperast_tsquery::PreparedQuerying<_, TStore, Acc> = more.into();
         let mut extra = PatternPrecompExtra::<_, Acc, _>::with_cache(more, md_cache);
         let mut tree_gen = PythonTreeGen::new(stores, &mut extra).set_line_break(lb);
-        let r = super::handle_python_file(tree_gen.with_dedup(dedup), n, t)
+        let r = super::handle_python_file(tree_gen.with_dedup(dedup), lang, n, t)
             .map(|x| x.map(|x| x.into()));
         proc.cache.md_cache = extra.md_cache;
         r
     } else {
         let mut tree_gen = PythonTreeGen::bare(stores).set_line_break(lb);
-        super::handle_python_file(tree_gen.with_dedup(dedup), n, t).map(|x| x.map(|x| x.into()))
+        super::handle_python_file(tree_gen.with_dedup(dedup), lang, n, t)
+            .map(|x| x.map(|x| x.into()))
     }
 }
 

@@ -3,6 +3,7 @@ use hyperast::types::{AnyType, HyperType, LangRef, RoleStore, TypeStore, TypeTra
 
 #[derive(Clone, Copy, Default)]
 pub struct TStore;
+impl<CAR, CDR> hyperast::store::TyDown<TStore> for hyperast::types::MultiTStore<CAR, CDR> {}
 
 #[derive(Debug)]
 pub struct Lang;

@@ -127,7 +127,7 @@ impl<'repo, 'b, 'd, 'c> Processor<JavaAcc> for JavaProcessor<'repo, 'b, 'd, 'c, 
 
         let acc = w.scripting_acc.as_mut()?;
         // SAFETY: this side should be fine, issue when unerasing
-        let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
+        let store = &self.prepro.main_stores;
         acc.acc::<_, TType, _>(store, ty, id.into()).unwrap();
 
         None
@@ -179,7 +179,7 @@ impl<'repo, 'b, 'd, 'c> JavaProcessor<'repo, 'b, 'd, 'c, JavaAcc> {
             // w.push(name, full_node, skiped_ana);
             if let Some(acc) = &mut w.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
-                let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
+                let store = &self.prepro.main_stores;
                 acc.acc::<_, TType, _>(store, Type::Directory, id.into())
                     .unwrap();
             }
@@ -536,7 +536,7 @@ impl RepositoryProcessor {
         w.push(name, full_node);
         if let Some(acc) = &mut w.scripting_acc {
             // SAFETY: this side should be fine, issue when unerasing
-            let store = unsafe { self.main_stores.erase_ts_unchecked() };
+            let store = &self.main_stores;
             acc.acc::<_, TType, _>(store, Type::Directory, id.into())
                 .unwrap();
         }

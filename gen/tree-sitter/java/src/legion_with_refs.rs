@@ -449,7 +449,7 @@ where
         parent.push(full_node);
         if let Some(p) = &mut parent.prepro {
             // SAFETY: this side should be fine, issue when unerasing
-            let store = unsafe { self.stores.erase_ts_unchecked() };
+            let store = &*self.stores;
             let child: hyperast::scripting::SubtreeHandle<crate::types::TType> = id.into();
             use hyperast::scripting::Accumulable;
             p.acc(self.more.scripts(), store, ty, child).unwrap();

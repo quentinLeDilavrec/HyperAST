@@ -25,24 +25,28 @@ impl<TS, NS, LS> SimpleStores<TS, NS, LS> {
     }
 }
 
-/// Declare we can convert from Self to T,
+/// Enforces explicit conversions between type stores,
+/// i.e., implement to declare that Self can be converted to T,
 /// e.g. from the git::types::TStore to the Java one, but not the contrary
-pub trait TyDown<T> {}
+/// Note: the unsafe keyword is not needed as the assertions ensure that both types are ZSTs, so we can safely transmute
+pub trait TyDown<T>: Sized {
+    const ASSERT_ZERO_T: () = assert!(std::mem::size_of::<T>() == 0, "T must be a ZST");
+    const ASSERT_ZERO_SELF: () = assert!(std::mem::size_of::<Self>() == 0, "Self must be a ZST");
+}
 
 impl<TS, NS, LS> SimpleStores<TS, NS, LS> {
     pub fn mut_with_ts<TS2>(&mut self) -> &mut SimpleStores<TS2, NS, LS>
     where
         TS: TyDown<TS2>,
     {
+        // SAFETY: TyDown is implemented for TS2 -> TS, thus both are ZSTs, so we can safely transmute
         unsafe { std::mem::transmute(self) }
     }
     pub fn with_ts<TS2>(&self) -> &SimpleStores<TS2, NS, LS>
     where
         TS: TyDown<TS2>,
     {
-        unsafe { std::mem::transmute(self) }
-    }
-    pub unsafe fn erase_ts_unchecked(&self) -> &SimpleStores<(), NS, LS> {
+        // SAFETY: TyDown is implemented for TS2 -> TS, thus both are ZSTs, so we can safely transmute
         unsafe { std::mem::transmute(self) }
     }
 }

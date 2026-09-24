@@ -10,6 +10,7 @@ pub type Role = hyperast::types::Role;
 
 #[derive(Clone, Copy, Default)]
 pub struct TStore;
+impl<CAR, CDR> hyperast::store::TyDown<TStore> for hyperast::types::MultiTStore<CAR, CDR> {}
 
 #[derive(Debug)]
 pub struct Lang;

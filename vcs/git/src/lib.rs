@@ -10,57 +10,8 @@ pub mod preprocessed;
 pub mod processing;
 pub mod processors;
 
-mod multi_type_store;
 mod type_store;
-
-#[macro_export]
-macro_rules! multitstore {
-    (#[cfg($($c:tt)+)] $t:ty, $($tt:tt)+ ) => {
-        mod _multitstore {
-            use super::multi_type_store;
-            multitstore!{$($tt)*}
-        }
-        #[cfg($($c)+)]
-        pub type TStore = multi_type_store::TStore<$t,_multitstore::TStore>;
-        #[cfg(not($($c)+))]
-        pub type TStore = _multitstore::TStore;
-    };
-    ($t:ty, $($tt:tt)+ ) => {
-        mod _multitstore {
-            use super::multi_type_store;
-            multitstore!{$($tt)*}
-        }
-        pub type TStore = multi_type_store::TStore<$t,aaa::TStore>;
-    };
-    (#[cfg($($c:tt)+)] $t:ty) => {
-        #[cfg($($c)+)]
-        pub type TStore = multi_type_store::TStore<$t>;
-        #[cfg(not($($c)+))]
-        pub type TStore = multi_type_store::EmptyMultiTStore;
-    };
-    ($t:ty) => {
-        pub type TStore = multi_type_store::TStore<$t>;
-    };
-}
-
-multitstore! {
-    #[cfg(feature = "java")]
-    hyperast_gen_ts_java::TStore,
-    #[cfg(feature = "cpp")]
-    hyperast_gen_ts_cpp::TStore,
-    #[cfg(feature = "c")]
-    hyperast_gen_ts_c::TStore,
-    #[cfg(feature = "maven")]
-    hyperast_gen_ts_xml::TStore,
-    #[cfg(feature = "typescript")]
-    hyperast_gen_ts_typescript::TStore,
-    #[cfg(feature = "rust")]
-    hyperast_gen_ts_rust::TStore,
-    #[cfg(feature = "python")]
-    hyperast_gen_ts_python::TStore,
-    #[cfg(feature = "file_sys")]
-    crate::processors::file_sys::TStore
-}
+pub use type_store::TStore;
 
 mod utils;
 use utils::_auto_configured_line_break;

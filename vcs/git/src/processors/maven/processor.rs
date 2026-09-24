@@ -151,7 +151,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool> Processor<MavenModuleAcc>
 
         if let Some(acc) = &mut w.scripting_acc {
             // SAFETY: this side should be fine, issue when unerasing
-            let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
+            let store = &self.prepro.main_stores;
             let child: hyperast::scripting::SubtreeHandle<hyperast_gen_ts_xml::TType> = id.into();
             acc.acc(store, Type::Directory, child).unwrap();
         }
@@ -214,7 +214,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             }
             if let Some(acc) = &mut w.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
-                let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
+                let store = &self.prepro.main_stores;
                 acc.acc::<_, hyperast_gen_ts_xml::TType, _>(store, Type::Directory, id.into())
                     .unwrap();
             }
@@ -236,7 +236,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             parent_acc.push_source_directory(name, full_node);
             if let Some(acc) = &mut parent_acc.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
-                let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
+                let store = &self.prepro.main_stores;
                 acc.acc::<_, hyperast_gen_ts_java::TType, _>(store, Type::Directory, id.into())
                     .unwrap();
             }
@@ -264,7 +264,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
 
             if let Some(acc) = &mut parent_acc.scripting_acc {
                 // SAFETY: this side should be fine, issue when unerasing
-                let store = unsafe { self.prepro.main_stores.erase_ts_unchecked() };
+                let store = &self.prepro.main_stores;
                 acc.acc::<_, hyperast_gen_ts_java::TType, _>(store, Type::Directory, id.into())
                     .unwrap();
             }

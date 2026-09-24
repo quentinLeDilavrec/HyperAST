@@ -1,7 +1,33 @@
-use hyperast::types::{AnyType, HyperType, LangRef, RoleStore, TypeStore};
+use hyperast::types::{AnyType, LangRef, RoleStore, TypeStore};
+
+mod multitstore {
+    // Do not hesitate to use it as an example.
+    // Copy and modify it, to handle the languages you need.
+    // Note: you can wrap it like I did in the rest of this file, to avoid ugly diagnostics caused by the recursive type.
+    hyperast::multitstore! {
+        #[cfg(feature = "java")]
+        hyperast_gen_ts_java::TStore,
+        #[cfg(feature = "cpp")]
+        hyperast_gen_ts_cpp::TStore,
+        #[cfg(feature = "c")]
+        hyperast_gen_ts_c::TStore,
+        #[cfg(feature = "maven")]
+        hyperast_gen_ts_xml::TStore,
+        #[cfg(feature = "typescript")]
+        hyperast_gen_ts_typescript::TStore,
+        #[cfg(feature = "rust")]
+        hyperast_gen_ts_rust::TStore,
+        #[cfg(feature = "python")]
+        hyperast_gen_ts_python::TStore,
+        #[cfg(feature = "file_sys")]
+        crate::processors::file_sys::TStore
+    }
+}
+
+pub use multitstore::TStore as MultiTStore;
 
 #[derive(Clone, Copy, Default)]
-pub struct TStore;
+pub struct TStore(MultiTStore);
 
 #[cfg(feature = "cpp")]
 impl hyperast::store::TyDown<hyperast_gen_ts_cpp::TStore> for TStore {}
@@ -20,116 +46,33 @@ impl hyperast::store::TyDown<crate::processors::file_sys::TStore> for TStore {}
 #[cfg(feature = "maven")]
 impl hyperast::store::TyDown<hyperast_gen_ts_xml::TStore> for TStore {}
 
-impl RoleStore for TStore {
-    type IdF = u16;
-
-    type Role = hyperast::types::Role;
-
-    fn resolve_field(lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role {
-        let name = lang.name();
-        macro_rules! resolve_field {
-            ($lang:path) => {{
-                use $lang as l;
-                if let l::Lang::NAME = name {
-                    let t = l::TType::new(l::Type::Spaces);
-                    return l::TStore::resolve_field(t.get_lang(), field_id);
-                }
-            }};
-        }
-        #[cfg(feature = "java")]
-        resolve_field!(hyperast_gen_ts_java);
-        #[cfg(feature = "cpp")]
-        resolve_field!(hyperast_gen_ts_cpp);
-        #[cfg(feature = "c")]
-        resolve_field!(hyperast_gen_ts_c);
-        #[cfg(feature = "python")]
-        resolve_field!(hyperast_gen_ts_python);
-        #[cfg(feature = "typescript")]
-        resolve_field!(hyperast_gen_ts_typescript);
-        #[cfg(feature = "rust")]
-        resolve_field!(hyperast_gen_ts_rust);
-        #[cfg(feature = "maven")]
-        resolve_field!(hyperast_gen_ts_xml);
-        panic!("unsupported lang: {}", name);
-    }
-
-    fn intern_role(lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
-        // TODO fix that, the lang thing, both parameter and the get_lang() should be respectively extracted and removed
-        let name = lang.name();
-        macro_rules! intern_role {
-            ($lang:path) => {{
-                use $lang as l;
-                if let l::Lang::NAME = name {
-                    let t = l::TType::new(l::Type::Spaces);
-                    return l::TStore::intern_role(t.get_lang(), role);
-                }
-            }};
-        }
-        #[cfg(feature = "java")]
-        intern_role!(hyperast_gen_ts_java);
-        #[cfg(feature = "cpp")]
-        intern_role!(hyperast_gen_ts_cpp);
-        #[cfg(feature = "c")]
-        intern_role!(hyperast_gen_ts_c);
-        #[cfg(feature = "python")]
-        intern_role!(hyperast_gen_ts_python);
-        #[cfg(feature = "typescript")]
-        intern_role!(hyperast_gen_ts_typescript);
-        #[cfg(feature = "rust")]
-        intern_role!(hyperast_gen_ts_rust);
-        #[cfg(feature = "maven")]
-        intern_role!(hyperast_gen_ts_xml);
-        panic!("unsupported lang: {}", name);
-    }
-}
-
 impl TypeStore for TStore {
     type Ty = AnyType;
     fn try_decompress_type(
         erazed: &impl hyperast::store::nodes::PolyglotHolder,
         _tid: std::any::TypeId,
     ) -> Option<Self::Ty> {
-        let id = erazed.lang_id();
-        macro_rules! decomp_t {
-            ($p:path) => {{
-                use $p as types;
-                if id.is::<types::Lang>() {
-                    let x = AnyType::from_polyglot::<types::Lang>(erazed);
-                    return Some(x.unwrap());
-                }
-            }};
-        }
-        #[cfg(feature = "java")]
-        decomp_t!(hyperast_gen_ts_java);
-        #[cfg(feature = "cpp")]
-        decomp_t!(hyperast_gen_ts_cpp);
-        #[cfg(feature = "c")]
-        decomp_t!(hyperast_gen_ts_c);
-        #[cfg(feature = "python")]
-        decomp_t!(hyperast_gen_ts_python);
-        #[cfg(feature = "typescript")]
-        decomp_t!(hyperast_gen_ts_typescript);
-        #[cfg(feature = "rust")]
-        decomp_t!(hyperast_gen_ts_rust);
-        #[cfg(feature = "maven")]
-        decomp_t!(hyperast_gen_ts_xml);
-        #[cfg(feature = "file_sys")]
-        decomp_t!(crate::processors::file_sys::types);
-        None
+        MultiTStore::try_decompress_type(erazed, _tid)
     }
 
     fn decompress_type(
         erazed: &impl hyperast::store::nodes::PolyglotHolder,
         tid: std::any::TypeId,
     ) -> Self::Ty {
-        if let Some(t) = Self::try_decompress_type(erazed, tid) {
-            return t;
-        }
-        #[cfg(not(debug_assertions))]
-        panic!();
-        #[cfg(debug_assertions)]
-        let id = erazed.lang_id();
-        #[cfg(debug_assertions)]
-        panic!("{} is not handled", id.name());
+        MultiTStore::decompress_type(erazed, tid)
+    }
+}
+
+impl RoleStore for TStore {
+    type IdF = u16;
+
+    type Role = hyperast::types::Role;
+
+    fn resolve_field(lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role {
+        MultiTStore::resolve_field(lang, field_id)
+    }
+
+    fn intern_role(lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
+        MultiTStore::intern_role(lang, role)
     }
 }

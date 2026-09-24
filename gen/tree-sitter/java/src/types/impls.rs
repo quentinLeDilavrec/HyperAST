@@ -69,7 +69,7 @@ impl hyperast::types::ETypeStore for TStore {
 }
 
 cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
-    use hyperast::types::LangWrapper;
+
     use hyperast::types::RoleStore;
 
     // static dynamically initialized once association table from Roles to tree_sitter_java Fields
@@ -92,7 +92,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
 
         type Role = Role;
 
-        fn resolve_field(_lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
+        fn resolve_field(_lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role {
             let s = crate::language()
                 .field_name_for_id(field_id)
                 .ok_or_else(|| format!("{}", field_id))
@@ -100,7 +100,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
             Role::try_from(s).expect(s)
         }
 
-        fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
+        fn intern_role(_lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
             let r = ROLE2FIELD[role as usize];
             assert!(r < u16::MAX, "Role not found");
             r

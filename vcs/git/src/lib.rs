@@ -11,7 +11,27 @@ pub mod processing;
 pub mod processors;
 
 mod type_store;
-pub use type_store::TStore;
+mod type_store2;
+
+macro_rules! multitstore {
+    ($t0:ty) => {
+        type_store2::TStore<$t0>
+    };
+    ($t0:ty, $($t:ty),+ $(,)?) => {
+        type_store2::TStore<$t0,multitstore!($($t),*)>
+    };
+}
+
+pub type TStore = multitstore!(
+    crate::processors::file_sys::TStore,
+    hyperast_gen_ts_java::TStore,
+    hyperast_gen_ts_cpp::TStore,
+    hyperast_gen_ts_c::TStore,
+    hyperast_gen_ts_xml::TStore,
+    hyperast_gen_ts_typescript::TStore,
+    hyperast_gen_ts_rust::TStore,
+    hyperast_gen_ts_python::TStore,
+);
 
 mod utils;
 use utils::_auto_configured_line_break;

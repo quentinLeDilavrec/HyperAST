@@ -97,10 +97,7 @@ impl hyperast::types::RoleStore for TStore {
 
     type Role = super::Role;
 
-    fn resolve_field(
-        _lang: hyperast::types::LangWrapper<Self::Ty>,
-        field_id: Self::IdF,
-    ) -> Self::Role {
+    fn resolve_field(_lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role {
         let s = crate::language()
             .field_name_for_id(field_id)
             .ok_or_else(|| format!("{}", field_id))
@@ -108,7 +105,7 @@ impl hyperast::types::RoleStore for TStore {
         super::Role::try_from(s).expect(s)
     }
 
-    fn intern_role(_lang: hyperast::types::LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
+    fn intern_role(_lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
         let r = ROLE2FIELD[role as usize];
         assert!(r < u16::MAX, "Role not found");
         r

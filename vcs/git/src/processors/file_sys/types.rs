@@ -1,5 +1,5 @@
 use hyperast::tree_gen::{TsEnabledTS, TsType};
-use hyperast::types::{AnyType, HyperType, LangRef, TypeStore, TypeTrait, TypeU16};
+use hyperast::types::{AnyType, HyperType, LangRef, RoleStore, TypeStore, TypeTrait, TypeU16};
 
 #[derive(Clone, Copy, Default)]
 pub struct TStore;
@@ -322,6 +322,20 @@ impl hyperast::types::LLang<TType> for Lang {
 
 impl TypeStore for TStore {
     type Ty = TypeU16<Lang>;
+}
+
+impl RoleStore for TStore {
+    type IdF = u16;
+
+    type Role = hyperast::types::Role;
+
+    fn resolve_field(_lang: impl LangRef<Self::Ty>, _field_id: Self::IdF) -> Self::Role {
+        unimplemented!()
+    }
+
+    fn intern_role(_lang: impl LangRef<Self::Ty>, _role: Self::Role) -> Self::IdF {
+        unimplemented!()
+    }
 }
 
 impl hyperast::types::ETypeStore for TStore {

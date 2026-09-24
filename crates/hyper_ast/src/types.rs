@@ -1184,8 +1184,8 @@ pub trait SpecializedTypeStore<T: Typed>: TypeStore {}
 pub trait RoleStore: TypeStore {
     type IdF: 'static + Copy + Default + PartialEq;
     type Role: 'static + Copy + PartialEq + Sync + Send;
-    fn resolve_field(lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role;
-    fn intern_role(lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF;
+    fn resolve_field(lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role;
+    fn intern_role(lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF;
 }
 
 pub trait HyperAST: for<'a> AstLending<'a> {

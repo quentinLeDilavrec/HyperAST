@@ -1,6 +1,6 @@
-use hyperast::types::{AnyType, HyperType, LangRef, LangWrapper, RoleStore, TypeStore};
+use hyperast::types::{AnyType, HyperType, LangRef, RoleStore, TypeStore};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct TStore;
 
 #[cfg(feature = "cpp")]
@@ -20,18 +20,12 @@ impl hyperast::store::TyDown<crate::processors::file_sys::TStore> for TStore {}
 #[cfg(feature = "maven")]
 impl hyperast::store::TyDown<hyperast_gen_ts_xml::TStore> for TStore {}
 
-impl Default for TStore {
-    fn default() -> Self {
-        Self
-    }
-}
-
 impl RoleStore for TStore {
     type IdF = u16;
 
     type Role = hyperast::types::Role;
 
-    fn resolve_field(lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
+    fn resolve_field(lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role {
         let name = lang.name();
         macro_rules! resolve_field {
             ($lang:path) => {{
@@ -59,7 +53,7 @@ impl RoleStore for TStore {
         panic!("unsupported lang: {}", name);
     }
 
-    fn intern_role(lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
+    fn intern_role(lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
         // TODO fix that, the lang thing, both parameter and the get_lang() should be respectively extracted and removed
         let name = lang.name();
         macro_rules! intern_role {

@@ -16,7 +16,6 @@ use super::{S_T_L, Type};
 
 cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
     use hyperast::types::RoleStore;
-    use hyperast::types::LangWrapper;
     use super::Role;
 
     impl TsEnabledTS for TStore {
@@ -88,7 +87,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
 
         type Role = Role;
 
-        fn resolve_field(_lang: LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
+        fn resolve_field(_lang: impl LangRef<Self::Ty>, field_id: Self::IdF) -> Self::Role {
             let s = crate::language()
                 .field_name_for_id(field_id)
                 .ok_or_else(|| format!("{}", field_id))
@@ -96,7 +95,7 @@ cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
             Role::try_from(s).expect(s)
         }
 
-        fn intern_role(_lang: LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
+        fn intern_role(_lang: impl LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
             let field_name = role.to_string();
             crate::language()
                 .field_id_for_name(field_name)

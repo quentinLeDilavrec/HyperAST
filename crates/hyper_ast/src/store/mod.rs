@@ -76,10 +76,13 @@ where
 
     type Role = TS::Role;
 
-    fn resolve_field(lang: crate::types::LangWrapper<Self::Ty>, field_id: Self::IdF) -> Self::Role {
+    fn resolve_field(
+        lang: impl crate::types::LangRef<Self::Ty>,
+        field_id: Self::IdF,
+    ) -> Self::Role {
         TS::resolve_field(lang, field_id)
     }
-    fn intern_role(lang: crate::types::LangWrapper<Self::Ty>, role: Self::Role) -> Self::IdF {
+    fn intern_role(lang: impl crate::types::LangRef<Self::Ty>, role: Self::Role) -> Self::IdF {
         TS::intern_role(lang, role)
     }
 }

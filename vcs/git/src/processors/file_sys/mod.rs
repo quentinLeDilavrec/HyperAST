@@ -19,6 +19,14 @@ use super::FullNode;
 type SimpleStores = hyperast::store::SimpleStores<TStore>;
 use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 
+type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
+
+pub(crate) struct FileSysProc {
+    parameter: Parameter,
+    cache: caches::FileSys,
+    commits: OidMap<crate::Commit>,
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct Parameter {
     #[cfg(feature = "cpp")]
@@ -31,12 +39,6 @@ pub struct Parameter {
     pub(crate) typescript_handle: PPHandle<super::typescript::TypescriptProc>,
     #[cfg(feature = "rust")]
     pub(crate) rust_handle: PPHandle<super::rust::RustProc>,
-}
-
-pub(crate) struct FileSysProc {
-    parameter: Parameter,
-    cache: caches::FileSys,
-    commits: OidMap<crate::Commit>,
 }
 
 pub struct FileSysAcc {
@@ -101,7 +103,6 @@ impl crate::preprocessed::RepositoryProcessor {
             #[cfg(feature = "rust")]
             rust_handle: RustProc::default_handle(processor_map),
         };
-        type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
         let holder = processor_map.commit_proc_mut::<FileSysProcessorHolder>();
         holder.register_param(t).erase()
     }

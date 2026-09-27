@@ -16,8 +16,10 @@ use crate::processors::Query;
 use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
 
+use super::RustProcessorHolder;
 use super::{Parameter, RustAcc};
 use super::{RustProc, SimpleStores};
+
 use hyperast_gen_ts_rust::legion as rust_gen;
 use hyperast_gen_ts_rust::{TStore, Type};
 
@@ -27,12 +29,9 @@ pub struct RustProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
-    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: Handle,
 }
-
-type RustProcessorHolder = crate::processing::ProcessorHolder<RustProc>;
 
 impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> RustProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     pub(crate) fn prepare(

@@ -16,6 +16,7 @@ use crate::processors::Query;
 use crate::processors::prepare_dir_exploration;
 use crate::{Processor, StackEle};
 
+use super::TypescriptProcessorHolder;
 use super::{Parameter, TypescriptAcc};
 use super::{SimpleStores, TypescriptProc};
 
@@ -28,12 +29,9 @@ pub struct TypescriptProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
-    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: Handle,
 }
-
-type TypescriptProcessorHolder = crate::processing::ProcessorHolder<TypescriptProc>;
 
 impl<'repo, 'prepro, 'd, 'c, Acc: From<String>> TypescriptProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     pub(crate) fn prepare(

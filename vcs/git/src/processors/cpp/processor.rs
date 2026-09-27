@@ -27,7 +27,6 @@ pub struct CppProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
-    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: PPHandle<CppProc>,
 }

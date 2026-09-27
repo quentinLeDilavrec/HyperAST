@@ -18,6 +18,7 @@ use crate::processing::ParametrizedProcessorHandle as PPHandle;
 use crate::processing::erased::ParametrizedCommitProcTyped as _;
 use crate::processing::{CacheHolding, ObjectName};
 
+use super::FileSysProcessorHolder;
 use super::{FileSysAcc, Parameter};
 use super::{FileSysProc, FullNode};
 
@@ -29,8 +30,6 @@ pub struct FileSysProcessor<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc> 
     file_sys_handle: PPHandle<FileSysProc>,
     handles: super::Parameter,
 }
-
-type FileSysProcessorHolder = crate::processing::ProcessorHolder<FileSysProc>;
 
 impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool, Acc: From<String>>
     FileSysProcessor<'a, 'b, 'c, RMS, FFWD, Acc>

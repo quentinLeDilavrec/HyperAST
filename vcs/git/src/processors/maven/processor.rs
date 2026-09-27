@@ -24,9 +24,10 @@ use crate::processors::java::JavaProc;
 use crate::processors::maven::PomProc;
 use crate::utils::drain_filter_strip;
 
+use super::MavenProcessorHolder;
 use super::scripting::ScriptingPrepro;
 use super::scripting::prep_scripting;
-use super::{FullNode, MavenModuleAcc, MavenProcessorHolder};
+use super::{FullNode, MavenModuleAcc};
 use super::{MavenProc, SimpleStores};
 
 /// RMS: Resursive Module Search

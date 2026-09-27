@@ -20,6 +20,7 @@ use crate::{Processor, StackEle};
 use super::PythonProcessorHolder;
 use super::SimpleStores;
 use super::{Parameter, PythonAcc};
+
 use hyperast_gen_ts_python::legion as python_gen;
 use hyperast_gen_ts_python::{TStore, Type};
 
@@ -29,7 +30,6 @@ pub struct PythonProcessor<'repo, 'prepro, 'd, 'c, Acc> {
     repository: &'repo Repository,
     prepro: &'prepro mut RepositoryProcessor,
     stack: Vec<StackEle<Acc>>,
-    // TODO reenable
     pub dir_path: &'d mut Peekable<Components<'c>>,
     handle: Handle,
 }

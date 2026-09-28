@@ -214,6 +214,7 @@ impl<IdN, Idx, C> From<SolvedStructuralPosition<IdN, Idx, C>> for (IdN, Vec<Idx>
         (val.node, val.offsets)
     }
 }
+
 impl<IdN, Idx, C> From<SolvedStructuralPosition<IdN, Idx, C>> for StructuralPosition<IdN, Idx, C> {
     fn from(value: SolvedStructuralPosition<IdN, Idx, C>) -> Self {
         Self {
@@ -334,6 +335,7 @@ impl<IdN, Idx> From<(Vec<IdN>, Vec<Idx>, IdN)> for StructuralPosition<IdN, Idx> 
         }
     }
 }
+
 impl<IdN, Idx> From<(Vec<IdN>, Vec<Idx>)> for StructuralPosition<IdN, Idx> {
     fn from(x: (Vec<IdN>, Vec<Idx>)) -> Self {
         assert_eq!(x.0.len(), x.1.len());
@@ -344,6 +346,7 @@ impl<IdN, Idx> From<(Vec<IdN>, Vec<Idx>)> for StructuralPosition<IdN, Idx> {
         }
     }
 }
+
 impl<IdN, Idx: num::Zero> From<IdN> for StructuralPosition<IdN, Idx> {
     fn from(node: IdN) -> Self {
         Self::new(node)

@@ -441,3 +441,112 @@ where
         }
     }
 }
+
+// # Make sure we implement the necessities to compute the positions
+
+use crate::position::position_accessors;
+use std::ops::Deref;
+
+impl<IdN, Idx: PrimInt> position_accessors::WithOffsets for RefNode<'_, IdN, Idx> {
+    type Idx = Idx;
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPath<IdN> for RefNode<'_, IdN, Idx> {}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPreOrderOffsets for RefNode<'_, IdN, Idx> {
+    type It<'a>
+        = Iter<'a, IdN, Idx>
+    where
+        Idx: 'a,
+        Self: 'a;
+    fn iter_offsets(&self) -> Self::It<'_> {
+        Iter {
+            s: self.s.deref(),
+            h: self.h,
+        }
+    }
+}
+
+impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets for RefNode<'_, IdN, Idx> {
+    fn iter(&self) -> impl Iterator<Item = Self::Idx> {
+        Iter {
+            s: self.s.deref(),
+            h: self.h,
+        }
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithPostOrderPath<IdN> for RefNode<'_, IdN, Idx> {
+    fn iter_offsets_and_parents(&self) -> impl Iterator<Item = (Self::Idx, IdN)> {
+        Iter {
+            s: self.s.deref(),
+            h: self.h,
+        }
+        .zip(IterParents {
+            s: self.s.deref(),
+            h: self.h,
+        })
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::RootedPosition<IdN> for RefNode<'_, IdN, Idx> {
+    fn root(&self) -> IdN {
+        self.s.root()
+    }
+}
+
+impl<IdN, Idx> position_accessors::SolvedPosition<IdN> for RefNode<'_, IdN, Idx>
+where
+    IdN: Copy,
+{
+    fn node(&self) -> IdN {
+        self.s.node(self.h)
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> RefNode<'_, IdN, Idx> {
+    pub fn iter_nodes(&self) -> impl Iterator<Item = IdN> {
+        Some(self.s.node(self.h)).into_iter().chain(IterParents {
+            s: self.s.deref(),
+            h: self.h,
+        })
+    }
+}
+
+impl<IdN: Copy, Idx: PrimInt> position_accessors::WithFullPostOrderPath<IdN>
+    for RefNode<'_, IdN, Idx>
+{
+    fn iter_with_nodes(&self) -> (IdN, impl Iterator<Item = (Self::Idx, IdN)>) {
+        use crate::position::position_accessors::WithPostOrderPath;
+        (self.s.node(self.h), self.iter_offsets_and_parents())
+    }
+}
+
+pub struct Iter<'a, IdN, Idx> {
+    s: &'a StructuralPositionStore2<IdN, Idx>,
+    h: Handle,
+}
+
+impl<IdN, Idx: PrimInt> Iterator for Iter<'_, IdN, Idx> {
+    type Item = Idx;
+    fn next(&mut self) -> Option<Self::Item> {
+        let r = self.s.offset(self.h);
+        self.h = self.s.parent(self.h)?;
+        Some(r)
+    }
+}
+
+pub struct IterParents<'a, IdN, Idx> {
+    s: &'a StructuralPositionStore2<IdN, Idx>,
+    h: Handle,
+}
+
+impl<IdN: Copy, Idx: PrimInt> Iterator for IterParents<'_, IdN, Idx> {
+    type Item = IdN;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.h = self.s.parent(self.h)?;
+        Some(self.s.node(self.h))
+    }
+}
+
+impl<IdN, Idx> crate::position::node_filter_traits::Full for RefNode<'_, IdN, Idx> {}

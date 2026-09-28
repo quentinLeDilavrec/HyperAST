@@ -23,10 +23,6 @@ pub trait AssistedFrom<S, T> {
     fn compute(&self, store: S) -> T;
 }
 
-/// helper trait directly providing the node it points to
-///
-/// `SolvedWrapper` provides an easy way to enable the capability on positions
-/// that do not have a direct node accessor (e.g. [`super::file_and_offset::Position`])
 pub trait SolvedPosition<IdN> {
     fn node(&self) -> IdN;
 }

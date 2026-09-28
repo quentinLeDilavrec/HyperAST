@@ -19,6 +19,14 @@ impl<IdN, Idx> StructuralPositionStore2<IdN, Idx> {
             self.persisted.0 = h.0;
         }
     }
+
+    pub fn root(&self) -> IdN
+    where
+        IdN: Copy,
+    {
+        *self.nodes.first().unwrap()
+    }
+
     pub fn parent(&self, h: Handle) -> Option<Handle> {
         if h.0 == 0 {
             panic!();

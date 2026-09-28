@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 
 use hyperast::position;
 use hyperast::position::offsets_and_nodes::SolvedStructuralPosition;
-use hyperast::position::position_accessors::{SolvedPosition, WithPreOrderOffsets};
+use hyperast::position::position_accessors;
 use hyperast::store::SimpleStores;
 use hyperast::store::defaults::NodeIdentifier;
 use hyperast::types;
@@ -357,7 +357,7 @@ impl<Init> QueryLattice<Init> {
 
 type VecDedup<Init, T> = Vec<(Init, (IdNQ, T))>;
 
-impl<Init: Clone + SolvedPosition<IdN>> QueryLattice<Init> {
+impl<Init: Clone + position_accessors::SolvedPosition<IdN>> QueryLattice<Init> {
     pub fn get_query(&self, index: usize) -> Option<(String, &[IdQ])> {
         self.queries
             .get(self.sort_cache[index] as usize)
@@ -533,7 +533,7 @@ impl<TR> Ded for DedupBySize2<TR> {
 }
 
 #[cfg(feature = "synth_par")]
-pub fn group_by_size<Init: Clone + SolvedPosition<IdN> + Eq + Sync + Send>(
+pub fn group_by_size<Init: Clone + position_accessors::SolvedPosition<IdN> + Eq + Sync + Send>(
     from: VecDedup<Init, (u32, u32)>,
 ) -> DedupBySize2<TR<Init>> {
     use rayon::iter::IntoParallelIterator as _;
@@ -698,7 +698,9 @@ impl Builder<'_, IdN, DedupRawEntry<TR<IdN>>> {
 
 // the parallel implementations
 #[cfg(feature = "synth_par")]
-impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupBySize2<TR<Init>>> {
+impl<Init: Clone + position_accessors::SolvedPosition<IdN> + Sync + Send>
+    Builder<'_, Init, DedupBySize2<TR<Init>>>
+{
     fn loop_par(&mut self)
     where
         Init: Eq,
@@ -807,7 +809,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
         uniques: Vec<(IdNQ, TR<Init>)>,
     ) -> BTreeMap<usize, Vec<(IdNQ, TR<Init>)>>
     where
-        Init: Eq + Clone + SolvedPosition<IdN>,
+        Init: Eq + Clone + position_accessors::SolvedPosition<IdN>,
         Init: Send + Sync,
     {
         self.by_pattern_metric(uniques, |q| q.size())
@@ -1374,7 +1376,10 @@ impl<Init: Clone + SolvedPosition<IdN> + Sync + Send> Builder<'_, Init, DedupByS
                 let mut map: Vec<IdNQ> = vec![];
                 let mut repl_decls: Vec<(Vec<u16>, IdNQ)> = vec![];
                 for c in decl_nodes.iter() {
-                    if let Some(i) = map.iter().position(|p| p.node() == c.node()) {
+                    if let Some(i) = map
+                        .iter()
+                        .position(|p| position_accessors::SolvedPosition::node(&p) == c.node())
+                    {
                         repl_decls.push((c.offsets(), s.auto_caps[i]));
                     } else {
                         let i = map.len();
@@ -1682,7 +1687,7 @@ pub fn filter_by_key_par<TR: Clone + PartialEq + Send + Sync>(
     });
 }
 #[cfg(feature = "synth_par")]
-impl<Init: Clone + SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
+impl<Init: Clone + position_accessors::SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
     pub fn actives(&self, active_size: usize) -> Vec<IdN> {
         use rayon::iter::ParallelIterator;
 
@@ -1718,7 +1723,7 @@ impl<Init: Clone + SolvedPosition<IdN> + Send + Sync> Builder<'_, Init> {
 }
 
 #[cfg(not(feature = "synth_par"))]
-impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
+impl<Init: Clone + position_accessors::SolvedPosition<IdN>> Builder<'_, Init> {
     pub fn actives(&mut self, active_size: usize) -> Vec<IdN> {
         self.dedup[active_size]
             .keys()
@@ -1751,7 +1756,7 @@ impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
     }
 }
 
-impl<Init: Clone + SolvedPosition<IdN>> Builder<'_, Init> {
+impl<Init: Clone + position_accessors::SolvedPosition<IdN>> Builder<'_, Init> {
     pub fn simp_eq(&mut self, active: &mut Vec<IdNQ>) -> (Vec<(IdNQ, TR<Init>)>, Vec<IdNQ>) {
         let s = &mut self.lattice;
         let dedup = &mut self.dedup;
@@ -1939,8 +1944,10 @@ where
     let mut per_label = std::collections::HashMap::<String, Vec<(String, Pos<_, _>)>>::default();
 
     for e in crate::iter::IterAll::new(&query_store, path, query) {
-        let capts =
-            prepared_matcher.is_matching_and_capture::<_, crate::TIdN<_>>(&query_store, e.node());
+        let capts = prepared_matcher.is_matching_and_capture::<_, crate::TIdN<_>>(
+            &query_store,
+            position_accessors::SolvedPosition::node(&e),
+        );
         let Some(capts) = capts else { continue };
         dbg!(&capts);
         let l_l = (prepared_matcher.captures.iter())
@@ -1959,17 +1966,13 @@ where
             .push((v.to_string(), e));
     }
     dbg!(&per_label);
-    let query_bis = tsq_transform::regen_query(
-        &mut query_store,
-        query,
-        (per_label.values())
-            .filter(|l| l.len() == 2)
-            .flatten()
-            .map(|x| tsq_transform::Action::Delete {
-                path: x.1.iter_offsets().collect(),
-            })
-            .collect(),
-    );
+    let del_actions = (per_label.values())
+        .filter(|l| l.len() == 2)
+        .flatten()
+        .map(|x| position_accessors::WithPreOrderOffsets::iter_offsets(&x.1).collect())
+        .map(|path| tsq_transform::Action::Delete { path })
+        .collect();
+    let query_bis = tsq_transform::regen_query(&mut query_store, query, del_actions);
     let query = qgen::PP::<_, _>::new(&query_store, query_bis.unwrap()).to_string();
     let query = format!("{} {}", query, PerLabel(per_label.clone()));
     println!("\nThe generified query:\n{}", query);
@@ -2017,7 +2020,7 @@ fn simp_focus(
 ) -> Vec<IdNQ> {
     let focus = if let Some(cid) = meta_simp.capture_index_for_name("focus") {
         use hyperast::position::structural_pos::CursorHead;
-        find_matches_aux(query_store, query, meta_simp, cid).collect_vec(|x| x.node())
+        find_matches_aux(query_store, query, meta_simp, cid).collect_vec(|x| CursorHead::node(&x))
     } else {
         vec![]
     };
@@ -2273,7 +2276,7 @@ fn generate_query_aux<
     TS: TypeStore + RoleStore,
     TIdN: TypedNodeId<IdN = NodeIdentifier>,
     T,
-    Init: SolvedPosition<IdN>,
+    Init: position_accessors::SolvedPosition<IdN>,
 >(
     query_store: &mut QStore,
     md_cache: &mut qgen::MDCache,
@@ -2693,7 +2696,7 @@ pub fn semi_interactive_poset_build<P>(
     mut timeout: impl FnMut() -> bool,
     size_threshold: impl Fn(usize) -> usize,
 ) where
-    P: Eq + Clone + SolvedPosition<IdN> + Sync + Send,
+    P: Eq + Clone + position_accessors::SolvedPosition<IdN> + Sync + Send,
 {
     type BySize<T> = Vec<T>;
     type SimpEqResult = IdN;

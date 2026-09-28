@@ -95,6 +95,7 @@ type SharedPStore<IdN, Idx> = std::rc::Rc<std::cell::RefCell<StructuralPositionS
 /// Cursor backed by a store, thus allowing to efficiently yield nodes, while sharing the shared sub path between all nodes.
 /// As long as a node is not persisted, this cursor reuses and mutate to update itself.
 // only tags::BottomUpFull is possible for efficiency
+#[derive(Debug)]
 pub struct CursorWithPersistence<IdN, Idx = u16> {
     s: SharedPStore<IdN, Idx>,
     h: Handle,

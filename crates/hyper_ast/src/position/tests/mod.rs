@@ -1,5 +1,6 @@
 //! Testing position conversion
 
+use crate::position::position_accessors::RootedPosition;
 use crate::types::{HyperAST as _, WithChildren as _};
 use crate::types::{HyperType as _, Labeled as _, WithSerialization as _};
 
@@ -203,7 +204,8 @@ fn top_down(stores: &SimpleStores<TStore, NS<Tree>, LS<u16>>, root: IdN, path: &
         .with_store(stores)
         .compute_pos_pre_order::<_, super::offsets_and_nodes::StructuralPosition<_, _>>(
     );
-    dbg!(&_rooted_offsets);
+    use crate::position::position_accessors::SolvedPosition;
+    dbg!(&_rooted_offsets.node());
 
     // rooted offsets --> offsets and nodes
     let _rooted_offsets = PositionConverter::new(&_rooted_offsets)
@@ -316,6 +318,42 @@ fn bottom_up(stores: &SimpleStores<TStore, NS<Tree>, LS<u16>>, root: IdN, path: 
         .compute_pos_post_order::<_, super::file_and_range::Position<_, _>>();
 
     dbg!(&file_and_range);
+
+    {
+        let (n, it) = _full_offsets_and_nodes.iter_with_nodes();
+        dbg!(n, it.collect::<Vec<_>>());
+    }
+
+    use crate::position::position_accessors::WithFullPostOrderPath;
+    let (n, it) = _full_offsets_and_nodes.iter_with_nodes();
+    let (mut idx, mut ids): (Vec<_>, Vec<_>) = it.unzip();
+    idx.reverse();
+    ids.reverse();
+    ids.push(n);
+    let mut ids = ids.into_iter();
+    let root = ids.next().unwrap();
+    assert_eq!(rooted_offsets.root(), _full_offsets_and_nodes.root());
+    assert_eq!(root, rooted_offsets.root());
+    let mut pos = crate::position::structural_pos::CursorWithPersistence::new(root);
+    for (o, n) in idx.into_iter().zip(ids) {
+        use crate::position::structural_pos::CursorHeadMove;
+        pos.down(n, o);
+    }
+    {
+        let x = pos.persist();
+        let x = x.ref_node();
+        let (n, it) = x.iter_with_nodes();
+        let v = it.collect::<Vec<_>>();
+        dbg!(n, &v);
+
+        let (n2, it) = _full_offsets_and_nodes.iter_with_nodes();
+        assert_eq!(n, n2);
+        assert_eq!(v, it.collect::<Vec<_>>());
+    }
+
+    let _file_and_range = PositionConverter::new(&pos.persist().ref_node())
+        .with_stores(stores)
+        .compute_pos_post_order::<_, Observed<super::file_and_range::Position<_, _>>>();
 }
 
 fn label<'a>(ls: &'a LS<u16>, x: &TreeRef<'_, Tree>) -> &'a str {

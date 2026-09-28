@@ -350,10 +350,22 @@ fn bottom_up(stores: &SimpleStores<TStore, NS<Tree>, LS<u16>>, root: IdN, path: 
         assert_eq!(n, n2);
         assert_eq!(v, it.collect::<Vec<_>>());
     }
-
     let _file_and_range = PositionConverter::new(&pos.persist().ref_node())
         .with_stores(stores)
         .compute_pos_post_order::<_, Observed<super::file_and_range::Position<_, _>>>();
+
+    dbg!(&_file_and_range);
+
+    let super::CompoundPositionPreparer(_file_and_range, _row_col) =
+        PositionConverter::new(&pos.persist().ref_node())
+            .with_stores(stores)
+            .compute_pos_post_order::<_, super::CompoundPositionPreparer<
+                super::file_and_range::Position<_, _>,
+                super::row_col::RowCol<usize>,
+            >>();
+
+    dbg!(_file_and_range);
+    dbg!(_row_col);
 }
 
 fn label<'a>(ls: &'a LS<u16>, x: &TreeRef<'_, Tree>) -> &'a str {

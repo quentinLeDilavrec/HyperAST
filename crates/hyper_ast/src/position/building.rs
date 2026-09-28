@@ -230,6 +230,17 @@ mod impl_c_p_p_receivers2 {
     use super::top_down;
     use crate::PrimInt;
 
+    impl<A: bottom_up::CreateBuilder, B: bottom_up::CreateBuilder> bottom_up::CreateBuilder
+        for CompoundPositionPreparer<A, B>
+    {
+        fn create() -> Self {
+            Self(
+                bottom_up::CreateBuilder::create(),
+                bottom_up::CreateBuilder::create(),
+            )
+        }
+    }
+
     impl<IdN: Copy, A: top_down::CreateBuilder<IdN>, B: top_down::CreateBuilder<IdN>>
         top_down::CreateBuilder<IdN> for CompoundPositionPreparer<A, B>
     {
@@ -280,12 +291,28 @@ mod impl_c_p_p_receivers2 {
         }
     }
 
+    impl<Idx: PrimInt, A: bottom_up::ReceiveIdx<Idx, A>, B: bottom_up::ReceiveIdx<Idx, B>>
+        bottom_up::ReceiveIdx<Idx, Self> for CompoundPositionPreparer<A, B>
+    {
+        fn push(self, idx: Idx) -> Self {
+            Self(self.0.push(idx), self.1.push(idx))
+        }
+    }
+
     // impl<IdN, Idx: PrimInt, IdO: PrimInt, C> top_down::ReceiveIdxNoSpace<Idx, Self> for CompoundPositionPreparer<IdN, Idx, IdO, C> {
     //     fn push(self, _idx: Idx) -> Self {
     //         //self.offsets.push(idx);
     //         self
     //     }
     // }
+
+    impl<IdN: Copy, A: bottom_up::ReceiveNode<IdN, A>, B: bottom_up::ReceiveNode<IdN, B>>
+        bottom_up::ReceiveNode<IdN, Self> for CompoundPositionPreparer<A, B>
+    {
+        fn push(self, idn: IdN) -> Self {
+            Self(self.0.push(idn), self.1.push(idn))
+        }
+    }
 
     impl<
         Idx: PrimInt,
@@ -302,6 +329,10 @@ mod impl_c_p_p_receivers2 {
         type InFile<O> = Self;
     }
 
+    impl<A, B> bottom_up::FileSysReceiver for CompoundPositionPreparer<A, B> {
+        type InFile<O> = Self;
+    }
+
     impl<IdO: PrimInt, A: top_down::ReceiveOffset<IdO, A>, B: top_down::ReceiveOffset<IdO, B>>
         top_down::ReceiveOffset<IdO, Self> for CompoundPositionPreparer<A, B>
     {
@@ -309,6 +340,14 @@ mod impl_c_p_p_receivers2 {
             Self(self.0.push(bytes), self.1.push(bytes))
         }
     }
+    impl<IdO: PrimInt, A: bottom_up::ReceiveOffset<IdO, A>, B: bottom_up::ReceiveOffset<IdO, B>>
+        bottom_up::ReceiveOffset<IdO, Self> for CompoundPositionPreparer<A, B>
+    {
+        fn push(self, bytes: IdO) -> Self {
+            Self(self.0.push(bytes), self.1.push(bytes))
+        }
+    }
+
     impl<IdO: PrimInt, A: super::SetLen<IdO, A>, B: super::SetLen<IdO, B>> super::SetLen<IdO, Self>
         for CompoundPositionPreparer<A, B>
     {
@@ -329,6 +368,15 @@ mod impl_c_p_p_receivers2 {
     {
         fn set_node(self, node: IdN) -> CompoundPositionPreparer<A2, B2> {
             CompoundPositionPreparer(self.0.set_node(node), self.1.set_node(node))
+        }
+    }
+
+    impl<IdN: Copy, A: bottom_up::SetRoot<IdN, A2>, B: bottom_up::SetRoot<IdN, B2>, A2, B2>
+        bottom_up::SetRoot<IdN, CompoundPositionPreparer<A2, B2>>
+        for CompoundPositionPreparer<A, B>
+    {
+        fn set_root(self, node: IdN) -> CompoundPositionPreparer<A2, B2> {
+            CompoundPositionPreparer(self.0.set_root(node), self.1.set_root(node))
         }
     }
 

@@ -643,8 +643,7 @@ fn aux_opt128<T>(
     mut ex: impl FnMut(usize) -> Option<T>,
 ) -> Option<T> {
     let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
-    use hyperast_tsquery::hyperast_opt;
-    let cursor = hyperast_opt::TreeCursor::new(stores, pos);
+    let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(stores, pos);
     let qcursor = query.matches(cursor);
     for m in qcursor {
         let i = m.pattern_index;
@@ -1287,4 +1286,65 @@ fn differential_aux(
     }
     // let compute_time = now.elapsed().as_secs_f64();
     (results, result_names, err_flags)
+}
+
+#[ignore] // ignore (from normal cargo test) for now, later make a feature
+#[test]
+// slow test, more of an integration test, try using release
+fn test_query_incr() {
+    tracing_subscriber::fmt()
+        .with_env_filter("backend=debug,hyperast_vcs_git=info,hyperast=error")
+        .with_test_writer()
+        .try_init()
+        .unwrap();
+
+    let repo_spec = hyperast_vcs_git::git::Forge::Github.repo("Marcono1234", "gson");
+    let config = hyperast_vcs_git::processing::RepoConfig::JavaMaven;
+    let commit = "3d241ca0a6435cbf1fa1cdaed2af8480b99fecde";
+    let language = "Java";
+    let precomp = "(try_statement)";
+    let query = "(try_statement\n  (block\n    (expression_statement\n      (method_invocation\n        (identifier) (#EQ? \"fail\")\n      )\n    )\n  )\n  (catch_clause)\n) @root";
+
+    let result = run_query(repo_spec, config, commit, language, precomp, query).unwrap();
+    assert_eq!(result, vec![335]);
+}
+
+fn run_query(
+    repo_spec: hyperast_vcs_git::git::Repo,
+    config: hyperast_vcs_git::processing::RepoConfig,
+    commit: &str,
+    _language: &str,
+    precomp: &str,
+    query: &str,
+) -> std::result::Result<Vec<u64>, Box<dyn std::error::Error>> {
+    let state = crate::AppState::default();
+    let repo = state
+        .repositories
+        .write()
+        .unwrap()
+        .register_config_with_prequeries(repo_spec.clone(), config, &[precomp]);
+    let mut repository = repo.fetch();
+    log::debug!("done cloning {}", repository.spec);
+    let _commits = state.repositories.write().unwrap().pre_process_with_limit(
+        &mut repository,
+        "",
+        commit,
+        1,
+    )?;
+
+    let timeout = std::time::Duration::from_millis(100000);
+    let max_matches = u64::MAX;
+    let language = hyperast_gen_ts_java::language();
+    let query = hyperast_tsquery::Query::with_precomputed(&query, language, [precomp].as_slice())
+        .unwrap()
+        .1;
+
+    let repositories = state.repositories.read().unwrap();
+    let commit = repositories
+        .get_commit(&repository.config, &_commits[0])
+        .unwrap();
+    let code = commit.ast_root;
+    let stores = &repositories.processor.main_stores;
+    let result = simple_aux(stores, code, &query, timeout, max_matches);
+    Ok(result.unwrap().result)
 }

@@ -116,19 +116,19 @@ impl MakeModuleAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
-        self.precomp_queries = full_node.precomp_queries;
+        self.precomp_queries += full_node.precomp_queries;
     }
     pub(crate) fn push_source_file(&mut self, name: LabelIdentifier, full_node: FullNode) {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
-        self.precomp_queries = full_node.precomp_queries;
+        self.precomp_queries += full_node.precomp_queries;
     }
     pub(crate) fn push_source_directory(&mut self, name: LabelIdentifier, full_node: FullNode) {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
-        self.precomp_queries = full_node.precomp_queries;
+        self.precomp_queries += full_node.precomp_queries;
     }
     pub(crate) fn push_test_source_directory(
         &mut self,
@@ -138,7 +138,7 @@ impl MakeModuleAcc {
         self.primary.children.push(full_node.id);
         self.primary.children_names.push(name);
         self.primary.metrics.acc(full_node.metrics);
-        self.precomp_queries = full_node.precomp_queries;
+        self.precomp_queries += full_node.precomp_queries;
     }
 }
 

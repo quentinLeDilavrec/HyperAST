@@ -479,30 +479,20 @@ fn pre_repo(
         hyperast_vcs_git::processing::RepoConfig::Any
     };
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
-    let repo = state
-        .repositories
-        .read()
-        .unwrap()
-        .get_config(repo_spec.clone());
-    let repo = match repo {
-        Some(_) | None => {
-            let configs = &mut state.repositories.write().unwrap();
-            if let Some(precomp) = precomp {
-                let precomp = precomp
-                    .split("\n\n")
-                    .filter(|x| !x.is_empty())
-                    .collect::<Vec<_>>();
-                configs.register_config_with_prequeries(
-                    repo_spec.clone(),
-                    config,
-                    precomp.as_slice(),
-                );
-            } else {
-                configs.register_config(repo_spec.clone(), config);
-            }
-            log::error!("missing config for {}", repo_spec);
-            configs.get_config(repo_spec.clone()).unwrap()
-        }
+    let repo = if let Some(precomp) = precomp {
+        let configs = &mut state.repositories.write().unwrap();
+        let precomp = precomp
+            .split("\n\n")
+            .filter(|x| !x.is_empty())
+            .collect::<Vec<_>>();
+        dbg!(&precomp);
+        configs.register_config_with_prequeries(repo_spec.clone(), config, precomp.as_slice())
+    } else {
+        state
+            .repositories
+            .write()
+            .unwrap()
+            .register_config(repo_spec.clone(), config)
     };
     let repo = repo.fetch();
     log::warn!("done cloning {}", &repo.spec);

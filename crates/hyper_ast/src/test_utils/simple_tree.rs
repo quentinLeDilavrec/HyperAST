@@ -753,7 +753,7 @@ impl HyperType for Ty {
     }
 
     fn is_hidden(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_named(&self) -> bool {
@@ -761,7 +761,7 @@ impl HyperType for Ty {
     }
 
     fn is_supertype(&self) -> bool {
-        todo!()
+        false
     }
 
     fn is_error(&self) -> bool {

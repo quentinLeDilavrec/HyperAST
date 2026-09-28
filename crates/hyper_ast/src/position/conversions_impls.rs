@@ -57,7 +57,7 @@ where
                 let b = stores.node_store().resolve(x.as_id());
                 let t = stores.resolve_type(x.as_id());
                 let v = &b.children().unwrap();
-                assert_eq!(Some(&prev_x), v.get(o));
+                assert_eq!(Some(&prev_x), v.get(o), "{} {:?}", t.as_static_str(), o);
                 let v = v.before(o).collect::<Vec<_>>();
                 fn compute<'store, HAST: HyperAST>(
                     stores: &'store HAST,
@@ -163,7 +163,7 @@ where
             let n = stores.resolve(&x);
             let cs = n.children().unwrap();
             let Some(c) = cs.get(o) else {
-                panic!("{}", stores.resolve_type(&x).as_static_str());
+                panic!("{} {:?}", stores.resolve_type(&x).as_static_str(), o);
             };
             let parent = x;
             x = *c;
@@ -271,7 +271,16 @@ where
             x = cbn.0;
             if stores.resolve_type(&x).is_file() {
                 let file_name = dir_name;
-                break builder.set_file_name(file_name);
+                use building::ReceiveRows;
+                use top_down::ReceiveIdxNoSpace;
+                use top_down::ReceiveOffset;
+                break builder
+                    .set_file_name(file_name)
+                    .push(parent)
+                    .push(idx)
+                    .push(0)
+                    .push(zero())
+                    .push(0);
             }
             builder = builder.push(parent).push(idx).push(dir_name);
         };
@@ -336,7 +345,7 @@ where
                     && !(ty.is_supertype() || ty.is_hidden())
                 {
                     // found
-                    dbg!(ty, offset, len, start, end);
+                    dbg!(ty.as_static_str(), offset, len, start, end);
                     builder = builder
                         .push(parent)
                         .push(idx1)

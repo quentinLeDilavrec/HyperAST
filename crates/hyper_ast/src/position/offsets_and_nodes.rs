@@ -371,13 +371,13 @@ impl<IdN: Clone, Idx: PrimInt> position_accessors::WithPreOrderOffsets
     for SolvedStructuralPosition<IdN, Idx>
 {
     type It<'a>
-        = std::iter::Copied<std::slice::Iter<'a, Idx>>
+        = std::iter::Map<std::slice::Iter<'a, Idx>, fn(&Idx) -> Idx>
     where
         Self: 'a,
         Self::Idx: 'a;
 
     fn iter_offsets(&self) -> Self::It<'_> {
-        self.offsets.iter().copied()
+        self.offsets.iter().map(|o| *o - num::one())
     }
 }
 
@@ -397,7 +397,7 @@ impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets
     for SolvedStructuralPosition<IdN, Idx>
 {
     fn iter(&self) -> impl Iterator<Item = Self::Idx> {
-        self.offsets.iter().rev().cloned().map(|o| o - num::one())
+        self.offsets.iter().rev().map(|o| *o - num::one())
     }
 }
 
@@ -429,7 +429,9 @@ impl<IdN, Idx: PrimInt> position_accessors::WithPostOrderOffsets
     for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
 {
     fn iter(&self) -> impl Iterator<Item = Self::Idx> {
-        self.offsets[..self.offsets.len()].iter().cloned()
+        self.offsets[..self.offsets.len()]
+            .iter()
+            .map(|o| *o - num::one())
     }
 }
 
@@ -445,7 +447,7 @@ impl<IdN: Clone, Idx> position_accessors::RootedPosition<IdN>
     for SolvedStructuralPosition<IdN, Idx, tags::BottomUpFull>
 {
     fn root(&self) -> IdN {
-        self.parents.last().cloned().unwrap()
+        self.parents.first().cloned().unwrap()
     }
 }
 

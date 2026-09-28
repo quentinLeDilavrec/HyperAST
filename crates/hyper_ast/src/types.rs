@@ -1583,12 +1583,17 @@ where
         erazed: &impl PolyglotHolder,
         id: crate::store::nodes::LangId,
     ) -> Option<AnyType> {
+        #[cfg(feature = "legion")]
         if id.is::<<<CAR as ETypeStore>::Ty2 as TypeTrait>::Lang>() {
             let x = AnyType::from_polyglot::<<<CAR as ETypeStore>::Ty2 as TypeTrait>::Lang>(erazed);
             return Some(x.unwrap());
-        } else {
-            CDR::decomp_aux(erazed, id)
         }
+        #[cfg(not(feature = "legion"))]
+        if id.is::<<<CAR as ETypeStore>::Ty2 as TypeTrait>::Lang>() {
+            return unimplemented!();
+        }
+
+        CDR::decomp_aux(erazed, id)
     }
 
     fn resolve_field_aux(field_id: Self::IdF, name: &str) -> Self::Role {

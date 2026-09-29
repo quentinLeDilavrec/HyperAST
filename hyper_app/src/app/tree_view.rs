@@ -60,8 +60,12 @@ impl std::ops::AddAssign for Action {
             (Action::Clicked(_), Action::Clicked(_)) => {
                 unreachable!()
             }
+            (slf @ Action::PartialFocused(_), other) => {
+                wasm_rs_dbg::dbg!(&slf, &other);
+                *slf = other;
+            }
             (slf, other) => {
-                dbg!(slf, other);
+                wasm_rs_dbg::dbg!(slf, other);
             }
         };
     }

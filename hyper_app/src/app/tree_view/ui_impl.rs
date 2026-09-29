@@ -1060,7 +1060,7 @@ impl<'a> FetchedViewImpl<'a> {
                 let min = ui.available_rect_before_wrap().min;
                 imp.draw_count += 1;
                 ui.horizontal(|ui| {
-                    egui::Spinner::new().ui(ui);
+                    egui::Spinner::new().color(egui::Color32::LIGHT_GRAY).ui(ui);
                     ui.label(c.to_string());
                 });
                 let mut prefill = imp.prefill_cache.take().unwrap_or_default();

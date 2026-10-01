@@ -5,22 +5,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 
-use code_aspects::remote_fetch_node;
-use commit::{CommitSlice, SelectedProjects};
 use egui_addon::{code_editor, egui_utils::radio_collapsing};
-use querying::DetailsResults;
-use single_repo::ComputeConfigSingle;
-use store::FetchedHyperAST;
-use types::{Commit, Repo, SelectedConfig};
-use utils_results_batched::ComputeResultsProm;
 
-use crate::app::app_components::show_project_selection;
-use crate::app::types::CommitId;
 use crate::command::{CommandReceiver, CommandSender, UICommand, UICommandSender};
 use crate::command_palette::CommandPalette;
+use crate::types;
+use crate::utils;
 use crate::utils_poll::{Buffered3, MultiBuffered2};
 
 pub use types::Languages;
+use types::{Commit, CommitId, Repo, SelectedConfig};
 
 mod app_components;
 mod code_aspects;
@@ -36,8 +30,6 @@ mod smells;
 pub(crate) mod store;
 mod tree_view;
 mod tsg;
-pub(crate) mod types;
-mod utils;
 mod utils_commit;
 mod utils_edition;
 mod utils_egui;
@@ -45,6 +37,14 @@ mod utils_results_batched;
 pub(crate) use app_components::show_repo_menu;
 mod commit_graph;
 mod tracking;
+
+use app_components::show_project_selection;
+use code_aspects::remote_fetch_node;
+use commit::{CommitSlice, SelectedProjects};
+use querying::DetailsResults;
+use single_repo::ComputeConfigSingle;
+use store::FetchedHyperAST;
+use utils_results_batched::ComputeResultsProm;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Deserialize, Serialize)]

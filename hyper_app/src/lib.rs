@@ -8,4 +8,6 @@ pub use app::Languages;
 mod command;
 mod command_palette;
 mod platform;
+mod types;
+mod utils;
 pub mod utils_poll;

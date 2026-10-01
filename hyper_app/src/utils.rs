@@ -229,7 +229,7 @@ pub(crate) struct Commit {
     pub(crate) id: &'static str,
 }
 
-impl From<&Repo> for super::types::Repo {
+impl From<&Repo> for crate::types::Repo {
     fn from(value: &Repo) -> Self {
         Self {
             user: value.user.into(),
@@ -237,7 +237,8 @@ impl From<&Repo> for super::types::Repo {
         }
     }
 }
-impl From<&Commit> for super::types::Commit {
+
+impl From<&Commit> for crate::types::Commit {
     fn from(value: &Commit) -> Self {
         Self {
             repo: (&value.repo).into(),

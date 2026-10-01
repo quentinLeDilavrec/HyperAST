@@ -14,6 +14,7 @@ use store::FetchedHyperAST;
 use types::{Commit, Repo, SelectedConfig};
 use utils_results_batched::ComputeResultsProm;
 
+use crate::app::app_components::show_project_selection;
 use crate::app::types::CommitId;
 use crate::command::{CommandReceiver, CommandSender, UICommand, UICommandSender};
 use crate::command_palette::CommandPalette;
@@ -1689,78 +1690,6 @@ fn te<'a>(txt: &'a mut String, hint: &'static str) -> egui::TextEdit<'a> {
         .min_size((100.0, 0.0).into())
         .id_salt(hint)
         .hint_text(hint)
-}
-
-pub(crate) fn show_project_selection(
-    ui: &mut egui::Ui,
-    data: &mut AppData,
-    selected: &mut ProjectId,
-) {
-    let old_selected = *selected;
-    // *selected = ProjectId::INVALID;
-    let mut rm = None;
-    let project_ids = data.selected_code_data.project_ids();
-    let add_contents = |ui: &mut egui::Ui, i: ProjectId, r: &mut Repo| {
-        ui.label("github.com");
-        ui.horizontal(|ui| {
-            ui.label("/");
-            ui.add(te(&mut r.user, "user").id(ui.id().with((i, "user"))));
-        });
-        ui.end_row();
-        ui.horizontal(|ui| {
-            ui.label("/");
-            ui.add(te(&mut r.name, "name").id(ui.id().with((i, "name"))));
-        });
-    };
-    let layout = egui::Layout::right_to_left(egui::Align::Center);
-    for i in project_ids {
-        let Some((r, _commits)) = data.selected_code_data.get_mut(i) else {
-            continue;
-        };
-        let is_selected = old_selected == i;
-        let ui_builder = egui::UiBuilder::new().layout(layout);
-        use re_ui::list_item::ContentContext as CC;
-        let r = |ui: &mut egui::Ui, _: &CC<'_>| {
-            add_contents(ui, i, r);
-            let button = ui
-                .new_child(ui_builder.max_rect(ui.max_rect()))
-                .button("➖")
-                .on_hover_text("remove repository");
-            ui.advance_cursor_after_rect(button.rect);
-            if button.clicked() {
-                rm = Some(i);
-            }
-        };
-
-        let id = ui.id().with(i);
-        let content = re_ui::list_item::CustomContent::new(r);
-
-        let list = re_ui::list_item::ListItem::new()
-            .interactive(true)
-            .selected(is_selected)
-            .with_height(22.0);
-        let r = re_ui::list_item::list_item_scope(ui, id, |ui| list.show_flat(ui, content));
-        if r.clicked() {
-            *selected = i;
-        }
-    }
-
-    if let Some(i) = rm {
-        data.selected_code_data.remove(i);
-    }
-
-    ui.add_space(20.0);
-    let button = ui.button("➕").on_hover_text("add new repository");
-    if button.clicked() {
-        data.selected_code_data.add(
-            Repo {
-                user: Default::default(),
-                name: Default::default(),
-            },
-            vec![],
-        );
-    }
-    ui.add_space(40.0);
 }
 
 impl eframe::App for HyperApp {

@@ -1,8 +1,11 @@
-use crate::app::tracking::*;
-use crate::app::*;
-use commit::CommitSlice;
 use re_ui::list_item;
 use utils_egui::MyUiExt as _;
+
+use super::AppData;
+use super::commit::CommitSlice;
+use super::tracking::*;
+use super::*;
+
 mod bars;
 mod panels;
 
@@ -10,14 +13,6 @@ mod panels;
 trait AppActions {
     fn ui(self, data: &mut AppData, ui: &mut egui::Ui) -> egui::Response;
 }
-// impl<F> Widget for F
-// where
-//     F: FnOnce(&mut Ui) -> Response,
-// {
-//     fn ui(self, ui: &mut Ui) -> Response {
-//         self(ui)
-//     }
-// }
 
 impl<F> AppActions for F
 where
@@ -392,8 +387,6 @@ impl super::HyperApp {
     }
 }
 
-use super::AppData;
-
 impl super::HyperApp {
     pub(crate) fn old_ui(&mut self, ctx: &egui::Context) {
         if false {
@@ -727,4 +720,76 @@ pub fn show_menu<R>(
     let title = selected.title();
     let id = ui.make_persistent_id(title.as_ref());
     radio_collapsing(ui, id, title, selected, &wanted, add_body)
+}
+
+pub(crate) fn show_project_selection(
+    ui: &mut egui::Ui,
+    data: &mut AppData,
+    selected: &mut ProjectId,
+) {
+    let old_selected = *selected;
+    // *selected = ProjectId::INVALID;
+    let mut rm = None;
+    let project_ids = data.selected_code_data.project_ids();
+    let add_contents = |ui: &mut egui::Ui, i: ProjectId, r: &mut Repo| {
+        ui.label("github.com");
+        ui.horizontal(|ui| {
+            ui.label("/");
+            ui.add(te(&mut r.user, "user").id(ui.id().with((i, "user"))));
+        });
+        ui.end_row();
+        ui.horizontal(|ui| {
+            ui.label("/");
+            ui.add(te(&mut r.name, "name").id(ui.id().with((i, "name"))));
+        });
+    };
+    let layout = egui::Layout::right_to_left(egui::Align::Center);
+    for i in project_ids {
+        let Some((r, _commits)) = data.selected_code_data.get_mut(i) else {
+            continue;
+        };
+        let is_selected = old_selected == i;
+        let ui_builder = egui::UiBuilder::new().layout(layout);
+        use re_ui::list_item::ContentContext as CC;
+        let r = |ui: &mut egui::Ui, _: &CC<'_>| {
+            add_contents(ui, i, r);
+            let button = ui
+                .new_child(ui_builder.max_rect(ui.max_rect()))
+                .button("➖")
+                .on_hover_text("remove repository");
+            ui.advance_cursor_after_rect(button.rect);
+            if button.clicked() {
+                rm = Some(i);
+            }
+        };
+
+        let id = ui.id().with(i);
+        let content = re_ui::list_item::CustomContent::new(r);
+
+        let list = re_ui::list_item::ListItem::new()
+            .interactive(true)
+            .selected(is_selected)
+            .with_height(22.0);
+        let r = re_ui::list_item::list_item_scope(ui, id, |ui| list.show_flat(ui, content));
+        if r.clicked() {
+            *selected = i;
+        }
+    }
+
+    if let Some(i) = rm {
+        data.selected_code_data.remove(i);
+    }
+
+    ui.add_space(20.0);
+    let button = ui.button("➕").on_hover_text("add new repository");
+    if button.clicked() {
+        data.selected_code_data.add(
+            Repo {
+                user: Default::default(),
+                name: Default::default(),
+            },
+            vec![],
+        );
+    }
+    ui.add_space(40.0);
 }

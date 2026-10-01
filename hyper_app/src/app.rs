@@ -1,13 +1,11 @@
-use egui::util::hash;
 use re_ui::UiExt;
 use re_ui::notifications::NotificationUi;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 
 use code_aspects::remote_fetch_node;
-use commit::fetch_commit;
 use commit::{CommitSlice, SelectedProjects};
 use egui_addon::{code_editor, egui_utils::radio_collapsing};
 use querying::DetailsResults;
@@ -1138,200 +1136,15 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                     });
                 Default::default()
             }
-            Tab::QueryResults {
-                id: _,
-                format: ResultFormat::List,
-            } => {
-                todo!()
-                // utils_results_batched::show_long_result_list(ui, res);
-            }
-            Tab::QueryResults {
-                id: _,
-                format: ResultFormat::Json,
-            } => todo!(),
-            Tab::QueryResults {
-                id,
-                format: ResultFormat::Table,
-            } => {
-                let qres = self.data.queries_results.get_mut(*id);
-                let Some((proj_id, _qid, res)) = extract_qres(ui, qres) else {
-                    ui.error_label(format!("problem with query result {id:?}"));
-                    return Default::default();
-                };
-                let mut selected_commit = None;
-                if let Some(selected) = &self.selected_commit {
-                    if selected.0 == *proj_id {
-                        let id = egui::Id::new(proj_id);
-                        let i = ui.data_mut(|w| {
-                            let m: &mut (Option<(ProjectId, CommitId)>, usize) =
-                                w.get_temp_mut_or_default(id);
-                            if m.0.as_ref() != Some(selected) {
-                                m.0 = Some(*selected);
-                                m.1 = (res.rows.lock().unwrap().1)
-                                    .iter()
-                                    .position(|x| {
-                                        x.as_ref().map_or(false, |r| r.commit == selected.1)
-                                    })
-                                    .unwrap_or(usize::MAX);
-                                log::debug!("{:?}", m);
-                                Some(m.1)
-                            } else {
-                                None
-                            }
-                        });
-                        selected_commit = i;
-                    }
-                }
-                ui.push_id("table", |ui| {
-                    utils_results_batched::show_long_result_table(
-                        ui,
-                        (&res.head, None, res.rows.lock().unwrap().1.as_slice()),
-                        &mut selected_commit,
-                        |cid| {
-                            let md_fetch = &self.data.fetched_commit_metadata;
-                            let commit_metadata = md_fetch.get(&cid.parse().unwrap())?;
-                            (commit_metadata.as_ref()).ok()?.message.clone()
-                        },
-                    )
-                });
-                Default::default()
-            }
-            Tab::QueryResults {
-                id,
-                format: format @ ResultFormat::Hunks,
-            } => {
-                let qres = self.data.queries_results.get_mut(*id);
-                let Some((&mut proj_id, &mut qid, _res)) = extract_qres(ui, qres) else {
-                    ui.error_label(format!("problem with query result {id:?}"));
-                    return Default::default();
-                };
-                if show_hunks_header(
+            Tab::QueryResults { id, format } => {
+                querying::results::show_results(
                     ui,
+                    id,
                     format,
-                    &mut self.data,
-                    &mut self.selected_baseline,
+                    pane,
                     &mut self.selected_commit,
-                ) {
-                    return Default::default();
-                }
-
-                let data = &mut *self.data;
-
-                let Some(selected_baseline) = &self.selected_baseline else {
-                    unreachable!()
-                };
-                let Some(selected_commit) = &self.selected_commit else {
-                    unreachable!()
-                };
-                let Some(differential) = &mut data.queries_differential_results else {
-                    compute_queries_differential_results(
-                        ui,
-                        *pane,
-                        proj_id,
-                        qid,
-                        data,
-                        selected_baseline,
-                        selected_commit,
-                    );
-                    return Default::default();
-                };
-                let (absent, new) = update_queries_differential_results(
-                    ui,
-                    &data.queries,
-                    selected_baseline,
-                    qid,
-                    differential,
-                );
-                if absent {
-                    wasm_rs_dbg::dbg!(new);
-                    data.queries_differential_results = None;
-                    return Default::default();
-                }
-                let x = match differential.2.get() {
-                    Some(Ok(x)) => x,
-                    Some(Err(err)) => {
-                        ui.error_label(format!("Error on Differential: {:?}", err));
-                        if ui.button("retry").clicked() {
-                            data.queries_differential_results = None;
-                        }
-                        return Default::default();
-                    }
-                    None => {
-                        return Default::default();
-                    }
-                };
-
-                if new {
-                    wasm_rs_dbg::dbg!(x.results.len());
-                    let store = &data.store;
-                    store.demand_nodes(x.iter_nodes_ids());
-                }
-                let fetched_files = &mut data.fetched_files;
-                let api_addr = &data.api_addr;
-                show_hunks(ui, fetched_files, api_addr, x, selected_commit);
-                Default::default()
-            }
-            Tab::QueryResults {
-                id,
-                format: ResultFormat::Tree,
-            } => {
-                let qres = self.data.queries_results.get_mut(*id);
-                let Some((&mut proj_id, &mut qid, _res)) = extract_qres(ui, qres) else {
-                    ui.error_label(format!("problem with query result {id:?}"));
-                    return Default::default();
-                };
-
-                let data = &mut *self.data;
-
-                let Some(selected_baseline) = &self.selected_baseline else {
-                    unreachable!()
-                };
-                let Some(selected_commit) = &self.selected_commit else {
-                    unreachable!()
-                };
-
-                let Some(differential) = &mut data.queries_differential_results else {
-                    compute_queries_differential_results(
-                        ui,
-                        *pane,
-                        proj_id,
-                        qid,
-                        data,
-                        selected_baseline,
-                        selected_commit,
-                    );
-                    return Default::default();
-                };
-                let (absent, new) = update_queries_differential_results(
-                    ui,
-                    &data.queries,
-                    selected_baseline,
-                    qid,
-                    differential,
-                );
-                if absent {
-                    wasm_rs_dbg::dbg!(new);
-                    data.queries_differential_results = None;
-                    return Default::default();
-                }
-                let Some(Ok(x)) = differential.2.get_mut() else {
-                    return Default::default();
-                };
-                if new {
-                    wasm_rs_dbg::dbg!(x.results.len());
-                    let store = &data.store;
-                    store.demand_nodes(x.iter_nodes_ids());
-                }
-                show_tree_view_pair(
-                    ui,
-                    selected_baseline,
-                    selected_commit,
-                    &data.api_addr,
-                    data.store.clone(),
-                    x,
-                    &mut data.aspects,
-                    &mut data.selected_code_data,
-                    &mut data.long_tracking,
+                    &mut self.selected_baseline,
+                    &mut self.data,
                 );
                 Default::default()
             }
@@ -1752,35 +1565,6 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 }
 
-type ComputeRes = Result<utils_results_batched::ComputeResultIdentified, querying::MatchingError>;
-type StreamedComputeTable = querying::StreamedDataTable<Vec<String>, ComputeRes>;
-fn extract_qres<'a>(
-    ui: &mut egui::Ui,
-    qres: Option<&'a mut QueryResults>,
-) -> Option<(
-    &'a mut ProjectId,
-    &'a mut QueryId,
-    &'a mut StreamedComputeTable,
-)> {
-    let Some(QueryResults {
-        project: pid,
-        query: qid,
-        content: res,
-        tab: _,
-    }) = qres
-    else {
-        log::error!("query result not in list");
-        return None;
-    };
-    let res = res.get_mut()?;
-    if let Err(err) = res {
-        ui.error_label(&format!("error {:?}", err));
-        return None;
-    }
-    let Ok(res) = res else { unreachable!() };
-    Some((pid, qid, res))
-}
-
 fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
     let code = &mut query.query.code;
     let language = "rs";
@@ -1788,7 +1572,7 @@ fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
 
     const EDIT_AWARE: bool = false;
     if EDIT_AWARE {
-        // some issues on cursor behavior, like lising focus on arrow key press
+        // some issues on cursor behavior, like releasing focus on arrow key press
         use code_editor::generic_text_edit::TextEdit;
         ui.add_sized(
             ui.available_size(),
@@ -1830,283 +1614,6 @@ fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
     }
 }
 
-fn show_tree_view(
-    ui: &mut egui::Ui,
-    aspects: &mut types::ComputeConfigAspectViews,
-    selected_projects: &mut SelectedProjects,
-    long_tacking: &mut tracking::long_tracking::LongTracking,
-    store: Arc<FetchedHyperAST>,
-    commit: &(ProjectId, CommitId),
-    api_addr: &String,
-    curr_view: &mut tracking::long_tracking::ColView<'_>,
-) {
-    let (repo, _c) = selected_projects.get_mut(commit.0).unwrap();
-
-    let curr_commit = Commit {
-        repo: repo.clone(),
-        id: commit.1,
-    };
-    let tree_viewer = long_tacking.tree_viewer.entry(curr_commit.clone());
-    let tree_viewer = tree_viewer.or_default();
-    tree_viewer.try_poll();
-    let trigger = true;
-    let Some(tree_viewer) = tree_viewer.get_mut() else {
-        if !tree_viewer.is_waiting() {
-            tree_viewer.buffer(code_aspects::remote_fetch_node_old(
-                ui.ctx(),
-                &api_addr,
-                store,
-                &curr_commit,
-                "",
-            ));
-        }
-        return Default::default();
-    };
-
-    let Ok(tree_viewer) = tree_viewer else {
-        return Default::default();
-    };
-    let col = 0;
-    let min_col = 0;
-    let mut attacheds = vec![];
-    let mut deferred_focus_scroll = None;
-    tracking::long_tracking::show_tree_view(
-        ui,
-        min_col,
-        api_addr,
-        col,
-        trigger,
-        tree_viewer,
-        curr_view,
-        aspects,
-        &mut attacheds,
-        &mut deferred_focus_scroll,
-    );
-
-    if let Some((o, _i, mut scroll)) = deferred_focus_scroll {
-        let o: f32 = o;
-        // let g_o = attacheds
-        //     .get(i)
-        //     .and_then(|a| a.0.get(&0))
-        //     .and_then(|x| x.1)
-        //     .map(|p| p.min.y)
-        //     .unwrap_or(ui.max_rect().height() / 2000.0);
-        let g_o: f32 = 50.0;
-        wasm_rs_dbg::dbg!(o, g_o);
-        if (scroll.state.offset.y - (o - g_o)).abs() < 20.0 {
-            scroll.state.offset = (0.0, (o - g_o)).into();
-        }
-        scroll.state.store(ui.ctx(), scroll.id);
-    }
-}
-
-fn show_hunks(
-    ui: &mut egui::Ui,
-    fetched_files: &mut tracking::FetchedFiles,
-    api_addr: &String,
-    x: &DetailsResults,
-    selected_commit: &(ProjectId, CommitId),
-) {
-    const B: f32 = 15.;
-    const H: f32 = 800.;
-    let id = ui.id();
-    let len = x.results.len();
-    egui::ScrollArea::vertical()
-        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-        .show_rows(ui, H, len, |ui, cols| {
-            let (mut rect, _) = ui.allocate_exact_size(
-                egui::Vec2::new(ui.available_width(), H * (cols.end - cols.start) as f32),
-                egui::Sense::hover(),
-            );
-            let top = rect.top();
-            for i in cols.clone() {
-                let mut rect = {
-                    let (t, b) = rect.split_top_bottom_at_y(top + H * (i - cols.start + 1) as f32);
-                    rect = b;
-                    t
-                };
-                use std::ops::SubAssign;
-                rect.bottom_mut().sub_assign(B);
-                let line_pos_1 = egui::emath::GuiRounding::round_to_pixels(
-                    rect.left_bottom(),
-                    ui.painter().pixels_per_point(),
-                );
-                let line_pos_2 = egui::emath::GuiRounding::round_to_pixels(
-                    rect.right_bottom(),
-                    ui.painter().pixels_per_point(),
-                );
-                ui.painter()
-                    .line_segment([line_pos_1, line_pos_2], ui.visuals().window_stroke());
-                rect.bottom_mut().sub_assign(B);
-                let mut ui = ui.new_child(
-                    egui::UiBuilder::new()
-                        .max_rect(rect)
-                        .layout(egui::Layout::top_down(egui::Align::Min)),
-                );
-                ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-                ui.label(format!(
-                    "{}:{}..{}",
-                    x.results[i].0.file.file_path,
-                    x.results[i].0.range.as_ref().unwrap().start,
-                    x.results[i].0.range.as_ref().unwrap().end
-                ));
-                ui.push_id(id.with(i).with(&x.results[i]), |ui| {
-                    let after = x.results[i].1.clone();
-                    assert_eq!(after.file.commit.id, selected_commit.1);
-                    smells::show_diff(
-                        ui,
-                        api_addr,
-                        &smells::ExamplesValue {
-                            before: x.results[i].0.clone(),
-                            after,
-                            inserts: Default::default(),
-                            deletes: Default::default(),
-                            moves: Default::default(),
-                        },
-                        fetched_files,
-                    );
-                });
-            }
-        });
-}
-
-fn update_queries_differential_results(
-    ui: &mut egui::Ui,
-    queries: impl std::ops::Index<QueryId, Output = QueryData>,
-    selected_baseline: &CommitId,
-    qid: QueryId,
-    differential: &mut QueriesDifferentialResults,
-) -> (bool, bool) {
-    if differential.2.is_waiting() {
-        ui.spinner();
-    }
-    let new = differential.2.try_poll_with(|x| {
-        x.map_err(|e| querying::QueryingError::NetworkError(e))
-            .and_then(|x| x.content.unwrap())
-    });
-    let absent = if !differential.2.is_present() && !differential.2.is_waiting() {
-        true
-    } else if let Some(Err(_)) = differential.2.get() {
-        false
-    } else {
-        hash((queries[qid].query.as_ref(), selected_baseline)) != differential.4
-    };
-    (absent, new)
-}
-
-fn compute_queries_differential_results(
-    ui: &mut egui::Ui,
-    pane: TabId,
-    proj_id: ProjectId,
-    qid: QueryId,
-    data: &mut AppData,
-    selected_baseline: &CommitId,
-    selected_commit: &(ProjectId, CommitId),
-) {
-    let pid = selected_commit.0;
-    if pid != proj_id {
-        return;
-    }
-    let (repo, _c) = data.selected_code_data.get_mut(pid).unwrap();
-    let language = &data.queries[qid].lang;
-    let query = data.queries[qid].query.as_ref().to_string();
-    wasm_rs_dbg::dbg!(&query);
-    let config = if language == "Cpp" {
-        types::Config::MakeCpp
-    } else if language == "Java" {
-        types::Config::MavenJava
-    } else {
-        log::warn!("{} is not supported defaulting to Java", &language);
-        types::Config::MavenJava
-    };
-    let language = language.to_string();
-    let commits = 2;
-    let baseline = Commit {
-        repo: repo.clone(),
-        id: *selected_baseline,
-    };
-    let commit = Commit {
-        repo: repo.clone(),
-        id: selected_commit.1,
-    };
-    let max_matches = data.queries[qid].max_matches;
-    let timeout = data.queries[qid].timeout;
-    let precomp = data.queries[qid].precomp;
-    wasm_rs_dbg::dbg!(qid, &data.queries, precomp);
-    let precomp = precomp.map(|qid| &data.queries[qid]);
-    let precomp = precomp.map(|p| p.query.as_ref().to_string());
-    let hash = hash((&query, *selected_baseline));
-    let prom = querying::remote_compute_query_differential(
-        ui.ctx(),
-        &data.api_addr,
-        &querying::ComputeConfigQueryDifferential {
-            commit,
-            config,
-            baseline,
-        },
-        querying::QueryContent {
-            language,
-            query,
-            precomp,
-            commits,
-            max_matches,
-            timeout,
-        },
-    );
-    data.queries_differential_results = Some((pid, qid, Default::default(), pane, hash));
-    let res = data.queries_differential_results.as_mut().unwrap();
-    res.2.buffer(prom);
-}
-
-pub(crate) fn show_tree_view_pair(
-    ui: &mut egui::Ui,
-    selected_baseline: &types::Oid,
-    selected_commit: &(ProjectId, types::Oid),
-    api_addr: &String,
-    store: Arc<store::FetchedHyperAST>,
-    x: &mut querying::DetailsResults,
-    aspects: &mut types::ComputeConfigAspectViews,
-    selected_projects: &mut commit::SelectedProjects,
-    long_tacking: &mut tracking::long_tracking::LongTracking,
-) {
-    use egui_addon::InteractiveSplitter;
-    use tracking::long_tracking::ColView;
-    use tracking::long_tracking::PlacedCode;
-
-    let commit = selected_commit;
-    let bl = &(selected_commit.0, *selected_baseline);
-
-    let mut f = |ui: &mut egui::Ui, id_salt: (&_, &_), left_side, commit: &_| {
-        let mut curr_view = ColView::default();
-        (curr_view.matcheds).extend(x.results.iter_mut().enumerate().map(|(i, x)| {
-            let code = if left_side { &mut x.0 } else { &mut x.1 };
-            PlacedCode::new(code, i)
-        }));
-
-        ui.push_id(id_salt, |ui| {
-            show_tree_view(
-                ui,
-                aspects,
-                selected_projects,
-                long_tacking,
-                store.clone(),
-                commit,
-                api_addr,
-                &mut curr_view,
-            );
-            ui.separator();
-        })
-    };
-
-    let rect = ui.clip_rect();
-    InteractiveSplitter::vertical().show(ui, |ui1, ui2| {
-        ui1.set_clip_rect(ui1.max_rect().intersect(rect));
-        ui2.set_clip_rect(ui2.max_rect().intersect(rect));
-        f(ui2, (commit, bl), true, commit);
-        f(ui1, (bl, commit), false, bl);
-    });
-}
-
 impl MyTileTreeBehavior<'_> {
     fn show_commits(&mut self, ui: &mut egui::Ui) {
         for i in self.data.selected_code_data.project_ids() {
@@ -2114,6 +1621,7 @@ impl MyTileTreeBehavior<'_> {
         }
     }
 }
+
 impl AppData {
     fn show_commits(&mut self, ui: &mut egui::Ui, i: ProjectId) {
         self._show_commits_selection::<false>(ui, i, 0..isize::MAX);
@@ -2423,64 +1931,6 @@ fn show_commit_row<const BUTTON: bool>(
     if BUTTON && button.clicked() {
         *clicked = Some(*id);
     }
-}
-
-fn show_hunks_header(
-    ui: &mut egui::Ui,
-    format: &mut ResultFormat,
-    data: &mut AppData,
-    selected_baseline: &mut Option<CommitId>,
-    selected_commit: &mut Option<(ProjectId, CommitId)>,
-) -> bool {
-    let oid = &selected_commit.as_ref().unwrap().1;
-    ui.label(oid.as_str());
-    let Some(selected_baseline) = &selected_baseline else {
-        *format = ResultFormat::Table;
-        return true;
-    };
-    ui.label(format!("baseline: {}", selected_baseline));
-    if let Some(msg) = data
-        .fetched_commit_metadata
-        .get(oid)
-        .and_then(|x| x.as_ref().ok())
-        .and_then(|x| x.message.as_ref())
-    {
-        ui.label("message: ");
-        egui::Frame::group(ui.style()).show(ui, |ui| {
-            let mut msg_lines = msg.lines();
-            let mut i = 0;
-            while let Some(t) = msg_lines.next() {
-                ui.label(t);
-                i += 1;
-                if i == 3 {
-                    let rem = msg_lines.count();
-                    if rem > 0 {
-                        ui.weak(format!("... ({rem} rem. lines)"));
-                    }
-                    break;
-                }
-            }
-        });
-    }
-    false
-}
-
-fn poll_md_with_pr(
-    (mut md, head_commit): (commit::CommitMetadata, Option<(Commit, ProjectId)>),
-    rid: ProjectId,
-    c: &mut CommitSlice<'_>,
-) -> commit::CommitMetadata {
-    if let Some((head_commit, i)) = head_commit {
-        if !md.parents.contains(&head_commit.id) {
-            if rid == i {
-                c.push(head_commit.id)
-            } else {
-                log::error!("{:?} {:?}", rid, i)
-            }
-            md.parents.push(head_commit.id);
-        }
-    }
-    md
 }
 
 const ACTIONS: &[fn(&mut AppData, &mut egui::Ui) -> egui::Response] = &[

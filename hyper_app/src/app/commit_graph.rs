@@ -1,7 +1,7 @@
 use crate::app::types::CommitId;
 
 use super::querying::StreamedComputeResults;
-use super::{CommitMdStore, ProjectId, QResId, poll_md_with_pr};
+use super::{CommitMdStore, ProjectId, QResId};
 use super::{QueryResults, commit};
 
 mod graph_caching;
@@ -360,6 +360,27 @@ fn to_poll_helper_aux(
     log::debug!("fetch_merge_pr");
     let waiting = commit::fetch_merge_pr(ctx, api_addr, &commit, md.clone(), repo_id);
     md_fetch.insert(id, waiting);
+}
+
+fn poll_md_with_pr(
+    (mut md, head_commit): (
+        commit::CommitMetadata,
+        Option<(super::types::Commit, ProjectId)>,
+    ),
+    rid: ProjectId,
+    c: &mut commit::CommitSlice<'_>,
+) -> commit::CommitMetadata {
+    if let Some((head_commit, i)) = head_commit {
+        if !md.parents.contains(&head_commit.id) {
+            if rid == i {
+                c.push(head_commit.id)
+            } else {
+                log::error!("{:?} {:?}", rid, i)
+            }
+            md.parents.push(head_commit.id);
+        }
+    }
+    md
 }
 
 enum GraphInteraction {

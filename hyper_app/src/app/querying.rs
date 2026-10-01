@@ -30,6 +30,8 @@ type CodeEditor2 = egui_addon::code_editor::CodeEditor<crate::Languages>;
 pub(crate) mod example_queries;
 use self::example_queries::EXAMPLES;
 
+pub(crate) mod results;
+
 const INFO_QUERY: EditorInfo<&'static str> = EditorInfo {
     title: "Query",
     short: "the query",

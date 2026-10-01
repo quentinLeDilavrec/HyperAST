@@ -774,10 +774,10 @@ You are using the GUI of the HyperAST.
 The HyperAST enables developers and researchers alike to explore and investigate
 temporal code evolutions in the repositories of their choice.
 
-Readily supports projects using Java with Maven, and simple C/C++ (Makefile in root and an src/ dir).
-Other codebase structures, languages and build systems could be added, but time is lacking for now.
+Readily supports projects using Java with Maven, simple C/C++ (Makefile in root and an src/ dir).
+Additional languages are also supported without any build system considerations: Python, TypeScript, XML, Rust.
 
-https://github.com/HyperAST/HyperAST
+repo: https://github.com/HyperAST/HyperAST
 
 ## Default Layouts
 

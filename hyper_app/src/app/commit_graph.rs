@@ -5,6 +5,7 @@ use super::{CommitMdStore, ProjectId, QResId};
 use super::{QueryResults, commit};
 
 mod graph_caching;
+// mod commits_layouting; // TODO check if mod still contain something useful
 
 type CommitComputeCache<'a> =
     graph_caching::GuardedCache<'a, super::ResultsPerCommit, graph_caching::ComputeResPerCommit>;

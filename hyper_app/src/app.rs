@@ -1624,312 +1624,35 @@ impl MyTileTreeBehavior<'_> {
 
 impl AppData {
     fn show_commits(&mut self, ui: &mut egui::Ui, i: ProjectId) {
-        self._show_commits_selection::<false>(ui, i, 0..isize::MAX);
+        let Some((r, c)) = self.selected_code_data.get_mut(i) else {
+            return;
+        };
+        let commit_md = &mut self.fetched_commit_metadata;
+        let api_addr = &self.api_addr;
+        commit::show_commits_selection::<false>(ui, api_addr, commit_md, r, c, i, 0..isize::MAX);
     }
     fn show_commits_selection_fast(&mut self, ui: &mut egui::Ui, i: ProjectId) -> Option<CommitId> {
-        let (_frame, area) = utils_egui::framed_scroll_area_aux();
+        let commit_md = &mut self.fetched_commit_metadata;
+        let api_addr = &self.api_addr;
+
         let text_style = egui::TextStyle::Body;
         let row_height = ui.text_style_height(&text_style);
+
         let id = egui::Id::new(("commit.sel", i));
         let rows = ui.data(|d| d.get_temp(id).unwrap_or(20));
+
+        let (_frame, area) = utils_egui::framed_scroll_area_aux();
         area.id_salt(i)
             .stick_to_bottom(false)
             .scroll_source(egui::scroll_area::ScrollSource::ALL)
             .show_rows(ui, row_height, rows, |ui, range| {
                 let range = range.start as isize..range.end as isize;
-                self._show_commits_selection::<true>(ui, i, range)
+                let Some((r, c)) = self.selected_code_data.get_mut(i) else {
+                    return None;
+                };
+                commit::show_commits_selection::<true>(ui, api_addr, commit_md, r, c, i, range)
             })
             .inner
-    }
-
-    #[inline(always)]
-    fn _show_commits_selection<const BUTTON: bool>(
-        &mut self,
-        ui: &mut egui::Ui,
-        i: ProjectId,
-        mut range: std::ops::Range<isize>,
-    ) -> Option<CommitId> {
-        let text_style = egui::TextStyle::Body;
-        let row_height = ui.text_style_height(&text_style);
-        let space = ui.style().spacing.item_spacing.y;
-        let row_height = row_height + space;
-        let Some((r, mut c)) = self.selected_code_data.get_mut(i) else {
-            return None;
-        };
-        let mut clicked = None;
-        if range.start == 0 {
-            ui.allocate_ui((ui.available_width(), 30.0).into(), |ui| {
-                ui.label(format!("{}/{}", r.user, r.name))
-            });
-        }
-        let mut total = 1usize;
-        range.start -= 1;
-        range.end -= 1;
-
-        let api_addr = &self.api_addr;
-        let commit_md = &mut self.fetched_commit_metadata;
-        commit_md.try_poll_all_waiting(|v| v.map(|x| x.0));
-        for commit_oid in c.iter_mut().map(|x| &*x) {
-            let mut to_fetch = HashSet::default();
-            let commit_md = &self.fetched_commit_metadata;
-            const IT: bool = true;
-            let _total = if IT {
-                show_commits_as_tree_it::<true>(
-                    ui,
-                    commit_oid,
-                    commit_md,
-                    &mut to_fetch,
-                    0,
-                    &mut clicked,
-                    range.clone(),
-                    row_height,
-                )
-            } else {
-                show_commits_as_tree::<true>(
-                    ui,
-                    commit_oid,
-                    commit_md,
-                    &mut to_fetch,
-                    0,
-                    &mut clicked,
-                    range.clone(),
-                    row_height,
-                )
-            };
-            // let _total = show_commits_as_tree::<true>(
-
-            range.start = range.start.saturating_sub(_total as isize);
-            range.end = range.end.saturating_sub(_total as isize);
-            total = total.saturating_add(_total);
-
-            let commit_md = &mut self.fetched_commit_metadata;
-            for id in to_fetch {
-                let repo = r.clone();
-                let commit = Commit { repo, id };
-                let v = fetch_commit(ui.ctx(), api_addr, &commit);
-                commit_md.insert(commit.id, v);
-            }
-        }
-        total += 1;
-        let id = egui::Id::new(("commit.sel", i));
-        ui.data_mut(|d| {
-            let r = d.get_temp_mut_or(id, total);
-            *r = total.max(*r)
-        });
-        clicked
-    }
-}
-
-/// imperative version
-fn show_commits_as_tree_it<'a, const BUTTON: bool>(
-    ui: &mut egui::Ui,
-    id: &'a CommitId,
-    commit_md: &'a CommitMdStore,
-    to_fetch: &mut HashSet<CommitId>,
-    d: usize,
-    clicked: &mut Option<CommitId>,
-    mut range: std::ops::Range<isize>,
-    row_height: f32,
-) -> usize {
-    let mut shown = HashSet::<&CommitId>::default();
-    let mut queue = vec![(id, d)];
-    let mut total = 0;
-    while let Some((id, d)) = queue.pop() {
-        let Some(res) = commit_md.get(id) else {
-            let waiting = commit_md.len_waiting();
-            if range.contains(&0) {
-                ui.horizontal(|ui| {
-                    ui.label("fetching");
-                    ui.add_space(2.0);
-                    ui.label(id.to_string());
-                    ui.add_space(2.0);
-                    ui.spinner();
-                    ui.label(waiting.to_string());
-                });
-                total += 1;
-                range.start -= 1;
-                range.end -= 1;
-            }
-            if waiting < 30 && commit_md.is_absent(id) {
-                to_fetch.insert(*id);
-            }
-            continue;
-        };
-        if let Err(err) = res {
-            ui.horizontal(|ui| {
-                ui.error_label(err);
-                if ui.button("Retry").clicked() {
-                    to_fetch.insert(*id);
-                }
-            });
-            total += 2;
-            range.start -= 2;
-            range.end -= 2;
-            continue;
-        }
-        let Ok(md) = res else { unreachable!() };
-        if range.start <= 0 {
-            let size = (ui.available_width(), row_height).into();
-            ui.new_child(egui::UiBuilder::new())
-                .allocate_ui(size, |ui| {
-                    show_commit_row::<BUTTON>(ui, id, clicked, md);
-                });
-            let text_style = egui::TextStyle::Body;
-            let row_height = ui.text_style_height(&text_style);
-            let size = (ui.available_width(), row_height).into();
-            ui.allocate_exact_size(size, egui::Sense::empty());
-        }
-        total += 1;
-        range.start -= 1;
-        range.end -= 1;
-        shown.insert(id);
-        if range.end >= -10 {
-            for x in (&md.parents).into_iter().rev() {
-                if !shown.contains(x) {
-                    queue.push((x, d + 1));
-                }
-            }
-        }
-        let waiting = commit_md.len_waiting();
-        for (i, a) in md.ancestors.iter().enumerate() {
-            let i = i + 1;
-            if d + i * i >= 100 {
-                break;
-            }
-            if waiting < 30 && commit_md.is_absent(a) {
-                to_fetch.insert(*a);
-            }
-        }
-        if range.end < -10 {
-            break;
-        }
-    }
-    total
-}
-
-fn show_commits_as_tree<const BUTTON: bool>(
-    ui: &mut egui::Ui,
-    id: &CommitId,
-    commit_md: &CommitMdStore,
-    to_fetch: &mut HashSet<CommitId>,
-    d: usize,
-    clicked: &mut Option<CommitId>,
-    mut range: std::ops::Range<isize>,
-    row_height: f32,
-) -> usize {
-    let mut total = 1;
-    let limit = usize::MAX;
-    if d >= limit {
-        return 0;
-    }
-    let Some(res) = commit_md.get(id) else {
-        let waiting = commit_md.len_waiting();
-        if !range.contains(&0) {
-            return 0;
-        }
-        ui.horizontal(|ui| {
-            ui.label("fetching");
-            ui.add_space(2.0);
-            ui.label(id.to_string());
-            ui.add_space(2.0);
-            ui.spinner();
-            ui.label(waiting.to_string());
-        });
-        if waiting < 30 && commit_md.is_absent(id) {
-            to_fetch.insert(*id);
-        }
-        return total;
-    };
-    if let Err(err) = res {
-        ui.horizontal(|ui| {
-            ui.error_label(err);
-            if ui.button("Retry").clicked() {
-                to_fetch.insert(*id);
-            }
-        });
-
-        return total;
-    }
-    let Ok(md) = res else { unreachable!() };
-    if range.contains(&0) {
-        ui.allocate_ui((ui.available_width(), row_height).into(), |ui| {
-            show_commit_row::<BUTTON>(ui, id, clicked, md);
-        });
-    }
-    range.start -= total as isize;
-    range.end -= total as isize;
-    for id in &md.parents {
-        if range.end < -200 {
-            break;
-        }
-        let _total = show_commits_as_tree::<BUTTON>(
-            ui,
-            id,
-            commit_md,
-            to_fetch,
-            d + 1,
-            clicked,
-            range.clone(),
-            row_height,
-        );
-        range.start = range.start.saturating_sub(_total as isize);
-        range.end = range.end.saturating_sub(_total as isize);
-        total = total.saturating_add(_total);
-    }
-    let waiting = commit_md.len_waiting();
-    for (i, a) in md.ancestors.iter().enumerate() {
-        let i = i + 2;
-        if d + i * i >= limit {
-            break;
-        }
-        if waiting < 30 && commit_md.is_absent(a) {
-            to_fetch.insert(*a);
-        }
-    }
-    total
-}
-
-fn show_commit_row<const BUTTON: bool>(
-    ui: &mut egui::Ui,
-    id: &CommitId,
-    clicked: &mut Option<CommitId>,
-    md: &commit::CommitMetadata,
-) {
-    let text = egui::RichText::new(format!("{}", id)).monospace();
-    let local_datetime = md.local_datetime();
-    let button = ui.horizontal(|ui| {
-        let button = if BUTTON {
-            ui.button(text)
-        } else {
-            ui.label(text)
-        };
-        let p = md.parents.len();
-        let local_datetime = if let Some(local_datetime) = local_datetime {
-            format!("{local_datetime} ")
-        } else {
-            "".to_string()
-        };
-        let text = if p == 1 {
-            format!("{local_datetime} 1 parent")
-        } else {
-            format!("{local_datetime} {p} parents")
-        };
-        ui.label(egui::RichText::new(text).monospace().weak());
-        button
-    });
-    let button = button.inner.on_hover_ui_at_pointer(|ui| {
-        ui.vertical(|ui| {
-            if let Some(local_datetime) = local_datetime {
-                ui.label(format!("time: {}", local_datetime));
-            }
-            ui.label("Parents:");
-            for id in &md.parents {
-                ui.monospace(id.to_string());
-            }
-        });
-    });
-    if BUTTON && button.clicked() {
-        *clicked = Some(*id);
     }
 }
 

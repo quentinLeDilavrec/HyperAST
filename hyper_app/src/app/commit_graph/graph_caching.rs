@@ -3,12 +3,13 @@ use lazy_static::lazy_static;
 use super::update_results_per_commit;
 use crate::app::ProjectId;
 use crate::app::QueryId;
-use crate::app::ResultsPerCommit;
 use crate::app::commit::CommitsLayoutTimed;
 use crate::app::commit::compute_commit_layout_timed;
 use crate::app::querying::StreamedComputeResults;
 use crate::app::types::CommitId;
 use crate::app::utils_commit;
+
+use crate::results_support::ResultsPerCommit;
 
 pub(crate) type GuardedCache<'a, T, U> =
     std::sync::MutexGuard<'a, utils_commit::BorrowFrameCache<T, U>>;

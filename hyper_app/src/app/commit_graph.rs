@@ -1,5 +1,6 @@
-use crate::app::types::CommitId;
+use crate::results_support::ResultsPerCommit;
 
+use super::CommitId;
 use super::querying::StreamedComputeResults;
 use super::{CommitMdStore, ProjectId, QResId};
 use super::{QueryResults, commit};
@@ -8,7 +9,7 @@ mod graph_caching;
 // mod commits_layouting; // TODO check if mod still contain something useful
 
 type CommitComputeCache<'a> =
-    graph_caching::GuardedCache<'a, super::ResultsPerCommit, graph_caching::ComputeResPerCommit>;
+    graph_caching::GuardedCache<'a, ResultsPerCommit, graph_caching::ComputeResPerCommit>;
 type CommitLayoutCache<'a> =
     graph_caching::GuardedCache<'a, commit::CommitsLayoutTimed, graph_caching::ComputeLayout>;
 
@@ -398,7 +399,7 @@ const LEFT_VALS: bool = false;
 
 struct CommitGraphWidget<'a, 'b> {
     fetched_commit_metadata: &'b CommitMdStore,
-    results_per_commit: Option<&'b super::ResultsPerCommit>,
+    results_per_commit: Option<&'b ResultsPerCommit>,
     repo_id: ProjectId,
     max_fetch: i64,
     cached: &'a commit::CommitsLayoutTimed,
@@ -792,7 +793,7 @@ fn before_after<'a>(
 }
 
 fn update_results_per_commit(
-    results_per_commit: &mut super::ResultsPerCommit,
+    results_per_commit: &mut ResultsPerCommit,
     r: &StreamedComputeResults,
 ) {
     let header = &r.head;
@@ -840,7 +841,7 @@ const CUSTOM_LABEL_FORMAT_MARK_NO_DATA: &str = "_";
 
 fn label_formatter(
     fetched_commit_metadata: &CommitMdStore,
-    results_per_commit: Option<&super::ResultsPerCommit>,
+    results_per_commit: Option<&ResultsPerCommit>,
     cached: &commit::CommitsLayoutTimed,
     name: &str,
     value: &egui_plot::PlotPoint,

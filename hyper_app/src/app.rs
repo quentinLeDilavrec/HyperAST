@@ -973,7 +973,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
                         egui::ScrollArea::both()
                             .auto_shrink([false, false])
                             .show(ui, |ui| {
-                                show_local_query(query, ui);
+                                show_local_query(ui, &mut query.query.code, "rs");
                             });
                     });
 
@@ -1566,9 +1566,7 @@ impl<'a> egui_tiles::Behavior<TabId> for MyTileTreeBehavior<'a> {
     }
 }
 
-fn show_local_query(query: &mut QueryData, ui: &mut egui::Ui) {
-    let code = &mut query.query.code;
-    let language = "rs";
+fn show_local_query(ui: &mut egui::Ui, code: &mut code_editor::EditAwareString, language: &str) {
     let theme = egui_extras::syntax_highlighting::CodeTheme::from_memory(ui.ctx(), ui.style());
 
     const EDIT_AWARE: bool = false;

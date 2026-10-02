@@ -134,7 +134,7 @@ objc2-app-kit = { version = "0.2.2", features = [
 ] }
 
 [features]
-default = ["serde", "force_layout", "collab"] #, "process_mining"
+default = ["serde", "force_layout"] #, "process_mining"
 
 serde = ["egui/serde", "dep:serde"]
 syntect = []

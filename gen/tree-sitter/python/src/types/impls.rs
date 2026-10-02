@@ -3,7 +3,7 @@
 
 use std::fmt::Display;
 
-use hyperast::tree_gen::utils_ts::{TsEnabledTS, TsType};
+use hyperast::tree_gen::{TsEnabledTS, TsType};
 use hyperast::types::{AnyType, TypeU16};
 use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
 use hyperast::types::{NodeId, UniformNodeId};
@@ -14,65 +14,60 @@ use super::TStore;
 use super::TType;
 use super::{S_T_L, Type};
 
+impl TsEnabledTS for TStore {
+    fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Type {
+        let k = n.kind_id();
+        Type::from_u16(k)
+    }
+
+    fn try_obtain_type<N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Option<Type> {
+        let k = n.kind_id();
+        static LEN: u16 = S_T_L.len() as u16;
+        if LEN <= k && k < TStore::LOWEST_RESERVED {
+            return None;
+        }
+        Some(Type::from_u16(k))
+    }
+
+    fn spaces() -> Type {
+        Type::Spaces
+    }
+
+    fn error() -> Type {
+        Type::ERROR
+    }
+
+    fn file() -> Type {
+        Type::Module
+    }
+}
+
+impl hyperast::types::ETypeStore for TStore {
+    type Ty2 = Type;
+
+    fn intern(ty: Self::Ty2) -> Self::Ty {
+        TType::new(ty)
+    }
+}
+
+impl TypeStore for TStore {
+    type Ty = TypeU16<Lang>;
+}
+
+impl TsType for Type {
+    fn is_repeat(&self) -> bool {
+        self.is_repeat()
+    }
+
+    fn is_leaf(self) -> bool {
+        self == Self::String
+    }
+}
+
 cfg_if::cfg_if! {if #[cfg(feature = "legion")] {
     use hyperast::types::RoleStore;
 
     use super::Role;
-
-    impl TsEnabledTS for TStore {
-        fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
-            n: &N,
-        ) -> Type {
-            let k = n.kind_id();
-            Type::from_u16(k)
-        }
-
-        fn try_obtain_type<N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
-            n: &N,
-        ) -> Option<Type> {
-            let k = n.kind_id();
-            static LEN: u16 = S_T_L.len() as u16;
-            if LEN <= k && k < TStore::LOWEST_RESERVED {
-                return None;
-            }
-            Some(Type::from_u16(k))
-        }
-
-        fn spaces() -> Type {
-            Type::Spaces
-        }
-
-        fn error() -> Type {
-            Type::ERROR
-        }
-
-        fn file() -> Type {
-            Type::Module
-        }
-    }
-
-    impl TsType for Type {
-
-        fn is_repeat(&self) -> bool {
-            self.is_repeat()
-        }
-
-        fn is_leaf(self) -> bool {
-            self == Self::String
-        }
-    }
-
-    impl hyperast::types::ETypeStore for TStore {
-        type Ty2 = Type;
-
-        fn intern(ty: Self::Ty2) -> Self::Ty {
-            TType::new(ty)
-        }
-    }
-
-    impl TypeStore for TStore {
-        type Ty = TypeU16<Lang>;
-    }
 
     // impl TsEnabledTypeStore for TStore {
     //     fn resolve(t: Self::Ty) -> Type {

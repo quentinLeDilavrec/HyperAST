@@ -15,76 +15,73 @@ use super::TType;
 use super::{C, Lang};
 use super::{S_T_L, Type};
 
+impl TsEnabledTS for TStore {
+    fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Type {
+        let k = n.kind_id();
+        Type::from_u16(k)
+    }
+
+    fn try_obtain_type<N: hyperast::tree_gen::parser::NodeWithU16TypeId>(n: &N) -> Option<Type> {
+        let k = n.kind_id();
+        static LEN: u16 = S_T_L.len() as u16;
+        if LEN <= k && k < TStore::LOWEST_RESERVED {
+            return None;
+        }
+        Some(Type::from_u16(k))
+    }
+
+    fn spaces() -> Type {
+        Type::Spaces
+    }
+
+    fn error() -> Type {
+        Type::ERROR
+    }
+
+    fn file() -> Type {
+        Type::TranslationUnit
+    }
+}
+
+impl TypeStore for TStore {
+    type Ty = TypeU16<C>;
+}
+
+impl hyperast::types::ETypeStore for TStore {
+    type Ty2 = Type;
+
+    fn intern(ty: Self::Ty2) -> Self::Ty {
+        TType::new(ty)
+    }
+}
+
+impl TsType for Type {
+    fn is_repeat(&self) -> bool {
+        self.is_repeat()
+    }
+
+    fn is_leaf(self) -> bool {
+        false
+    }
+
+    fn as_repeat(self) -> Option<Self> {
+        match self {
+            Self::ERROR => Some(Self::_ERROR),
+            Self::_ERROR => Some(Self::_ERROR),
+            _ => None,
+        }
+    }
+}
+
 cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
     use hyperast::tree_gen::utils_ts::TsType;
 
-    use hyperast::types::{ RoleStore};
+    use hyperast::types::{RoleStore};
 
-    impl TsEnabledTS for TStore {
-        fn obtain_type<'a, N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
-            n: &N,
-        ) -> Type {
-            let k = n.kind_id();
-            Type::from_u16(k)
-        }
 
-        fn try_obtain_type<N: hyperast::tree_gen::parser::NodeWithU16TypeId>(
-            n: &N,
-        ) -> Option<Type> {
-            let k = n.kind_id();
-            static LEN: u16 = S_T_L.len() as u16;
-            if LEN <= k && k < TStore::LOWEST_RESERVED {
-                return None;
-            }
-            Some(Type::from_u16(k))
-        }
-
-        fn spaces() -> Type {
-            Type::Spaces
-        }
-
-        fn error() -> Type {
-            Type::ERROR
-        }
-
-        fn file() -> Type {
-            Type::TranslationUnit
-        }
-    }
-
-    impl TsType for Type {
-
-        fn is_repeat(&self) -> bool {
-            self.is_repeat()
-        }
-
-        fn is_leaf(self) -> bool {
-            false
-        }
-
-        fn as_repeat(self) -> Option<Self> {
-            match self {
-                Self::ERROR => Some(Self::_ERROR),
-                Self::_ERROR => Some(Self::_ERROR),
-                _ => None
-            }
-        }
-    }
-
-    impl TypeStore for TStore {
-        type Ty = TypeU16<C>;
-    }
     impl CEnabledTypeStore for TStore {
         fn resolve(t: Self::Ty) -> Type {
             t.e()
-        }
-    }
-
-    impl hyperast::types::ETypeStore for TStore {
-        type Ty2 = Type;
-
-        fn intern(ty: Self::Ty2) -> Self::Ty {
-            TType::new(ty)
         }
     }
 

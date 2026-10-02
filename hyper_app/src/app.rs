@@ -9,20 +9,19 @@ use egui_addon::{code_editor, egui_utils::radio_collapsing};
 
 use crate::command::{CommandReceiver, CommandSender, UICommand, UICommandSender};
 use crate::command_palette::CommandPalette;
+use crate::edition::Sharing;
 use crate::types;
 use crate::utils;
+use crate::utils_egui;
 use crate::utils_poll::{Buffered3, MultiBuffered2};
+use crate::utils_results_batched::ComputeResultsProm;
 
 pub use types::Languages;
 use types::{Commit, CommitId, Repo, SelectedConfig};
 
 mod app_components;
 mod code_aspects;
-#[cfg(feature = "collab")]
-mod code_editor_automerge;
 pub mod commit;
-#[cfg(feature = "collab")]
-pub(crate) mod crdt_over_ws;
 mod querying;
 mod re_ui_collapse;
 mod single_repo;
@@ -31,9 +30,6 @@ pub(crate) mod store;
 mod tree_view;
 mod tsg;
 mod utils_commit;
-mod utils_edition;
-mod utils_egui;
-mod utils_results_batched;
 pub(crate) use app_components::show_repo_menu;
 mod commit_graph;
 mod tracking;
@@ -44,7 +40,6 @@ use commit::{CommitSlice, SelectedProjects};
 use querying::DetailsResults;
 use single_repo::ComputeConfigSingle;
 use store::FetchedHyperAST;
-use utils_results_batched::ComputeResultsProm;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Deserialize, Serialize)]
@@ -284,7 +279,7 @@ pub(crate) struct AppData {
     smells_diffs_result: Option<smells::RemoteResultDiffs>,
 
     #[serde(skip)]
-    fetched_files: tracking::FetchedFiles,
+    fetched_files: types::FetchedFiles,
     #[serde(skip)]
     fetched_files2: HashMap<
         types::FileIdentifier,
@@ -361,29 +356,7 @@ impl Default for AppData {
                 lang: "Java".to_string(),
                 query: code_editor::CodeEditor::new(
                     code_editor::EditorInfo::default().into(),
-                    r#"(try_statement
-  (block
-    (expression_statement
-      (method_invocation
-        (identifier) (#EQ? "fail")
-      )
-    )
-  )
-  (catch_clause)
-)
-(class_declaration
-  body: (_
-    (method_declaration
-      (modifiers
-        (marker_annotation
-          name: (_) (#EQ? "Test")
-        )
-      )
-    )
-  )
-)
-"#
-                    .to_string(),
+                    QUERY.to_string(),
                 ),
                 ..Default::default()
             }]
@@ -496,23 +469,6 @@ impl Tab {
     }
 }
 
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default)]
-pub(crate) struct Sharing<T> {
-    pub(crate) content: T,
-    #[cfg(feature = "collab")]
-    #[serde(skip)]
-    rt: crdt_over_ws::Rt, // TODO do not init
-    #[cfg(feature = "collab")]
-    #[serde(skip)]
-    ws: Option<crdt_over_ws::WsDoc>,
-    #[cfg(feature = "collab")]
-    #[serde(skip)]
-    doc_db: Option<crdt_over_ws::WsDocsDb>,
-    #[cfg(not(feature = "collab"))]
-    doc_db: Option<()>,
-}
-
 impl SelectedConfig {
     fn default_layout(&self) -> Tabs {
         match self {
@@ -584,24 +540,6 @@ impl Default for HyperApp {
         }
     }
 }
-
-const DEFAULT_EXPLAINATIONS_MDS: &[&str] = &[r#"# Graphical Interface of the HyperAST
-
-You are using the GUI of the HyperAST.
-The HyperAST enables developers and researchers alike to explore and investigate
-temporal code evolutions in the repositories of their choice.
-
-Readily supports projects using Java with Maven, simple C/C++ (Makefile in root and an src/ dir).
-Additional languages are also supported without any build system considerations: Python, TypeScript, XML, Rust.
-
-repo: https://github.com/HyperAST/HyperAST
-
-## Default Layouts
-
-To kickstart you HyperAST journey,
-we provide provide a few layouts and their associated examples.
-
-"#];
 
 impl HyperApp {
     /// Called once before the first frame.
@@ -1777,6 +1715,47 @@ impl eframe::App for HyperApp {
         }
     }
 }
+
+const QUERY: &str = r#"(try_statement
+  (block
+    (expression_statement
+      (method_invocation
+        (identifier) (#EQ? "fail")
+      )
+    )
+  )
+  (catch_clause)
+)
+(class_declaration
+  body: (_
+    (method_declaration
+      (modifiers
+        (marker_annotation
+          name: (_) (#EQ? "Test")
+        )
+      )
+    )
+  )
+)
+"#;
+
+const DEFAULT_EXPLAINATIONS_MDS: &[&str] = &[r#"# Graphical Interface of the HyperAST
+
+You are using the GUI of the HyperAST.
+The HyperAST enables developers and researchers alike to explore and investigate
+temporal code evolutions in the repositories of their choice.
+
+Readily supports projects using Java with Maven, simple C/C++ (Makefile in root and an src/ dir).
+Additional languages are also supported without any build system considerations: Python, TypeScript, XML, Rust.
+
+repo: https://github.com/HyperAST/HyperAST
+
+## Default Layouts
+
+To kickstart you HyperAST journey,
+we provide provide a few layouts and their associated examples.
+
+"#];
 
 const BACKEND_ADDR_INFO: &'static str = concat!(
     "The backend is necessary to clone repositories, ",

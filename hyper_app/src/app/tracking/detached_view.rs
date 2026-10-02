@@ -4,11 +4,12 @@ use std::sync::Arc;
 use hyperast::store::nodes::fetched::NodeIdentifier;
 
 use crate::app::querying::DetailedResult;
+use crate::app::store::FetchedHyperAST;
+
+use crate::types::CodeRange;
+use crate::utils_egui::MyUiExt as _;
 
 use super::code_tracking::TrackingResult;
-use crate::app::store::FetchedHyperAST;
-use crate::app::types::CodeRange;
-use crate::app::utils_egui::MyUiExt as _;
 
 const DEBUG: bool = false;
 

@@ -1,5 +1,6 @@
 use re_ui::list_item;
-use utils_egui::MyUiExt as _;
+
+use crate::utils_egui::MyUiExt as _;
 
 use super::AppData;
 use super::commit::CommitSlice;

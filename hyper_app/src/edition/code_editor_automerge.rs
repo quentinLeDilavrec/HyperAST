@@ -7,7 +7,7 @@ use egui_addon::{Lang, code_editor::EditorInfo};
 use egui_demo_lib::easy_mark::easy_mark;
 
 use super::crdt_over_ws::Quote;
-use super::types::Languages;
+use crate::types::Languages;
 
 const TREE_SITTER: bool = false;
 
@@ -110,7 +110,7 @@ impl autosurgeon::Hydrate for CodeEditor {
                         short: String::hydrate(doc, obj, "info.short".into())?,
                         long: String::hydrate(doc, obj, "info.long".into())?,
                     },
-                    code: crate::app::crdt_over_ws::Quote::hydrate(doc, obj, "code".into())?,
+                    code: Quote::hydrate(doc, obj, "code".into())?,
                     ..Default::default()
                 })
             }

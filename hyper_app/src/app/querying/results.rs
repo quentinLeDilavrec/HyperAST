@@ -3,12 +3,13 @@ use std::sync::Arc;
 use re_ui::UiExt as _;
 
 use crate::app::store::FetchedHyperAST;
-use crate::app::types::{self, Commit, CommitId};
 use crate::app::{
     AppData, CommitMdStore, ProjectId, QResId, QueriesDifferentialResults, QueryData, QueryId,
     QueryResults, ResultFormat, TabId,
 };
-use crate::app::{commit, tracking, utils_results_batched};
+use crate::app::{commit, tracking};
+use crate::types::{self, Commit, CommitId};
+use crate::utils_results_batched;
 
 pub(crate) fn show_results(
     ui: &mut egui::Ui,
@@ -319,7 +320,7 @@ const H: f32 = 800.;
 
 fn show_hunks(
     ui: &mut egui::Ui,
-    fetched_files: &mut tracking::FetchedFiles,
+    fetched_files: &mut types::FetchedFiles,
     api_addr: &String,
     x: &super::DetailsResults,
     selected_commit: &(ProjectId, CommitId),
@@ -343,7 +344,7 @@ fn show_hunks(
 
 fn show_hunk(
     ui: &mut egui::Ui,
-    fetched_files: &mut tracking::FetchedFiles,
+    fetched_files: &mut types::FetchedFiles,
     api_addr: &String,
     x: &super::DetailsResults,
     selected_commit: &(ProjectId, CommitId),

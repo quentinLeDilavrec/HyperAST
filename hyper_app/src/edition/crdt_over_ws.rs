@@ -106,7 +106,7 @@ impl TextBuffer for Quote {
 pub(super) struct WsCont(tokio_tungstenite_wasm::WebSocketStream);
 unsafe impl Send for WsCont {}
 
-pub(super) struct WsChannel<S> {
+pub(crate) struct WsChannel<S> {
     ws: WsState,
     pub data: Arc<RwLock<S>>,
     pub timer: f32,
@@ -120,7 +120,7 @@ pub(super) type WsDoc = WsChannel<DocSharingState>;
 type User = String;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub(super) struct SharedDocView {
+pub(crate) struct SharedDocView {
     pub(super) owner: User,
     pub(super) name: String,
     // TODO show users currently on shared doc
@@ -128,7 +128,7 @@ pub(super) struct SharedDocView {
     pub(super) id: usize,
 }
 
-pub(super) type WsDocsDb = WsChannel<(Option<usize>, Vec<Option<SharedDocView>>)>;
+pub(crate) type WsDocsDb = WsChannel<(Option<usize>, Vec<Option<SharedDocView>>)>;
 
 #[derive(Default)]
 enum WsState {
@@ -324,7 +324,7 @@ impl WsDocsDb {
 // # Cross platform async utils
 
 #[derive(Clone)]
-pub(super) struct Rt(#[cfg(not(target_arch = "wasm32"))] Arc<tokio::runtime::Runtime>);
+pub(crate) struct Rt(#[cfg(not(target_arch = "wasm32"))] Arc<tokio::runtime::Runtime>);
 
 impl Default for Rt {
     fn default() -> Self {

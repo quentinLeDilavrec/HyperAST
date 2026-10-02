@@ -11,7 +11,10 @@ use egui_addon::egui_utils::highlight_byte_range;
 
 use hyperast::store::nodes::fetched::NodeIdentifier;
 
-use super::FetchedFiles;
+use crate::types::FetchedFiles;
+use crate::types::{CodeRange, ComputeConfigAspectViews, SelectedConfig};
+use crate::types::{Commit, CommitId};
+
 use super::code_tracking::{TrackingResult, TrackingResultWithChanges, TrackingResultsWithChanges};
 
 use crate::app::code_aspects::remote_fetch_node_old;
@@ -19,9 +22,8 @@ use crate::app::code_aspects::{FetchedView, Focus, HighLightHandle};
 use crate::app::commit::{CommitMetadata, fetch_commit0};
 use crate::app::store::FetchedHyperAST;
 use crate::app::tree_view::Action;
-use crate::app::types::{CodeRange, ComputeConfigAspectViews, SelectedConfig};
-use crate::app::types::{Commit, CommitId};
-use crate::app::utils_egui::MyUiExt as _;
+
+use crate::utils_egui::MyUiExt as _;
 use crate::utils_poll::{AccumulableResult, Buffered, MultiBuffered, Resource};
 
 use super::detached_view::LinkConfig;

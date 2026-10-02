@@ -3,9 +3,11 @@ use re_ui::UiExt;
 
 use crate::app::QResId;
 use crate::app::querying::{self, ComputeConfigQuery};
-use crate::app::types::{self, Commit, Config};
 
-use super::{QueryDataVec, QueryId, TabId, utils_results_batched::ComputeError};
+use crate::types::{self, Commit, Config};
+use crate::utils_results_batched::ComputeError;
+
+use super::{QueryDataVec, QueryId, TabId};
 
 impl crate::HyperApp {
     pub(crate) fn show_left_panel(&mut self, ctx: &egui::Context) {

@@ -1,9 +1,9 @@
 use poll_promise::Promise;
 
-use super::types::CommitId;
-use super::utils::SecFmt;
-use super::utils::file_save;
-use crate::app::utils_egui::MyUiExt;
+use crate::types::CommitId;
+use crate::utils::SecFmt;
+use crate::utils::file_save;
+use crate::utils_egui::MyUiExt;
 use crate::utils_poll::Resource;
 
 pub(crate) trait ComputeError {
@@ -11,9 +11,11 @@ pub(crate) trait ComputeError {
     fn content(&self) -> &str;
 }
 
+/// save as json through serde
 pub(super) fn show_short_result(
     promise: &Option<ComputeResultsProm<impl ComputeError + Send + Sync>>,
     ui: &mut egui::Ui,
+    save_name: &str,
 ) {
     let Some(promise) = &promise else {
         ui.label("click on Compute");
@@ -33,7 +35,7 @@ pub(super) fn show_short_result(
     };
     if ui.add(egui::Button::new("Export")).clicked() {
         if let Ok(text) = serde_json::to_string_pretty(content) {
-            file_save("query_results", ".json", &text);
+            file_save(save_name, ".json", &text);
         }
     };
     show_short_result_aux(content, ui);

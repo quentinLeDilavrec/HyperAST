@@ -2,24 +2,27 @@ use poll_promise::Promise;
 
 use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 
-use super::Sharing;
 use super::show_repo_menu;
-use super::types::{CodeEditors, Commit, Config, SelectedConfig};
-use super::types::{EditorHolder, WithDesc};
-use super::utils_edition::{EditStatus, EditingContext};
-use super::utils_edition::{show_interactions, show_locals_and_interact};
-use super::utils_results_batched::ComputeError;
-use super::utils_results_batched::{ComputeResults, ComputeResultsProm, show_long_result};
+
+use crate::edition::Sharing;
+use crate::edition::locals_and_interact_menu;
+use crate::edition::show_locals_and_interact;
+use crate::edition::{EditStatus, EditingContext};
+use crate::types::{CodeEditors, Commit, Config, SelectedConfig};
+use crate::types::{EditorHolder, WithDesc};
 use crate::utils_poll::Resource;
+use crate::utils_results_batched::ComputeError;
+use crate::utils_results_batched::{ComputeResults, ComputeResultsProm, show_long_result};
 
 #[cfg(feature = "collab")]
-use super::utils_edition::{
-    locals_and_interact_menu, show_available_remote_docs, show_shared_code_edition,
-    update_shared_editors,
+use crate::edition::ToShared;
+#[cfg(feature = "collab")]
+use crate::edition::utils_collab::{
+    show_available_remote_docs, show_shared_code_edition, update_shared_editors,
 };
 
 #[cfg(feature = "collab")]
-use super::code_editor_automerge::CodeEditor as CodeEditor2;
+use crate::edition::code_editor_automerge::CodeEditor as CodeEditor2;
 #[cfg(not(feature = "collab"))]
 type CodeEditor2 = egui_addon::code_editor::CodeEditor<super::Languages>;
 
@@ -103,17 +106,19 @@ impl<T> WithDesc<T> for CodeEditors<T> {
     }
 }
 
-impl<T> CodeEditors<T> {
-    #[cfg(feature = "collab")]
-    pub(crate) fn to_shared<U>(self) -> CodeEditors<U>
-    where
-        T: Into<U>,
-    {
+#[cfg(feature = "collab")]
+impl<T> ToShared for CodeEditors<T>
+where
+    T: ToShared,
+{
+    type U = CodeEditors<T::U>;
+
+    fn to_shared(self) -> Self::U {
         CodeEditors {
-            description: self.description.into(),
-            init: self.init.into(),
-            filter: self.filter.into(),
-            accumulate: self.accumulate.into(),
+            description: self.description.to_shared(),
+            init: self.init.to_shared(),
+            filter: self.filter.to_shared(),
+            accumulate: self.accumulate.to_shared(),
         }
     }
 }
@@ -269,30 +274,9 @@ fn handle_interactions(
     single: &mut Sharing<ComputeConfigSingle>,
     trigger_compute: &mut bool,
 ) {
-    #[cfg(not(feature = "collab"))]
-    let _ = single;
-
-    let interaction = show_interactions(
-        ui,
-        code_editors,
-        #[cfg(feature = "collab")]
-        &single.doc_db,
-        compute_single_result,
-        |i| EXAMPLES[i].name.to_string(),
-    );
-    #[cfg(feature = "collab")]
-    if interaction.share_button.map_or(false, |x| x.clicked()) {
-        let (name, content) = interaction.editor.unwrap();
-        let content = content.clone().to_shared();
-        let content = std::sync::Mutex::new(content);
-        let content = std::sync::Arc::new(content);
-        let name = name.to_string();
-        code_editors.current = EditStatus::Sharing(content.clone());
-        let mut content = content.lock().unwrap();
-        let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_attempt(&single.rt, name, &mut *content);
-        return;
-    }
+    let interaction = single.show_interactions(ui, code_editors, compute_single_result, |i| {
+        EXAMPLES[i].name.to_string()
+    });
     if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving script: {:#?}", content.clone());

@@ -3,9 +3,12 @@ use std::collections::hash_map;
 use egui::CollapsingResponse;
 use re_ui::UiExt;
 
-use crate::app::tracking;
+// use crate::app::tracking;
 
-use super::types;
+use crate::types;
+use crate::types::RemoteFile;
+use crate::utils::remote_fetch_file;
+use crate::utils::try_fetch_remote_file;
 
 type ShowRes<T> = (
     egui::Response,
@@ -83,7 +86,7 @@ pub trait MyUiExt: UiExt {
         api_addr: &str,
         commit: &types::Commit,
         file_path: &mut String,
-        file_result: hash_map::Entry<'_, types::FileIdentifier, tracking::RemoteFile>,
+        file_result: hash_map::Entry<'_, types::FileIdentifier, RemoteFile>,
     ) -> ShowRes<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>> {
         egui::ScrollArea::horizontal()
             .show(self.ui_mut(), |ui| {
@@ -104,7 +107,7 @@ pub trait MyUiExt: UiExt {
         api_addr: &str,
         commit: &types::Commit,
         file_path: &mut String,
-        file_result: hash_map::Entry<'_, types::FileIdentifier, tracking::RemoteFile>,
+        file_result: hash_map::Entry<'_, types::FileIdentifier, RemoteFile>,
         desired_width: f32,
         wrap: bool,
     ) -> ShowRes<egui::scroll_area::ScrollAreaOutput<egui::text_edit::TextEditOutput>> {
@@ -124,7 +127,7 @@ pub trait MyUiExt: UiExt {
         })
         .body_unindented(|ui| {
             ui.add_space(4.0);
-            let r = tracking::try_fetch_remote_file(&file_result, |file| {
+            let r = try_fetch_remote_file(&file_result, |file| {
                 let code: &str = &file.content;
                 let language = "java";
                 // show_code_scrolled(ui, language, wrap, code, desired_width)
@@ -132,7 +135,7 @@ pub trait MyUiExt: UiExt {
             });
             if upd_src || r.is_none() {
                 if let std::collections::hash_map::Entry::Vacant(_) = file_result {
-                    file_result.insert_entry(tracking::remote_fetch_file(
+                    file_result.insert_entry(remote_fetch_file(
                         ui.ctx(),
                         &api_addr,
                         commit,
@@ -187,10 +190,10 @@ pub trait MyUiExt: UiExt {
 
     fn show_remote_code2(
         &mut self,
-        api_addr: &str,
         commit: &mut types::Commit,
         file_path: &mut String,
-        file_result: hash_map::Entry<'_, types::FileIdentifier, tracking::RemoteFile>,
+        file_result: hash_map::Entry<'_, types::FileIdentifier, RemoteFile>,
+        fetch: impl Fn(&mut egui::Ui, &types::Commit, &str) -> RemoteFile,
         desired_width: f32,
         wrap: bool,
     ) -> ShowRes<egui::scroll_area::ScrollAreaOutput<(SkipedBytes, egui::text_edit::TextEditOutput)>>
@@ -246,21 +249,11 @@ pub trait MyUiExt: UiExt {
                     None
                 };
                 if upd_src {
-                    file_result.insert_entry(tracking::remote_fetch_file(
-                        ui.ctx(),
-                        &api_addr,
-                        commit,
-                        file_path,
-                    ));
+                    file_result.insert_entry(fetch(ui, commit, file_path));
                 }
                 resp
             } else {
-                file_result.insert_entry(tracking::remote_fetch_file(
-                    ui.ctx(),
-                    &api_addr,
-                    commit,
-                    file_path,
-                ));
+                file_result.insert_entry(fetch(ui, commit, file_path));
                 None
             }
         })

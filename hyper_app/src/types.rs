@@ -336,7 +336,7 @@ impl Default for ComputeConfigAspectViews {
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
-pub(crate) struct FileIdentifier {
+pub struct FileIdentifier {
     #[serde(flatten)]
     pub(crate) commit: Commit,
     #[serde(rename = "file")]
@@ -403,6 +403,16 @@ impl Default for Commit {
         // * close to first b8e487ff9caffb5061f680b1919ab2fe442bc0a1
     }
 }
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct FetchedFile {
+    pub content: String,
+    pub line_breaks: Vec<usize>,
+}
+
+pub(crate) type RemoteFile = crate::utils_poll::Remote<FetchedFile>;
+
+pub(crate) type FetchedFiles = std::collections::HashMap<crate::types::FileIdentifier, RemoteFile>;
 
 #[derive(
     serde::Deserialize,

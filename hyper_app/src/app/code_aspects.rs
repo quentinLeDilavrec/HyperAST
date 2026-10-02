@@ -6,8 +6,9 @@ use std::sync::Arc;
 use super::store::{FetchedHyperAST, LabelIdentifier, NodeIdentifier};
 use super::tree_view::FetchedViewImpl;
 use super::tree_view::{Action, PrefillCache, SimplePacked};
-use super::types::{Commit, ComputeConfigAspectViews, Repo, SelectedConfig};
-use super::utils_egui::MyUiExt as _;
+
+use crate::types::{Commit, ComputeConfigAspectViews, Repo, SelectedConfig};
+use crate::utils_egui::MyUiExt as _;
 use crate::utils_poll::Resource;
 
 pub(crate) const WANTED: SelectedConfig = SelectedConfig::Aspects;

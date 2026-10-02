@@ -6,13 +6,13 @@ use std::ops::Range;
 use egui_addon::InteractiveSplitter;
 use egui_addon::egui_utils::highlight_byte_range;
 
-use super::FetchedFiles;
-
 use crate::app::code_editor::generic_text_buffer::byte_index_from_char_index;
 use crate::app::show_repo_menu;
-use crate::app::types::ComputeConfigTracking;
-use crate::app::types::{CodeRange, Commit, SelectedConfig};
-use crate::app::utils_egui::MyUiExt as _;
+
+use crate::types::ComputeConfigTracking;
+use crate::types::FetchedFiles;
+use crate::types::{CodeRange, Commit, SelectedConfig};
+use crate::utils_egui::MyUiExt as _;
 use crate::utils_poll::{Accumulable, Buffered, Resource};
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

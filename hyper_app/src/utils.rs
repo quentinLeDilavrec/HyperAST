@@ -387,3 +387,86 @@ mod tests {
         assert_eq!(users[user_id2].name, "Jane Doe");
     }
 }
+
+pub(crate) fn try_fetch_remote_file<R>(
+    file_result: &std::collections::hash_map::Entry<
+        '_,
+        crate::types::FileIdentifier,
+        crate::types::RemoteFile,
+    >,
+    mut f: impl FnMut(&crate::types::FetchedFile) -> R,
+) -> Option<Result<R, String>> {
+    let std::collections::hash_map::Entry::Occupied(promise) = file_result else {
+        return None;
+    };
+    let promise = promise.get();
+    let result = promise.ready()?;
+    match result {
+        Ok(resource) => {
+            let text = resource.content.as_ref()?;
+            Some(Ok(f(text)))
+        }
+        Err(error) => Some(Err(error.to_string())),
+    }
+}
+
+impl crate::utils_poll::Resource<crate::types::FetchedFile> {
+    pub(crate) fn from_response(_ctx: &egui::Context, response: ehttp::Response) -> Self {
+        let _content_type = response.content_type().unwrap_or_default();
+        // let image = if content_type.starts_with("image/") {
+        //     RetainedImage::from_image_bytes(&response.url, &response.bytes).ok()
+        // } else {
+        //     None
+        // };
+
+        let text = response.text();
+        // let colored_text = text.and_then(|text| syntax_highlighting(ctx, &response, text));
+        let text = text.map(|x| {
+            let content = x.to_string();
+            let line_breaks = content
+                .bytes()
+                .enumerate()
+                .filter_map(|(i, b)| if b == b'\n' { Some(i) } else { None })
+                .collect();
+            crate::types::FetchedFile {
+                content,
+                line_breaks,
+            }
+        });
+
+        Self {
+            response,
+            content: text,
+            // image,
+            // text: colored_text,
+        }
+    }
+}
+
+pub(super) fn remote_fetch_file(
+    ctx: &egui::Context,
+    api_addr: &str,
+    commit: &crate::types::Commit,
+    file_path: &str,
+) -> crate::types::RemoteFile {
+    let ctx = ctx.clone();
+    let (sender, promise) = poll_promise::Promise::new();
+    let url = format!(
+        "http://{}/file/github/{}/{}/{}/{}",
+        api_addr, &commit.repo.user, &commit.repo.name, &commit.id, &file_path,
+    );
+
+    let request = ehttp::Request::get(&url);
+    // request
+    //     .headers
+    //     .insert("Content-Type".to_string(), "text".to_string());
+
+    ehttp::fetch(request, move |response| {
+        ctx.request_repaint(); // wake up UI thread
+        let resource = response.map(|response| {
+            crate::utils_poll::Resource::<crate::types::FetchedFile>::from_response(&ctx, response)
+        });
+        sender.send(resource);
+    });
+    promise
+}

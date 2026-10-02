@@ -1,25 +1,26 @@
 use egui_addon::{InteractiveSplitter, code_editor::EditorInfo};
 use poll_promise::Promise;
 
+#[cfg(feature = "collab")]
+use crate::edition::ToShared;
 use crate::utils_poll::Resource;
 
 use super::Sharing;
 use super::types::{Commit, Config, SelectedConfig, TsgEditor};
 use super::types::{EditorHolder, WithDesc};
-use super::utils_edition::show_interactions;
-use super::utils_edition::show_locals_and_interact;
-use super::utils_edition::{EditStatus, EditingContext};
-use super::utils_results_batched::show_long_result;
-use super::utils_results_batched::{ComputeError, ComputeResults, ComputeResultsProm};
+use crate::utils_results_batched::show_long_result;
+use crate::utils_results_batched::{ComputeError, ComputeResults, ComputeResultsProm};
+
+use crate::edition::{EditStatus, EditingContext};
+use crate::edition::{locals_and_interact_menu, show_locals_and_interact};
 
 #[cfg(feature = "collab")]
-use super::utils_edition::{
-    locals_and_interact_menu, show_available_remote_docs, show_shared_code_edition,
-    update_shared_editors,
+use crate::edition::utils_collab::{
+    show_available_remote_docs, show_shared_code_edition, update_shared_editors,
 };
 
 #[cfg(feature = "collab")]
-use super::code_editor_automerge::CodeEditor;
+use crate::edition::code_editor_automerge::CodeEditor;
 #[cfg(not(feature = "collab"))]
 type CodeEditor = egui_addon::code_editor::CodeEditor<crate::Languages>;
 
@@ -136,15 +137,17 @@ impl<T> EditorHolder for TsgEditor<T> {
     }
 }
 
-impl<T> TsgEditor<T> {
-    #[cfg(feature = "collab")]
-    pub(crate) fn to_shared<U>(self) -> TsgEditor<U>
-    where
-        T: Into<U>,
-    {
+#[cfg(feature = "collab")]
+impl<T> ToShared for TsgEditor<T>
+where
+    T: ToShared,
+{
+    type U = TsgEditor<T::U>;
+
+    fn to_shared(self) -> Self::U {
         TsgEditor {
-            description: self.description.into(),
-            query: self.query.into(),
+            description: self.description.to_shared(),
+            query: self.query.to_shared(),
         }
     }
 }
@@ -346,7 +349,7 @@ pub(crate) fn show_result_graph(
 ) {
     pub(super) type GraphTy = egui_addon::force_layout::PrettyGraph<String, ()>;
 
-    use crate::app::utils_results_batched::prep_compute_res_prom_mut;
+    use crate::utils_results_batched::prep_compute_res_prom_mut;
     let Some(content) = prep_compute_res_prom_mut(querying_result, ui) else {
         return;
     };
@@ -437,31 +440,9 @@ fn handle_interactions(
     single: &mut Sharing<ComputeConfigQuery>,
     trigger_compute: &mut bool,
 ) {
-    #[cfg(not(feature = "collab"))]
-    let _ = single;
-
-    let interaction = show_interactions(
-        ui,
-        code_editors,
-        #[cfg(feature = "collab")]
-        &single.doc_db,
-        querying_result,
-        |i| EXAMPLES[i].name.to_string(),
-    );
-
-    #[cfg(feature = "collab")]
-    if interaction.share_button.map_or(false, |x| x.clicked()) {
-        let (name, content) = interaction.editor.unwrap();
-        let content = content.clone().to_shared();
-        let content = std::sync::Mutex::new(content);
-        let content = std::sync::Arc::new(content);
-        let name = name.to_string();
-        code_editors.current = EditStatus::Sharing(content.clone());
-        let mut content = content.lock().unwrap();
-        let db = &mut single.doc_db.as_mut().unwrap();
-        db.create_doc_attempt(&single.rt, name, &mut *content);
-        return;
-    }
+    let interaction = single.show_interactions(ui, code_editors, querying_result, |i| {
+        EXAMPLES[i].name.to_string()
+    });
     if interaction.save_button.map_or(false, |x| x.clicked()) {
         let (name, content) = interaction.editor.unwrap();
         log::warn!("saving query: {:#?}", content.clone());

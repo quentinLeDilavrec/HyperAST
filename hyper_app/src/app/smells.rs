@@ -41,11 +41,11 @@ use wasm_rs_dbg::dbg;
 use egui_addon::InteractiveSplitter;
 use egui_addon::MultiSplitter;
 
-use super::tracking::FetchedFiles;
-use super::tracking::try_fetch_remote_file;
-use super::types::{CodeRange, Commit, CommitId, SelectedConfig};
-use super::utils_edition::MakeHighlights;
-use crate::app::utils_egui::MyUiExt as _;
+use crate::edition::MakeHighlights;
+use crate::types::FetchedFiles;
+use crate::types::{CodeRange, Commit, CommitId, SelectedConfig};
+use crate::utils::try_fetch_remote_file;
+use crate::utils_egui::MyUiExt as _;
 use crate::utils_poll::{Remote, Resource};
 
 mod config_examples;
@@ -418,7 +418,7 @@ pub(crate) fn show_config(
     ui: &mut egui::Ui,
     smells: &mut Config,
 ) -> (egui::Response, egui::Response) {
-    use super::utils_egui::MyUiExt;
+    use crate::utils_egui::MyUiExt;
     let Some(conf) = &mut smells.commits else {
         return (ui.label(""), ui.label(""));
     };
@@ -579,7 +579,7 @@ fn handle_open_synth_graph(
     let Some(queries) = access_smells_results(ui, result) else {
         return;
     };
-    use crate::app::utils_egui::MyUiExt;
+    use crate::utils_egui::MyUiExt;
     ui.grouped_wrapped_list(queries.graphs.iter().map(Some), |ui, i, x| {
         let b = ui.button(format!(
             "lattice {} q:{} e:{}",
@@ -2215,11 +2215,11 @@ fn show_either_side<MH: MakeHighlights>(
         let theme = CodeTheme::from_memory(ui.ctx());
         let mut layouter = |ui: &egui::Ui, content: &dyn egui::TextBuffer, _wrap_width: f32| {
             type HighlightCache =
-                egui::util::cache::FrameCache<LayoutJob, crate::app::utils_edition::Highlighter0>;
+                egui::util::cache::FrameCache<LayoutJob, crate::edition::Highlighter0>;
             let layout_job = ui.ctx().memory_mut(|mem| {
                 mem.caches.cache::<HighlightCache>().get((
                     &theme,
-                    crate::app::utils_edition::FileContainer(&code.file, content.as_str()),
+                    crate::edition::FileContainer(&code.file, content.as_str()),
                     language,
                 ))
             });
@@ -2240,7 +2240,7 @@ fn show_either_side<MH: MakeHighlights>(
     });
     if r.is_none() {
         if let std::collections::hash_map::Entry::Vacant(_) = file_result {
-            file_result.insert_entry(super::tracking::remote_fetch_file(
+            file_result.insert_entry(crate::utils::remote_fetch_file(
                 ui.ctx(),
                 &api_addr,
                 &code.file.commit,
@@ -2298,7 +2298,7 @@ fn show_either_side<MH: MakeHighlights>(
 
             type Type = egui::util::cache::FrameCache<
                 Vec<(egui::Color32, Vec<egui::Rect>)>,
-                crate::app::utils_edition::HiHighlighter2,
+                crate::edition::HiHighlighter2,
             >;
             let shape = ui
                 .ctx()

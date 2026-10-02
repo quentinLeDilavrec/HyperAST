@@ -471,28 +471,20 @@ fn pre_repo(
         max_matches: _,
         timeout: _,
     } = content.clone();
-    let config = if language == "Java" {
-        hyperast_vcs_git::processing::RepoConfig::JavaMaven
-    } else if language == "Cpp" {
-        hyperast_vcs_git::processing::RepoConfig::CppMake
-    } else {
-        hyperast_vcs_git::processing::RepoConfig::Any
-    };
+    let config = language.parse().unwrap();
     let repo_spec = hyperast_vcs_git::git::Forge::Github.repo(user, name);
     let repo = if let Some(precomp) = precomp {
-        let configs = &mut state.repositories.write().unwrap();
+        log::info!("{:?} config with precomputed queries", config);
+        let repositories = &mut state.repositories.write().unwrap();
         let precomp = precomp
             .split("\n\n")
             .filter(|x| !x.is_empty())
             .collect::<Vec<_>>();
-        dbg!(&precomp);
-        configs.register_config_with_prequeries(repo_spec.clone(), config, precomp.as_slice())
+        repositories.register_config_with_prequeries(repo_spec.clone(), config, precomp.as_slice())
     } else {
-        state
-            .repositories
-            .write()
-            .unwrap()
-            .register_config(repo_spec.clone(), config)
+        log::info!("{:?} config", config);
+        let mut repositories = state.repositories.write().unwrap();
+        repositories.register_config(repo_spec.clone(), config)
     };
     let repo = repo.fetch();
     log::warn!("done cloning {}", &repo.spec);
@@ -500,7 +492,7 @@ fn pre_repo(
     let rw = crate::utils::walk_commits_multi(&repo, afters)?.take(commits);
     assert!(state.repositories.try_write().is_ok());
     let commits = crate::utils::handle_pre_processing_aux(state, &repo, rw);
-    log::info!("done construction of {commits:?} in  {}", repo.spec);
+    log::info!("done construction of {commits:?} in {}", repo.spec);
 
     Ok((repo, commits))
 }
@@ -526,24 +518,14 @@ fn pre_query(
         max_matches: _,
         timeout: _,
     } = &content;
-    let _config = if language == "Java" {
-        hyperast_vcs_git::processing::RepoConfig::JavaMaven
-    } else if language == "Cpp" {
-        hyperast_vcs_git::processing::RepoConfig::CppMake
-    } else {
-        hyperast_vcs_git::processing::RepoConfig::Any
-    };
     let lang = &language;
     let language: tree_sitter::Language = hyperast_vcs_git::resolve_language(language)
         .ok_or_else(|| QueryingError::MissingLanguage(language.to_string()))?;
     let language: tree_sitter::Language = language.clone();
 
     let precomputeds = INCREMENTAL_QUERIES.then(|| {
-        state
-            .repositories
-            .read()
-            .unwrap()
-            .get_precomp_query(repo_config, lang)
+        let repositories = state.repositories.read().unwrap();
+        repositories.get_precomp_query(repo_config, lang)
     });
     if let Some(Some(precomputeds)) = precomputeds {
         hyperast_tsquery::Query::with_precomputed(query, language, precomputeds).map(|x| x.1)

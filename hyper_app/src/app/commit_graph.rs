@@ -1,9 +1,9 @@
 use crate::results_support::ResultsPerCommit;
 
 use super::CommitId;
+use super::commit;
 use super::querying::StreamedComputeResults;
 use super::{CommitMdStore, ProjectId, QResId};
-use super::{QueryResults, commit};
 
 mod graph_caching;
 // mod commits_layouting; // TODO check if mod still contain something useful
@@ -125,7 +125,7 @@ impl crate::HyperApp {
             .show(ui, |ui| widget.show(ui, &mut to_fetch, &mut to_poll))
             .inner;
 
-        self.handle_graph_interactions(ui, repo_id, &r, cached, resp);
+        self.handle_graph_interactions(ui, repo_id, &r, qrid, cached, resp);
 
         for id in to_fetch {
             if !self.data.fetched_commit_metadata.is_absent(id) {
@@ -158,13 +158,10 @@ impl crate::HyperApp {
         ui: &mut egui::Ui,
         repo_id: ProjectId,
         r: &super::Repo,
+        qrid: Option<QResId>,
         cached: &commit::CommitsLayoutTimed,
         resp: egui_plot::PlotResponse<GraphInteraction>,
     ) {
-        let is_target_repo = |x: &QueryResults| x.project == repo_id;
-        let is_target_query = |x: &QueryResults| x.query.to_usize() == 0;
-        let is_target_lang = |x: &QueryResults| self.data.queries[x.query].lang == "Java";
-
         let effect = to_effect(resp);
         if let InteractionEffect::ClickCommitPlusCmdMod(i) = effect {
             if let Some((_, mut commit_slice)) = self.data.selected_code_data.get_mut(repo_id) {
@@ -183,8 +180,9 @@ impl crate::HyperApp {
                 self.data.fetched_commit_metadata.insert(commit.id, v);
             }
         } else if let InteractionEffect::ClickCommitPrimary(i) = effect {
-            let pred = |x: &_| is_target_repo(x) && is_target_query(x);
-            if let Some((_qrid, qres)) = self.data.queries_results.find(pred) {
+            if let Some(qrid) = qrid
+                && let Some(qres) = self.data.queries_results.get(qrid)
+            {
                 self.selected_commit = Some((repo_id, cached.commits[i]));
                 self.selected_baseline = None;
                 if let super::Tab::QueryResults { format, .. } = &mut self.tabs[qres.tab] {
@@ -233,10 +231,12 @@ impl crate::HyperApp {
             self.selected_baseline = Some(cached.commits[i]);
             self.selected_commit = Some((repo_id, cached.commits[after]));
             // assert_eq!(self.data.queries.len(), 1); // need to retrieve current query if multiple
-
-            let pred = |x: &_| is_target_repo(x) && is_target_lang(x);
-            let Some((_qrid, qres)) = self.data.queries_results.find(pred) else {
-                log::warn!("No Java query results found");
+            let Some(qrid) = qrid else {
+                log::warn!("No query results id");
+                return;
+            };
+            let Some(qres) = self.data.queries_results.get(qrid) else {
+                log::warn!("No query results found");
                 return;
             };
             if let super::Tab::QueryResults { id: _, format } = &mut self.tabs[qres.tab] {

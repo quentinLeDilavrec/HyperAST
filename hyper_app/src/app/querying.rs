@@ -143,12 +143,7 @@ pub(super) fn remote_compute_query(
     single: &Sharing<ComputeConfigQuery>,
     query_editors: &mut QueryingContext,
 ) -> ComputeResultsProm<QueryingError> {
-    let language = match single.content.config {
-        Config::Any => "",
-        Config::MavenJava => "Java",
-        Config::MakeCpp => "Cpp",
-    }
-    .to_string();
+    let language = single.content.config.language().to_string();
     let query = match &mut query_editors.current {
         EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
             content.query.code().to_string()
@@ -324,6 +319,8 @@ pub(crate) fn remote_compute_query_aux(
             }
             Err(err) => {
                 log::error!("{}", err);
+                let (header_sender, _rows) = move_once.take().unwrap();
+                header_sender.send(Err(QueryingError::NetworkError(err.to_string())));
                 // let (header_sender, _) = move_once.take().unwrap();
                 // header_sender.send(Err(QueryingError::NetworkError(err)));
                 std::ops::ControlFlow::Break(())

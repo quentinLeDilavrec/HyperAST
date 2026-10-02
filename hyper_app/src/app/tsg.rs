@@ -234,12 +234,7 @@ pub(super) fn remote_compute_query(
         commits: usize,
         path: String,
     }
-    let language = match single.content.config {
-        Config::Any => "",
-        Config::MavenJava => "Java",
-        Config::MakeCpp => "Cpp",
-    }
-    .to_string();
+    let language = single.content.config.language().to_string();
     let script = match &mut query_editors.current {
         EditStatus::Local { name: _, content } | EditStatus::Example { i: _, content } => {
             QueryContent {

@@ -605,18 +605,14 @@ fn show_lang_selector(ui: &mut egui::Ui, id: impl std::hash::Hash, lang: &mut St
     egui::ComboBox::new((ui.id(), "Lang", id), "Lang")
         .selected_text(lang.as_str())
         .show_ui(ui, |ui| {
-            let v = "Cpp";
-            if ui.selectable_label(v == lang, v).clicked() {
-                if lang != v {
-                    *lang = v.to_string()
+            enumset::EnumSet::<Config>::all().into_iter().for_each(|l| {
+                let v = l.language();
+                if ui.selectable_label(v == lang, v).clicked() {
+                    if lang != v {
+                        *lang = v.to_string()
+                    }
                 }
-            }
-            let v = "Java";
-            if ui.selectable_label(v == lang, v).clicked() {
-                if lang != v {
-                    *lang = v.to_string()
-                }
-            }
+            })
         });
 }
 

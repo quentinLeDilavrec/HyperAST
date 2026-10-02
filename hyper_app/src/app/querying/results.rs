@@ -268,13 +268,12 @@ fn compute_queries_differential_results(
     let language = &data.queries[qid].lang;
     let query = data.queries[qid].query.as_ref().to_string();
     wasm_rs_dbg::dbg!(&query);
-    let config = if language == "Cpp" {
-        types::Config::MakeCpp
-    } else if language == "Java" {
-        types::Config::MavenJava
-    } else {
-        log::warn!("{} is not supported defaulting to Java", &language);
-        types::Config::MavenJava
+    let config = match language.parse() {
+        Ok(config) => config,
+        Err(()) => {
+            log::warn!("{} is not supported defaulting to Java", &language);
+            types::Config::MavenJava
+        }
     };
     let language = language.to_string();
     let commits = 2;

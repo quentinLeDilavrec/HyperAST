@@ -1,3 +1,4 @@
+use enumset::EnumSetType;
 use re_ui::UiExt;
 use std::{collections::HashSet, hash::Hash, ops::Range, str::FromStr, u8};
 
@@ -537,21 +538,6 @@ impl egui_addon::Languages for Languages {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq)]
-pub enum QueriedLang {
-    Cpp,
-    Java,
-}
-impl QueriedLang {
-    #[allow(unused)]
-    pub fn as_str(&self) -> &str {
-        match self {
-            QueriedLang::Cpp => "Cpp",
-            QueriedLang::Java => "Java",
-        }
-    }
-}
-
 pub(crate) trait WithDesc<T> {
     fn desc(&self) -> &T;
 }
@@ -596,20 +582,63 @@ pub(crate) struct TsgEditor<T = code_editor::CodeEditor<Languages>> {
     pub(crate) query: T,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, EnumSetType)]
 pub(crate) enum Config {
     Any,
     MavenJava,
     MakeCpp,
+    Python,
+    Typescript,
+    Rust,
+}
+
+impl FromStr for Config {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "any" => Ok(Config::Any),
+            "java" => Ok(Config::MavenJava),
+            "mavenjava" => Ok(Config::MavenJava),
+            "cpp" => Ok(Config::MakeCpp),
+            "makecpp" => Ok(Config::MakeCpp),
+            "python" => Ok(Config::Python),
+            "typescript" => Ok(Config::Typescript),
+            "rust" => Ok(Config::Rust),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Config {
-    #[allow(unused)]
     pub fn language(&self) -> &'static str {
         match self {
             Config::Any => "",
             Config::MavenJava => "Java",
             Config::MakeCpp => "Cpp",
+            Config::Python => "Python",
+            Config::Typescript => "Typescript",
+            Config::Rust => "Rust",
+        }
+    }
+    pub fn name(&self) -> &'static str {
+        match self {
+            Config::Any => "Any",
+            Config::MavenJava => "Java",
+            Config::MakeCpp => "Cpp",
+            Config::Python => "Python",
+            Config::Typescript => "Typescript",
+            Config::Rust => "Rust",
+        }
+    }
+    pub fn full_name(&self) -> &'static str {
+        match self {
+            Config::Any => "Any",
+            Config::MavenJava => "MavenJava",
+            Config::MakeCpp => "MakeCpp",
+            Config::Python => "Python",
+            Config::Typescript => "Typescript",
+            Config::Rust => "Rust",
         }
     }
 }
@@ -622,9 +651,11 @@ impl Config {
         egui::ComboBox::from_label(label)
             .selected_text(format!("{:?}", self))
             .show_ui(ui, |ui| {
-                ui.selectable_value(self, super::types::Config::Any, "Any");
-                ui.selectable_value(self, super::types::Config::MavenJava, "Java");
-                ui.selectable_value(self, super::types::Config::MakeCpp, "Cpp");
+                enumset::EnumSet::<Config>::all()
+                    .into_iter()
+                    .for_each(|config| {
+                        ui.selectable_value(self, config, config.language());
+                    });
             })
     }
 }

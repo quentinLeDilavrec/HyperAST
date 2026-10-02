@@ -163,7 +163,7 @@ impl LangRef<AnyType> for Lang {
         // &From::<&'static dyn HyperType>::from(&S_T_L[t as usize])
     }
     fn to_u16(&self, t: AnyType) -> u16 {
-        self.to_u16(*t.as_any().downcast_ref::<TType>().unwrap())
+        self.to_u16(*t.as_any().downcast_ref::<Type>().unwrap())
     }
 
     fn name(&self) -> &'static str {

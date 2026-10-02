@@ -198,7 +198,7 @@ impl LangRef<AnyType> for Java {
         todo!("{}", t)
     }
     fn to_u16(&self, t: AnyType) -> u16 {
-        let t: &Type = t.as_any().downcast_ref().unwrap();
+        let t = t.as_any().downcast_ref::<Type>().unwrap();
         Lang.to_u16(*t)
     }
 

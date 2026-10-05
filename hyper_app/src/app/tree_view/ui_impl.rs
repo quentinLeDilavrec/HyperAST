@@ -155,7 +155,7 @@ impl<'a> FetchedViewImpl<'a> {
                 ui.label(label);
                 r
             })
-            .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size)))
+            .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size), ""))
             .into();
 
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
@@ -212,6 +212,7 @@ impl<'a> FetchedViewImpl<'a> {
         size: u32,
         nid: NodeIdentifier,
         cs: &[NodeIdentifier],
+        supertyp: &str,
     ) -> Action {
         if self.is_hidden(kind) {
             self.prefill_cache.get_or_insert_default();
@@ -242,9 +243,23 @@ impl<'a> FetchedViewImpl<'a> {
         {
             load_with_default_open.set_open(true)
         }
+        if kind.is_supertype() {
+            let global_pos = self.global_pos.map(|x| x - size);
+            let k = kind.as_static_str();
+            return if supertyp.is_empty() {
+                self.children_ui(ui, cs, global_pos, k)
+            } else {
+                let s = format!("{}/{}", supertyp, k);
+                self.children_ui(ui, cs, global_pos, &s)
+            };
+        }
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
-                let text = format!("{}:", kind);
+                let text = if supertyp.is_empty() {
+                    format!("{}:", kind)
+                } else {
+                    format!("{}/{}:", supertyp, kind)
+                };
                 let rt = egui::RichText::new(text).monospace();
                 let gp = self.global_pos.as_ref();
                 let rt = if no_change || gp.is_none() {
@@ -260,7 +275,7 @@ impl<'a> FetchedViewImpl<'a> {
                 };
                 ui.label(rt)
             })
-            .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size)))
+            .body(|ui| self.children_ui(ui, cs, self.global_pos.map(|x| x - size), ""))
             .into();
         let mut prefill = self.prefill_cache.take().unwrap_or_default();
         let mut rect = show.header_response.rect.union(
@@ -416,6 +431,7 @@ impl<'a> FetchedViewImpl<'a> {
                     None,
                     &mut self.global_pos.clone(),
                     path,
+                    "",
                 );
                 act
             })
@@ -463,6 +479,7 @@ impl<'a> FetchedViewImpl<'a> {
         size: u32,
         nid: NodeIdentifier,
         label: LabelIdentifier,
+        supertyp: &str,
     ) -> Action {
         if self.is_hidden(kind) {
             self.prefill_cache.get_or_insert_default();
@@ -531,7 +548,11 @@ impl<'a> FetchedViewImpl<'a> {
             } else {
                 let mut label = egui::RichText::new(label).monospace();
                 let monospace = {
-                    let text = format!("{}: ", kind,);
+                    let text = if supertyp.is_empty() {
+                        format!("{}: ", kind)
+                    } else {
+                        format!("{}/{}: ", supertyp, kind)
+                    };
                     let mut rt = egui::RichText::new(text).monospace();
 
                     if let Some(color) = color {
@@ -560,7 +581,11 @@ impl<'a> FetchedViewImpl<'a> {
         } else {
             let add_contents = |ui: &mut egui::Ui| {
                 let action = {
-                    let text = format!("{}: ", kind,);
+                    let text = if supertyp.is_empty() {
+                        format!("{}: ", kind)
+                    } else {
+                        format!("{}/{}: ", supertyp, kind)
+                    };
                     let mut label = egui::RichText::new(label);
                     let mut rt = egui::RichText::new(text).monospace();
                     if let Some(color) = color {
@@ -721,6 +746,7 @@ impl<'a> FetchedViewImpl<'a> {
         ui: &mut egui::Ui,
         kind: AnyType,
         _size: u32,
+        supertyp: &str,
     ) -> Action {
         if self.is_hidden(kind) {
             return Action::Keep;
@@ -750,19 +776,23 @@ impl<'a> FetchedViewImpl<'a> {
         };
 
         let mut rt = None;
+        let text = || {
+            if supertyp.is_empty() {
+                format!("{}", kind)
+            } else {
+                format!("{}/{}", supertyp, kind)
+            }
+        };
         if kind.is_spaces() {
             if self.aspects.spacing {
-                let text = format!("{}", kind);
-                rt = Some(egui::RichText::new(text));
+                rt = Some(egui::RichText::new(text()));
             }
         } else if kind.is_syntax() {
             if self.aspects.syntax {
-                let text = format!("{}", kind);
-                rt = Some(egui::RichText::new(text));
+                rt = Some(egui::RichText::new(text()));
             }
         } else {
-            let text = format!("{}", kind);
-            rt = Some(egui::RichText::new(text));
+            rt = Some(egui::RichText::new(text()));
         };
         if let Some(color) = color {
             rt = rt.map(|rt| rt.color(color));
@@ -797,6 +827,7 @@ impl<'a> FetchedViewImpl<'a> {
         ui: &mut egui::Ui,
         cs: &[NodeIdentifier],
         mut global_pos: Option<u32>,
+        supertyp: &str,
     ) -> Action {
         let mut action = Action::Keep;
         let additions = self.additions.as_ref().map(|x| &x[..]);
@@ -821,6 +852,7 @@ impl<'a> FetchedViewImpl<'a> {
                 deletions,
                 &mut global_pos,
                 path,
+                supertyp,
             ) {
                 ControlFlow::Continue(_) => continue,
                 ControlFlow::Break(_) => break,
@@ -842,6 +874,7 @@ impl<'a> FetchedViewImpl<'a> {
         deletions: Option<&[u32]>,
         mut global_pos: &mut Option<u32>,
         path: super::Offsets,
+        supertyp: &str,
     ) -> ControlFlow<()> {
         let rect = ui.available_rect_before_wrap();
         if self.focus.is_empty()
@@ -982,18 +1015,19 @@ impl<'a> FetchedViewImpl<'a> {
             } else if serialized {
                 imp.show_pp(ui, *c, size as u32)
             } else if let Some(cs) = cs {
+                let cs1 = cs.0.to_vec();
                 if let Some(label) = l {
-                    imp.ui_both_impl(ui, kind, size as u32, *c, label, cs.0.to_vec().as_ref())
+                    imp.ui_both_impl(ui, kind, size as u32, *c, label, &cs1)
                 } else {
-                    imp.ui_children_impl2(ui, kind, size as u32, *c, cs.0.to_vec().as_ref())
+                    imp.ui_children_impl2(ui, kind, size as u32, *c, &cs1, supertyp)
                 }
             } else if let Some(label) = l {
-                imp.ui_labeled_impl2(ui, kind, size as u32, *c, label)
+                imp.ui_labeled_impl2(ui, kind, size as u32, *c, label, supertyp)
             } else {
                 if imp.is_hidden(kind) {
                     imp.prefill_cache.get_or_insert_default();
                 }
-                imp.ui_typed_impl2(ui, kind, size as u32)
+                imp.ui_typed_impl2(ui, kind, size as u32, supertyp)
             }
         // let ret = if let Some(c) = self.store.both.ids.iter().position(|x| x == c) {
         //     imp.ui_both_impl(ui, depth + 1, c)
@@ -1032,7 +1066,7 @@ impl<'a> FetchedViewImpl<'a> {
                     let kind = unsafe { AnyType::make(kind) };
                     imp.additions = None;
                     imp.deletions = None;
-                    let a = imp.ui_typed_impl2(ui, kind, 0);
+                    let a = imp.ui_typed_impl2(ui, kind, 0, supertyp);
                     match a {
                         Action::PartialFocused(x) => Action::PartialFocused(x),
                         Action::Focused(x) => Action::PartialFocused(x),
@@ -1051,6 +1085,11 @@ impl<'a> FetchedViewImpl<'a> {
                 imp.draw_count += 1;
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_BLUE).ui(ui);
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    if !supertyp.is_empty() {
+                        ui.label(supertyp);
+                        ui.label("/");
+                    }
                     ui.label(c.to_string());
                 });
                 prefill.head = ui.available_rect_before_wrap().min.y - min.y;
@@ -1061,6 +1100,11 @@ impl<'a> FetchedViewImpl<'a> {
                 imp.draw_count += 1;
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_GRAY).ui(ui);
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    if !supertyp.is_empty() {
+                        ui.label(supertyp);
+                        ui.label("/");
+                    }
                     ui.label(c.to_string());
                 });
                 let mut prefill = imp.prefill_cache.take().unwrap_or_default();

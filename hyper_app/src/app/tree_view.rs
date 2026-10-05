@@ -150,13 +150,13 @@ impl<'a> FetchedViewImpl<'a> {
             } else if let Some(cs) = cs {
                 let cs = cs.0.to_vec();
                 drop(node_store);
-                self.ui_children_impl2(ui, kind, size as u32, *root, cs.as_ref())
+                self.ui_children_impl2(ui, kind, size as u32, *root, cs.as_ref(), "")
             } else if let Some(label) = l {
                 drop(node_store);
-                self.ui_labeled_impl2(ui, kind, size as u32, *root, label)
+                self.ui_labeled_impl2(ui, kind, size as u32, *root, label, "")
             } else {
                 drop(node_store);
-                self.ui_typed_impl2(ui, kind, size as u32)
+                self.ui_typed_impl2(ui, kind, size as u32, "")
             }
         } else {
             drop(node_store);

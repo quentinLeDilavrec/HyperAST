@@ -246,7 +246,7 @@ impl<'a> FetchedViewImpl<'a> {
         if kind.is_supertype() {
             let global_pos = self.global_pos.map(|x| x - size);
             let k = kind.as_static_str();
-            return if supertyp.is_empty() {
+            return if supertyp.is_empty() || !self.aspects.ast {
                 self.children_ui(ui, cs, global_pos, k)
             } else {
                 let s = format!("{}/{}", supertyp, k);
@@ -255,7 +255,7 @@ impl<'a> FetchedViewImpl<'a> {
         }
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
-                let text = if supertyp.is_empty() {
+                let text = if supertyp.is_empty() || !self.aspects.ast {
                     format!("{}:", kind)
                 } else {
                     format!("{}/{}:", supertyp, kind)
@@ -548,7 +548,7 @@ impl<'a> FetchedViewImpl<'a> {
             } else {
                 let mut label = egui::RichText::new(label).monospace();
                 let monospace = {
-                    let text = if supertyp.is_empty() {
+                    let text = if supertyp.is_empty() || !self.aspects.ast {
                         format!("{}: ", kind)
                     } else {
                         format!("{}/{}: ", supertyp, kind)
@@ -581,7 +581,7 @@ impl<'a> FetchedViewImpl<'a> {
         } else {
             let add_contents = |ui: &mut egui::Ui| {
                 let action = {
-                    let text = if supertyp.is_empty() {
+                    let text = if supertyp.is_empty() || !self.aspects.ast {
                         format!("{}: ", kind)
                     } else {
                         format!("{}/{}: ", supertyp, kind)
@@ -777,7 +777,7 @@ impl<'a> FetchedViewImpl<'a> {
 
         let mut rt = None;
         let text = || {
-            if supertyp.is_empty() {
+            if supertyp.is_empty() || !self.aspects.ast {
                 format!("{}", kind)
             } else {
                 format!("{}/{}", supertyp, kind)
@@ -1086,7 +1086,7 @@ impl<'a> FetchedViewImpl<'a> {
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_BLUE).ui(ui);
                     ui.spacing_mut().item_spacing.x = 0.0;
-                    if !supertyp.is_empty() {
+                    if !supertyp.is_empty() && self.aspects.ast {
                         ui.label(supertyp);
                         ui.label("/");
                     }
@@ -1101,7 +1101,7 @@ impl<'a> FetchedViewImpl<'a> {
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_GRAY).ui(ui);
                     ui.spacing_mut().item_spacing.x = 0.0;
-                    if !supertyp.is_empty() {
+                    if !supertyp.is_empty() && self.aspects.ast {
                         ui.label(supertyp);
                         ui.label("/");
                     }

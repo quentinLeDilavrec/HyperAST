@@ -41,9 +41,8 @@ pub(crate) fn show_config(
     ui.checkbox(&mut aspects.spacing, "Spacing");
     ui.checkbox(&mut aspects.syntax, "Syntax");
     ui.checkbox(&mut aspects.cst, "CST");
+    ui.checkbox(&mut aspects.ast, "AST");
     ui.add_enabled_ui(false, |ui| {
-        ui.checkbox(&mut aspects.ast, "AST");
-        ui.wip(Some(" soon available"));
         ui.checkbox(&mut aspects.type_decls, "Type Decls");
         ui.wip(Some(" soon available"));
         ui.checkbox(&mut aspects.licence, "Licence");

@@ -47,12 +47,14 @@ pub(crate) fn show_config(
         .on_hover_text("show abstract aspects (supertypes, hidden nodes)")
         .changed()
     {
-        aspects.ast = Some(false);
+        aspects.ast = Some(Default::default());
     }
     if let Some(n) = &mut aspects.ast {
         ui.indent("ast_options", |ui| {
-            ui.checkbox(n, "abstract nodes")
+            ui.checkbox(&mut n.nodes, "as nodes")
                 .on_hover_text("when enabled show as individual nodes, otherwise as annotations");
+            ui.checkbox(&mut n.hidden, "hidden")
+                .on_hover_text("when enabled show hidden node types. Supertypes can be seen as special hidden types, more specifically they are unions of grammar rules.");
         });
     }
     ui.add_enabled_ui(false, |ui| {

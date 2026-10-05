@@ -241,6 +241,12 @@ pub(crate) struct ComputeConfigTracking {
     pub(crate) target: CodeRange,
 }
 
+#[derive(Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
+pub(crate) struct AstAspect {
+    pub nodes: bool,
+    pub hidden: bool,
+}
+
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub(crate) struct ComputeConfigAspectViews {
@@ -250,7 +256,7 @@ pub(crate) struct ComputeConfigAspectViews {
     pub(super) cst: bool,
     pub(super) spacing: bool,
     pub(super) syntax: bool,
-    pub(super) ast: Option<bool>,
+    pub(super) ast: Option<AstAspect>,
     pub(super) type_decls: bool,
     pub(super) licence: bool,
     pub(super) doc: bool,

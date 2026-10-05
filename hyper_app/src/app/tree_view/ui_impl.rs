@@ -243,21 +243,31 @@ impl<'a> FetchedViewImpl<'a> {
         {
             load_with_default_open.set_open(true)
         }
-        // following guard is skipped when we want to show abstract nodes
-        if kind.is_supertype() && self.aspects.ast != Some(true) {
-            let global_pos = self.global_pos.map(|x| x - size);
-            // no supertypes to propagate when not showing abstract aspects
-            if self.aspects.ast.is_none() {
+        let global_pos = self.global_pos.map(|x| x - size);
+        if let Some(ast) = &self.aspects.ast
+            && kind.is_hidden()
+        {
+            if !ast.nodes {
+                if !kind.is_supertype() && !ast.hidden {
+                    return self.children_ui(ui, cs, global_pos, supertyp);
+                }
+                let k = kind.as_static_str();
+                if supertyp.is_empty() {
+                    return self.children_ui(ui, cs, global_pos, k);
+                }
+                // multiple supertypes can be nested
+                let s = format!("{}/{}", supertyp, k);
+                return self.children_ui(ui, cs, global_pos, &s);
+            } else if !kind.is_supertype() && !ast.hidden {
                 return self.children_ui(ui, cs, global_pos, "");
+            } else {
+                // pass through when we want to show hidden types as nodes
+                // if it is not a supertype, hidden must be enabled
             }
-            let k = kind.as_static_str();
-            if supertyp.is_empty() {
-                return self.children_ui(ui, cs, global_pos, k);
-            }
-            // multiple supertypes can be nested
-            let s = format!("{}/{}", supertyp, k);
-            return self.children_ui(ui, cs, global_pos, &s);
+        } else if kind.is_hidden() {
+            return self.children_ui(ui, cs, global_pos, "");
         }
+
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
                 let text = if supertyp.is_empty() || !self.aspects.ast.is_some() {

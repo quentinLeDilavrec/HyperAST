@@ -96,7 +96,7 @@ impl<'a> FetchedViewImpl<'a> {
         }
 
         self.draw_count += 1;
-        let id = ui.id().with(&self.path);
+        let id = self.root_ui_id.with(&self.path);
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
         self.additions_deletions_compute(size);
@@ -223,7 +223,7 @@ impl<'a> FetchedViewImpl<'a> {
             self.min_before_count += 1;
         }
         self.draw_count += 1;
-        let id = ui.id().with(&self.path);
+        let id = self.root_ui_id.with(&self.path);
 
         self.additions_deletions_compute(size);
         if self.is_pp(kind) {
@@ -418,7 +418,7 @@ impl<'a> FetchedViewImpl<'a> {
             self.min_before_count += 1;
         }
         self.draw_count += 1;
-        let id = ui.id().with(&self.path);
+        let id = self.root_ui_id.with(&self.path);
         let mut load_with_default_open =
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
         if !self.focus.is_empty() {
@@ -502,7 +502,7 @@ impl<'a> FetchedViewImpl<'a> {
         }
         let min = ui.available_rect_before_wrap().min;
         self.draw_count += 1;
-        let id = ui.id().with(&self.path);
+        let id = self.root_ui_id.with(&self.path);
         self.additions_deletions_compute(size);
         if self.is_pp(kind) {
             let action = self.show_pp(ui, nid, size);

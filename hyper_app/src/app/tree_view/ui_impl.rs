@@ -243,19 +243,24 @@ impl<'a> FetchedViewImpl<'a> {
         {
             load_with_default_open.set_open(true)
         }
-        if kind.is_supertype() {
+        // following guard is skipped when we want to show abstract nodes
+        if kind.is_supertype() && self.aspects.ast != Some(true) {
             let global_pos = self.global_pos.map(|x| x - size);
+            // no supertypes to propagate when not showing abstract aspects
+            if self.aspects.ast.is_none() {
+                return self.children_ui(ui, cs, global_pos, "");
+            }
             let k = kind.as_static_str();
-            return if supertyp.is_empty() || !self.aspects.ast {
-                self.children_ui(ui, cs, global_pos, k)
-            } else {
-                let s = format!("{}/{}", supertyp, k);
-                self.children_ui(ui, cs, global_pos, &s)
-            };
+            if supertyp.is_empty() {
+                return self.children_ui(ui, cs, global_pos, k);
+            }
+            // multiple supertypes can be nested
+            let s = format!("{}/{}", supertyp, k);
+            return self.children_ui(ui, cs, global_pos, &s);
         }
         let show: FoldRet<_, _> = load_with_default_open
             .show_header(ui, |ui| {
-                let text = if supertyp.is_empty() || !self.aspects.ast {
+                let text = if supertyp.is_empty() || !self.aspects.ast.is_some() {
                     format!("{}:", kind)
                 } else {
                     format!("{}/{}:", supertyp, kind)
@@ -548,7 +553,7 @@ impl<'a> FetchedViewImpl<'a> {
             } else {
                 let mut label = egui::RichText::new(label).monospace();
                 let monospace = {
-                    let text = if supertyp.is_empty() || !self.aspects.ast {
+                    let text = if supertyp.is_empty() || !self.aspects.ast.is_some() {
                         format!("{}: ", kind)
                     } else {
                         format!("{}/{}: ", supertyp, kind)
@@ -581,7 +586,7 @@ impl<'a> FetchedViewImpl<'a> {
         } else {
             let add_contents = |ui: &mut egui::Ui| {
                 let action = {
-                    let text = if supertyp.is_empty() || !self.aspects.ast {
+                    let text = if supertyp.is_empty() || !self.aspects.ast.is_some() {
                         format!("{}: ", kind)
                     } else {
                         format!("{}/{}: ", supertyp, kind)
@@ -777,7 +782,7 @@ impl<'a> FetchedViewImpl<'a> {
 
         let mut rt = None;
         let text = || {
-            if supertyp.is_empty() || !self.aspects.ast {
+            if supertyp.is_empty() || !self.aspects.ast.is_some() {
                 format!("{}", kind)
             } else {
                 format!("{}/{}", supertyp, kind)
@@ -1086,7 +1091,7 @@ impl<'a> FetchedViewImpl<'a> {
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_BLUE).ui(ui);
                     ui.spacing_mut().item_spacing.x = 0.0;
-                    if !supertyp.is_empty() && self.aspects.ast {
+                    if !supertyp.is_empty() && self.aspects.ast.is_some() {
                         ui.label(supertyp);
                         ui.label("/");
                     }
@@ -1101,7 +1106,7 @@ impl<'a> FetchedViewImpl<'a> {
                 ui.horizontal(|ui| {
                     egui::Spinner::new().color(egui::Color32::LIGHT_GRAY).ui(ui);
                     ui.spacing_mut().item_spacing.x = 0.0;
-                    if !supertyp.is_empty() && self.aspects.ast {
+                    if !supertyp.is_empty() && self.aspects.ast.is_some() {
                         ui.label(supertyp);
                         ui.label("/");
                     }

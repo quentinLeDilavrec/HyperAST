@@ -41,7 +41,20 @@ pub(crate) fn show_config(
     ui.checkbox(&mut aspects.spacing, "Spacing");
     ui.checkbox(&mut aspects.syntax, "Syntax");
     ui.checkbox(&mut aspects.cst, "CST");
-    ui.checkbox(&mut aspects.ast, "AST");
+    let mut ast = aspects.ast.is_some();
+    if ui
+        .checkbox(&mut ast, "AST")
+        .on_hover_text("show abstract aspects (supertypes, hidden nodes)")
+        .changed()
+    {
+        aspects.ast = Some(false);
+    }
+    if let Some(n) = &mut aspects.ast {
+        ui.indent("ast_options", |ui| {
+            ui.checkbox(n, "abstract nodes")
+                .on_hover_text("when enabled show as individual nodes, otherwise as annotations");
+        });
+    }
     ui.add_enabled_ui(false, |ui| {
         ui.checkbox(&mut aspects.type_decls, "Type Decls");
         ui.wip(Some(" soon available"));

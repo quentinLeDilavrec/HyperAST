@@ -158,6 +158,7 @@ where
             has_later_siblings = true;
             if s.kind().is_supertype() {
                 has_later_named_siblings = true;
+                break;
             }
             if s.is_visible() {
                 has_later_siblings = true;

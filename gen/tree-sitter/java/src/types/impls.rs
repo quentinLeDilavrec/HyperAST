@@ -48,7 +48,9 @@ impl TsType for Type {
     }
 
     fn is_leaf(self) -> bool {
-        self == Type::StringLiteral
+        // a string literal keeps its children (string_fragment, escape_sequence), as in the
+        // Tree-sitter tree, so that a query naming them matches (as in the C grammar)
+        false
     }
 }
 

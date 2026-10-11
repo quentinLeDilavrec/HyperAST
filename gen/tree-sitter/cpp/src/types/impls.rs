@@ -54,6 +54,14 @@ impl TsType for Type {
         self.is_repeat()
     }
 
+    fn as_repeat(self) -> Option<Self> {
+        match self {
+            Self::ERROR => Some(Self::_ERROR),
+            Self::_ERROR => Some(Self::_ERROR),
+            _ => None,
+        }
+    }
+
     fn is_leaf(self) -> bool {
         self == Type::RawStringLiteral
     }

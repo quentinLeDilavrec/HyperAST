@@ -64,6 +64,7 @@ hyperast = { path = "../crates/hyper_ast", default-features = false, features = 
     "ts_type",
 ] }
 hyperast_gen_ts_cpp = { path = "../gen/tree-sitter/cpp", default-features = false, features = ["types"] }
+hyperast_gen_ts_c = { path = "../gen/tree-sitter/c", default-features = false, features = ["types"] }
 hyperast_gen_ts_java = { path = "../gen/tree-sitter/java", default-features = false, features = ["types"] }
 hyperast_gen_ts_xml = { path = "../gen/tree-sitter/xml", default-features = false, features = ["types"] }
 hyperast_gen_ts_tsquery = { path = "../gen/tree-sitter/query", default-features = false, features = ["types"] }

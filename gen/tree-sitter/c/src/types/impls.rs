@@ -4,6 +4,7 @@
 use std::fmt::Display;
 
 use hyperast::tree_gen::TsEnabledTS;
+use hyperast::tree_gen::TsType;
 use hyperast::types::{AnyType, TypeU16};
 use hyperast::types::{HyperType, LangRef, TypeStore, TypeTrait, TypedNodeId};
 use hyperast::types::{NodeId, UniformNodeId};
@@ -74,7 +75,6 @@ impl TsType for Type {
 }
 
 cfg_if::cfg_if! {if #[cfg(feature = "impl")] {
-    use hyperast::tree_gen::utils_ts::TsType;
 
     use hyperast::types::{RoleStore};
 

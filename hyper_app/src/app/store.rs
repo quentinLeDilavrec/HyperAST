@@ -278,6 +278,7 @@ fn resolve_type(n: HashedNodeRef<'_, NodeIdentifier>, lang: &str) -> AnyType {
     }
     aux!(hyperast_gen_ts_java);
     aux!(hyperast_gen_ts_cpp);
+    aux!(hyperast_gen_ts_c);
     aux!(hyperast_gen_ts_xml);
     aux!(hyperast_gen_ts_rust);
     aux!(hyperast_gen_ts_python);

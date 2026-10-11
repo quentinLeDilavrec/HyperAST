@@ -423,11 +423,13 @@ where
         if comp!(      padding == start == end == cursor) {
             //                        what ??
             log::info!(
-                "what should we do with {} {} {} {} ?",
+                "what should we do at {} {} {} {} for {}.{} ?",
                 padding,
                 start,
                 end,
-                cursor
+                cursor,
+                parent.simple.kind.as_static_str(),
+                acc.simple.kind.as_static_str(),
             );
             // unreachable!(
             //     "what should we do with {} {} {} {} ?",
@@ -477,8 +479,13 @@ where
             );
         } else {
             unreachable!(
-                "should normally handle all cases including {} {} {} {}",
-                padding, start, end, cursor
+                "should normally handle all cases including {} {} {} {} for {}.{}",
+                padding,
+                start,
+                end,
+                cursor,
+                parent.simple.kind.as_static_str(),
+                acc.simple.kind.as_static_str(),
             )
         }
         if start < end {

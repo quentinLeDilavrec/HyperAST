@@ -4,6 +4,8 @@ use tree_sitter::Parser;
 use crate::TStore;
 use crate::legion::tree_sitter_parse;
 
+mod same_matches;
+
 type CTreeGen<'store, 'cache, HAST, Acc> =
     crate::legion::CTreeGen<'store, 'cache, TStore, NoOpMore<HAST, Acc>, true>;
 type SimpleStores = hyperast::store::SimpleStores<TStore>;

@@ -9,6 +9,8 @@ mod tsg_hyperast;
 // #[cfg(all(feature = "tsg", debug_assertions))]
 mod tsqueries_java;
 
+mod error_nodes;
+
 #[cfg(all(feature = "impl", feature = "bevy"))]
 mod test_bevy;
 

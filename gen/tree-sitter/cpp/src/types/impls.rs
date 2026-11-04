@@ -316,7 +316,9 @@ impl hyperast::types::HyperType for Type {
     }
 
     fn is_hidden(&self) -> bool {
-        self.is_hidden()
+        // the hidden repeat nodes of an error node, as in tree-sitter: not in the generated list,
+        // which only holds the grammar's symbols
+        self.is_hidden() || self == &Self::_ERROR
     }
 
     fn is_supertype(&self) -> bool {

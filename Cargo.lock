@@ -4446,6 +4446,7 @@ dependencies = [
  "polyglot",
  "pretty_assertions",
  "serde",
+ "streaming-iterator",
  "tree-sitter",
  "tree-sitter-c",
 ]

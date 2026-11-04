@@ -108,6 +108,16 @@ impl crate::tree_gen::parser::Node for TNode<'_> {
 
 impl crate::tree_gen::parser::NodeWithU16TypeId for TNode<'_> {
     fn kind_id(&self) -> u16 {
+        // The hidden repeat nodes of an error node (`ts_builtin_sym_error_repeat`, `_ERROR`, reached
+        // with `HIDDEN_NODES`) have no public symbol: tree-sitter's `ts_node_symbol` maps them
+        // through the language's `public_symbol_map` without a bound check, so `kind_id` reads past
+        // its end and returns another kind of the grammar (or one out of range). Their grammar
+        // symbol is the reserved id `TsEnabledTS::_ERROR`.
+        const ERROR_REPEAT: u16 = u16::MAX - 1;
+        let grammar_id = self.0.grammar_id();
+        if grammar_id == ERROR_REPEAT {
+            return grammar_id;
+        }
         self.0.kind_id()
     }
 }

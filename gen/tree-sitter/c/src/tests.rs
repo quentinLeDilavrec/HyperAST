@@ -199,3 +199,60 @@ NpyIter_AdvancedNew()
     NIT_ITERINDEX(iter) = 0;
     memset(NIT_BASEOFFSETS(iter), 0, (nop+1)*NPY_SIZEOF_INTP);
 }"#;
+
+/// The matches of a query on a C file with HyperAST (the generator of the git processor).
+fn hyperast_matches(query: &str, text: &str) -> usize {
+    let query = hyperast_tsquery::Query::new(query, crate::language()).unwrap();
+    let tree = tree_sitter_parse(text.as_bytes());
+    let mut stores = SimpleStores::default();
+    let mut tree_gen = crate::legion_ts_simp::CTreeGen::bare(&mut stores);
+    let file = tree_gen
+        .generate_file(b"", text.as_bytes(), tree.walk())
+        .local
+        .compressed_node;
+    let pos = hyperast::position::StructuralPosition::new(file);
+    let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(&stores, pos);
+    let mut matches = query.matches(cursor);
+    let mut count = 0;
+    while matches.next().is_some() {
+        count += 1;
+    }
+    count
+}
+
+/// The matches of a query on a C file with Tree-sitter's own query cursor.
+fn tree_sitter_matches(query: &str, text: &str) -> usize {
+    use streaming_iterator::StreamingIterator;
+    let query = tree_sitter::Query::new(&crate::language(), query).unwrap();
+    let tree = tree_sitter_parse(text.as_bytes());
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), text.as_bytes());
+    let mut count = 0;
+    while matches.next().is_some() {
+        count += 1;
+    }
+    count
+}
+
+/// A query on a node whose children are wrapped in hidden supertypes (an initializer list: each
+/// element is an `expression`) is not quadratic in the width of the node: `current_status` kept
+/// walking the later siblings after a supertype (fixed by a `break`, 224861a). On 4,000 elements:
+/// 7.3 s before the fix, 39 ms after (release; 0.4 s in debug), 1.8 ms with Tree-sitter. The
+/// query matches nowhere, as most queries on most files.
+#[test]
+fn c_query_on_wide_nodes_test() {
+    const NO_MATCH: &str = "(if_statement condition: (parenthesized_expression \
+        (binary_expression left: (identifier) right: (number_literal)))) @if";
+    let initializer = |n: usize| {
+        let elements: Vec<String> = (0..n).map(|i| i.to_string()).collect();
+        format!("int table[] = {{{}}};\n", elements.join(", "))
+    };
+    // the sibling walks of `current_status` are not counted by the cursor (`status_count`): the
+    // time is the measure, with a wide margin
+    let text = initializer(4_000);
+    let start = std::time::Instant::now();
+    let matches = hyperast_matches(NO_MATCH, &text);
+    let elapsed = start.elapsed();
+    assert_eq!(matches, 0);
+    assert!(elapsed < std::time::Duration::from_secs(2), "{:?} for 4,000 elements", elapsed);
+}

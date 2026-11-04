@@ -203,6 +203,7 @@ where
         has_later_siblings = true;
         if k.is_supertype() {
             has_later_named_siblings = true;
+            break;
         }
         if is_visible(stores, &pos) {
             has_later_siblings = true;

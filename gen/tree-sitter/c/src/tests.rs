@@ -87,6 +87,45 @@ pub(crate) fn c_preproc_space_define_test() {
     );
 }
 
+/// A bare list of bytes, as the FPGA bitstreams of u-boot (`board/**/fpgadata.c`, included
+/// inside an array initializer elsewhere): not valid C on its own, its error node gets more than
+/// 10,000 children, so the generator splits them into repeat nodes (`zipped_ts_extra::_post`).
+fn bare_byte_list(indent: &str) -> String {
+    (0..6_600)
+        .map(|i: usize| {
+            let start = if i % 16 == 0 { indent } else { "" };
+            let end = if i % 16 == 15 { "\n" } else { "" };
+            format!("{}0x{:02x},{}", start, (i * 37) % 256, end)
+        })
+        .collect()
+}
+
+fn assert_round_trip(text: &str) {
+    let tree = tree_sitter_parse(text.as_bytes());
+    let mut stores = SimpleStores::default();
+    let mut tree_gen = crate::legion_ts_simp::CTreeGen::bare(&mut stores);
+    let x = tree_gen.generate_file(b"", text.as_bytes(), tree.walk());
+    let x = x.local.compressed_node;
+    pretty_assertions::assert_eq!(
+        text,
+        hyperast::nodes::TextSerializer::new(&stores, x).to_string()
+    );
+}
+
+/// The split kept the parent's start but moved its padding start to the current position: when
+/// the parent did not start at byte 0 (here a leading space), `_post` met padding > start and
+/// panicked (`unreachable!`, "should normally handle all cases").
+#[test]
+pub(crate) fn c_many_children_after_leading_space_test() {
+    assert_round_trip(&bare_byte_list(" "));
+}
+
+/// The same without the leading space (the case the "repeat trick" exception of `_post` covered).
+#[test]
+pub(crate) fn c_many_children_test() {
+    assert_round_trip(&bare_byte_list(""));
+}
+
 use crate::Type;
 use hyperast::nodes::{SyntaxSerializer, TextSerializer};
 use hyperast::tree_gen;

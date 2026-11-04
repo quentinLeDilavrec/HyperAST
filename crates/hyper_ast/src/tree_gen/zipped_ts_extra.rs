@@ -516,7 +516,12 @@ where
                 start_byte: parent.start_byte,
                 end_byte: parent.end_byte,
                 metrics: Default::default(),
-                padding_start: global.sum_byte_length(),
+                // the parent's own leading space (padding_start..start_byte) is still to be
+                // produced, by the grandparent's `_post`: keep where it starts. The current
+                // position would put padding after start_byte when the parent does not start at
+                // the beginning of the text (e.g. a file starting with a space), a case `_post`
+                // does not handle (unreachable!)
+                padding_start: parent.padding_start,
                 simple: BasicAccumulator::new(kind),
                 no_space: vec![],
                 role: Default::default(),

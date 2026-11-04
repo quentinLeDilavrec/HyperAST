@@ -2762,3 +2762,127 @@ mod test_tsg_queries {
         query._check_preprocessed(1, 3);
     }
 }
+
+/// A string literal keeps its children (`string_fragment`, `escape_sequence`), as in the
+/// Tree-sitter tree: a query written against Tree-sitter that names them must match.
+#[test]
+fn test_string_literal_children() {
+    let text = r#"
+class A {
+    String f() { return "abc"; }
+    String g() { return "\n"; }
+}
+    "#;
+    let text = text.as_bytes();
+    assert_eq!(2, run_stepped(r#"(string_literal) @s"#, text));
+    assert_eq!(1, run_stepped(r#"(string_literal (string_fragment)) @s"#, text));
+    assert_eq!(1, run_stepped(r#"(string_literal (escape_sequence)) @s"#, text));
+    assert_eq!(1, run_stepped(r#"(return_statement (string_literal (string_fragment))) @r"#, text));
+}
+
+/// A Java file without parse errors, with most kinds of declarations, statements and expressions.
+const VARIED_JAVA: &str = r#"package a.b;
+
+import java.util.*;
+import static java.lang.Math.max;
+
+@Deprecated
+public class Varied<T extends Comparable<T>> implements Runnable {
+    private static final String NAME = "a\tb";
+    private final List<T> items = new ArrayList<>();
+    protected int[] counts = {1, 2, 3};
+    enum Color { RED, GREEN }
+    interface Visitor { void visit(Object o); }
+    record Pair(int a, int b) {}
+
+    public Varied(T first) { this.items.add(first); }
+
+    @Override
+    public void run() {
+        for (int i = 0; i < counts.length; i++) { counts[i] += max(i, 1); }
+        for (T item : items) { System.out.println(item + "\n"); }
+        int n = 0;
+        while (n < 10) n++;
+        do { n--; } while (n > 0);
+        switch (n) { case 0: break; default: n = 1; }
+        try { Object o = items.get(0); if (o instanceof String s && !s.isEmpty()) throw new IllegalStateException(s); }
+        catch (IndexOutOfBoundsException | IllegalStateException e) { n = -1; }
+        finally { n = n > 0 ? n : 0; }
+        Runnable r = () -> System.out.println('c');
+        Visitor v = new Visitor() { public void visit(Object o) { } };
+        synchronized (this) { assert n >= 0 : "negative"; }
+        long l = 10L; double d = 1.5e3; char c = (char) l; boolean b = true;
+        String text = """
+            block""";
+    }
+
+    static <U> U first(List<? extends U> list) { return list.isEmpty() ? null : list.get(0); }
+}
+"#;
+
+/// The matches of a query on a Java file with HyperAST (the generator of the git processor).
+fn hyperast_count(query: &str, text: &[u8]) -> usize {
+    use crate::legion_with_refs;
+    let query = hyperast_tsquery::Query::new(query, crate::language()).unwrap();
+    let mut stores = SimpleStores::<crate::TStore>::default();
+    let mut md_cache = Default::default();
+    let mut java_tree_gen = legion_with_refs::JavaTreeGen::new(&mut stores, &mut md_cache);
+    let tree = legion_with_refs::tree_sitter_parse(text);
+    let file = java_tree_gen.generate_file(b"", text, tree.walk()).local.compressed_node;
+    let pos = hyperast::position::StructuralPosition::new(file);
+    let cursor = hyperast_tsquery::hyperast_cursor::TreeCursor::new(&stores, pos);
+    query.matches(cursor).count()
+}
+
+/// The matches of a query on a Java file with Tree-sitter's own query cursor.
+fn tree_sitter_count(query: &str, text: &[u8]) -> usize {
+    use streaming_iterator::StreamingIterator;
+    let query = tree_sitter::Query::new(&crate::language(), query).unwrap();
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&crate::language()).unwrap();
+    let tree = parser.parse(text, None).unwrap();
+    let mut cursor = tree_sitter::QueryCursor::new();
+    let mut matches = cursor.matches(&query, tree.root_node(), text);
+    let mut count = 0;
+    while matches.next().is_some() {
+        count += 1;
+    }
+    count
+}
+
+/// HyperAST and Tree-sitter count the same matches for every named node type of a Java file, and
+/// for the children of string literals, apart from a lone `(identifier)`: HyperAST also matches
+/// the nodes that Tree-sitter aliases as identifiers, while `(<parent> (identifier))` counts the
+/// same for every parent type (a known difference, not covered here).
+#[test]
+fn test_same_matches_as_tree_sitter() {
+    const KNOWN_DIFFERENT: [&str; 1] = ["identifier"];
+    let text = VARIED_JAVA.as_bytes();
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&crate::language()).unwrap();
+    let tree = parser.parse(text, None).unwrap();
+    assert!(!tree.root_node().has_error(), "{}", tree.root_node().to_sexp());
+    let mut kinds = std::collections::BTreeSet::new();
+    let mut stack = vec![tree.root_node()];
+    while let Some(node) = stack.pop() {
+        if node.is_named() && !KNOWN_DIFFERENT.contains(&node.kind()) {
+            kinds.insert(node.kind().to_string());
+        }
+        let mut walk = node.walk();
+        stack.extend(node.children(&mut walk));
+    }
+    let mut queries: Vec<String> = kinds.iter().map(|kind| format!("({kind}) @c")).collect();
+    queries.push("(string_literal (string_fragment)) @c".to_string());
+    queries.push("(string_literal (escape_sequence)) @c".to_string());
+    let differ: Vec<String> = queries
+        .iter()
+        .filter_map(|query| {
+            let hyperast = hyperast_count(query, text);
+            let tree_sitter = tree_sitter_count(query, text);
+            (hyperast != tree_sitter)
+                .then(|| format!("{query}: HyperAST {hyperast}, Tree-sitter {tree_sitter}"))
+        })
+        .collect();
+    assert!(queries.len() > 60, "too few node types: {}", queries.len());
+    assert!(differ.is_empty(), "{} of {} queries differ:\n{}", differ.len(), queries.len(), differ.join("\n"));
+}

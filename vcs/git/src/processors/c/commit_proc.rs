@@ -4,9 +4,7 @@ use crate::preprocessed::CommitBuilder;
 use crate::processing::erased::ParametrizedCommitProcessorHandle as PCPHandle;
 use crate::processing::erased::PreparedCommitProc;
 
-use super::Proc;
-
-impl crate::processing::erased::CommitProc for Proc {
+impl crate::processing::erased::CommitProc for super::Proc {
     fn prepare_processing_at_path<'repo>(
         &self,
         repository: &'repo Repository,
@@ -34,5 +32,9 @@ impl crate::processing::erased::CommitProc for Proc {
     fn get_precomp_query(&self) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
         dbg!(&self.parameter.query);
         self.parameter.query.clone()
+    }
+
+    fn matches_lang(&self, lang: &str) -> bool {
+        super::Proc::matches_lang(lang)
     }
 }

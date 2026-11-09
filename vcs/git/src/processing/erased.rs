@@ -142,6 +142,9 @@ pub trait CommitProc: Proc {
     fn get_lang_handle(&self, _lang: &str) -> Option<PCPHandle> {
         None
     }
+    fn matches_lang(&self, _lang: &str) -> bool {
+        false
+    }
 }
 
 /// erased commit processor

@@ -17,8 +17,6 @@ pub struct Parameter {
     pub(crate) query: Option<hyperast_tsquery::ZeroSepArrayStr>,
 }
 
-pub(crate) type CProcessorHolder = crate::processing::ProcessorHolder<CProc>;
-
 pub(crate) type Proc = super::SimpleProc<Parameter, TStore>;
 pub type CProc = Proc;
 

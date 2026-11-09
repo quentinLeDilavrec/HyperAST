@@ -39,6 +39,10 @@ impl crate::processing::erased::CommitProc for CppProc {
         dbg!(&self.parameter.query);
         self.parameter.query.clone()
     }
+
+    fn matches_lang(&self, lang: &str) -> bool {
+        super::Proc::matches_lang(lang)
+    }
 }
 
 struct PreparedCppCommitProc<'repo> {

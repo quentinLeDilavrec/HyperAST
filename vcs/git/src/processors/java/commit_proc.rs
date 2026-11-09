@@ -45,6 +45,10 @@ impl crate::processing::erased::CommitProc for JavaProc {
             java_handle,
         })
     }
+
+    fn matches_lang(&self, lang: &str) -> bool {
+        super::Proc::matches_lang(lang)
+    }
 }
 
 struct PreparedJavaCommitProc<'repo> {

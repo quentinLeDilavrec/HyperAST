@@ -464,6 +464,9 @@ impl PreProcessedRepositories {
     ) -> Option<hyperast_tsquery::ZeroSepArrayStr> {
         let processor_map = &self.processor.processing_systems;
         let proc = processor_map.by_id(handle).unwrap().get(handle);
+        if proc.matches_lang(lang) {
+            return proc.get_precomp_query();
+        }
         let handle = proc.get_lang_handle(lang)?;
         let proc = processor_map.by_id(handle).unwrap().get(handle);
         proc.get_precomp_query()

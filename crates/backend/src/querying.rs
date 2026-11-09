@@ -616,14 +616,15 @@ fn aux_opt128<T>(
 ) -> Option<T> {
     let pos = hyperast::position::structural_pos::CursorWithPersistence::new(code);
     let cursor = hyperast_tsquery::hyperast_opt::TreeCursor::new(stores, pos);
-    let qcursor = query.matches(cursor);
-    for m in qcursor {
+    let mut qcursor = query.matches(cursor);
+    while let Some(m) = qcursor.next() {
         let i = m.pattern_index;
         let i = query.enabled_pattern_index(i).unwrap();
         if let Some(value) = ex(i as usize) {
             return Some(value);
         }
     }
+    log::trace!("query cursor status_count: {}", qcursor.status_count);
     None
 }
 

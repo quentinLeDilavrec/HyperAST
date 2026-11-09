@@ -235,6 +235,7 @@ impl PreProcessedRepositories {
             RepoConfig::Any => {
                 let t = crate::processors::file_sys::Parameter {
                     cpp_handle: CppProc::default_handle(processor_map),
+                    c_handle: CProc::default_handle(processor_map),
                     rust_handle: RustProc::default_handle(processor_map),
                     java_handle: JavaProc::default_handle(processor_map),
                     python_handle: PythonProc::default_handle(processor_map),

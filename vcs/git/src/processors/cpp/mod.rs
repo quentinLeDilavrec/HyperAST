@@ -1,5 +1,5 @@
-//! Handles C++
-
+//! Handles C++ processing
+//!
 mod caches;
 mod commit_proc;
 mod impls;
@@ -30,6 +30,7 @@ pub struct Parameter {
 
 pub(crate) type CppProcessorHolder = crate::processing::ProcessorHolder<CppProc>;
 
+pub type Proc = CppProc;
 pub struct CppProc {
     parameter: Parameter,
     query: Option<crate::processors::Query>,
@@ -70,6 +71,13 @@ impl CppProc {
         let t = crate::processors::cpp::Parameter::default();
         let h = pr.commit_proc_mut::<CppProcessorHolder>();
         h.register_param(t)
+    }
+
+    pub fn matches_lang(lang: &str) -> bool {
+        lang.eq_ignore_ascii_case("cpp")
+    }
+    pub fn matches_file_name(name: &ObjectName) -> bool {
+        name.ends_with(".cpp")
     }
 }
 

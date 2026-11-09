@@ -132,7 +132,7 @@ pub struct ParametrizedProcessorHandle<T>(ConfigParametersHandle, std::marker::P
 
 use ParametrizedProcessorHandle as PPHandle;
 
-impl<T> std::fmt::Debug for ParametrizedProcessorHandle<T> {
+impl<T> std::fmt::Debug for PPHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("PPHandle")
             .field(&self.0)

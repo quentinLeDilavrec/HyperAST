@@ -31,6 +31,9 @@ pub struct PreProcessedRepository {
 
 type SimpleStores = hyperast::store::SimpleStores<crate::TStore>;
 
+/// An HyperAST associated with erased processors.
+///
+/// Processor can be nested, parametrized, and hold caches.
 #[derive(Default)]
 pub struct RepositoryProcessor {
     pub main_stores: SimpleStores,
@@ -38,6 +41,7 @@ pub struct RepositoryProcessor {
     pub parsing_time: Duration,
     pub processing_time: Duration,
 }
+
 // NOTE what about making a constraints between sys processors
 // it should be a 1..n relation so it must be impl on the target
 // Examples:
@@ -113,6 +117,7 @@ impl PreProcessedRepository {
         self.processor.child_by_type(d, t)
     }
 }
+
 impl RepositoryProcessor {
     /// If `before` and `after` are unrelated then only one commit will be processed.
     #[cfg(feature = "impact")]

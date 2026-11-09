@@ -1,5 +1,5 @@
-//! Handles Java
-
+//! Handles Java processing
+//!
 pub mod caches;
 mod commit_proc;
 mod parameters;
@@ -28,6 +28,7 @@ type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
 use super::FullNode;
 use super::PrecompQueries;
 
+pub type Proc = JavaProc;
 pub struct JavaProc {
     pub(crate) parameter: Parameter,
     pub height_counts: Vec<u32>,

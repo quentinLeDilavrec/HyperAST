@@ -162,7 +162,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "cpp")]
-        if crate::processors::cpp::selection::matches(&name) {
+        if crate::processors::cpp::Proc::matches_file_name(name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let repo = self.repository;
             let p = self.handles.cpp_handle;
@@ -172,8 +172,19 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             parent.push(name, full_node);
             return Ok(());
         }
+        #[cfg(feature = "c")]
+        if crate::processors::c::Proc::matches_file_name(name) {
+            let parent = &mut self.stack.last_mut().unwrap().acc;
+            let repo = self.repository;
+            let p = self.handles.c_handle;
+            let full_node = self.prepro.handle_c_blob(oid, name, repo, p)?;
+            let name = self.prepro.intern_object_name(name);
+            assert!(!parent.primary.children_names.contains(&name));
+            parent.push(name, full_node);
+            return Ok(());
+        }
         #[cfg(feature = "java")]
-        if crate::processors::java::selection::matches(&name) {
+        if crate::processors::java::Proc::matches_file_name(name) {
             let w = &mut self.stack.last_mut().unwrap().acc;
             let repo = self.repository;
             let p = self.handles.java_handle;
@@ -184,7 +195,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "python")]
-        if crate::processors::python::file_sys::matches(&name) {
+        if crate::processors::python::Proc::matches_file_name(name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let repo = self.repository;
             let p = self.handles.python_handle;
@@ -195,7 +206,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "typescript")]
-        if crate::processors::typescript::file_sys::matches(&name) {
+        if crate::processors::typescript::Proc::matches_file_name(name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let repo = self.repository;
             let p = self.handles.typescript_handle;
@@ -206,7 +217,7 @@ impl<'a, 'b, 'c, const RMS: bool, const FFWD: bool>
             return Ok(());
         }
         #[cfg(feature = "rust")]
-        if crate::processors::rust::file_sys::matches(&name) {
+        if crate::processors::rust::Proc::matches_file_name(name) {
             let parent = &mut self.stack.last_mut().unwrap().acc;
             let repo = self.repository;
             let p = self.handles.rust_handle;

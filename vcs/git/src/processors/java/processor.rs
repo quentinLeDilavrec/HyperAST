@@ -360,6 +360,14 @@ fn make(acc: JavaAcc, stores: &mut SimpleStores, java_proc: &mut JavaProc) -> su
 }
 
 impl JavaProc {
+    pub fn matches_lang(lang: &str) -> bool {
+        lang.eq_ignore_ascii_case("java")
+    }
+
+    pub fn matches_file_name(name: &crate::processing::ObjectName) -> bool {
+        name.ends_with(".java")
+    }
+
     pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PPHandle<Self> {
         type JavaProcessorHolder = crate::processing::ProcessorHolder<JavaProc>;
         let t = crate::processors::java::Parameter::default();

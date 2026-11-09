@@ -19,7 +19,7 @@ pub fn resolve_language(language: &str) -> Option<tree_sitter::Language> {
     }
 }
 
-pub(crate) enum ParseErr {
+pub enum ParseErr {
     NotUtf8(std::str::Utf8Error),
     IllFormed,
 }
@@ -43,6 +43,28 @@ pub(crate) struct FailedParsing<D = std::time::Duration> {
     pub parsing_time: D,
     pub tree: tree_sitter::Tree,
     pub error: &'static str,
+}
+
+impl std::fmt::Display for FailedParsing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FailedParsing after {}ms: {}",
+            self.parsing_time.as_millis(),
+            self.error
+        )
+    }
+}
+impl std::fmt::Debug for FailedParsing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FailedParsing after {}ms: {}\n------sexp------\n{}\n----------------",
+            self.parsing_time.as_millis(),
+            self.error,
+            self.tree.root_node().to_sexp()
+        )
+    }
 }
 
 impl From<FailedParsing> for ParseErr {

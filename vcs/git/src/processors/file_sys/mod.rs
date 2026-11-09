@@ -1,5 +1,5 @@
 //! Handles raw directory structure, ignoring build systems
-
+//!
 mod caches;
 mod commit_proc;
 mod processor;
@@ -31,6 +31,8 @@ pub(crate) struct FileSysProc {
 pub struct Parameter {
     #[cfg(feature = "cpp")]
     pub(crate) cpp_handle: PPHandle<super::cpp::CppProc>,
+    #[cfg(feature = "c")]
+    pub(crate) c_handle: PPHandle<super::c::CProc>,
     #[cfg(feature = "java")]
     pub(crate) java_handle: PPHandle<super::java::JavaProc>,
     #[cfg(feature = "python")]
@@ -85,25 +87,22 @@ impl hyperast::tree_gen::Accumulator for FileSysAcc {
 
 impl crate::preprocessed::RepositoryProcessor {
     pub fn default_config(&mut self) -> PCPHandle {
-        use crate::processors::cpp::CppProc;
-        use crate::processors::java::JavaProc;
-        use crate::processors::python::PythonProc;
-        use crate::processors::rust::RustProc;
-        use crate::processors::typescript::TypescriptProc;
-        let processor_map = &mut self.processing_systems;
+        let pmap = &mut self.processing_systems;
         let t = crate::processors::file_sys::Parameter {
             #[cfg(feature = "cpp")]
-            cpp_handle: CppProc::default_handle(processor_map),
+            cpp_handle: crate::processors::cpp::Proc::default_handle(pmap),
+            #[cfg(feature = "c")]
+            c_handle: crate::processors::c::Proc::default_handle(pmap),
             #[cfg(feature = "java")]
-            java_handle: JavaProc::default_handle(processor_map),
+            java_handle: crate::processors::java::Proc::default_handle(pmap),
             #[cfg(feature = "python")]
-            python_handle: PythonProc::default_handle(processor_map),
+            python_handle: crate::processors::python::Proc::default_handle(pmap),
             #[cfg(feature = "typescript")]
-            typescript_handle: TypescriptProc::default_handle(processor_map),
+            typescript_handle: crate::processors::typescript::Proc::default_handle(pmap),
             #[cfg(feature = "rust")]
-            rust_handle: RustProc::default_handle(processor_map),
+            rust_handle: crate::processors::rust::Proc::default_handle(pmap),
         };
-        let holder = processor_map.commit_proc_mut::<FileSysProcessorHolder>();
+        let holder = pmap.commit_proc_mut::<FileSysProcessorHolder>();
         holder.register_param(t).erase()
     }
 }

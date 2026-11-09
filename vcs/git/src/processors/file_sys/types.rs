@@ -232,6 +232,14 @@ impl TsEnabledTS for TStore {
         // NOTE could provide one though
         panic!("no specific file type at the file system level")
     }
+
+    fn directory() -> Self::Ty2 {
+        Type::Directory
+    }
+
+    fn language() -> tree_sitter::Language {
+        panic!("no specific language at the file system level")
+    }
 }
 
 impl Lang {

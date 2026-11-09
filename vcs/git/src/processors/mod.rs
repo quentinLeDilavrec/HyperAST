@@ -1,3 +1,4 @@
+use hyperast::store::defaults::LabelIdentifier as FileNameIdentifier;
 use hyperast::tree_gen::extra_pattern_precomp::PrecompQueries;
 
 // # languages
@@ -22,6 +23,9 @@ pub mod maven;
 
 #[cfg(feature = "file_sys")]
 pub mod file_sys;
+
+mod simple_helpers;
+use simple_helpers::{SimpleProc, SimpleProcParam, SimpleProcessor};
 
 #[derive(Clone, Debug)]
 pub struct FullNode {

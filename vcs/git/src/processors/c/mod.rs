@@ -1,16 +1,11 @@
-//! Handles C
-
+//! Handles C processing
+//!
 mod caches;
 mod commit_proc;
 mod impls;
 mod processor;
-pub mod selection;
 
-use hyperast::store::defaults::LabelIdentifier;
-
-use crate::Accumulator;
-use crate::DirPrimary;
-use crate::processing::ParametrizedProcessorHandle as PPHandle;
+use hyperast_gen_ts_c::TStore;
 
 pub type SimpleStores = hyperast::store::SimpleStores<hyperast_gen_ts_c::TStore>;
 
@@ -24,45 +19,46 @@ pub struct Parameter {
 
 pub(crate) type CProcessorHolder = crate::processing::ProcessorHolder<CProc>;
 
-pub struct CProc {
-    parameter: Parameter,
-    query: Option<crate::processors::Query>,
-    cache: caches::CCache,
-    commits: crate::processing::caches::OidMap<crate::Commit>,
-}
+pub(crate) type Proc = super::SimpleProc<Parameter, TStore>;
+pub type CProc = Proc;
 
-pub struct CAcc {
-    pub(crate) primary: DirPrimary,
-    pub(crate) precomp_queries: PrecompQueries,
-}
+impl super::SimpleProcParam for Parameter {
+    fn query(&self) -> Option<crate::processors::Query> {
+        self.query.as_ref().map(|q| {
+            use hyperast_tsquery::ArrayStr;
+            crate::processors::Query::new(q.iter(), <Parameter>::ts_language())
+        })
+    }
 
-impl Accumulator for CAcc {
-    type Unlabeled = FullNode;
-}
+    fn ts_language() -> tree_sitter::Language {
+        Parameter::ts_language()
+    }
 
-impl hyperast::tree_gen::Accumulator for CAcc {
-    type Node = (LabelIdentifier, FullNode);
-    fn push(&mut self, (name, full_node): Self::Node) {
-        self.primary.push(name, full_node.id, full_node.metrics);
-        self.precomp_queries += full_node.precomp_queries;
+    fn matches_file_name(name: &crate::processing::ObjectName) -> bool {
+        name.ends_with(".c") || name.ends_with(".h")
+    }
+
+    fn matches_lang(lang: &str) -> bool {
+        lang.eq_ignore_ascii_case("c")
     }
 }
 
-impl CAcc {
-    pub(crate) fn push(&mut self, name: LabelIdentifier, full_node: impl Into<FullNode>) {
-        let full_node = full_node.into();
-        self.primary.push(name, full_node.id, full_node.metrics);
-        self.precomp_queries += full_node.precomp_queries;
+impl PartialEq<CProc> for Parameter {
+    fn eq(&self, other: &CProc) -> bool {
+        self == &other.parameter
     }
 }
 
-impl CProc {
-    pub fn default_handle(pr: &mut crate::processing::erased::ProcessorMap) -> PPHandle<Self> {
-        type CProcessorHolder = crate::processing::ProcessorHolder<CProc>;
-        let t = crate::processors::c::Parameter::default();
-        let h = pr.commit_proc_mut::<CProcessorHolder>();
-        h.register_param(t)
+impl Parameter {
+    pub(crate) fn new(query: impl hyperast_tsquery::ArrayStr) -> Self {
+        Self {
+            query: Some(query.iter().collect()),
+        }
+    }
+
+    pub(crate) fn ts_language() -> tree_sitter::Language {
+        hyperast_gen_ts_rust::language()
     }
 }
 
-use super::handle_file_ts_simp as handle_c_file;
+pub(crate) type Acc = super::simple_helpers::SimpleAcc;

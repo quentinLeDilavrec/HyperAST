@@ -80,15 +80,18 @@ impl crate::processing::erased::CommitProc for FileSysProc {
     }
 
     fn get_lang_handle(&self, lang: &str) -> Option<PCPHandle> {
-        if lang.eq_ignore_ascii_case("cpp") {
+        use crate::processors;
+        if processors::cpp::CppProc::matches_lang(lang) {
             Some(self.parameter.cpp_handle.erase())
-        } else if lang.eq_ignore_ascii_case("java") {
+        } else if processors::c::CProc::matches_lang(lang) {
+            Some(self.parameter.c_handle.erase())
+        } else if processors::java::JavaProc::matches_lang(lang) {
             Some(self.parameter.java_handle.erase())
-        } else if lang.eq_ignore_ascii_case("python") {
+        } else if processors::python::PythonProc::matches_lang(lang) {
             Some(self.parameter.python_handle.erase())
-        } else if lang.eq_ignore_ascii_case("rust") {
+        } else if processors::rust::RustProc::matches_lang(lang) {
             Some(self.parameter.rust_handle.erase())
-        } else if lang.eq_ignore_ascii_case("typescript") {
+        } else if processors::typescript::TypescriptProc::matches_lang(lang) {
             Some(self.parameter.typescript_handle.erase())
         } else {
             None

@@ -677,6 +677,8 @@ where
     fn error() -> Self::Ty2;
     fn spaces() -> Self::Ty2;
     fn file() -> Self::Ty2;
+    fn directory() -> Self::Ty2;
+    fn language() -> tree_sitter::Language;
 }
 
 #[cfg(feature = "ts_type")]

@@ -42,6 +42,14 @@ impl TsEnabledTS for TStore {
     fn file() -> Type {
         Type::TranslationUnit
     }
+
+    fn directory() -> Type {
+        Type::Directory
+    }
+
+    fn language() -> tree_sitter::Language {
+        crate::language()
+    }
 }
 
 impl TypeStore for TStore {

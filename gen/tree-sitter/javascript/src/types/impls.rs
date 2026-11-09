@@ -40,6 +40,14 @@ impl TsEnabledTS for TStore {
     fn file() -> Type {
         Type::Program
     }
+
+    fn directory() -> Type {
+        Type::Directory
+    }
+
+    fn language() -> tree_sitter::Language {
+        crate::language()
+    }
 }
 
 impl hyperast::types::ETypeStore for TStore {
